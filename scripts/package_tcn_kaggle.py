@@ -30,15 +30,18 @@ def collect(plan_path):
     paths.append(ROOT / "scripts/train_tcn_kaggle.py")
     if plan.get("cloud_driver"):
         if plan["cloud_driver"] not in {"train_tcn_validated.py", "train_tcn_ranked.py",
-                                         "train_tcn_listwise.py"}:
+                                         "train_tcn_listwise.py", "train_tcn_ranked_gate.py"}:
             raise ValueError("Cloud driver is not allowlisted")
         paths.append(ROOT / "scripts" / plan["cloud_driver"])
         if plan["cloud_driver"] == "train_tcn_validated.py":
             paths.append(ROOT / "src/agentic_alpha_lab/models/temporal_validation.py")
         elif plan["cloud_driver"] == "train_tcn_ranked.py":
             paths.append(ROOT / "src/agentic_alpha_lab/models/ranked_loss.py")
-        else:
+        elif plan["cloud_driver"] == "train_tcn_listwise.py":
             paths.append(ROOT / "src/agentic_alpha_lab/models/listwise_loss.py")
+        else:
+            paths.append(ROOT / "src/agentic_alpha_lab/models/ranked_loss.py")
+            paths.append(ROOT / "src/agentic_alpha_lab/models/ranked_gate_loss.py")
     for path in paths:
         if not path.resolve().is_relative_to(ROOT) or not path.is_file() or path.is_symlink():
             raise ValueError(f"Unsafe/missing bundle member: {path.name}")

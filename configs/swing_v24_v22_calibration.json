@@ -1,0 +1,16 @@
+{
+  "experiment": "v24-v22-causal-calibration",
+  "source": "artifacts/kaggle/v22_download/tcn-training",
+  "replay_audit": "artifacts/research/v22_local_audit/audit.json",
+  "dataset": "data/processed/swing_regime_research_v4",
+  "parent_plan": "configs/swing_v15_continuous_folds.json",
+  "seeds": [1729, 1730, 1731],
+  "penalty": 0.0,
+  "windows_previous_quarters": [1, 2, 4, 0],
+  "exposures": [1.0, 0.5],
+  "embargo_days": 8,
+  "warmup": "WAIT until at least50 eligible out-of-sample decision rows exist",
+  "hypothesis": "V22 pairwise ranking produced positive but poorly calibrated selection. Fit monotone score maps only from earlier mature-label fold histories, with an 8-day embargo, and compare identity plus fixed 1/2/4/all-quarter windows. This is a calibration probe, not a threshold search or independent test.",
+  "target": "Calendar-geometric5%monthly net and global drawdown <=20% after normal fee, fee-stress and execution-stress scenarios; no live approval.",
+  "registration": "All mappings and windows fixed before this probe; all opened historical dates remain development data. Preserve every result and do not select a favorable window retrospectively."
+}
