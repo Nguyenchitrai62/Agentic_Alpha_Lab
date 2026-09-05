@@ -1,0 +1,35 @@
+[build-system]
+requires = ["setuptools>=69", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "agentic-alpha-lab"
+version = "0.1.0"
+description = "Leakage-aware agentic research lab for crypto forecasting and trading signals."
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+  "numpy==1.26.4",
+  "pandas==2.2.2",
+  "einops==0.8.1",
+  "huggingface_hub==0.33.1",
+  "matplotlib==3.9.3",
+  "tqdm==4.67.1",
+  "safetensors==0.6.2",
+  "PyYAML==6.0.2",
+  "requests==2.32.5",
+  "pyarrow==18.1.0",
+  "scikit-learn==1.5.2",
+]
+
+[project.optional-dependencies]
+dev = ["pytest==8.3.4"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+addopts = "-q"
+pythonpath = ["src"]
+testpaths = ["tests"]
+

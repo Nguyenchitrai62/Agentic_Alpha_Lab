@@ -1,0 +1,38 @@
+data:
+  market: binance_usdm
+  symbol: BTCUSDT
+  interval: 5m
+  days: 30
+  path: data/raw/binance_usdm/BTCUSDT/5m/klines.parquet
+
+kronos:
+  repo_path: ../Kronos
+  variants: [mini, small, base]
+  device: cuda:0
+  lookback: 512
+  horizon: 12
+  temperature: 0.6
+  top_k: 1
+  top_p: 1.0
+  sample_count: 1
+
+signal:
+  # Round-trip fee is 4 bps; the initial research gate adds a conservative buffer.
+  threshold_bps: 12.0
+  atr_window: 14
+  entry_limit_offset_bps: 0.0
+  entry_expiry_bars: 1
+  stop_atr: 1.25
+  tp1_atr: 1.0
+  tp2_atr: 2.0
+  tp1_fraction: 0.5
+
+backtest:
+  initial_equity: 10000.0
+  leverage: 1.0
+  fee_rate_per_fill: 0.0002
+  funding_long_rate: 0.0001
+  funding_short_rate: 0.0
+  funding_interval_hours: 8
+  max_holding_bars: 12
+  intrabar_policy: stop_first
