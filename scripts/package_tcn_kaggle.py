@@ -29,10 +29,13 @@ def collect(plan_path):
     paths += [p for p in (ROOT / "src/agentic_alpha_lab/__init__.py", ROOT / "src/agentic_alpha_lab/models/__init__.py") if p.exists()]
     paths.append(ROOT / "scripts/train_tcn_kaggle.py")
     if plan.get("cloud_driver"):
-        if plan["cloud_driver"] != "train_tcn_validated.py":
+        if plan["cloud_driver"] not in {"train_tcn_validated.py", "train_tcn_ranked.py"}:
             raise ValueError("Cloud driver is not allowlisted")
-        paths += [ROOT / "scripts/train_tcn_validated.py",
-                  ROOT / "src/agentic_alpha_lab/models/temporal_validation.py"]
+        paths.append(ROOT / "scripts" / plan["cloud_driver"])
+        if plan["cloud_driver"] == "train_tcn_validated.py":
+            paths.append(ROOT / "src/agentic_alpha_lab/models/temporal_validation.py")
+        else:
+            paths.append(ROOT / "src/agentic_alpha_lab/models/ranked_loss.py")
     for path in paths:
         if not path.resolve().is_relative_to(ROOT) or not path.is_file() or path.is_symlink():
             raise ValueError(f"Unsafe/missing bundle member: {path.name}")
@@ -63,7 +66,7 @@ def main(a):
             z.write(path, path.relative_to(ROOT).as_posix())
         z.writestr("bundle-hashes.json", json.dumps(hashes, indent=2))
     dataset_id = f"{a.owner}/{a.slug}-data"
-    dm = {"id": dataset_id, "title": a.slug + " private training data", "licenses": [{"name": "other"}],
+    dm = {"id": dataset_id, "title": a.slug + " data", "licenses": [{"name": "other"}],
           "description": "Private BTC research snapshot and allowlisted training code. No credentials. Opened development periods only."}
     (dataset / "dataset-metadata.json").write_text(json.dumps(dm, indent=2))
     shutil.copy2(ROOT / "scripts/kaggle_tcn_bootstrap.py", kernel / "train.py")

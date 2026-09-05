@@ -2,6 +2,12 @@
 
 ## Latest verified state
 
+FINAL2026-09-06: v21 COMPLETE. All33 nested-selection/refit models finished,
+full local replay and policy parity passed, and the continuous portfolio failed
+the user target. Read RESEARCH_V21_RESULTS.md for the authoritative table.
+Mean1x normal−33.684%/DD40.327%/22fills; mean−std0.5x normal−14.583%/
+DD14.837%/10fills. The older LIVE/RUNNING paragraphs below are historical.
+
 FIRST REFITS SAVED: fold0seeds1729/1730 both selectedepoch1 after5nonimproving
 validationepochs, scratchrefit completed and reportedstatecomplete/GPUparitypass.
 Atleast2/33finalcheckpoints saved; nextinnerselectionjobs observed. Still noPnL.

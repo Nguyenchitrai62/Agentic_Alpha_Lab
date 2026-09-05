@@ -2,6 +2,11 @@
 
 ## Current verified state
 
+CURRENT2026-09-06: v21 is complete and failed the target; v22 ranked-loss TCN
+kernel `nguynchtrai/btc-swing-v22-ranked-20260906` version1 is running. Do not
+resubmit v22. After completion, download/audit all33 models and run the single
+continuous portfolio. See RESEARCH_V21_RESULTS.md for v21 evidence.
+
 FINAL2026-09-06: Full local audit PASSED; continuousv19 andall10v20calibration
 branches COMPLETE and FAIL usertarget. Read RESEARCH_V19_V20_RESULTS.md for full
 table/provenance. Mean1x−40.984%net/DD59.824%;mean−std1x−47.642%/DD62.605%.

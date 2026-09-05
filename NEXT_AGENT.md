@@ -1,15 +1,19 @@
 # Handoff for the next coding agent
 
-V21 RUNTIME VERIFIED: live logs show2TeslaT4,torch2.10.0+cu128,bothworkers
-inner_selection epochs1–4. Firstfold selects1 sofar asvalidationlossrises while
-trainlossfalls. Cloudjobhealthy; waitforall33finalrefits, do notresubmit.
+V22 RUNNING: private Kaggle kernel `nguynchtrai/btc-swing-v22-ranked-20260906`
+version1 was submitted once after full tests/package checks. Poll status/logs; do
+not resubmit. On COMPLETE download to a new ignored `artifacts/kaggle/v22_download`
+directory, run full audit with the existing TCN gate, then one-state continuous
+portfolio. v21 is complete and failed; read `RESEARCH_V21_RESULTS.md`.
 
-CURRENT v21 CLOUD RUNNING: nguynchtrai/btc-swing-v21-val-20260906 version1
-submitted successfully. Read RESEARCH_V21_STATUS.md FIRST.131tests pass;
-privateT4request,29hfreequota beforejob,actualGPU/epochverificationpending.
-V19/V20 completefailed; detailedresults in RESEARCH_V19_V20_RESULTS.md.
-Do not resubmit v21; monitorlive logs then downloadfull inner+finalweights (~6.4GB),
-audit local withv21plan andruncontinuousportfolio. Older no-kernel notes superseded.
+V21 COMPLETE: all33 nested-validation refits, local replay and policy parity
+passed, but mean1x net−33.684%/DD40.327%/22 fills and mean−std0.5x net−14.583%
+/DD14.837%/10 fills. No target or deployment approval.
+
+HISTORICAL v21 RUNNING NOTE: v21 is complete; read RESEARCH_V21_RESULTS.md for
+the full audit/portfolio failure. Do not resubmit it or use the older pending
+instructions below. V19/V20 completefailed; detailedresults in
+RESEARCH_V19_V20_RESULTS.md.
 
 LATEST RESULTS: v19fullaudit PASSED;v19baseline andv20calibration COMPLETE/FAILED.
 Read RESEARCH_V19_V20_RESULTS.md. v19mean1x−40.98%/DD59.82%;allv20normalnets

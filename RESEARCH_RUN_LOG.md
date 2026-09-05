@@ -1,5 +1,20 @@
 # BTC research ledger
 
+V21 COMPLETE2026-09-06: nested180day validation/refit kernel finished with33/33
+models, full local replay/policy audit passed (max error2.861e-6), then failed
+continuous acceptance. Mean1x normal−33.684%/DD40.327%/22fills; fee stress
+−34.722%/DD41.142%; execution stress−38.984%/DD46.037%. Mean−std0.5x had
+−14.583% normal/−14.925% execution,DD15.178%,10fills. Forecast diagnostic
+MSE8.4876 vs constant8.3653,fill Brier.2133 vs.1956,rankcorr.0261. Full
+provenance inRESEARCH_V21_RESULTS.md; no deployment or leverage.
+
+V22 REGISTERED2026-09-06: ranked TCN utility hypothesis packaged and submitted
+once to private Kaggle kernel `nguynchtrai/btc-swing-v22-ranked-20260906`,
+version1. Keep polling this job; do not resubmit. It keeps causal5-frame TCN+
+attention/export audit but uses width256/tcn_width64/4attention layers, fixed8
+epochs, Huber payoff loss plus fixed pairwise candidate ranking against WAIT.
+Full pytest passed before upload; quota was28.74h. Evaluation remains local.
+
 USER-IDEA DIAGNOSTIC2026-09-06: see RESEARCH_USER_IDEAS_20260906.md. Currentv19
 SL/TP1minimum~2%,median3.93%;minimum.5/1%constraintchangeszeroorders. Fees+funding
 6.77points vsnetloss40.98points: primarylossnotfees. Replayedoppositeside with

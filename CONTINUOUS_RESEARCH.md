@@ -1,11 +1,18 @@
 # Continuous BTC research — active
 
-V21 LIVE VERIFIED:2TeslaT4 andbothinner-validationworkers active; firstfold
-selects1sofar,validationlossrisesafterfirstepoch. No finalresults; do notresubmit.
+V22 LIVE SUBMITTED2026-09-06: private kernel
+`nguynchtrai/btc-swing-v22-ranked-20260906` version1 is RUNNING after one
+successful push; dataset READY. Do not resubmit. It uses registered ranked-loss
+and reduced-capacity TCN config `configs/swing_v22_ranked_tcn.json`; wait for
+COMPLETE, then download, audit every33model and run one continuous portfolio.
 
-CURRENT v21 CLOUD RUNNING: nguynchtrai/btc-swing-v21-val-20260906 version1
-submittedprivateT4job.131testspass. Read RESEARCH_V21_STATUS.md forcontinuation;
-do notresubmit. V19/V20finishedfailed; no acceptedtradingmodelyet.
+V21 COMPLETE2026-09-06: full audit passed but continuous net/drawdown/fill gate
+failed. Read RESEARCH_V21_RESULTS.md. No target met; v22 is the next hypothesis.
+
+HISTORICAL v21 RUNNING NOTE: the v21 kernel is now COMPLETE and its local audit
+and continuous portfolio are recorded in RESEARCH_V21_RESULTS.md. Do not treat
+the older running/submission paragraphs below as current state. V19/V20 also
+finished failed; no accepted trading model exists.
 
 LATEST: v19/v20 finished and FAILED. Read RESEARCH_V19_V20_RESULTS.md;fullaudit
 passed butmean1x−40.98%/DD59.82%,allcalibratednormalnetsnegative. v21nested
