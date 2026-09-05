@@ -23,6 +23,8 @@ modified from this project.
 - Limit entry begins on the next candle and expires after the configured number of bars.
 - Fee is `0.0002` per entry/exit fill (0.04% round trip).
 - Long funding is `0.0001` every 8 hours; short funding is zero by user assumption.
+- Capital is compounded from current equity and reported with initial capital indexed to 100.
+- Keep fixed 1x as the baseline; report confidence-based leverage separately and cap it at 2x until validated.
 - When stop and take-profit are both touched inside one OHLC bar, use stop-first.
 - Do not claim maker fill probability or queue position from OHLC alone.
 

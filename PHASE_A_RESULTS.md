@@ -25,13 +25,14 @@ One window cannot rank model quality; this only verifies execution and resource 
 ## One-hour forecast/bracket smoke comparison
 
 Same 256 windows, 15-minute decision stride, 12-bar horizon, 12 bps forecast gate,
-1x notional, 0.04% per fill, long funding 0.01%/8h, short funding zero.
+1x notional, 0.02% per fill (0.04% round trip), long funding 0.01%/8h,
+short funding zero.
 
 | Model | Direction accuracy at coverage | Trades | Gross PnL | Fees + funding | Net return |
 |---|---:|---:|---:|---:|---:|
-| mini | 51.8% | 51 | +62.46 | 404.47 | -3.42% |
-| small | 50.9% | 54 | +48.22 | 427.57 | -3.79% |
-| base | 52.3% | 52 | -76.65 | 407.53 | -4.84% |
+| mini | 51.8% | 51 | +61.94 | 204.77 | -1.43% |
+| small | 50.9% | 54 | +48.37 | 217.53 | -1.69% |
+| base | 52.3% | 52 | -77.16 | 206.83 | -2.84% |
 
 ## Longer mini runs
 
@@ -40,21 +41,29 @@ Same 256 windows, 15-minute decision stride, 12-bar horizon, 12 bps forecast gat
 - 2,706 rolling windows over roughly 28 days.
 - 755 actionable forecasts at a 12 bps gate; 400 non-overlapping filled trades.
 - Direction accuracy at coverage: 54.17%.
-- Gross PnL: +145.04; fees: 2,772.53; funding: 4.66.
-- Net return: **-26.32%**.
+- Gross PnL: +149.38; fees: 1,497.13; funding: 5.08.
+- Net return: **-13.53%**; capital index 100 became 86.47.
 
 The raw sign forecast showed a small positive gross result, but turnover made it unusable.
 
 ### Four-hour horizon
 
 - 674 rolling windows, one decision per hour, 48-bar horizon.
-- The full-sample 40 bps gate appeared profitable (+0.80%), but this was selected on the same sample.
+- The full-sample 30 bps gate appeared profitable (+2.66%), but this was selected on the same sample.
 - A chronological validation/test audit selected 30 bps on the first half:
-  - validation: +0.74%, 27 trades;
-  - embargoed second half: **-1.61%**, 34 trades, profit factor 0.74;
+  - validation: +1.83%, 27 trades, profit factor 1.43;
+  - embargoed second half: **-0.26%**, 34 trades, profit factor 0.95;
   - direction accuracy fell from 65.7% to 46.2%.
 
 Therefore no zero-shot configuration tested in Phase A passes an out-of-sample acceptance gate.
+
+### Leverage experiment
+
+An exploratory strength-based policy used 1x normally, 1.5x when the absolute
+forecast was at least twice the signal threshold, and 2x at four times the threshold.
+On the same full sample it returned +2.34% with -3.24% drawdown versus +2.66% and
+-2.97% at fixed 1x. Forecast magnitude is not calibrated confidence, and leverage
+made both return and drawdown worse; it remains disabled by default.
 
 ### Passive BTC comparison
 
@@ -65,21 +74,24 @@ bullish and the tested Kronos signal/execution combinations failed to preserve t
 
 ## Latest uncalibrated observation
 
-At 2026-09-05 07:34:59.999 UTC for the next 12 five-minute bars:
+The latest probabilistic Kronos-mini snapshot uses 16 paths per timeframe:
 
-- mini: WAIT at the 12 bps gate;
-- small: SHORT;
-- base: SHORT.
+- 5m → 1h: WAIT, 50.0% upside probability;
+- 15m → 4h: LONG, 62.5%;
+- 1h → 24h: LONG, 93.8%;
+- 4h → 72h: LONG, 100.0%;
+- weighted view: LONG, 85.625% upside probability.
 
 This is saved only to demonstrate the live-data interface. It must not be treated as an executable signal.
-Small and base produced the same decoded endpoint in this run, so their matching
-votes are correlated evidence rather than two independent confirmations.
+The sampled percentages are not calibrated probabilities and the combined
+multi-timeframe rule has not passed a locked test.
 
 ## Current simulator limitations
 
-- Maximum drawdown is computed from closed-trade equity, not intratrade mark-to-market equity.
+- Maximum drawdown is now sampled from mark-to-market equity during each held trade.
 - OHLC bars cannot represent exchange queue priority or the probability that a touched limit fills.
-- Slippage, liquidation, maintenance margin, latency, and variable historical funding are not modeled yet.
+- Approximate isolated liquidation is modeled, but true mark price, risk tiers, latency,
+  and historical variable funding are not modeled yet.
 - Funding is the fixed scenario requested here, not Binance's historical realized funding series.
 
 ## Next research step

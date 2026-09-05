@@ -1,5 +1,8 @@
 # Agentic Alpha Lab
 
+> Coding agent mới hoặc một máy vừa clone repo: đọc
+> [`NEXT_AGENT.md`](NEXT_AGENT.md) trước khi cài đặt hay chạy thí nghiệm.
+
 Môi trường nghiên cứu leakage-aware cho BTC futures: dữ liệu Binance USD-M,
 Kronos zero-shot, chuyển forecast thành signal, backtest limit-order, và sau đó
 mở rộng sang fine-tuning/agentic experiment search.
@@ -50,9 +53,10 @@ Kết quả feasibility đầu tiên được tóm tắt trong `PHASE_A_RESULTS.
 
 Artifacts sinh ra trong `artifacts/` và `reports/`; raw data không được commit.
 
-Lưu ý: drawdown hiện được tính trên equity sau mỗi lệnh đã đóng. Trước khi paper
-trade cần bổ sung mark-to-market theo từng nến, slippage, margin/liquidation và
-lịch funding lịch sử. OHLC cũng không chứng minh được vị trí hàng đợi của limit order.
+Drawdown hiện được mark-to-market theo nến trong thời gian giữ lệnh và engine đã
+có sizing/đòn bẩy cùng liquidation gần đúng. Trước khi paper trade vẫn cần dữ liệu
+mark price, lịch funding lịch sử, slippage và risk tier thật. OHLC không chứng minh
+được vị trí hàng đợi của limit order.
 
 ## Quy tắc chống look-ahead
 
