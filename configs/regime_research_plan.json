@@ -1,0 +1,23 @@
+{
+  "experiment": "swing-regime-v4",
+  "development_cutoff": "2026-03-23T00:00:00Z",
+  "reserve_holdout": ["2026-04-01T00:00:00Z", "2026-08-01T00:00:00Z"],
+  "folds": [
+    ["2024-07-01T00:00:00Z", "2024-10-01T00:00:00Z"],
+    ["2024-10-09T00:00:00Z", "2025-01-01T00:00:00Z"],
+    ["2025-06-09T00:00:00Z", "2025-09-01T00:00:00Z"],
+    ["2025-09-09T00:00:00Z", "2025-12-01T00:00:00Z"],
+    ["2025-12-09T00:00:00Z", "2026-03-23T00:00:00Z"]
+  ],
+  "models": [
+    {"kind": "extra", "n_estimators": 100, "max_depth": 8, "min_samples_leaf": 20, "max_features": 0.8},
+    {"kind": "extra", "n_estimators": 150, "max_depth": 12, "min_samples_leaf": 40, "max_features": 1.0}
+  ],
+  "regime_gates": ["none", "trend", "confirmed_reversal_or_pullback"],
+  "minimum_expected_net_percent": [0.3, 0.6],
+  "maximum_exposure": 1.0,
+  "max_drawdown": 0.2,
+  "selection": "Rank mean fold net return minus mean absolute drawdown, penalize each negative fold by5 percentage points. Reject any fold with drawdown below -20%; require at least15 fills total and at least3 positive folds.",
+  "test_rule": "One selected frozen pipeline evaluated once on reserve. Previous first holdout is now development and not independent evidence for v4.",
+  "fallback_if_no_candidate": "Do not open reserve if no configuration passes development screens. Need further data/model/execution research."
+}

@@ -1,0 +1,16 @@
+{
+  "experiment": "swing-v6-frozen-kronos-context-probe",
+  "hypothesis": "Compare whether frozen fine-tuned Kronos v5 context adds development utility beyond the same 40 raw features with the same candidate tree head.",
+  "dataset": "data/processed/kronos_swing_v5_20260905",
+  "checkpoint": "artifacts/kaggle/swing_results_v5/checkpoint",
+  "cache": "artifacts/features/swing_v5_context_20260905",
+  "branches": ["raw40", "raw40_plus_kronos_pca32"],
+  "seeds": [1729, 1730, 1731],
+  "pca_components": 32,
+  "tree": {"n_estimators": 100, "max_depth": 8, "min_samples_leaf": 20, "max_features": 0.8},
+  "policy": "Unchanged v5 policy: expected net0.3%, fill0.25, cooldown5days, max4/month, 1x. No threshold sweep.",
+  "fit_scope": "PCA/scaling and forests fitted on train only. v5 checkpoint selection already used validation, so all comparisons are development evidence, not independent tests.",
+  "decision": "Require both validation and policy positive net/stress, DD<=20%, at least15 combined fills for every seed before further validation work. This is a preliminary screen, not final live acceptance. Retain every result and do not pick only a winning seed.",
+  "cloud_training": false,
+  "live_approved": false
+}

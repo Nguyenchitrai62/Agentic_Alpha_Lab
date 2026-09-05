@@ -14,9 +14,16 @@ def resample_closed_ohlcv(
     frame["close_time"] = pd.to_datetime(frame["close_time"], utc=True)
     frame = frame.sort_values("open_time").set_index("open_time")
 
-    expected = int(pd.Timedelta(rule) / pd.Timedelta(base_interval))
-    if expected < 1:
-        raise ValueError("Target timeframe must not be shorter than the base interval")
+    ratio = pd.Timedelta(rule) / pd.Timedelta(base_interval)
+    expected = int(ratio)
+    if expected < 1 or ratio != expected:
+        raise ValueError("Target timeframe must be an integer multiple of the base interval")
+    if frame.index.has_duplicates:
+        raise ValueError("Duplicate base candles")
+    if (frame.index.asi8 % pd.Timedelta(base_interval).value != 0).any():
+        raise ValueError("Base candles are not aligned to the interval grid")
+    if (frame["close_time"].array != frame.index + pd.Timedelta(base_interval) - pd.Timedelta(milliseconds=1)).any():
+        raise ValueError("Invalid base candle close times")
 
     aggregation = {
         "open": "first",

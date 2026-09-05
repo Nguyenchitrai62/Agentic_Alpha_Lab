@@ -1,0 +1,13 @@
+{
+  "experiment":"swing-v13-patch-gru-temporal-values",
+  "parent_plan":"configs/swing_v8_walkforward.json",
+  "dataset":"data/processed/swing_regime_research_v4",
+  "cache":"artifacts/features/swing_sequences_v13_20260905",
+  "seeds":[1729,1730,1731],
+  "network":{"width":48,"dropout":0.15},
+  "training":{"epochs":16,"batch_size":64,"learning_rate":0.0003,"weight_decay":0.01,"gradient_clip":1.0},
+  "hypothesis":"v11 summaries and v12 ensembling failed. Add actual closed128-candle temporal paths in each of5frames. Encode8-candle patches and learn their order with sharedGRU; combine with40 summaries before macro/micro gating and action value head. Train all layers from scratch. Same unconditional net/fill/macroaux loss asv11, smaller fixed epoch count for sequence compute budget.",
+  "selection":"Fixed16epochs and all3seeds/eightfolds; no early-stopping on evaluation. Every seed must pass original screen before additional validation; no winning-seed choice. Save every fold weights/scaling and replay inputs.",
+  "data_rule":"Feature cache exactly matches existing5,628decision timestamps; closed-window preprocessing only. Purged730day training and8day label embargo. All periods development, not a new test.",
+  "compute":"Local GTX1650 if available, FP32,CPU2threads, no paid resources. If GPU unavailable useCPU. No new Kaggle job."
+}

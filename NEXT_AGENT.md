@@ -1,9 +1,165 @@
 # Handoff for the next coding agent
 
+V21 RUNTIME VERIFIED: live logs show2TeslaT4,torch2.10.0+cu128,bothworkers
+inner_selection epochs1–4. Firstfold selects1 sofar asvalidationlossrises while
+trainlossfalls. Cloudjobhealthy; waitforall33finalrefits, do notresubmit.
+
+CURRENT v21 CLOUD RUNNING: nguynchtrai/btc-swing-v21-val-20260906 version1
+submitted successfully. Read RESEARCH_V21_STATUS.md FIRST.131tests pass;
+privateT4request,29hfreequota beforejob,actualGPU/epochverificationpending.
+V19/V20 completefailed; detailedresults in RESEARCH_V19_V20_RESULTS.md.
+Do not resubmit v21; monitorlive logs then downloadfull inner+finalweights (~6.4GB),
+audit local withv21plan andruncontinuousportfolio. Older no-kernel notes superseded.
+
+LATEST RESULTS: v19fullaudit PASSED;v19baseline andv20calibration COMPLETE/FAILED.
+Read RESEARCH_V19_V20_RESULTS.md. v19mean1x−40.98%/DD59.82%;allv20normalnets
+negative. v21nestedvalidation implemented with separatetrainer/immutablev19base;
+privatepackage artifacts/kaggle/btc_swing_v21_20260906, datasetuploadsession67399.
+Check cloud dataset/job state before submitting. No v21kernel yet at this update.
+
+LATEST v19 DOWNLOAD COMPLETE: full export exists at artifacts/kaggle/v19_download;
+localGPU inference audit ACTIVE session28359, output artifacts/research/v19_local_audit.
+First2folds passed (~2e-6error).126tests passed. After auditpass run baseline
+continuousportfolio, diagnostics and pre-registeredv20calibration. No retraining.
+
+LATEST v19 CLOUD COMPLETE2026-09-06:33/33metadata complete, bothworkers exit0,
+GPUreloadparity allpassed (maxerror2.384e-6). Full ~3.2GBexport downloading to
+artifacts/kaggle/v19_download (session84333 at update). Do not re-train. After
+download, run audit_tcn_export then continuousportfolio; v20causalcalibration
+config pre-registered for follow-up, only after audit passes. Read V19status top.
+
+VERIFIED v19 TRAINING: live logs confirm TeslaT4x2,torch2.10.0+cu128; first3/33
+models (fold0,all3seeds) complete16epochs +checkpoint/GPUreload parity; fold1
+running. Use `kernels logs ... --follow` (bare logs may remain empty during run).
+No new backtest yet. Do not resubmit; wait for all33, download and audit locally.
+
+LATEST v19 CLOUD RUNNING2026-09-06: kernel version1 submitted successfully to
+nguynchtrai/btc-swing-v19-tcn-20260906 (private,T4request,timeout12000seconds).
+Dataset READY and all hashes verified. Initial logs empty; hardware/epochs not
+yet confirmed. Read RESEARCH_V19_STATUS.md. DO NOT submit duplicate training.
+Use `kaggle kernels logs` / status; download completed outputs then audit locally.
+Older no-submission/approval-block notes below are superseded.
+
+LATEST v19 2026-09-06: Read RESEARCH_V19_STATUS.md FIRST. TCN+attention24,106,627
+params implemented;121tests passed; private Kaggle dataset uploaded successfully.
+NO v19 kernel submitted: automatic approval review hit usage limit on status check.
+Do not bypass rejection. Resume dataset-ready check then single T4x2 submission
+when permissions recover. All older "no cloud data"/local-training notes superseded.
+Local full-forecast audit and mandatory TCN backtest gate now implemented. Use
+scripts/audit_tcn_export.py then continuous evaluator with --replay-audit; no actual
+v19 weight replay yet because the training kernel has not been submitted.
+
+LATEST2026-09-06: v18 STOPPED,8complete folds +partialfold8weights after CPU/GPU
+replay assertion. Read ARCHITECTURE_REVIEW_20260906.md and topofresearchrunlog.
+Heavy training MUST move to Kaggle CLI/freeGPUs; local machine inference/backtest.
+No new cloud job submitted. Old running-session61208 notes below are superseded.
+
+CURRENT2026-09-06: v17corrected calibration COMPLETE; v18Transformer ACTIVE
+session61208 at artifacts/research/swing_v18_transformer_20260906.3,056,451params,
+6layers,3seeds,11contiguous quarters,16epochs; same past128candles×5frames.
+Read topof RESEARCH_RUN_LOG.md and RESEARCH_20260906_CORRECTION.md before work.
+New target5%monthly geometric net,globalDD20%. No candidate meets target.110tests
+passed. v17four-quarter1x only1.715%monthly despite77.398%total in2.809years.
+
+LATEST2026-09-06: Read RESEARCH_20260906_CORRECTION.md FIRST. Target geometric
+5%monthly net,79.5856%annual,globalDD20%;deep learning preferred. v15 COMPLETE.
+Previous isotonic+41.46% result INVALID due future label leakage and quarter-reset
+cooldowns. Correct past-only calibration/global-state audit is the next task.
+
+START HERE: `RESEARCH_RUN_LOG.md` is the new compact experiment/result index.
+NEWEST: v13/v14 COMPLETE. v14temporal mean0.5x stitched development net+25.6370%,
+DD12.6895%, executionstress+17.4605%; BUT1xDD23.9068%, history has fold gaps and
+original6/8fold screen failed. No live candidate. Read the run log for full costs.
+v15 ACTIVE session94744 at `artifacts/research/swing_v15_continuous_20260905`:
+33GPUmodels,11contiguous quarters, final ONE-state portfolio automatically follows
+training. Inspect training progress and continuous/summary.json before relaunch.
+105tests pass. All24v13checkpoint full evaluation forecasts CPU-replayed.
+Current continuation completed v6 context probe (FAILED), both data caches and
+derivatives48h/72h feature construction. Old cache/download-running notes below
+are historical. v10 derivatives experiment session36977 active; exact artifact
+path/next steps in the run log. No reset credits used and no live candidate.
+
+NEWEST2026-09-05: Kronos is now OPTIONAL per user; choose any learned architecture
+by evidence. See `RESEARCH_V8_V9_RESULTS.md` and top of`CONTINUOUS_RESEARCH.md`.
+v8 shared-value and v9 four-head models both failed8-fold robustness; do not deploy
+or quote only v8's positive recent slice.90 tests pass. Existing hourly prompt
+updated to model-agnostic. Check cache50466 and new derivatives-data audit99026
+before launching anything; artifacts/data remain ignored and no live orders.
+
+LATEST: v5 finished all WAIT; v2/v5 full checkpoints downloaded and audited.
+See `CONTINUOUS_RESEARCH.md` for active local feature-cache/probe processes and
+their output paths. Do not duplicate those jobs.77 tests pass. No new live approval.
+Heartbeat13:47Z:83 tests pass after optional UTC-anchored decision-grid support.
+Future new dataset configs must pin decision_anchor_utc; see continuation log.
+
+CONTINUOUS MODE: user requested autonomous repeated research. Read
+`CONTINUOUS_RESEARCH.md` first for the active hourly continuation and next steps.
+The prior handoff below is a completed iteration, NOT completion of the objective.
+NEW v5: full-trunk candidate-interaction/ranking experiment implemented; expanded
+4448/308/752 dataset; CPU/GPU smoke and49 tests pass. Kaggle private kernel
+`nguynchtrai/kronos-btc-swing-v5-20260905` version1 submitted; inspect before any
+new run. Do not confuse smoke output with full training performance.
+
+LATEST — 2026-09-05: read `RESEARCH_V4_RESULTS.md` first, then `SWING_TRAINING.md`.
+Kaggle full-trunk Kronos-base v2 is COMPLETE, not running: all WAIT on development.
+Its reports/predictions are downloaded; full weights have NOT been downloaded.
+Tree v3 first historical holdout FAILED: -14.7835%, DD23.215%,9 fills.
+Extended BTC data to Jan2022; v4 searched12 configurations across5 purged walk-forward
+folds, froze one pipeline, then opened the April–July2026 reserve ONCE.
+Result: 100->105.1135 (+5.1135%), close-sampled DD4.2228%, but only ONE filled trade
+and3 alerts, all June. Not sufficient evidence; no live approval, no validated leverage.
+Selected pipeline is ExtraTrees/40 causal five-frame features, NOT a larger Kronos;
+explicit regime gate was NOT selected. Kronos does not deserve credit for this result.
+User now permits maxDD20%, superseding10%; config `swing_acceptance.json` is canonical.
+43 tests pass; all3 historical alerts replayed exactly. See report/bootstrap limitations.
+No GPU job or background monitor active. Do not submit duplicate Kaggle jobs.
+April–July reserve is now opened; do not tune against it and call it independent again.
+Next: keep v4 frozen as a paper comparator, acquire genuinely new forward evidence
+and improve execution/derivatives data on development only. No profit guarantee.
+Source/data/checkpoint hash manifests and exact commands are in the latest report.
+
+Older sections below retain historical context; latest report/config supersede them.
+
 This is the canonical continuation guide after cloning `Agentic_Alpha_Lab`.
 Read this file and `AGENTS.md` completely before changing code or running an
 experiment. The repository is a research and paper-trading system, not a live
 order executor.
+
+## Latest continuation — 2026-09-05, engine v2 + supervised smoke
+
+NEWEST: read `KRONOS_TRADING.md` first for the implemented **actual frozen Kronos-mini
++ cross-timeframe attention + learned bracket selection** and private Kaggle run
+`nguynchtrai/kronos-btc-mtf-20260905-v1`. COMPLETE on confirmed 2 Tesla T4.
+Downloaded checkpoint and hash/replay verified at `artifacts/kaggle/results_v1`.
+Best epoch 11, stopped 16; validation 971 decisions all WAIT, 0 trades, equity 100.
+This does NOT pass trading acceptance. Do not submit duplicate runs. Read the
+diagnosis and v2 proposal in the new document. Older notes below describe earlier baselines.
+Source/tests/data builder/train/infer/Kaggle packaging are implemented; backbone
+fine-tuning, calibration, locked-test evaluation and new web wiring are NOT done.
+
+Newer data/Colab status: read `COLAB_3Y_STATUS.md`. Three-year data and the 56.6 MB
+training ZIP now exist locally and are ignored by Git. Colab upload/training has
+NOT started: browser control was blocked by Codex usage-limit approval failure.
+
+Read `TRAINING.md` next; it contains exact commands and current unfinished work.
+Dataset builder, MLP/logistic trainer, calibration, checkpoint evaluator, Colab
+packager, and notebook now exist and the local end-to-end loop has run.
+This is NOT Kronos fine-tuning, learned brackets, or RL. Excursion/touch labels
+exist but their heads are not trained. The reference head intentionally uses FP32.
+
+Local artifacts (ignored; regenerate after clone):
+
+- `data/processed/btc_20260905_v1`: immutable snapshot, 4263/560/182/849 rows.
+- `artifacts/checkpoints/mlp_20260905_v2`: canonical smoke checkpoint with source hashes.
+- `artifacts/colab_btc_20260905_v1.zip`: training bundle; excludes test and raw candles.
+- `reports/supervised/mlp_20260905_v1/summary.json`: opened research test, capital
+  100 -> 99.6459, -0.3541% return, -0.9029% close-sampled DD, PF 0.8051, 12 long trades.
+
+Do NOT tune thresholds on that result. This interval was already inspected in Phase A.
+Next: acquire multi-year/mark data, implement multi-fold walk-forward/tree comparisons,
+and improve explicit maker-vs-stop execution before training Kronos fusion heads.
+Colab notebook syntax and equivalent local pipeline are tested; real Colab execution
+and browser interaction/responsive QA are still unverified. Web build and TypeScript pass.
 
 ## 1. Objective
 
@@ -43,7 +199,8 @@ Node dependencies are intentionally ignored. A fresh clone must regenerate them.
 
 - Instrument: linear `BTCUSDT` perpetual.
 - Base data: closed 5-minute candles; aggregate only complete higher-timeframe candles.
-- Entry and normal exit: limit/maker fee `0.0002` (0.02%) per fill, or 0.04% round trip.
+- Entry/TP: limit-touch proxy. Fee scenario `0.0002` (0.02%) per fill, or 0.04% round trip.
+  Stop/timeout are market-like exits at that scenario fee, not proven maker fills.
 - Long funding scenario: pay `0.0001` (0.01%) at each 00:00, 08:00, and 16:00 UTC boundary held.
 - Short funding income: always zero. This deliberately avoids optimistic funding income
   and acts as a small allowance for unmodeled slippage.
@@ -56,7 +213,7 @@ Node dependencies are intentionally ignored. A fresh clone must regenerate them.
   capped at 2x until calibrated, and must never be enabled because it improves the
   same sample used to design it.
 - Bybit-style liquidation is triggered using mark-price logic in production. The
-  current OHLC approximation is conservative but is not an exchange-perfect simulator.
+  current trade-OHLC approximation is not necessarily conservative and is not exchange-perfect.
 - Never place authenticated or live orders without a new explicit user instruction.
 
 ## 4. Bootstrap a fresh Windows/NVIDIA clone
@@ -83,7 +240,7 @@ Download model files and market data:
 .\.venv\Scripts\python.exe -m pytest -p no:cacheprovider
 ```
 
-Expected baseline at this handoff: 7 tests pass. If they do not, stop and fix the
+Run the complete test suite (now includes training leakage/hash/packaging tests). If tests fail, stop and fix the
 regression before running new experiments.
 
 ## 5. Reproduce inference and the dashboard
@@ -112,10 +269,10 @@ The current dashboard covers:
 - timeframe consensus, entry/TP/SL candidates, compounded backtests, and a
   separate leverage comparison.
 
-Known web work still to finish:
+Web validation status and remaining work:
 
-1. run and fix the production build if necessary;
-2. wire `web/public/og.png` into Open Graph/X metadata;
+1. production build and TypeScript check pass; rerun after changes;
+2. preserve existing social assets; do not generate or wire sharing features without a request;
 3. validate the timeframe tabs and responsive layout in the browser;
 4. validate the optional WebMCP `select_forecast_timeframe` tool where a supported
    browser context is available;
@@ -123,8 +280,10 @@ Known web work still to finish:
 
 ## 6. Current evidence — do not reinterpret it
 
-All numbers below use 0.02% entry plus 0.02% exit fees, long funding 0.01%/8h,
-short funding zero, compounded equity, and conservative OHLC execution.
+All numbers below are historical **legacy OHLC v1** results: 0.02% entry plus
+0.02% exit, long funding 0.01%/8h, short funding zero and compounded equity.
+They predate the v2 fixes for entry-candle target ordering, funding notional and
+truncated holding windows. They have NOT been silently repriced or revalidated.
 
 | Experiment | Capital 100 becomes | Net return | Important note |
 |---|---:|---:|---|
@@ -149,7 +308,7 @@ The last generated multi-timeframe snapshot was:
 
 This is a 16-path zero-shot snapshot, not calibrated confidence and not a live signal.
 
-## 7. Priority continuation: build the training pipeline
+## 7. Research roadmap beyond the implemented baseline pipeline
 
 Do not start with reinforcement learning or architecture search. First establish a
 strong, cheap, reproducible supervised baseline.
@@ -199,7 +358,7 @@ splits with an embargo at least as long as the longest horizon.
 7. Consider offline RL only after the supervised policy is stable; otherwise an
    RL reward will mostly exploit simulator artifacts.
 
-### Colab deliverables to create
+### Colab deliverables (implemented baseline; details in TRAINING.md)
 
 - `scripts/build_training_dataset.py` for deterministic Parquet splits;
 - `configs/training.yaml` for all feature, label, cost, model, and seed settings;
@@ -211,21 +370,21 @@ splits with an embargo at least as long as the longest horizon.
 - `scripts/evaluate_checkpoint.py` that evaluates an imported checkpoint without
   touching validation thresholds.
 
-The Colab notebook should mount Drive only for input/output transfer, install pinned
-requirements, verify hashes, train with mixed precision and early stopping, save the
-best validation checkpoint, and export a small inference bundle back to this repo.
+The notebook uses direct upload/download without a Drive mount, verifies hashes,
+installs pinned non-torch requirements, and trains the reference MLP in FP32 with
+early stopping. PyTorch is supplied by the Colab runtime and its version is recorded.
+Mixed precision/frozen Kronos fusion remains future work for a larger model.
 
 ## 8. Acceptance gates
 
-A coding agent may call a model a candidate only if a new untouched forward test has:
-
-- positive net return after all specified costs;
-- profit factor at least 1.15;
-- at least 200 filled trades across multiple regimes;
-- mark-to-market maximum drawdown no worse than 10%;
-- calibrated expected calibration error no worse than 5%;
-- performance that is not concentrated in one month, one direction, or a few trades;
-- no material degradation under worse fill and slippage stress scenarios.
+Use `configs/swing_acceptance.json`, not the superseded short-horizon Phase A gates.
+User's latest drawdown tolerance is20%, with desired1–4 alerts/month (never force trades).
+Current provisional research safeguards require positive normal/stressed net return,
+DD within20%, at least30 fills and12 evaluation months, and a held-out evaluation.
+These sample floors are not statistical guarantees. A live candidate also needs
+mark-price/queue/slippage robustness, calibrated sizing and forward evidence not
+concentrated in one month, direction or a few trades. Close-sampled DD cannot prove
+a live20% loss limit. v4 fails the sample and duration safeguards.
 
 Leverage is a risk overlay, not a way to rescue a negative 1x strategy. Enable it
 only when calibrated confidence buckets show monotonic out-of-sample expectancy.

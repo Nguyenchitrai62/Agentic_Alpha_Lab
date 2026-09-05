@@ -5,6 +5,8 @@ from dataclasses import asdict, dataclass
 import numpy as np
 import pandas as pd
 
+ENGINE_VERSION = "ohlc-v2"
+
 
 @dataclass(frozen=True)
 class CostModel:
@@ -156,7 +158,12 @@ def run_backtest(
     costs: CostModel | None = None,
     execution: ExecutionConfig | None = None,
 ) -> tuple[BacktestResult, list[Trade]]:
-    """Run a conservative, non-overlapping bracket backtest."""
+    """OHLC research proxy, not a maker-only or exchange-exact simulator.
+
+    Stop and timeout exits are market-like at the user's scenario fee. TP fills
+    on an intrabar entry candle are suppressed because their ordering is unknown.
+    Drawdown samples trade-candle closes, not exchange mark prices/intrabar lows.
+    """
     costs = costs or CostModel()
     execution = execution or ExecutionConfig()
     if execution.intrabar_policy != "stop_first":
@@ -165,6 +172,10 @@ def run_backtest(
         raise ValueError("tp1_fraction must be between zero and one")
     if execution.leverage <= 0 or execution.max_leverage < execution.leverage:
         raise ValueError("Leverage must be positive and not exceed max_leverage")
+    if initial_equity <= 0 or execution.max_holding_bars < 1 or execution.entry_expiry_bars < 1:
+        raise ValueError("Capital and execution horizons must be positive")
+    if costs.funding_interval_hours < 1 or 24 % costs.funding_interval_hours:
+        raise ValueError("Funding interval must divide 24 hours")
 
     candles = candles.sort_values("open_time").reset_index(drop=True)
     signals = signals.sort_values("bar_index").reset_index(drop=True)
@@ -175,11 +186,17 @@ def run_backtest(
     rejected = 0
 
     for signal in signals.itertuples(index=False):
+        if equity <= 0:
+            break
         signal_index = int(signal.bar_index)
         direction = int(signal.direction)
         if direction == 0 or signal_index < next_available_index:
             rejected += 1
             continue
+
+        holding_bars = int(getattr(signal, "holding_bars", execution.max_holding_bars))
+        if holding_bars < 1 or holding_bars > execution.max_holding_bars:
+            raise ValueError("Signal holding_bars must be within execution horizon cap")
 
         entry_index = None
         entry_price = None
@@ -191,7 +208,7 @@ def run_backtest(
                 entry_index = index
                 entry_price = candidate
                 break
-        if entry_index is None or entry_price is None:
+        if entry_index is None or entry_price is None or entry_index + holding_bars >= len(candles):
             rejected += 1
             continue
 
@@ -201,13 +218,14 @@ def run_backtest(
         notional = equity_before * leverage
         entry_fee = notional * costs.fee_rate_per_fill
         equity -= entry_fee
+        equity_points.append(equity)
         fees = entry_fee
         funding = 0.0
         gross_pnl = 0.0
         remaining = 1.0
         tp1_done = False
         exit_reason = "time"
-        exit_index = min(entry_index + execution.max_holding_bars, len(candles) - 1)
+        exit_index = min(entry_index + holding_bars, len(candles) - 1)
         final_exit_price = float(candles.iloc[exit_index]["open"])
         liquidation_price = _liquidation_price(
             entry_price,
@@ -221,7 +239,8 @@ def run_backtest(
             bar_time = pd.Timestamp(bar["open_time"])
             if index > entry_index and _is_funding_time(bar_time, costs.funding_interval_hours):
                 rate = costs.funding_long_rate if direction == 1 else costs.funding_short_rate
-                charge = notional * remaining * rate
+                # Trade open is a documented proxy until mark-price data exists.
+                charge = notional / entry_price * float(bar["open"]) * remaining * rate
                 funding += charge
                 equity -= charge
 
@@ -233,7 +252,8 @@ def run_backtest(
                 ) or (
                     direction == -1 and float(bar["open"]) >= float(liquidation_price)
                 )
-                if not opened_beyond_liquidation:
+                stop_before_liquidation = direction * (float(signal.stop_loss) - float(liquidation_price)) > 0
+                if not opened_beyond_liquidation and stop_before_liquidation:
                     liquidation_fill = None
             if liquidation_fill is not None:
                 fraction = remaining
@@ -268,7 +288,11 @@ def run_backtest(
                 equity_points.append(equity)
                 break
 
-            if not tp1_done:
+            entry_at_open = (direction == 1 and float(bar["open"]) <= float(signal.entry_limit)) or (
+                direction == -1 and float(bar["open"]) >= float(signal.entry_limit)
+            )
+            allow_targets = index != entry_index or entry_at_open
+            if not tp1_done and allow_targets:
                 tp1_fill = _take_profit_fill(bar, direction, float(signal.take_profit_1))
                 if tp1_fill is not None:
                     fraction = execution.tp1_fraction
@@ -280,7 +304,7 @@ def run_backtest(
                     remaining -= fraction
                     tp1_done = True
 
-            tp2_fill = _take_profit_fill(bar, direction, float(signal.take_profit_2))
+            tp2_fill = _take_profit_fill(bar, direction, float(signal.take_profit_2)) if allow_targets else None
             if remaining > 0 and tp2_fill is not None:
                 fraction = remaining
                 pnl = direction * (tp2_fill - entry_price) / entry_price * notional * fraction
@@ -304,7 +328,7 @@ def run_backtest(
             bar_time = pd.Timestamp(bar["open_time"])
             if _is_funding_time(bar_time, costs.funding_interval_hours):
                 rate = costs.funding_long_rate if direction == 1 else costs.funding_short_rate
-                charge = notional * remaining * rate
+                charge = notional / entry_price * float(bar["open"]) * remaining * rate
                 funding += charge
                 equity -= charge
             final_exit_price = float(bar["open"])

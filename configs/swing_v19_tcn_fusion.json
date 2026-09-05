@@ -1,0 +1,16 @@
+{
+  "experiment": "v19-tcn-cross-frame-attention-kaggle",
+  "model_family": "tcn_fusion",
+  "parent_plan": "configs/swing_v15_continuous_folds.json",
+  "dataset": "data/processed/swing_regime_research_v4",
+  "cache": "artifacts/features/swing_sequences_v13_20260905",
+  "seeds": [1729, 1730, 1731],
+  "network": {"width": 512, "tcn_width": 128, "dropout": 0.15, "layers": 6, "heads": 8, "dilations": [1, 2, 4, 8, 16]},
+  "training": {"epochs": 16, "batch_size": 32, "accumulation_steps": 2, "learning_rate": 0.0003, "weight_decay": 0.01, "gradient_clip": 1.0, "amp": true, "window_days": 730, "embargo_days": 8, "minimum_train_decisions": 200},
+  "ensemble_branches": [{"name": "mean", "penalty": 0.0}, {"name": "mean_minus_std", "penalty": 1.0}],
+  "exposures": [1.0, 0.5],
+  "hypothesis": "Five independent causal TCN encoders (125-candle receptive field),16 tokens/frame and six joint attention layers. Retain5m/15m/1h/4h/1d, existing causal40features,16 discrete brackets and unconditional net/fill/macro losses. Changes representation AND capacity; not a pure capacity ablation. No direct continuous TP/SL regression or trained MFE/MAE head in this version.",
+  "selection": "All33models, fixed16epochs, allseeds; no winning seed/epoch selection. Existing dates are opened development, not an independent test. Calibration must be a separately registered past-mature-label-only experiment.",
+  "target": "Calendar-geometric net>=5%monthly and global drawdown<=20% after fees/funding; report execution stress and trade count. Positive return alone is not success. No live approval.",
+  "compute": "Private free Kaggle T4x2 only; independent fold/seed jobs perGPU, AMP training effectivebatch64, FP32 inference. Local GTX1650 inference/replay/backtests only. No paid fallback. All weights and provenance saved before parity validation; any parity failure blocks evaluation, not preservation."
+}

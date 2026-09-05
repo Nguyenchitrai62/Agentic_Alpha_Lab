@@ -12,6 +12,7 @@ import numpy as np
 import pandas as pd
 
 from agentic_alpha_lab.backtest.engine import (
+    ENGINE_VERSION,
     CostModel,
     ExecutionConfig,
     result_dict,
@@ -128,6 +129,7 @@ def main() -> None:
         max_holding_bars=args.horizon,
         tp1_fraction=args.tp1_fraction,
         leverage=args.leverage,
+        max_leverage=args.leverage,
         intrabar_policy="stop_first",
     )
     result, trades = run_backtest(
@@ -143,6 +145,7 @@ def main() -> None:
         float(actionable["direction_correct"].mean()) if len(actionable) else None
     )
     metadata = {
+        "engine_version": ENGINE_VERSION,
         "variant": args.variant,
         "data": str(args.data.resolve()),
         "first_signal_time": signals["signal_time"].iloc[0],

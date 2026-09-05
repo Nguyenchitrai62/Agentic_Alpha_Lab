@@ -1,9 +1,14 @@
 .venv/
+kaggle.json
+access_token
+.env
+.env.*
 __pycache__/
 *.py[cod]
 .pytest_cache/
 .mypy_cache/
 .ruff_cache/
+*.tsbuildinfo
 *.egg-info/
 data/raw/
 data/processed/
@@ -14,5 +19,5 @@ reports/*.png
 reports/**/*.csv
 reports/**/*.json
 reports/**/*.png
+reports/**/*.parquet
 !reports/.gitkeep
-

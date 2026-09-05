@@ -4339,52 +4339,74 @@
     {
       "label": "Mini \u00b7 60m",
       "return": -0.014282988581617029,
-      "gross_pnl": 61.935527137586064,
-      "fees": 203.76211236485705,
-      "funding": 1.003300588902657,
+      "max_drawdown": -0.026560331463795772,
+      "initial_equity": 100.0,
+      "gross_pnl": 0.6193552713758607,
+      "fees": 2.0376211236485706,
+      "funding": 0.010033005889026569,
       "trades": 51,
       "profit_factor": 0.7649577598599084,
-      "status": "smoke"
+      "status": "legacy_ohlc_v1_smoke"
     },
     {
       "label": "Small \u00b7 60m",
       "return": -0.01691602179887086,
-      "gross_pnl": 48.370806568492405,
-      "fees": 214.56453122402203,
-      "funding": 2.9664933331770897,
+      "max_drawdown": -0.03766401342338732,
+      "initial_equity": 100.0,
+      "gross_pnl": 0.4837080656849241,
+      "fees": 2.1456453122402204,
+      "funding": 0.029664933331770896,
       "trades": 54,
       "profit_factor": 0.7299565797165414,
-      "status": "smoke"
+      "status": "legacy_ohlc_v1_smoke"
     },
     {
       "label": "Base \u00b7 60m",
       "return": -0.028398756565716776,
-      "gross_pnl": -77.15963934339693,
-      "fees": 204.8504630017311,
-      "funding": 1.9774633120414944,
+      "max_drawdown": -0.03121365670715759,
+      "initial_equity": 100.0,
+      "gross_pnl": -0.7715963934339694,
+      "fees": 2.048504630017311,
+      "funding": 0.019774633120414945,
       "trades": 52,
       "profit_factor": 0.5765288873292469,
-      "status": "smoke"
+      "status": "legacy_ohlc_v1_smoke"
     },
     {
       "label": "Mini \u00b7 60m",
       "return": -0.13528326330044949,
-      "gross_pnl": 149.3793166809685,
-      "fees": 1497.1299763664556,
-      "funding": 5.081973318987821,
+      "max_drawdown": -0.14051802807142832,
+      "initial_equity": 100.0,
+      "gross_pnl": 1.4937931668096849,
+      "fees": 14.971299763664558,
+      "funding": 0.05081973318987821,
       "trades": 400,
       "profit_factor": 0.7297918538374849,
-      "status": "research"
+      "status": "legacy_ohlc_v1_research"
     },
     {
       "label": "Mini \u00b7 4h locked test",
       "return": -0.0025944721463135867,
-      "gross_pnl": 111.52792050578887,
-      "fees": 136.46141316001743,
-      "funding": 1.0112288089101018,
+      "max_drawdown": -0.029697202420675417,
+      "initial_equity": 100.0,
+      "gross_pnl": 1.1152792050578886,
+      "fees": 1.3646141316001743,
+      "funding": 0.010112288089101019,
       "trades": 34,
       "profit_factor": 0.952264619843038,
-      "status": "out_of_sample"
+      "status": "legacy_ohlc_v1_opened_test"
+    },
+    {
+      "label": "MLP \u0111a khung \u00b7 4h",
+      "return": -0.003541207640665456,
+      "max_drawdown": -0.009028546397160997,
+      "initial_equity": 100.0,
+      "gross_pnl": 0.1341852577219807,
+      "fees": 0.4783192131012931,
+      "funding": 0.009986808687243384,
+      "trades": 12,
+      "profit_factor": 0.8050541606940452,
+      "status": "ohlc-v2_pipeline_smoke_not_candidate"
     }
   ],
   "leverage_experiment": {
@@ -4443,5 +4465,6 @@
       "1.5": 9,
       "2.0": 1
     }
-  }
+  },
+  "reports_updated_at": "2026-09-05T09:54:34.402858+00:00"
 }

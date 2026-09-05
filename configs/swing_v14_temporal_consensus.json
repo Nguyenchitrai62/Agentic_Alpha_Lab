@@ -1,0 +1,11 @@
+{
+  "experiment":"swing-v14-temporal-consensus",
+  "model_family":"temporal",
+  "source_run":"artifacts/research/swing_v13_temporal_20260905",
+  "dataset":"data/processed/swing_regime_research_v4",
+  "seeds":[1729,1730,1731],
+  "branches":[{"name":"mean","penalty":0.0},{"name":"mean_minus_std","penalty":1.0}],
+  "hypothesis":"Raw-sequence v13 seeds differ materially. Test the same fixed all-seed unconditional-payoff mean and one-standard-deviation penalty used in v12, without selecting the profitable seed, changing thresholds or refitting.",
+  "decision":"Preserve all outcomes. Research screen remains at least6of8 jointly positive normal/fee/execution folds, every scenarioDD<=20%, at least30fills. Neither branch can establish live readiness from opened history. Disagreement is not calibrated probability or a confidence interval.",
+  "data_status":"Exploratory after inspecting v13 on already-opened development; no independent test, no leverage change and no live approval. Full24-checkpoint evaluation replay on CPU, tolerance1e-3 for GPU/CPU numerical differences."
+}

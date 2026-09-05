@@ -1,0 +1,23 @@
+{
+  "experiment":"swing-v15-continuous-quarterly-retraining",
+  "dataset":"data/processed/swing_regime_research_v4",
+  "model_plan":"configs/swing_v8_adaptive_model.json",
+  "folds":[
+    ["2023-06-01T00:00:00Z","2023-09-01T00:00:00Z"],
+    ["2023-09-01T00:00:00Z","2023-12-01T00:00:00Z"],
+    ["2023-12-01T00:00:00Z","2024-03-01T00:00:00Z"],
+    ["2024-03-01T00:00:00Z","2024-06-01T00:00:00Z"],
+    ["2024-06-01T00:00:00Z","2024-09-01T00:00:00Z"],
+    ["2024-09-01T00:00:00Z","2024-12-01T00:00:00Z"],
+    ["2024-12-01T00:00:00Z","2025-03-01T00:00:00Z"],
+    ["2025-03-01T00:00:00Z","2025-06-01T00:00:00Z"],
+    ["2025-06-01T00:00:00Z","2025-09-01T00:00:00Z"],
+    ["2025-09-01T00:00:00Z","2025-12-01T00:00:00Z"],
+    ["2025-12-01T00:00:00Z","2026-03-23T00:00:00Z"]
+  ],
+  "complete_evaluation_until":"2026-03-23T00:00:00Z",
+  "minimum_positive_folds":9,
+  "branches":["temporal_neural","train_candidate_mean"],
+  "policy":"730day past-only train; label_end before refit minus8days. Forecast every available6h decision until global final mature-label cutoff, including fold-end days. Assemble predictions first, then run one global monthly/cooldown/position/equity state. Fold-local execution reports are diagnostic only, never the continuous result.",
+  "data_status":"All opened development. Continuous coverage addresses gaps in v13/v14; this is not an independent test or a claim of live readiness."
+}

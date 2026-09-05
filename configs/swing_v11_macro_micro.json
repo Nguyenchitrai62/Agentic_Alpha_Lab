@@ -1,0 +1,11 @@
+{
+  "experiment": "swing-v11-learned-macro-micro-gating",
+  "parent_plan": "configs/swing_v8_walkforward.json",
+  "seeds": [1729,1730,1731],
+  "network": {"width":64,"dropout":0.15},
+  "training": {"epochs":40,"batch_size":128,"learning_rate":0.0003,"weight_decay":0.01,"gradient_clip":1.0},
+  "hypothesis": "Shared per-frame encoders; macro4h/1d embedding gates micro5m/15m/1h features; action embedding interactions score16 brackets. Direct unconditional net MSE plus fill BCE and small macro directional-payoff auxiliary loss. Joint training learns macro/micro interaction without handcoded regime thresholds. Uses40 candle summaries, not full raw sequences.",
+  "fit_scope": "Same eight chronological folds,730day train window and8day label embargo as v8. Train-only normalization. Fixed40epochs with no early stopping, no validation/outcome-based epoch selection. Score threshold0.3%,fill0.25,cooldown5days,max4alerts/month,1x unchanged.",
+  "decision": "Preserve all seeds/folds/checkpoints. Require every seed to pass unchanged eightfold advancement screen before further validation. Outcomes already development; not independent test or live approval.",
+  "compute": "Local CPU2threads; no cloud job or paid resource. Small network is a controlled interaction/regularization test, parameter count is measured not a target."
+}

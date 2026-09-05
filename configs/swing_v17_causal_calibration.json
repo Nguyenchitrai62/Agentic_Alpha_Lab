@@ -1,0 +1,15 @@
+{
+  "experiment":"v17-corrected-mature-label-global-policy-calibration",
+  "source":"artifacts/research/swing_v15_continuous_20260905/training",
+  "dataset":"data/processed/swing_regime_research_v4",
+  "parent_plan":"configs/swing_v15_continuous_folds.json",
+  "seeds":[1729,1730,1731],
+  "penalty":1.0,
+  "windows_previous_quarters":[1,2,4,0],
+  "exposures":[1.0,0.5],
+  "embargo_days":8,
+  "warmup":"WAIT until at least50 eligible out-of-sample decision rows exist",
+  "hypothesis":"Correct invalid earlier isotonic probe: label_end must be strictly before refit minus8days. Map all scores first, then use ONE global policy across quarters. Preserve every previously inspected window, plus identity comparator, with both exposures. No training or threshold search.",
+  "target":"User now requires geometric5%monthly net (annual1.05^12-1), globalDD<=20%. Report all3scenarios, full calendar duration and fills. Old positive-net screen is insufficient.",
+  "status":"Opened development after many experiments. Previous leaked+41.46% claim withdrawn. This correction is not an independent test. Deep-learning base is unchanged; no live approval."
+}

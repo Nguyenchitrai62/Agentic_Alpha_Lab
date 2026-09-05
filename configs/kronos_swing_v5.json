@@ -1,0 +1,23 @@
+{
+  "schema": "kronos-base-swing-v5",
+  "seed": 1729,
+  "timeframes": ["5min", "15min", "1h", "4h", "1d"],
+  "context": 128,
+  "stride": 72,
+  "holding_days": [3, 7],
+  "entry_expiry_bars": 12,
+  "entry_atr_5m": [0.5, 1.5],
+  "brackets_atr_4h": [[2.0, 2.0, 4.0], [3.0, 3.0, 6.0]],
+  "minimum_risk_fraction": 0.01,
+  "splits": {
+    "train": ["2022-01-01T00:00:00Z", "2025-06-01T00:00:00Z"],
+    "validation": ["2025-06-09T00:00:00Z", "2025-09-01T00:00:00Z"],
+    "policy": ["2025-09-09T00:00:00Z", "2026-03-23T00:00:00Z"]
+  },
+  "costs": {"fee_rate_per_fill": 0.0002, "funding_long_rate": 0.0001, "funding_short_rate": 0.0, "funding_interval_hours": 8},
+  "model": {"width": 256, "heads": 8, "dropout": 0.1},
+  "loss": {"return_scale_percent": 2.0, "ranking_weight": 0.5},
+  "training": {"epochs": 8, "patience": 3, "batch_per_gpu": 1, "accumulation": 8, "backbone_lr": 0.000005, "head_lr": 0.0001, "weight_decay": 0.01, "max_seconds": 5400},
+  "policy": {"minimum_expected_net_percent": 0.3, "minimum_fill_score": 0.25, "cooldown_days": 5, "maximum_signals_per_month": 4, "leverage": 1.0},
+  "evaluation_note": "v5 expanded-history development only. Policy includes previously opened v3 holdout; NOT an independent test. No threshold tuning on v4 reserve."
+}

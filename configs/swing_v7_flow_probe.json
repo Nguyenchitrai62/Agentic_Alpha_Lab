@@ -1,0 +1,14 @@
+{
+  "experiment": "swing-v7-causal-flow-probe",
+  "hypothesis": "Existing kline buy-volume imbalance and trade activity might add predictive information absent from raw40 OHLCV features. Test the same tree and exact same v5 decisions/labels, not a new threshold sweep.",
+  "dataset": "data/processed/kronos_swing_v5_20260905",
+  "cache": "artifacts/features/swing_flow_20260905",
+  "branches": ["raw40", "raw40_plus_flow_pca16"],
+  "seeds": [1729, 1730, 1731],
+  "pca_components": 16,
+  "tree": {"n_estimators": 100, "max_depth": 8, "min_samples_leaf": 20, "max_features": 0.8},
+  "fit_scope": "Flow features causal completed candles only. Scaling/PCA/forests train-only. All periods development and already researched.",
+  "policy": "Unchanged v5 expected net0.3%, fill0.25, max4/month, cooldown5days, 1x.",
+  "decision": "Both validation/policy normal and stressed net positive, DD<=20%, at least15 combined fills for EVERY seed before advancing. No seed cherry-picking; preliminary research screen only.",
+  "live_approved": false
+}

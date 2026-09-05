@@ -1,0 +1,16 @@
+{
+  "experiment":"v18-joint-cross-timeframe-transformer",
+  "model_family":"transformer",
+  "parent_plan":"configs/swing_v15_continuous_folds.json",
+  "dataset":"data/processed/swing_regime_research_v4",
+  "cache":"artifacts/features/swing_sequences_v13_20260905",
+  "seeds":[1729,1730,1731],
+  "network":{"width":192,"dropout":0.15,"layers":6,"heads":6},
+  "training":{"epochs":16,"batch_size":64,"learning_rate":0.0003,"weight_decay":0.01,"gradient_clip":1.0},
+  "ensemble_branches":[{"name":"mean","penalty":0.0},{"name":"mean_minus_std","penalty":1.0}],
+  "exposures":[1.0,0.5],
+  "hypothesis":"Replace shared GRU with6joint attention layers over80past patches, learned timeframe/age embeddings. Retain128candles per frame, all5frames, macro/micro bracket heads, payoff/fill loss and16epochs. Test whether larger joint temporal representation improves generalization. Any effect combines attention topology and capacity, not a pure parameter-count ablation.",
+  "target":"Geometric5%monthly net =79.5856%annual; globalDD<=20%. Older generic continuous runner flags only positive net and MUST NOT be interpreted as meeting the new user target. Report actual elapsed-calendar CAGR, monthly geometric return and all costs before acceptance.",
+  "selection":"33models across all3seeds and11contiguous quarterly refits; no winning-seed or epoch selection. Preserve all outcomes. All dates opened development. Corrected8day label-end calibration, if evaluated later, is an additional separately versioned pipeline. No live approval.",
+  "compute":"Local GTX1650 FP32,2CPUthreads. Fixed16epochs. No paid compute. Save every checkpoint and CPU replay. If GPU memory smoke fails, record failure before changing batch configuration."
+}

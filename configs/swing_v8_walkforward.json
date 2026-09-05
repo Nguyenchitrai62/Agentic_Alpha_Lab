@@ -1,0 +1,20 @@
+{
+  "experiment": "swing-v8-shared-value-chronological-robustness",
+  "dataset": "data/processed/swing_regime_research_v4",
+  "model_plan": "configs/swing_v8_adaptive_model.json",
+  "folds": [
+    ["2023-06-01T00:00:00Z", "2023-09-01T00:00:00Z"],
+    ["2023-09-09T00:00:00Z", "2023-12-01T00:00:00Z"],
+    ["2024-01-09T00:00:00Z", "2024-04-01T00:00:00Z"],
+    ["2024-07-01T00:00:00Z", "2024-10-01T00:00:00Z"],
+    ["2024-10-09T00:00:00Z", "2025-01-01T00:00:00Z"],
+    ["2025-06-09T00:00:00Z", "2025-09-01T00:00:00Z"],
+    ["2025-09-09T00:00:00Z", "2025-12-01T00:00:00Z"],
+    ["2025-12-09T00:00:00Z", "2026-03-23T00:00:00Z"]
+  ],
+  "branches": ["shared_action_model", "train_candidate_mean"],
+  "policy": "Frozen v8 hyperparameters and v5 trading thresholds. Fit each fold once at its start on trailing730 days, labels fully mature before8-day embargo. Candidate-mean control has no market features. No threshold, sizing or direction sweep.",
+  "clock": "Existing v4 immutable examples use source-offset legacy clock; verify every decision matches explicit UTC anchor1970-01-01T00:04:59.999Z on6h grid. Do not regenerate or silently realign examples.",
+  "advance_rule": "Model must have positive normal and stress net in at least6 of8 folds, no fold DD>20% in any normal/fee/execution scenario, >=30 total fills and higher mean fold net than candidate-mean control. This is a research screen only, not independent validation or live approval.",
+  "data_status": "All dates are development after earlier experiments; April-July2026 reserve already opened but not used in this trial. No new independent test is claimed."
+}

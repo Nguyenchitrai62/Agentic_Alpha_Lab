@@ -1,0 +1,21 @@
+{
+  "experiment": "kronos-swing-v5-interaction-ranking",
+  "status": "implementation_prototype_not_trained",
+  "hypothesis": "v2 saved outputs weakly differentiate candidates and track a small common range. Explicit market-candidate interactions and robust payoff regression plus WAIT-aware ranking may improve discrimination; neither cause nor profitability is established.",
+  "source": "data/processed/btc_2022_2026_source_v1",
+  "development_end_exclusive": "2026-03-23T00:00:00Z",
+  "reserve_status": "No pristine historical reserve remains in the declared plan; do not reuse v4 reserve as independent test.",
+  "training_splits": {
+    "train": ["2022-01-01T00:00:00Z", "2025-06-01T00:00:00Z"],
+    "validation": ["2025-06-09T00:00:00Z", "2025-09-01T00:00:00Z"],
+    "policy": ["2025-09-09T00:00:00Z", "2026-03-23T00:00:00Z"]
+  },
+  "backbone": "Kronos-base full pretrained trunk; tokenizer frozen",
+  "architecture_change": "CandidateUtilityHead: context/candidate/product/difference features",
+  "loss": {"name": "swing_v5_loss", "return_scale_percent": 2.0, "ranking_weight": 0.5, "ranking_temperature_percent": 1.0, "ranking_tie_band_percent": 0.25},
+  "development_comparators": ["unchanged v2 loss on extended history", "v5 ranking weight 0 ablation", "v5 ranking weight 0.5"],
+  "seeds": [1729, 1730, 1731],
+  "unchanged_policy": {"minimum_expected_net_percent": 0.3, "maximum_signals_per_month": 4, "cooldown_days": 5, "maximum_exposure": 1.0},
+  "execution": "First smoke, then one free GPU experiment at a time; run ablations and additional seeds only after finite-gradient/runtime validation. No test-based tuning or automatic levered deployment. Log each run and its actual architecture.",
+  "larger_architecture_gate": "Measure candidate discrimination and held-out-development utility before expanding trunk; larger-than-base training not implemented or claimed yet."
+}

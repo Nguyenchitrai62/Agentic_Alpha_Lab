@@ -1,0 +1,15 @@
+{
+  "experiment": "swing-v8-shared-action-value-model",
+  "hypothesis": "Use a shared nonlinear model of unconditional net payoff conditioned on market features and action parameters, and compare static vs monthly purged retraining. No Kronos dependency or forced positive trades.",
+  "dataset": "data/processed/kronos_swing_v5_20260905",
+  "model": {"loss": "squared_error", "learning_rate": 0.05, "max_iter": 120, "max_leaf_nodes": 15, "min_samples_leaf": 128, "l2_regularization": 10.0, "max_bins": 127, "early_stopping": false, "random_state": 1729},
+  "branches": ["static", "monthly"],
+  "training_window_days": 730,
+  "label_embargo_days": 8,
+  "minimum_train_decisions": 200,
+  "static_fit_at": "2025-06-09T00:00:00Z",
+  "policy": "Use unchanged v5 geometry, expected net>=0.3%, fill>=0.25, 5-day cooldown, max4/month, baseline1x. Do not sweep thresholds or add rule-based directions.",
+  "data_rule": "Fit only rows whose complete label_end precedes fit_at minus8 days, within730 days of fit_at. Monthly branch refits at UTC month start using only matured labels. All periods already development; not a new independent test.",
+  "selection": "Both validation and policy positive after normal/fee/execution stress, DD<=20%, at least15 combined fills before further validation. Neither branch gets live approval from this trial. Preserve both results.",
+  "compute": "Local CPU 2 threads; existing local GPU cache may continue. No new cloud job."
+}

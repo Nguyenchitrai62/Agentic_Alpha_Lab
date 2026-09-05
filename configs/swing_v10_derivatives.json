@@ -1,0 +1,11 @@
+{
+  "experiment": "swing-v10-derivatives-incremental-value",
+  "parent_plan": "configs/swing_v8_walkforward.json",
+  "runs": [
+    {"name": "lag48", "feature_cache": "artifacts/features/btc_derivatives_lag48_v1"},
+    {"name": "lag72", "feature_cache": "artifacts/features/btc_derivatives_lag72_v1"}
+  ],
+  "hypothesis": "Add20 daily OI/positioning log-level/change features plus20 missing masks to40 candle features. Test whether derivatives context improves the same shared action-value HGB model versus recorded v8 across eight purged folds. Delay48h and72h from source day are separate predeclared scenarios, not observed historical receipt times.",
+  "model_and_policy": "Exactly v8: shared net/fill regressors; squared loss,120iterations,15leaves,minleaf128,learningrate0.05,L2=10,randomstate1729. Trailing730days,8day label embargo, same brackets/threshold/frequency and1x. No tuning using fold outcomes.",
+  "decision": "Require both delays to pass the unchanged v8 robustness screen and improve mean fold net over v8 before further validation. Do not select the more flattering lag. All periods already development; no independent test, no live approval."
+}

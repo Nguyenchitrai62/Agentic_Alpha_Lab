@@ -1,0 +1,17 @@
+{
+  "schema": "kronos-mtf-brackets-v1",
+  "seed": 1729,
+  "timeframes": ["5min", "15min", "1h", "4h"],
+  "context": 64,
+  "stride": 48,
+  "holding_bars": 48,
+  "entry_offsets_bps": [2.0, 5.0],
+  "brackets_atr": [[1.5, 1.0, 2.0], [2.0, 1.5, 3.0]],
+  "minimum_risk_bps": 8.0,
+  "minimum_net_bps": 2.0,
+  "minimum_win_score": 0.55,
+  "costs": {"fee_rate_per_fill": 0.0002, "funding_long_rate": 0.0001, "funding_short_rate": 0.0, "funding_interval_hours": 8},
+  "model": {"width": 128, "heads": 4, "dropout": 0.1},
+  "training": {"epochs": 30, "patience": 5, "batch_size": 128, "encode_batch_size": 32, "learning_rate": 0.0003, "weight_decay": 0.01},
+  "policy": "fixed_1x_no_live_orders_uncalibrated_scores"
+}

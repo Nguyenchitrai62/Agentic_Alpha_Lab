@@ -80,6 +80,7 @@ type FrameData = {
 type Backtest = {
   label: string;
   return: number;
+  max_drawdown?: number;
   gross_pnl: number;
   fees: number;
   funding: number;
@@ -239,9 +240,9 @@ function ForecastPanel({ frame }: { frame: FrameData }) {
     <div className="space-y-4">
       <div className="grid gap-3 md:grid-cols-3">
         <MetricCard
-          label={`Xác suất tăng · ${frame.horizon_label}`}
+          label={`Tỷ lệ đường dự báo tăng · ${frame.horizon_label}`}
           value={`${(frame.upside_probability * 100).toFixed(1)}%`}
-          note={`${data.sampling.paths} đường lấy mẫu xác suất`}
+          note={`${data.sampling.paths} mẫu; chưa phải xác suất đúng đã hiệu chỉnh`}
           icon={Activity}
         />
         <MetricCard
@@ -392,6 +393,7 @@ function BacktestTable() {
         <CardTitle>Backtest sau chi phí</CardTitle>
         <CardDescription>
           Vốn khởi đầu được chuẩn hóa thành 100; notional tái tính theo equity sau mỗi lệnh.
+          {' '}PnL và chi phí cũng theo vốn 100. Các dòng legacy dùng engine cũ, chưa được kiểm toán lại.
         </CardDescription>
         <CardAction>
           <Badge variant="outline" className="border-white/10 text-muted-foreground">
@@ -406,6 +408,7 @@ function BacktestTable() {
               <th>Thử nghiệm</th>
               <th>Vốn cuối</th>
               <th>Lợi nhuận</th>
+              <th>Max DD</th>
               <th>Gross PnL</th>
               <th>Phí + funding</th>
               <th>PF</th>
@@ -423,8 +426,9 @@ function BacktestTable() {
                 <td className={`font-mono ${row.return >= 0 ? 'positive' : 'negative'}`}>
                   {formatPercent(row.return)}
                 </td>
-                <td className="font-mono">{row.gross_pnl.toFixed(1)}</td>
-                <td className="font-mono">{(row.fees + row.funding).toFixed(1)}</td>
+                <td className="font-mono negative">{row.max_drawdown === undefined ? '—' : formatPercent(row.max_drawdown)}</td>
+                <td className="font-mono">{row.gross_pnl.toFixed(2)}</td>
+                <td className="font-mono">{(row.fees + row.funding).toFixed(2)}</td>
                 <td className="font-mono">{row.profit_factor?.toFixed(2) ?? '—'}</td>
                 <td className="font-mono">{row.trades}</td>
               </tr>
@@ -447,7 +451,7 @@ function LeverageComparison() {
     <Card className="section-card">
       <CardHeader>
         <CardTitle>Đòn bẩy có điều kiện</CardTitle>
-        <CardDescription>So sánh thăm dò trên forecast 4 giờ; không phải locked test mới.</CardDescription>
+        <CardDescription>Kết quả lịch sử engine v1 trên forecast 4 giờ; không phải locked test mới.</CardDescription>
       </CardHeader>
       <CardContent className="grid gap-3 md:grid-cols-2">
         {rows.map((row) => (
@@ -557,9 +561,10 @@ export default function Dashboard() {
               <DirectionBadge value={data.consensus.label} />
             </div>
             <p className="overview-copy">
-              Xác suất tăng có trọng số{' '}
+              Điểm tổng hợp đường dự báo tăng{' '}
               <strong>{(data.consensus.weighted_upside_probability * 100).toFixed(1)}%</strong>,
               mức đồng thuận {(data.consensus.agreement * 100).toFixed(0)}% trên bốn khung.
+              {' '}Các khung có horizon khác nhau; điểm này không phải xác suất thắng hay độ tin cậy để tăng đòn bẩy.
             </p>
           </div>
           <div className="price-block">
@@ -620,7 +625,7 @@ export default function Dashboard() {
           </div>
           <div className="cost-grid">
             <div><span>Entry limit</span><strong>0.02%</strong></div>
-            <div><span>Exit limit</span><strong>0.02%</strong></div>
+            <div><span>Exit fee giả định</span><strong>0.02%</strong></div>
             <div><span>Long funding / 8h</span><strong>0.01%</strong></div>
             <div><span>Short funding</span><strong>0.00%</strong></div>
           </div>
@@ -628,7 +633,8 @@ export default function Dashboard() {
             <ShieldAlert className="size-5" />
             <p>
               Limit chỉ fill khi OHLC thật chạm giá; tín hiệu tại nến t chỉ được vào từ t+1.
-              Funding short dương được bỏ qua để bù cho slippage và tránh làm kết quả lạc quan.
+              Stop và timeout hiện mô phỏng như market exit nhưng dùng phí giả định 0.02%; không bảo đảm maker fill.
+              Funding short bằng 0 không thay thế kiểm tra slippage. Max DD lấy mẫu giá đóng nến, chưa phải mark price sàn.
             </p>
           </div>
         </section>

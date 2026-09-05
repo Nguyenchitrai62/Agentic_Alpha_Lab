@@ -1,0 +1,15 @@
+{
+  "experiment":"swing-v15-continuous-temporal-ensemble",
+  "parent_plan":"configs/swing_v15_continuous_folds.json",
+  "dataset":"data/processed/swing_regime_research_v4",
+  "cache":"artifacts/features/swing_sequences_v13_20260905",
+  "seeds":[1729,1730,1731],
+  "network":{"width":48,"dropout":0.15},
+  "training":{"epochs":16,"batch_size":64,"learning_rate":0.0003,"weight_decay":0.01,"gradient_clip":1.0},
+  "ensemble_branches":[{"name":"mean","penalty":0.0},{"name":"mean_minus_std","penalty":1.0}],
+  "exposures":[1.0,0.5],
+  "hypothesis":"v14 mean ensemble is profitable in discontinuous development but stitched1x drawdown exceeds20%. Keep architecture,loss,epochs and thresholds fixed. Evaluate complete chronological coverage with quarterly past-only refits, global policy state, and a declared half-exposure baseline. No seed or threshold search.",
+  "primary_branch":"mean",
+  "selection":"No deployment from this run. Continuous net must be positive in all3 cost scenarios with DD<=20% and>=30fills before further validation. Preserve both exposure levels and both branches. v14 already inspected; these are exploratory hypotheses, not independent confirmation. Per-fold gates cannot certify this continuous pipeline.",
+  "compute":"Local GTX1650 FP32,2CPUthreads;33models, fixed16epochs, alltrainable, no paid GPU. Save every fold weights,replay and source."
+}

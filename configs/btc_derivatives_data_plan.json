@@ -1,0 +1,11 @@
+{
+  "experiment": "btc-derivatives-archive-audit-v1",
+  "symbol": "BTCUSDT",
+  "start": "2022-01-01",
+  "end_exclusive": "2026-03-23",
+  "source": "https://data.binance.vision/data/futures/um/daily/metrics/BTCUSDT/",
+  "purpose": "After v8/v9 failed cross-regime research, audit additional derivatives context (open interest and available positioning ratios) before designing new learned features. Acquisition only; no train, predictions or holdout opening in this step.",
+  "availability": "create_time is not a verified historical publication/receipt time. Daily archives are published later and may be revised. Do not join same-time values and claim point-in-time correctness. Subsequent feature plans must explicitly lag, test longer availability delays, bound staleness and retain missingness.",
+  "quality": "Verify Binance SHA256 for each zip; preserve source files and missing-file ledger. Reject unsafe archive members/schema/symbol/timestamps. Report sparse fields and gaps rather than filling values with future data. An incomplete archive is not feature-ready.",
+  "compute": "Four HTTP readers, public unauthenticated archives only. Store under ignored data folders, no uploads or paid data."
+}

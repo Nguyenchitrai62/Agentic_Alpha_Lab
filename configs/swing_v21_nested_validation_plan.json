@@ -1,0 +1,15 @@
+{
+  "experiment": "v21-deep-tcn-nested-validation",
+  "status": "DESIGN_AND_SPLIT_TESTED_NOT_TRAINED",
+  "base_architecture": "configs/swing_v19_tcn_fusion.json",
+  "hypothesis": "v19 exhibits poor opened-OOS action ranking and overly dispersed payoff predictions despite falling training loss. Retain24.1M TCN attention architecture but select training duration using purged past-only inner validation. More parameters or confidence leverage are not justified by v19 evidence.",
+  "dataset": "data/processed/swing_regime_research_v4",
+  "parent_plan": "configs/swing_v15_continuous_folds.json",
+  "seeds": [1729, 1730, 1731],
+  "validation": {"window_days": 730, "validation_days": 180, "embargo_days": 8, "minimum_train": 200, "minimum_validation": 100, "earliest_tie_minimum_improvement": 0.0001},
+  "proposed_training": {"maximum_selection_epochs": 32, "patience": 5, "learning_rate": 0.0001, "weight_decay": 0.05, "effective_batch": 64},
+  "selection": "Use only inner validation payoff/fill objective, never outer-fold trading PnL. Preserve all epoch losses and selected epoch for each seed/fold. Compare with constant train-label control. Refit from scratch for selected epochs on all matured outer-training data before generating outer forecasts. A validation-stage and final-refit provenance audit must be implemented before cloud submission.",
+  "required_before_submission": ["Implement separate trainer without modifying immutable v19 trainer", "Audit inner splits, training-only normalization and selected-epoch refit", "Persist inner checkpoint/curve and final model provenance", "Package versioned private Kaggle bundle and run small CPU tests only", "Inspect v20 outcomes and register any revisions explicitly"],
+  "compute": "Kaggle free T4x2 only for heavy training; local inference/backtests. Not yet submitted.",
+  "research_status": "Opened development, not independent test. Target geometric5%monthlynet and globalDD20% after costs. No profit guarantee, no live approval."
+}

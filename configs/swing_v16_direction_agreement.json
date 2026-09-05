@@ -1,0 +1,15 @@
+{
+  "experiment":"swing-v16-unanimous-learned-direction",
+  "parent_plan":"configs/swing_v15_continuous_folds.json",
+  "dataset":"data/processed/swing_regime_research_v4",
+  "cache":"artifacts/features/swing_sequences_v13_20260905",
+  "seeds":[1729,1730,1731],
+  "ensemble_branches":[
+    {"name":"unanimous_mean","penalty":0.0,"require_direction_agreement":true},
+    {"name":"unanimous_mean_minus_std","penalty":1.0,"require_direction_agreement":true}
+  ],
+  "exposures":[1.0,0.5],
+  "hypothesis":"v15 produces4alerts in every complete month despite40%of decisions lacking unanimous eligible model direction. Its mean0.5x failsDD and secondary mean-minus-std0.5x does not convincingly outperform a no-market-feature control. Add one fixed abstention criterion: ALL3models must independently select the same LONG/SHORT side above existing net/fill thresholds. Score brackets only on that side. No labels, new training, seed selection or threshold sweep.",
+  "selection":"Exploratory development only. Preserve both mean and disagreement-penalty branches and both exposures. Require positive net after all3 costs,globalDD<=20%,>=30fills before further research; compare constant baseline and retain failures. No claim of statistical confidence from seed agreement.",
+  "data_status":"Reuse all33frozen v15 networks and4,076continuous past-only forecasts. Same one-state policy and final maturity cutoff. No independent test or live approval."
+}

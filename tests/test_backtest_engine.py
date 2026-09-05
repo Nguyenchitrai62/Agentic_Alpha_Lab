@@ -55,6 +55,55 @@ def test_flat_round_trip_charges_two_fills_and_enters_after_signal() -> None:
     assert result.final_equity == pytest.approx(9_996.0)
 
 
+@pytest.mark.parametrize("direction", [1, -1])
+def test_intrabar_entry_cannot_capture_a_pre_entry_target(direction: int) -> None:
+    frame = candles()
+    frame.loc[1, ["open", "high", "low", "close"]] = (
+        [105, 125, 99, 100] if direction == 1 else [95, 101, 75, 100]
+    )
+    result, trades = run_backtest(frame, signal(direction), execution=ExecutionConfig(max_holding_bars=2))
+    assert trades[0].exit_reason == "time"
+    assert trades[0].gross_pnl == 0
+    assert result.final_equity < result.initial_equity
+
+
+def test_reject_truncated_holding_window() -> None:
+    result, trades = run_backtest(candles(rows=3), signal())
+    assert not trades
+    assert result.rejected_or_unfilled_signals == 1
+
+
+def test_funding_uses_current_notional_not_entry_notional() -> None:
+    frame = candles(start="2026-01-01 07:45:00+00:00", rows=10)
+    frame.loc[3, ["open", "high", "low", "close"]] = 105.0
+    _, trades = run_backtest(frame, signal(), execution=ExecutionConfig(max_holding_bars=5))
+    assert trades[0].funding == pytest.approx(1.05)
+
+
+def test_funding_after_tp1_charges_only_remaining_quantity() -> None:
+    frame = candles(start="2026-01-01 07:45:00+00:00", rows=10)
+    frame.loc[2:3, ["open", "high", "low", "close"]] = 110.0
+    _, trades = run_backtest(frame, signal(), execution=ExecutionConfig(max_holding_bars=5))
+    assert trades[0].funding == pytest.approx(0.55)
+    assert trades[0].gross_pnl == pytest.approx(500)
+    assert trades[0].fees == pytest.approx(4.1)
+
+
+def test_sequential_trades_compound_current_equity() -> None:
+    frame = candles(rows=8)
+    frame.loc[2:4, ["open", "high", "low", "close"]] = 101.0
+    frame.loc[5:, ["open", "high", "low", "close"]] = 102.0
+    second = signal(bar_index=3)
+    second.loc[0, "entry_limit"] = 101.0
+    signals = pd.concat([signal(), second], ignore_index=True)
+    result, trades = run_backtest(frame, signals, initial_equity=100,
+                                  costs=CostModel(fee_rate_per_fill=0, funding_long_rate=0),
+                                  execution=ExecutionConfig(max_holding_bars=1))
+    assert len(trades) == 2
+    assert trades[1].equity_before == pytest.approx(101)
+    assert result.final_equity == pytest.approx(102)
+
+
 def test_long_pays_funding_but_short_does_not() -> None:
     frame = candles(start="2026-01-01 07:45:00+00:00", rows=10)
     execution = ExecutionConfig(max_holding_bars=5)

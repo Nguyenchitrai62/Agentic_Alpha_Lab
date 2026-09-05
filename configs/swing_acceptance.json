@@ -1,0 +1,17 @@
+{
+  "schema": "swing-acceptance-v3",
+  "user_target_monthly_geometric_net_return": 0.05,
+  "user_target_annual_compounded_net_return": 0.7958563260221301,
+  "return_measurement": "Use continuous calendar-time compounded equity after fees and funding, including inactive months. Monthly geometric equivalent >=5%; annual growth factor >=1.05^12. Report calendar and rolling12-month returns; no averaging independent fold returns.",
+  "model_preference": "Prioritize deep-learning multi-timeframe models. Any architecture, size, ML model or supporting logic is permitted, with performance demonstrated on causal evaluation.",
+  "user_confirmed_maximum_drawdown": 0.20,
+  "maximum_alerts_per_month": 4,
+  "desired_minimum_alerts_per_month": 1,
+  "force_minimum_alerts": false,
+  "baseline_leverage": 1.0,
+  "require_positive_net_return": true,
+  "require_positive_stress_net_return": true,
+  "research_minimum_filled_trades": 30,
+  "research_minimum_evaluation_months": 12,
+  "warning": "20% is the latest user-confirmed drawdown screen, replacing 10%. Sample-size floors are provisional research safeguards, not statistical guarantees. Close-sampled OHLC drawdown cannot establish a live loss limit. No live approval."
+}

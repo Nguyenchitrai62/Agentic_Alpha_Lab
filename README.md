@@ -7,6 +7,21 @@ Môi trường nghiên cứu leakage-aware cho BTC futures: dữ liệu Binance 
 Kronos zero-shot, chuyển forecast thành signal, backtest limit-order, và sau đó
 mở rộng sang fine-tuning/agentic experiment search.
 
+## Tiếp tục từ trạng thái hiện tại
+
+Đã có pipeline dataset bất biến → MLP đa khung + logistic baseline → calibration →
+checkpoint → backtest, và notebook/gói ZIP cho Colab. Hướng dẫn/lệnh cụ thể tại
+[`TRAINING.md`](TRAINING.md). Đây chưa phải fine-tune Kronos hay RL.
+
+Smoke MLP mới: vốn 100 → **99,6459**, net **-0,3541%**, Max DD **0,9029%**, 12 lệnh.
+Không đạt điều kiện ứng dụng. Không tune tiếp trên khoảng test đã mở.
+Kết quả Phase A là engine cũ; engine v2 sửa thứ tự TP/entry và funding, không so sánh ngang mà bỏ qua version.
+
+Dashboard local: `cd web`, `npm ci`, `npm run dev`, mở URL mà server in ra.
+`npm run build` và kiểm tra TypeScript đã chạy thành công. Dữ liệu infer là snapshot,
+không có API tự cập nhật. Tái tạo infer bằng `scripts/generate_dashboard_data.py`;
+`--refresh-reports-only` chỉ cập nhật bảng backtest, không làm mới timestamp forecast.
+
 ## Trạng thái vòng đầu
 
 - Market: `BTCUSDT` Binance USD-M perpetual.
@@ -18,6 +33,7 @@ mở rộng sang fine-tuning/agentic experiment search.
 - Intrabar ambiguity: nếu TP và SL cùng chạm trong một nến, backtest ưu tiên SL.
 
 Đây là research backtest, không phải hệ thống live trading.
+SL/timeout hiện là market-like exit dùng phí giả định 0.02%, không bảo đảm đóng bằng limit/maker.
 
 ## Cài đặt Windows + NVIDIA
 

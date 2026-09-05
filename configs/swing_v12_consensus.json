@@ -1,0 +1,10 @@
+{
+  "experiment":"swing-v12-neural-consensus-ablation",
+  "source_run":"artifacts/research/swing_v11_macro_micro_20260905_r2",
+  "dataset":"data/processed/swing_regime_research_v4",
+  "seeds":[1729,1730,1731],
+  "branches":[{"name":"mean","penalty":0.0},{"name":"mean_minus_std","penalty":1.0}],
+  "hypothesis":"v11 seed instability motivates averaging all three models and testing a single preregistered disagreement penalty. Combine unconditional net payoff, not conditional-payoff means or logits. No seed picking, refitting, sizing, threshold sweep or data split change.",
+  "decision":"Require at least6of8 folds jointly positive under normal/fee/execution scenarios, every scenarioDD<=20%, at least30fills. Disagreement is a heuristic, not a statistical confidence interval. Both results retained, further evidence required before deployment.",
+  "data_status":"Post-v11 exploratory ensemble research on already-opened development. No independent test and no live approval. Preserve original weights/predictions."
+}

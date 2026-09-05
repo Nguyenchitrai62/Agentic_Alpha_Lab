@@ -1,0 +1,16 @@
+{
+  "experiment": "v20-tcn-mature-label-calibration",
+  "source": "artifacts/kaggle/v19_download/tcn-training",
+  "replay_audit": "artifacts/research/v19_local_audit/audit.json",
+  "dataset": "data/processed/swing_regime_research_v4",
+  "parent_plan": "configs/swing_v15_continuous_folds.json",
+  "seeds": [1729, 1730, 1731],
+  "penalty": 1.0,
+  "windows_previous_quarters": [1, 2, 4, 0],
+  "exposures": [1.0, 0.5],
+  "embargo_days": 8,
+  "warmup": "WAIT until at least50 eligible out-of-sample decision rows exist",
+  "hypothesis": "After full local replay passes, evaluate the same registered1/2/4/all-quarter mature-label isotonic maps as v17 on the new TCN ensemble. Do not choose a winning seed. All mappings fit only earlier out-of-sample scores with label_end before refit minus8days. One continuous cooldown/monthly/position/equity state. Identity comparator must reproduce v19 mean_minus_std portfolio. No new training, leverage, threshold search or independent-test claim.",
+  "target": "Calendar-geometric5%monthly net and globalDD<=20% after fees/funding, all three cost/execution scenarios. Preserve all10branches even if none passes.",
+  "registration": "Registered while downloading v19 metadata, before inspecting v19 predictions or portfolio results. This is an extension of previously explored calibration, not a fresh independent test. No live approval."
+}

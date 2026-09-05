@@ -1,0 +1,18 @@
+{
+  "experiment": "v21-tcn-purged-validation-refit",
+  "model_family": "tcn_fusion",
+  "cloud_driver": "train_tcn_validated.py",
+  "parent_plan": "configs/swing_v15_continuous_folds.json",
+  "dataset": "data/processed/swing_regime_research_v4",
+  "cache": "artifacts/features/swing_sequences_v13_20260905",
+  "seeds": [1729, 1730, 1731],
+  "network": {"width": 512, "tcn_width": 128, "dropout": 0.15, "layers": 6, "heads": 8, "dilations": [1, 2, 4, 8, 16]},
+  "training": {"epochs": 32, "batch_size": 32, "accumulation_steps": 2, "learning_rate": 0.0001, "weight_decay": 0.05, "gradient_clip": 1.0, "amp": true, "window_days": 730, "embargo_days": 8, "minimum_train_decisions": 200},
+  "epoch_selection": {"window_days": 730, "validation_days": 180, "embargo_days": 8, "minimum_train": 200, "minimum_validation": 100, "minimum_improvement": 0.0001, "patience": 5},
+  "ensemble_branches": [{"name": "mean", "penalty": 0.0}, {"name": "mean_minus_std", "penalty": 1.0}],
+  "exposures": [1.0, 0.5],
+  "hypothesis": "Keep v19 24.1M architecture; combat observed opened-OOS overfit with chronological180day inner validation,8day label-end purge, earlystopping then scratch refit on all matured outer training. Lower lr and stronger weight decay jointly change optimization; this is not a pure early-stopping ablation.",
+  "selection": "All3seeds x11folds, maximum32selectionepochs, patience5, earliest validation objective improvement by1e-4. Same payoff/fill/macro objective; constant-validation comparator diagnostic only. Never select on outer predictions or portfolio. Save innerselectedweights, losses, indices, provenance and finalrefitweights. Refit exactly selectedepochs. No winning seed and no confidence leverage.",
+  "target": "5%monthly geometricnet and globalDD<=20% after costs. All dates opened development. No live approval or profit guarantee.",
+  "compute": "Private free KaggleT4x2 independent workers; local inference and backtests only. Timeout12000seconds. Do not mutate v19 artifacts."
+}

@@ -1,0 +1,27 @@
+schema_version: 1
+seed: 1729
+horizons: [12, 48, 288]
+timeframes: [5min, 15min, 1h, 4h]
+wait_band_bps: 8.0
+entry_offset_bps: 2.0
+split_fractions: [0.60, 0.15, 0.10, 0.15]
+embargo_bars: 289
+model:
+  hidden: 64
+  epochs: 40
+  patience: 6
+  batch_size: 256
+  learning_rate: 0.001
+policy:
+  horizon: 48
+  minimum_probability: 0.60
+  minimum_return_bps: 8.0
+  leverage: 1.0
+  stop_atr: 1.5
+  tp1_atr: 1.0
+  tp2_atr: 2.0
+costs:
+  fee_rate_per_fill: 0.0002
+  funding_long_rate: 0.0001
+  funding_short_rate: 0.0
+  funding_interval_hours: 8

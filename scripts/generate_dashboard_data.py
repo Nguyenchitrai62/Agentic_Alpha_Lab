@@ -53,12 +53,14 @@ def _load_backtests(project_root: Path) -> list[dict[str, object]]:
                 {
                     "label": "Mini · 4h locked test",
                     "return": result["total_return"],
+                    "max_drawdown": result["max_drawdown"],
+                    "initial_equity": result["initial_equity"],
                     "gross_pnl": result["gross_pnl"],
                     "fees": result["fees"],
                     "funding": result["funding"],
                     "trades": result["trades"],
                     "profit_factor": result["profit_factor"],
-                    "status": "out_of_sample",
+                    "status": "legacy_ohlc_v1_opened_test",
                 }
             )
         else:
@@ -68,14 +70,29 @@ def _load_backtests(project_root: Path) -> list[dict[str, object]]:
                 {
                     "label": f"{payload['variant'].title()} · {horizon * 5}m",
                     "return": result["total_return"],
+                    "max_drawdown": result["max_drawdown"],
+                    "initial_equity": result["initial_equity"],
                     "gross_pnl": result["gross_pnl"],
                     "fees": result["fees"],
                     "funding": result["funding"],
                     "trades": result["trades"],
                     "profit_factor": result["profit_factor"],
-                    "status": "smoke" if payload["windows"] <= 256 else "research",
+                    "status": payload.get("engine_version", "legacy_ohlc_v1") + ("_smoke" if payload["windows"] <= 256 else "_research"),
                 }
             )
+    mlp_path = project_root / "reports/supervised/mlp_20260905_v1/summary.json"
+    if mlp_path.exists():
+        payload = json.loads(mlp_path.read_text(encoding="utf-8"))
+        result = payload["backtest"]
+        rows.append({"label": "MLP đa khung · 4h", "return": result["total_return"],
+                     "max_drawdown": result["max_drawdown"], "initial_equity": result["initial_equity"],
+                     "gross_pnl": result["gross_pnl"], "fees": result["fees"], "funding": result["funding"],
+                     "trades": result["trades"], "profit_factor": result["profit_factor"],
+                     "status": payload["engine_version"] + "_pipeline_smoke_not_candidate"})
+    for row in rows:
+        for field in ("gross_pnl", "fees", "funding"):
+            row[field] = float(row[field]) * 100 / float(row["initial_equity"])
+        row["initial_equity"] = 100.0
     return rows
 
 
@@ -90,6 +107,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Generate static multi-timeframe Kronos dashboard data")
     parser.add_argument("--variant", default="mini", choices=["mini", "small", "base"])
     parser.add_argument("--paths", type=int, default=16)
+    parser.add_argument("--refresh-reports-only", action="store_true", help="Preserve forecast snapshot timestamp; refresh report table without GPU inference")
     parser.add_argument("--threshold-bps", type=float, default=12.0)
     parser.add_argument("--temperature", type=float, default=0.7)
     parser.add_argument("--top-p", type=float, default=0.9)
@@ -107,6 +125,14 @@ def main() -> None:
     args = parser.parse_args()
 
     project_root = Path.cwd()
+    if args.refresh_reports_only:
+        payload = json.loads(args.output.read_text(encoding="utf-8"))
+        payload["backtests"] = _load_backtests(project_root)
+        payload["reports_updated_at"] = datetime.now(timezone.utc).isoformat()
+        for output in [args.output, args.public_output, args.artifact]:
+            output.parent.mkdir(parents=True, exist_ok=True)
+            output.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+        return
     base = pd.read_parquet(args.data).sort_values("open_time").reset_index(drop=True)
     base["open_time"] = pd.to_datetime(base["open_time"], utc=True)
     base["close_time"] = pd.to_datetime(base["close_time"], utc=True)
