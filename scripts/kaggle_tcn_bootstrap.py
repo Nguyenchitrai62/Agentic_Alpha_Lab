@@ -67,7 +67,8 @@ def main():
         "mode": "independent fold/seed workers", "backtest_location": "local", "live_approved": False}, indent=2))
     workers = []
     driver = plan.get("cloud_driver", "train_tcn_kaggle.py")
-    if driver not in ("train_tcn_kaggle.py", "train_tcn_validated.py", "train_tcn_ranked.py"):
+    if driver not in ("train_tcn_kaggle.py", "train_tcn_validated.py", "train_tcn_ranked.py",
+                      "train_tcn_listwise.py"):
         raise ValueError("Unknown cloud driver")
     for shard in range(2):
         env = dict(os.environ, CUDA_VISIBLE_DEVICES=str(shard), PYTHONPATH=str(bundle / "src"),

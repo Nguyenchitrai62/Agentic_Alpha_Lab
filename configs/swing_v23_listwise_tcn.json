@@ -1,0 +1,46 @@
+{
+  "experiment": "v23-listwise-tcn-utility",
+  "model_family": "tcn_fusion",
+  "cloud_driver": "train_tcn_listwise.py",
+  "parent_plan": "configs/swing_v15_continuous_folds.json",
+  "dataset": "data/processed/swing_regime_research_v4",
+  "cache": "artifacts/features/swing_sequences_v13_20260905",
+  "seeds": [1729, 1730, 1731],
+  "network": {
+    "width": 256,
+    "tcn_width": 64,
+    "dropout": 0.2,
+    "layers": 4,
+    "heads": 4,
+    "dilations": [1, 2, 4, 8, 16]
+  },
+  "training": {
+    "epochs": 8,
+    "batch_size": 32,
+    "accumulation_steps": 2,
+    "learning_rate": 0.0002,
+    "weight_decay": 0.02,
+    "gradient_clip": 1.0,
+    "amp": true,
+    "window_days": 730,
+    "embargo_days": 8,
+    "minimum_train_decisions": 200
+  },
+  "loss": {
+    "scale_percent": 2.0,
+    "listwise_weight": 0.25,
+    "fill_weight": 0.1,
+    "auxiliary_weight": 0.1,
+    "listwise_temperature_percent": 1.5,
+    "listwise_clip_percent": 6.0
+  },
+  "ensemble_branches": [
+    {"name": "mean", "penalty": 0.0},
+    {"name": "mean_minus_std", "penalty": 1.0}
+  ],
+  "exposures": [1.0, 0.5],
+  "hypothesis": "V22 improved within-decision rank correlation from 0.0013 to 0.0389 but its fixed pairwise loss still produced poorly ordered absolute-score buckets and 35% 1x drawdown. Keep the same causal TCN and capacity; replace equal-weight pairwise ranking with a fixed-temperature softmax over realized candidate utility plus a synthetic WAIT action, while retaining Huber payoff, fill and regime auxiliaries.",
+  "selection": "Fixed8 epochs, all3 seeds x11 contiguous folds, no winner-seed or fold selection and no threshold/portfolio tuning. Listwise temperature and clipping plus loss weights are versioned here before training. All dates are opened development, not an independent test.",
+  "target": "Calendar-geometric net >=5% monthly and global drawdown <=20% after normal fee, fee-stress and execution-stress scenarios; report gross, fees, funding, net, coverage and fills. No live approval.",
+  "compute": "Private free Kaggle T4x2 only for heavy training; local GTX1650 inference/replay/backtests. Do not mutate v19/v21/v22 exports."
+}
