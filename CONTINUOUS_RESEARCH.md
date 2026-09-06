@@ -1,13 +1,14 @@
 # Continuous BTC research — active
 
-V31 LIVE SUBMITTED 2026-09-06: private kernel
-`nguynchtrai/btc-swing-v31-short-residual-20260906` version1 is RUNNING after
-one successful push; dataset READY and pre-submit quota28.02 GPU-hours. This is
-the fixed60-day short-window residual-GRU hypothesis in
-`configs/swing_v31_short_window_residual_gru.json`, motivated by the causal
-rolling-prior diagnostic. Do not resubmit. Wait for all33 models, download to a
-new ignored v31 directory, pass the complete local replay audit, then run one
-continuous portfolio state.
+V31 COMPLETE/REJECTED 2026-09-06: private kernel
+`nguynchtrai/btc-swing-v31-short-residual-20260906` finished once with33/33
+models; local replay audit passed all forecasts (maximum error1.073e-6), then
+continuous replay covered4,076 decisions. Best drawdown-safe mean-minus-std
+0.5x was+14.244% normal net/DD15.044%/+0.396% monthly; fee stress+12.024%/
+DD15.224%/+0.337%; execution stress+17.198%/DD15.031%/+0.472%. No branch
+met5% monthly; the1x rows exceeded20% DD. Read `RESEARCH_V31_RESULTS.md`.
+Next hypothesis must address candidate action ranking with a materially
+different representation; no short-window residual or calibration duplicate.
 
 V30 COMPLETE 2026-09-06: the pre-registered causal calibration probe of
 immutable v29 predictions finished locally at

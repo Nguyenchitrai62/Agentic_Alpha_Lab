@@ -1,15 +1,15 @@
 # Handoff for the next coding agent
 
-V31 RUNNING: private Kaggle kernel
-`nguynchtrai/btc-swing-v31-short-residual-20260906` version1 was submitted
-exactly once after the causal 60-day prior diagnostic, fold-size validation,
-package checks, dataset READY and quota/job inventory. Logs/status confirmed
-RUNNING; pre-submit quota was28.02 GPU-hours. Do not resubmit. Wait for all33
-models, download to new ignored `artifacts/kaggle/v31_download`, run
-`scripts/audit_tcn_export.py --plan configs/swing_v31_short_window_residual_gru.json`
-against all models, then run one continuous replay with the passed audit. The
-package archive SHA-256 is
-`61736966aab3b48b03760fe68c82b348aa2a082abc388a1c4661a394d48d9aab`.
+V31 COMPLETE/REJECTED: private Kaggle kernel
+`nguynchtrai/btc-swing-v31-short-residual-20260906` version1 finished once
+with33/33 models after the causal 60-day prior diagnostic. The full local
+replay audit passed (maximum error1.073e-6) and one continuous replay covered
+4,076 decisions. Best drawdown-safe branch was mean-minus-std0.5x:
+normal+14.244% net/DD15.044%/+0.396% monthly; fee stress+12.024%/DD15.224%/
++0.337%; execution stress+17.198%/DD15.031%/+0.472%. All1x branches exceeded
+20% DD and no branch reached5% monthly. Read `RESEARCH_V31_RESULTS.md` and do
+not resubmit. Diagnostics found MSE8.6705 vs constant8.7271 but worse Brier
+and rank correlation; v32 must change action-ranking representation.
 
 V30 COMPLETE: the pre-registered causal calibration probe of immutable v29
 predictions is finished at `artifacts/research/v30_v29_calibration`. Isotonic-4

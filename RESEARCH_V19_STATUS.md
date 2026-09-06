@@ -3,10 +3,14 @@
 ## Current verified state
 
 CURRENT2026-09-06: v31 short-window residual-GRU private kernel
-`nguynchtrai/btc-swing-v31-short-residual-20260906` version1 is RUNNING after
-one successful push. Dataset READY; pre-submit quota28.02 GPU-hours; package
-SHA-256 `61736966aab3b48b03760fe68c82b348aa2a082abc388a1c4661a394d48d9aab`.
-Do not resubmit. Wait for all33 models, then download/audit/replay locally.
+`nguynchtrai/btc-swing-v31-short-residual-20260906` version1 is
+COMPLETE/REJECTED with33/33 models. Full local replay audit passed all
+forecasts (maximum error1.073e-6), and continuous replay covered4,076
+decisions. Best drawdown-safe branch was mean-minus-std0.5x:
+normal+14.244% net/DD15.044%/+0.396% monthly; fee stress+12.024%/DD15.224%/
++0.337%; execution stress+17.198%/DD15.031%/+0.472%. No branch met5% monthly;
+1x exceeded20% DD. Read `RESEARCH_V31_RESULTS.md`; v32 must materially change
+action-ranking representation. Do not resubmit v31.
 
 CURRENT2026-09-06: v30 causal calibration of immutable v29 predictions is
 COMPLETE. Isotonic-4 at1x reached+122.798% normal net but DD20.086% and

@@ -1,13 +1,14 @@
 # BTC research ledger
 
-CURRENT ACTIVE 2026-09-06: v31 short-window residual-GRU was submitted exactly
-once to private Kaggle kernel
-`nguynchtrai/btc-swing-v31-short-residual-20260906`; status RUNNING. Dataset is
-READY, package archive SHA-256 is
-`61736966aab3b48b03760fe68c82b348aa2a082abc388a1c4661a394d48d9aab`, and the
-pre-submit quota was28.02 GPU-hours. Wait for all33 models, then download to a
-new ignored v31 directory, run the full local replay audit and one continuous
-portfolio replay. Do not resubmit.
+CURRENT 2026-09-06: v31 short-window residual-GRU is COMPLETE/REJECTED. The
+private Kaggle export finished once with33/33 models; the local full replay
+audit passed all forecasts (maximum error1.073e-6), and the continuous replay
+covered4,076 decisions. Best drawdown-safe fixed branch was mean-minus-std
+0.5x: normal+14.244% net/DD15.044%/+0.396% monthly; fee stress+12.024%/
+DD15.224%/+0.337%; execution stress+17.198%/DD15.031%/+0.472%. The 1x rows
+exceeded20% DD and every row missed5% monthly. Read `RESEARCH_V31_RESULTS.md`;
+do not resubmit. The next registration must change action-ranking
+representation, not repeat short-window residual-GRU or calibration.
 
 CURRENT AUTHORITATIVE 2026-09-06: v30 causal calibration of v29 is COMPLETE
 as a read-only local probe. The strongest fixed map was isotonic-4 at1x:
