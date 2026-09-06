@@ -1,0 +1,13 @@
+{
+  "experiment": "swing-v44-causal-v29-meta-ranker-probe",
+  "source": "artifacts/kaggle/v29_download/tcn-training",
+  "replay_audit": "artifacts/research/v29_local_audit/audit.json",
+  "dataset": "data/processed/swing_regime_research_v4",
+  "seeds": [1729, 1730, 1731],
+  "model": {"learning_rate": 0.05, "max_iter": 160, "max_leaf_nodes": 15, "min_samples_leaf": 32, "l2_regularization": 10.0, "max_bins": 127},
+  "training": {"window_days": 730, "embargo_days": 8, "minimum_train_decisions": 200},
+  "features": "40 causal context features + 6 candidate parameters + each v29 seed expected-net and fill outputs; raw forecasts are available only for earlier completed folds",
+  "selection": "One fixed shared HGB net/fill meta-ranker per chronological fold; no winner fold, seed, threshold, or portfolio tuning.",
+  "target": "Calendar-geometric net >=5% monthly and global drawdown <=20% after normal fee, fee-stress and execution-stress scenarios; at least30 fills in each scenario.",
+  "compute": "Local CPU inference/meta-fit/replay only; no cloud upload; research-only and no live approval."
+}

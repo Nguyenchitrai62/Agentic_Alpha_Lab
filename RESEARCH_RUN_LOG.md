@@ -1,5 +1,10 @@
 # BTC research ledger
 
+CURRENT 2026-09-06: v44 COMPLETE/REJECTED. The causal v29 meta-ranker reached
+only0.218%/month in execution stress with24.745% DD and66 fills (normal
+0.559%/month,28.423% DD). Read `RESEARCH_V44_RESULTS.md`; the local
+meta-ranking path did not close the gate.
+
 CURRENT 2026-09-06: v43 COMPLETE/REJECTED. Combining the v42 7-day horizon
 with score tiers reached2.071%/month in execution stress at39 fills; the
 0.5% tier fell to1.784%/month with30 fills. No variant reaches the5% monthly,

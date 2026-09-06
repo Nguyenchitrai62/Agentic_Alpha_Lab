@@ -1,5 +1,9 @@
 # Handoff for the next coding agent
 
+V44 COMPLETE/REJECTED: read `RESEARCH_V44_RESULTS.md`. The causal v29
+meta-ranker produced only0.218%/month in execution stress,24.745% DD, and66
+fills; do not repeat this meta-HGB path without a new representation.
+
 V43 COMPLETE/REJECTED: read `RESEARCH_V43_RESULTS.md`. The best local
 combination was v42 holding_7d with the0.3% score gate:2.071%/month in
 execution stress,15.531% DD,39 fills. The0.5% gate had30 fills but only1.784%

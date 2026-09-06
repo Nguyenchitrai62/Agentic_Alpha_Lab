@@ -1,5 +1,9 @@
 # Continuous BTC research — active
 
+V44 COMPLETE/REJECTED 2026-09-06: the causal v29 meta-ranker reached only
+0.218%/month in execution stress with24.745% DD and66 fills; normal was
+0.559%/month with28.423% DD. Read `RESEARCH_V44_RESULTS.md`.
+
 V43 COMPLETE/REJECTED 2026-09-06: combining the v42 7-day horizon with score
 tiers reached2.071%/month in execution stress at39 fills; the0.5% tier reached
 1.784% with30 fills. No variant reaches the5% monthly,20% global-DD,30-fill
