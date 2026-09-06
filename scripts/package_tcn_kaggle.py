@@ -25,7 +25,8 @@ def collect(plan_path):
         paths.append(cache / name)
     for name in ("tcn_fusion_value.py", "temporal_value.py", "macro_micro_value.py",
                  "hurdle_temporal_value.py", "hurdle_ranked_loss.py",
-                 "residual_temporal_value.py", "residual_ranked_loss.py"):
+                 "residual_temporal_value.py", "residual_ranked_loss.py",
+                 "top_action_loss.py"):
         paths.append(ROOT / "src/agentic_alpha_lab/models" / name)
     # Namespace packages work without an __init__; include actual initializers if present.
     paths += [p for p in (ROOT / "src/agentic_alpha_lab/__init__.py", ROOT / "src/agentic_alpha_lab/models/__init__.py") if p.exists()]
@@ -34,7 +35,7 @@ def collect(plan_path):
         if plan["cloud_driver"] not in {"train_tcn_validated.py", "train_tcn_ranked.py",
                                          "train_tcn_listwise.py", "train_tcn_ranked_gate.py",
                                          "train_gru_ranked.py", "train_gru_hurdle.py",
-                                         "train_gru_residual.py"}:
+                                         "train_gru_residual.py", "train_gru_top_action.py"}:
             raise ValueError("Cloud driver is not allowlisted")
         paths.append(ROOT / "scripts" / plan["cloud_driver"])
         if plan["cloud_driver"] == "train_tcn_validated.py":
@@ -47,6 +48,8 @@ def collect(plan_path):
             paths.append(ROOT / "src/agentic_alpha_lab/models/ranked_loss.py")
         elif plan["cloud_driver"] == "train_gru_residual.py":
             paths.append(ROOT / "src/agentic_alpha_lab/models/ranked_loss.py")
+        elif plan["cloud_driver"] == "train_gru_top_action.py":
+            paths.append(ROOT / "src/agentic_alpha_lab/models/top_action_loss.py")
         else:
             paths.append(ROOT / "src/agentic_alpha_lab/models/ranked_loss.py")
             paths.append(ROOT / "src/agentic_alpha_lab/models/ranked_gate_loss.py")

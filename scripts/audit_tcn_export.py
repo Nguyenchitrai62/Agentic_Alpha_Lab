@@ -102,8 +102,11 @@ def main(a):
                  "src/agentic_alpha_lab/models/temporal_value.py",
                  "src/agentic_alpha_lab/models/macro_micro_value.py", "scripts/train_tcn_kaggle.py"]
     if family in {"gru_temporal", "gru_hurdle", "gru_residual"}:
-        source_names += ["scripts/" + plan["cloud_driver"],
-                         "src/agentic_alpha_lab/models/ranked_loss.py"]
+        source_names += ["scripts/" + plan["cloud_driver"]]
+        if plan["cloud_driver"] == "train_gru_top_action.py":
+            source_names += ["src/agentic_alpha_lab/models/top_action_loss.py"]
+        else:
+            source_names += ["src/agentic_alpha_lab/models/ranked_loss.py"]
     if family == "gru_hurdle":
         source_names += ["src/agentic_alpha_lab/models/hurdle_ranked_loss.py"]
     if family == "gru_residual":
