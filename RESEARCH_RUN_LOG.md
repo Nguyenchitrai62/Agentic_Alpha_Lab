@@ -1,5 +1,14 @@
 # BTC research ledger
 
+CURRENT ACTIVE 2026-09-06: v31 short-window residual-GRU was submitted exactly
+once to private Kaggle kernel
+`nguynchtrai/btc-swing-v31-short-residual-20260906`; status RUNNING. Dataset is
+READY, package archive SHA-256 is
+`61736966aab3b48b03760fe68c82b348aa2a082abc388a1c4661a394d48d9aab`, and the
+pre-submit quota was28.02 GPU-hours. Wait for all33 models, then download to a
+new ignored v31 directory, run the full local replay audit and one continuous
+portfolio replay. Do not resubmit.
+
 CURRENT AUTHORITATIVE 2026-09-06: v30 causal calibration of v29 is COMPLETE
 as a read-only local probe. The strongest fixed map was isotonic-4 at1x:
 normal+122.798% net/DD20.086% and fee-stress+112.963%/DD20.473%, only

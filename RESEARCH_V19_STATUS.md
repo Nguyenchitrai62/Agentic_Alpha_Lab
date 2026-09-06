@@ -2,6 +2,12 @@
 
 ## Current verified state
 
+CURRENT2026-09-06: v31 short-window residual-GRU private kernel
+`nguynchtrai/btc-swing-v31-short-residual-20260906` version1 is RUNNING after
+one successful push. Dataset READY; pre-submit quota28.02 GPU-hours; package
+SHA-256 `61736966aab3b48b03760fe68c82b348aa2a082abc388a1c4661a394d48d9aab`.
+Do not resubmit. Wait for all33 models, then download/audit/replay locally.
+
 CURRENT2026-09-06: v30 causal calibration of immutable v29 predictions is
 COMPLETE. Isotonic-4 at1x reached+122.798% normal net but DD20.086% and
 +112.963% fee-stress net but DD20.473%; monthly geometric returns were2.405%

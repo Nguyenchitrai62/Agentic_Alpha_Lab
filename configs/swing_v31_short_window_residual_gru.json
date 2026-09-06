@@ -1,0 +1,42 @@
+{
+  "experiment": "v31-short-window-residual-gru",
+  "model_family": "gru_residual",
+  "cloud_driver": "train_gru_residual.py",
+  "parent_plan": "configs/swing_v15_continuous_folds.json",
+  "dataset": "data/processed/swing_regime_research_v4",
+  "cache": "artifacts/features/swing_sequences_v13_20260905",
+  "seeds": [1729, 1730, 1731],
+  "network": {
+    "width": 48,
+    "dropout": 0.15
+  },
+  "training": {
+    "epochs": 16,
+    "batch_size": 64,
+    "accumulation_steps": 1,
+    "learning_rate": 0.0003,
+    "weight_decay": 0.01,
+    "gradient_clip": 1.0,
+    "amp": false,
+    "window_days": 60,
+    "embargo_days": 8,
+    "minimum_train_decisions": 160
+  },
+  "loss": {
+    "scale_percent": 2.0,
+    "ranking_weight": 0.5,
+    "fill_weight": 0.1,
+    "auxiliary_weight": 0.1,
+    "ranking_temperature_percent": 1.0,
+    "ranking_tie_band_percent": 0.25
+  },
+  "ensemble_branches": [
+    {"name": "mean", "penalty": 0.0},
+    {"name": "mean_minus_std", "penalty": 1.0}
+  ],
+  "exposures": [1.0, 0.5],
+  "hypothesis": "V31 tests regime adaptation after the causal rolling-prior diagnostic found its strongest development edge with a 60-day history. Use the unchanged residual-GRU architecture, loss and policy, but fit each fold only on the latest 60 days of matured labels so its candidate prior and residual target describe the same recent regime. This is a fixed short-window hypothesis, not a post-hoc threshold or branch search.",
+  "selection": "Fixed60-day training window with the fixed minimum160 matured training rows (actual folds contain180),16 epochs, all3 seeds x11 contiguous folds, no winner-seed or fold selection and no threshold/portfolio tuning. The 8-day label-end embargo remains fixed. All dates are opened development, not an independent test.",
+  "target": "Calendar-geometric net >=5% monthly and global drawdown <=20% after normal fee, fee-stress and execution-stress scenarios; report gross, fees, funding, coverage and fills. No live approval.",
+  "compute": "Private free Kaggle T4x2 only for heavy training; local GTX1650 inference/replay/backtests. Do not mutate v19/v21/v22/v23/v25/v26/v28/v29 exports."
+}
