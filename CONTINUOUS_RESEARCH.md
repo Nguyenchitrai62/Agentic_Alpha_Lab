@@ -1,5 +1,14 @@
 # Continuous BTC research — active
 
+V32 REGISTERED/PACKAGED 2026-09-06: top-action/WAIT causal GRU is ready for one
+private Kaggle run. Archive SHA-256 is
+`ed68a90b153fe8caea81148501096330323d40ad81a5aeb97eeb3bb4425e0cb7` and the
+pre-submit quota is28.01 GPU-hours. It replaces pairwise utility ranking with
+a fixed best-action-versus-WAIT classification target while retaining a
+percent-scale Huber score, fill head and direction auxiliary. Tests and fold
+chronology passed; no kernel has been submitted. Upload, submit once, full
+audit, then continuous replay. Do not submit a duplicate.
+
 V31 COMPLETE/REJECTED 2026-09-06: private kernel
 `nguynchtrai/btc-swing-v31-short-residual-20260906` finished once with33/33
 models; local replay audit passed all forecasts (maximum error1.073e-6), then

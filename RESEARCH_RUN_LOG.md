@@ -1,5 +1,15 @@
 # BTC research ledger
 
+CURRENT REGISTERED 2026-09-06: v32 top-action/WAIT GRU is packaged and ready
+for one private Kaggle submission. Package archive SHA-256 is
+`ed68a90b153fe8caea81148501096330323d40ad81a5aeb97eeb3bb4425e0cb7`, bootstrap
+SHA-256 is `410cb05dc61ff09c71bcd32842d575d6bd1c9adfa6bbfda03a0673454458379c`,
+and the pre-submit quota is28.01 GPU-hours. The new fixed objective classifies
+the best executable action versus WAIT and retains Huber payoff/fill/direction
+terms; chronology and full pytest (`145 passed`) are verified. No v32 kernel has
+been submitted yet. Upload the private dataset, submit at most once, then audit
+all33 models locally before any portfolio result.
+
 CURRENT 2026-09-06: v31 short-window residual-GRU is COMPLETE/REJECTED. The
 private Kaggle export finished once with33/33 models; the local full replay
 audit passed all forecasts (maximum error1.073e-6), and the continuous replay

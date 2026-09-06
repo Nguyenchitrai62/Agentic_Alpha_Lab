@@ -2,6 +2,14 @@
 
 ## Current verified state
 
+CURRENT2026-09-06: v32 top-action/WAIT causal GRU is registered and packaged,
+not yet submitted. Package archive SHA-256
+`ed68a90b153fe8caea81148501096330323d40ad81a5aeb97eeb3bb4425e0cb7`; bootstrap
+SHA-256 `410cb05dc61ff09c71bcd32842d575d6bd1c9adfa6bbfda03a0673454458379c`.
+Quota snapshot28.01/30.00 GPU-hours; no v32 job is running. Full pytest145
+passed. Next: upload private data, submit one kernel, download and audit all33
+models, then run one continuous portfolio state. No result yet.
+
 CURRENT2026-09-06: v31 short-window residual-GRU private kernel
 `nguynchtrai/btc-swing-v31-short-residual-20260906` version1 is
 COMPLETE/REJECTED with33/33 models. Full local replay audit passed all

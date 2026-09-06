@@ -1,5 +1,16 @@
 # Handoff for the next coding agent
 
+V32 REGISTERED/PACKAGED: `configs/swing_v32_top_action_gru.json` and its
+top-action/WAIT loss/trainer are committed and tested (`145 passed`). The
+allowlisted package is
+`artifacts/kaggle/btc_swing_v32_top_action_gru_20260906`; archive SHA-256 is
+`ed68a90b153fe8caea81148501096330323d40ad81a5aeb97eeb3bb4425e0cb7`, bootstrap
+SHA-256 is `410cb05dc61ff09c71bcd32842d575d6bd1c9adfa6bbfda03a0673454458379c`.
+Quota snapshot is28.01/30.00 GPU-hours, refresh2026-09-12; no v32 kernel exists
+or is running. Next safe action: check dataset/job inventory, upload the private
+dataset and submit exactly one kernel, then download/audit all33 models. No
+portfolio evaluation is valid before the full audit.
+
 V31 COMPLETE/REJECTED: private Kaggle kernel
 `nguynchtrai/btc-swing-v31-short-residual-20260906` version1 finished once
 with33/33 models after the causal 60-day prior diagnostic. The full local
