@@ -35,7 +35,7 @@ def partition_indices(decisions,parent):
 
 
 def require_tcn_audit(plan,source,audit_path):
-    if plan.get("model_family") not in {"tcn_fusion", "gru_temporal", "gru_hurdle", "gru_residual"}:
+    if plan.get("model_family") not in {"tcn_fusion", "gru_temporal", "gru_hurdle", "gru_residual", "gru_action_margin"}:
         return
     if audit_path is None:
         raise ValueError("TCN cloud exports require a completed local full-forecast audit")

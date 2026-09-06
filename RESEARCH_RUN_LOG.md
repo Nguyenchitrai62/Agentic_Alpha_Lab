@@ -1,15 +1,26 @@
 # BTC research ledger
 
-CURRENT ACTIVE 2026-09-06: v32 top-action/WAIT GRU version1 was submitted once
-to private Kaggle kernel `nguynchtrai/btc-swing-v32-top-action-20260906`; API
-status is RUNNING. Package archive SHA-256 is
-`ed68a90b153fe8caea81148501096330323d40ad81a5aeb97eeb3bb4425e0cb7`, bootstrap
-SHA-256 is `410cb05dc61ff09c71bcd32842d575d6bd1c9adfa6bbfda03a0673454458379c`,
-and the pre-submit quota was28.01 GPU-hours. The new fixed objective classifies
-the best executable action versus WAIT and retains Huber payoff/fill/direction
-terms; chronology and full pytest (`145 passed`) are verified. Wait for the
-complete 33-model export; do not resubmit or inspect a partial subset as a
-portfolio result.
+CURRENT REGISTERED/PACKAGED 2026-09-06: v33 separate candidate-vs-WAIT
+action-margin GRU is ready for one private Kaggle submission. The fixed
+candidate-minus-WAIT inference margin, loss and 1x/0.5x branches are recorded
+in `configs/swing_v33_action_margin_gru.json`; full pytest is `147 passed` and
+the causal real-data smoke is finite. Package archive SHA-256 is
+`915f89e4476684646f11f44895830ec6d0eadd54b21e504b94ff27287e58766f`, bootstrap
+SHA-256 is `5840bb415fde8bdec54153f45b4571fda8087c42e52f7bdc2939cfbb83de9515`.
+Kaggle inventory shows v32 COMPLETE and no v33 kernel; the last quota snapshot
+was27.98 GPU-hours with refresh2026-09-12. Submit at most one v33 kernel, then
+wait for all33 models before downloading or evaluating it.
+
+CURRENT 2026-09-06: v32 top-action/WAIT GRU is COMPLETE/REJECTED. The private
+kernel `nguynchtrai/btc-swing-v32-top-action-20260906` finished exactly once
+with33/33 models and worker exit codes[0,0]. Local GPU replay passed all
+forecasts (maximum error2.384e-6), and continuous replay covered4,076
+decisions. Every fixed branch missed5% monthly; the safest mean0.5x row lost
+1.967% normal net/DD18.807%, while the strongest positive execution row still
+failed normal/fee and had DD21.823%. Diagnostics found MSE8.7939 vs constant
+8.3653 and rank correlation−.00178. Read `RESEARCH_V32_RESULTS.md`; do not
+resubmit. V33 must use a separate action-logit inference adapter, not the
+tied-logit objective.
 
 CURRENT 2026-09-06: v31 short-window residual-GRU is COMPLETE/REJECTED. The
 private Kaggle export finished once with33/33 models; the local full replay

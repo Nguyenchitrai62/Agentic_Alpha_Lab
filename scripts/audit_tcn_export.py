@@ -15,6 +15,7 @@ from agentic_alpha_lab.models.temporal_value import TemporalValue as GRUTemporal
 from agentic_alpha_lab.models.temporal_value import predict
 from agentic_alpha_lab.models.hurdle_temporal_value import HurdleTemporalValue, hurdle_predict
 from agentic_alpha_lab.models.residual_temporal_value import ResidualTemporalValue, residual_predict
+from agentic_alpha_lab.models.action_margin_value import ActionMarginValue, predict_action_margin
 from agentic_alpha_lab.models.ensemble_value import combine
 from agentic_alpha_lab.backtest.swing import swing_signals
 from train_tcn_kaggle import digest, fold_indices, load_inputs, stable_evaluation_backend, write_json
@@ -84,7 +85,7 @@ def main(a):
     stable_evaluation_backend()
     plan = json.loads(a.plan.read_text())
     family = plan.get("model_family")
-    if family not in {"tcn_fusion", "gru_temporal", "gru_hurdle", "gru_residual"}:
+    if family not in {"tcn_fusion", "gru_temporal", "gru_hurdle", "gru_residual", "gru_action_margin"}:
         raise ValueError("Unsupported temporal architecture")
     summary = json.loads((a.source / "summary.json").read_text())
     require_complete(summary, plan)
@@ -96,15 +97,18 @@ def main(a):
         "gru_temporal": "src/agentic_alpha_lab/models/temporal_value.py",
         "gru_hurdle": "src/agentic_alpha_lab/models/hurdle_temporal_value.py",
         "gru_residual": "src/agentic_alpha_lab/models/residual_temporal_value.py",
+        "gru_action_margin": "src/agentic_alpha_lab/models/action_margin_value.py",
     }[family]
     source_names = [a.plan.resolve().relative_to(ROOT).as_posix(), plan["parent_plan"],
                  "src/agentic_alpha_lab/models/tcn_fusion_value.py",
                  "src/agentic_alpha_lab/models/temporal_value.py",
                  "src/agentic_alpha_lab/models/macro_micro_value.py", "scripts/train_tcn_kaggle.py"]
-    if family in {"gru_temporal", "gru_hurdle", "gru_residual"}:
+    if family in {"gru_temporal", "gru_hurdle", "gru_residual", "gru_action_margin"}:
         source_names += ["scripts/" + plan["cloud_driver"]]
         if plan["cloud_driver"] == "train_gru_top_action.py":
             source_names += ["src/agentic_alpha_lab/models/top_action_loss.py"]
+        elif plan["cloud_driver"] == "train_gru_action_margin.py":
+            source_names += ["src/agentic_alpha_lab/models/action_margin_loss.py"]
         else:
             source_names += ["src/agentic_alpha_lab/models/ranked_loss.py"]
     if family == "gru_hurdle":
@@ -151,7 +155,8 @@ def main(a):
             architecture = {"tcn_fusion": TCNTemporalValue,
                             "gru_temporal": GRUTemporalValue,
                             "gru_hurdle": HurdleTemporalValue,
-                            "gru_residual": ResidualTemporalValue}[family]
+                            "gru_residual": ResidualTemporalValue,
+                            "gru_action_margin": ActionMarginValue}[family]
             model = architecture(candidates, **plan["network"])
             model.load_state_dict(load_file(str(weights)))
             np.testing.assert_array_equal(model.candidates.numpy(), candidates)
@@ -168,7 +173,10 @@ def main(a):
             if cloud.shape != (len(test), 16, 6):
                 raise ValueError("Invalid exported prediction shape")
             predictor = {"gru_hurdle": hurdle_predict,
-                         "gru_residual": residual_predict}.get(family, predict)
+                         "gru_residual": residual_predict,
+                         "gru_action_margin": lambda model, sequence, features, batch_size: predict_action_margin(
+                             model, sequence, features, batch_size=batch_size,
+                             margin_scale_percent=plan["loss"]["margin_scale_percent"])}.get(family, predict)
             local = predictor(model, sequence[test], features[test], batch_size=a.batch_size)
             error = check_numeric(local, cloud)
             row = {"seed": seed, "fold": fold, "decisions": len(test), "max_error": error}

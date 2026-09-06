@@ -1,16 +1,26 @@
 # Handoff for the next coding agent
 
-V32 ACTIVE: private Kaggle kernel
-`nguynchtrai/btc-swing-v32-top-action-20260906` version1 was submitted exactly
-once and API status is RUNNING. `configs/swing_v32_top_action_gru.json` and its
-top-action/WAIT loss/trainer are committed and tested (`145 passed`). The
-allowlisted package is
-`artifacts/kaggle/btc_swing_v32_top_action_gru_20260906`; archive SHA-256 is
-`ed68a90b153fe8caea81148501096330323d40ad81a5aeb97eeb3bb4425e0cb7`, bootstrap
-SHA-256 is `410cb05dc61ff09c71bcd32842d575d6bd1c9adfa6bbfda03a0673454458379c`.
-Pre-submit quota was28.01/30.00 GPU-hours, refresh2026-09-12. Wait for
-completion, download/audit all33 models and only then run the continuous
-portfolio. Do not resubmit.
+V33 REGISTERED/PACKAGED: the separate candidate-vs-WAIT action-margin GRU is
+ready for one private Kaggle submission. Use
+`configs/swing_v33_action_margin_gru.json` and package directory
+`artifacts/kaggle/btc_swing_v33_action_margin_gru_20260906`; archive SHA-256 is
+`915f89e4476684646f11f44895830ec6d0eadd54b21e504b94ff27287e58766f`, bootstrap
+SHA-256 is `5840bb415fde8bdec54153f45b4571fda8087c42e52f7bdc2939cfbb83de9515`.
+The causal probe was negative, but it did not include the registered sequence
+encoder; the cloud hypothesis is the explicit action-logit adapter. Inventory
+confirmed v32 COMPLETE, no v33 kernel, and the latest quota snapshot was
+27.98/30.00 GPU-hours (refresh2026-09-12). Submit at most once; then download,
+audit all33 models, run continuous replay and diagnostics. Do not use partial
+outputs as evidence.
+
+V32 COMPLETE/REJECTED: private Kaggle kernel
+`nguynchtrai/btc-swing-v32-top-action-20260906` finished exactly once with
+33/33 models. Local replay passed (maximum error2.384e-6); continuous replay
+covered4,076 decisions and every branch missed5% monthly. Best drawdown-safe
+row was mean0.5x at−1.967% normal net/DD18.807%. Diagnostics had MSE8.7939 vs
+constant8.3653 and rank correlation−.00178. Read `RESEARCH_V32_RESULTS.md`;
+do not resubmit. The next hypothesis is v33: separate candidate-vs-WAIT logits
+with a registered inference adapter.
 
 V31 COMPLETE/REJECTED: private Kaggle kernel
 `nguynchtrai/btc-swing-v31-short-residual-20260906` version1 finished once

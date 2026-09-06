@@ -1,14 +1,22 @@
 # Continuous BTC research — active
 
-V32 ACTIVE 2026-09-06: top-action/WAIT causal GRU version1 was submitted once
-to private Kaggle kernel `nguynchtrai/btc-swing-v32-top-action-20260906`; API
-status is RUNNING. Archive SHA-256 is
-`ed68a90b153fe8caea81148501096330323d40ad81a5aeb97eeb3bb4425e0cb7` and the
-pre-submit quota was28.01 GPU-hours. It replaces pairwise utility ranking with
-a fixed best-action-versus-WAIT classification target while retaining a
-percent-scale Huber score, fill head and direction auxiliary. Tests and fold
-chronology passed. Wait for all33 models, then download, full audit and one
-continuous replay. Do not submit a duplicate.
+V33 REGISTERED/PACKAGED 2026-09-06: separate candidate-vs-WAIT action-margin
+GRU is ready for one private Kaggle run. Its fixed logit-margin inference
+adapter, chronology and loss are in `configs/swing_v33_action_margin_gru.json`;
+pytest passed147 tests. Package archive SHA-256 is
+`915f89e4476684646f11f44895830ec6d0eadd54b21e504b94ff27287e58766f` and the
+last quota snapshot was27.98 GPU-hours. Submit only once after confirming the
+inventory, then require all33 models, full replay audit and one continuous
+portfolio evaluation.
+
+V32 COMPLETE/REJECTED 2026-09-06: the top-action/WAIT causal GRU kernel
+`nguynchtrai/btc-swing-v32-top-action-20260906` finished once with33/33 models;
+full local replay passed (maximum error2.384e-6) and continuous replay covered
+4,076 decisions. Every registered branch missed5% monthly. Best drawdown-safe
+row was mean0.5x at−1.967% normal net/DD18.807%; diagnostics had MSE8.7939 vs
+constant8.3653 and rank correlation−.00178. Read `RESEARCH_V32_RESULTS.md`.
+V33 must separate action logits from the payoff score and register its inference
+adapter before any cloud run; do not resubmit v32.
 
 V31 COMPLETE/REJECTED 2026-09-06: private kernel
 `nguynchtrai/btc-swing-v31-short-residual-20260906` finished once with33/33

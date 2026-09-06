@@ -2,14 +2,23 @@
 
 ## Current verified state
 
-CURRENT2026-09-06: v32 top-action/WAIT causal GRU version1 was submitted once
-to private Kaggle kernel `nguynchtrai/btc-swing-v32-top-action-20260906`; API
-status is RUNNING. Package archive SHA-256
-`ed68a90b153fe8caea81148501096330323d40ad81a5aeb97eeb3bb4425e0cb7`; bootstrap
-SHA-256 `410cb05dc61ff09c71bcd32842d575d6bd1c9adfa6bbfda03a0673454458379c`.
-Pre-submit quota was28.01/30.00 GPU-hours. Full pytest145 passed. Wait for
-completion, download and audit all33 models, then run one continuous portfolio
-state. Do not resubmit; no result yet.
+CURRENT2026-09-06: v33 separate candidate-vs-WAIT action-margin GRU is
+REGISTERED/PACKAGED but not submitted. Its fixed logit-margin inference adapter
+and loss are in `configs/swing_v33_action_margin_gru.json`; full pytest147 passed.
+Package archive SHA-256
+`915f89e4476684646f11f44895830ec6d0eadd54b21e504b94ff27287e58766f`; bootstrap
+SHA-256 `5840bb415fde8bdec54153f45b4571fda8087c42e52f7bdc2939cfbb83de9515`.
+Inventory found v32 COMPLETE and no v33 kernel; latest quota snapshot was
+27.98/30.00 GPU-hours. Submit only once, then require all33 models and a full
+local audit before portfolio evaluation.
+
+CURRENT2026-09-06: v32 top-action/WAIT causal GRU is COMPLETE/REJECTED. Its
+private kernel finished once with33/33 models; local replay passed every
+forecast (maximum error2.384e-6), and the continuous portfolio covered4,076
+decisions. All branches missed5% monthly; mean0.5x was the safest but lost
+1.967% normal net with18.807% DD. Diagnostics found MSE8.7939 vs constant8.3653
+and rank correlation−.00178. Read `RESEARCH_V32_RESULTS.md`; do not resubmit.
+V33 is the next materially different action-selection hypothesis.
 
 CURRENT2026-09-06: v31 short-window residual-GRU private kernel
 `nguynchtrai/btc-swing-v31-short-residual-20260906` version1 is

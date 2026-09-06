@@ -1,0 +1,44 @@
+{
+  "experiment": "v33-action-margin-gru",
+  "model_family": "gru_action_margin",
+  "cloud_driver": "train_gru_action_margin.py",
+  "parent_plan": "configs/swing_v15_continuous_folds.json",
+  "dataset": "data/processed/swing_regime_research_v4",
+  "cache": "artifacts/features/swing_sequences_v13_20260905",
+  "seeds": [1729, 1730, 1731],
+  "network": {
+    "width": 48,
+    "dropout": 0.15
+  },
+  "training": {
+    "epochs": 16,
+    "batch_size": 64,
+    "accumulation_steps": 1,
+    "learning_rate": 0.0003,
+    "weight_decay": 0.01,
+    "gradient_clip": 1.0,
+    "amp": false,
+    "window_days": 730,
+    "embargo_days": 8,
+    "minimum_train_decisions": 200
+  },
+  "loss": {
+    "scale_percent": 2.0,
+    "margin_scale_percent": 1.0,
+    "action_weight": 1.0,
+    "margin_regression_weight": 0.25,
+    "fill_weight": 0.1,
+    "auxiliary_weight": 0.1,
+    "minimum_action_percent": 0.3,
+    "classification_temperature": 1.0
+  },
+  "ensemble_branches": [
+    {"name": "mean", "penalty": 0.0},
+    {"name": "mean_minus_std", "penalty": 1.0}
+  ],
+  "exposures": [1.0, 0.5],
+  "hypothesis": "V32 tied the WAIT classification logits to the payoff score, and its ensemble rank correlation was -0.00178 versus +0.00135 for the causal constant control. Keep the causal 48-wide GRU, closed-candle sequence, train-only normalization, 730-day matured-label window, folds, 8-day embargo and fixed policy, but give candidate-vs-WAIT action selection its own logits: each candidate receives an action logit and the shared context receives a WAIT logit. The inference adapter uses the fixed candidate-minus-WAIT logit margin at 1 percentage point per logit for the unchanged .3% policy gate, while a separate fill head remains responsible for fill probability. A small margin-regression term anchors the otherwise shift-invariant classifier to percent-scale realized utility. This tests an explicit action-selection adapter, not a tied score loss or post-hoc calibration.",
+  "selection": "The separate action head, fixed 1.0 margin scale, loss weights and temperature are registered before cloud training. Fixed 16 epochs, all 3 seeds x 11 contiguous folds, no winner-seed/fold/threshold/branch selection. The 8-day label-end embargo remains fixed. All dates are opened development, not an independent test.",
+  "target": "Calendar-geometric net >=5% monthly and global drawdown <=20% after normal fee, fee-stress and execution-stress scenarios; report gross, fees, funding, coverage and fills. No live approval.",
+  "compute": "Private free Kaggle T4x2 only for heavy training; local GTX1650 inference/replay/backtests. Do not mutate v19/v21/v22/v23/v25/v26/v28/v29/v31/v32 exports."
+}

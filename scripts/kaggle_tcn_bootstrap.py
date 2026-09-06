@@ -69,7 +69,8 @@ def main():
     driver = plan.get("cloud_driver", "train_tcn_kaggle.py")
     if driver not in ("train_tcn_kaggle.py", "train_tcn_validated.py", "train_tcn_ranked.py",
                       "train_tcn_listwise.py", "train_tcn_ranked_gate.py", "train_gru_ranked.py",
-                      "train_gru_hurdle.py", "train_gru_residual.py", "train_gru_top_action.py"):
+                      "train_gru_hurdle.py", "train_gru_residual.py", "train_gru_top_action.py",
+                      "train_gru_action_margin.py"):
         raise ValueError("Unknown cloud driver")
     for shard in range(2):
         env = dict(os.environ, CUDA_VISIBLE_DEVICES=str(shard), PYTHONPATH=str(bundle / "src"),
