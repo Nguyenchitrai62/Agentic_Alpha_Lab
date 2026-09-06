@@ -1,5 +1,10 @@
 # BTC research ledger
 
+CURRENT 2026-09-06: v43 COMPLETE/REJECTED. Combining the v42 7-day horizon
+with score tiers reached2.071%/month in execution stress at39 fills; the
+0.5% tier fell to1.784%/month with30 fills. No variant reaches the5% monthly,
+20% global-DD,30-fill gate. Read `RESEARCH_V43_RESULTS.md`.
+
 CURRENT 2026-09-06: v40-v42 causal probes are COMPLETE/REJECTED. Score tiers,
 cross-timeframe HGB features, and direction/horizon filters all missed the
 5% monthly,20% global-DD,30-fill gate; the strongest was v42 holding_7d at

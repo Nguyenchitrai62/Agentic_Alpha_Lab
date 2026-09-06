@@ -1,0 +1,14 @@
+{
+  "experiment": "swing-v43-causal-7d-score-probe",
+  "source": "artifacts/research/v30_v29_calibration/isotonic_4/signals.parquet",
+  "dataset": "data/processed/swing_regime_research_v4",
+  "variants": [
+    {"name": "holding_7d_score_0.3", "holding_bars": 2016, "minimum_expected_net_percent": 0.3},
+    {"name": "holding_7d_score_0.5", "holding_bars": 2016, "minimum_expected_net_percent": 0.5},
+    {"name": "holding_7d_score_0.75", "holding_bars": 2016, "minimum_expected_net_percent": 0.75},
+    {"name": "holding_7d_score_1.0", "holding_bars": 2016, "minimum_expected_net_percent": 1.0}
+  ],
+  "selection": "Fixed filters over immutable v30 selected signals; no variant is selected from a locked test and no live approval is implied.",
+  "target": "Calendar-geometric net >=5% monthly and global drawdown <=20% after normal fee, fee-stress and execution-stress scenarios; at least30 fills in each scenario.",
+  "compute": "Local replay/backtest only; no cloud upload."
+}

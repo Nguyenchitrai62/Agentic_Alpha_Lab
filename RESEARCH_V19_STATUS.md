@@ -2,6 +2,11 @@
 
 ## Current verified state
 
+CURRENT2026-09-06: v43 is COMPLETE/REJECTED. The best 7-day score-tier
+combination reached2.071% monthly in execution stress with15.531% DD and39
+fills; no variant reaches the5% monthly,20% global-DD,30-fill gate. Read
+`RESEARCH_V43_RESULTS.md`.
+
 CURRENT2026-09-06: v40-v42 causal probes are COMPLETE/REJECTED. The best
 holding_7d filter reached2.071% monthly in execution stress with15.531% DD and
 39 fills; no variant reaches the5% monthly,20% global-DD,30-fill gate. Read

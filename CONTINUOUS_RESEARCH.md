@@ -1,5 +1,10 @@
 # Continuous BTC research — active
 
+V43 COMPLETE/REJECTED 2026-09-06: combining the v42 7-day horizon with score
+tiers reached2.071%/month in execution stress at39 fills; the0.5% tier reached
+1.784% with30 fills. No variant reaches the5% monthly,20% global-DD,30-fill
+gate. Read `RESEARCH_V43_RESULTS.md`.
+
 V40-V42 COMPLETE/REJECTED 2026-09-06: score tiers, cross-timeframe HGB
 features, and direction/horizon filters were run over the causal v30 output.
 None reached the5% monthly,20% global-DD,30-fill gate; the best was holding_7d

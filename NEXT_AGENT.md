@@ -1,5 +1,10 @@
 # Handoff for the next coding agent
 
+V43 COMPLETE/REJECTED: read `RESEARCH_V43_RESULTS.md`. The best local
+combination was v42 holding_7d with the0.3% score gate:2.071%/month in
+execution stress,15.531% DD,39 fills. The0.5% gate had30 fills but only1.784%
+monthly. Do not repeat this combination without a new hypothesis.
+
 V40-V42 COMPLETE/REJECTED: read `RESEARCH_V40_V42_RESULTS.md`. The strongest
 local result was the immutable-v30 holding_7d filter at2.071%/month in
 execution stress with15.531% DD and39 fills; it still misses5% monthly. The
