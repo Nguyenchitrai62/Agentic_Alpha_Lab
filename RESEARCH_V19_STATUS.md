@@ -2,6 +2,11 @@
 
 ## Current verified state
 
+CURRENT2026-09-06: v40-v42 causal probes are COMPLETE/REJECTED. The best
+holding_7d filter reached2.071% monthly in execution stress with15.531% DD and
+39 fills; no variant reaches the5% monthly,20% global-DD,30-fill gate. Read
+`RESEARCH_V40_V42_RESULTS.md`.
+
 CURRENT BLOCKER2026-09-06: v36-v39 local causal probes are COMPLETE/REJECTED;
 none reaches the5% monthly,20% global-DD,30-fill gate. Read
 `RESEARCH_V36_V39_RESULTS.md`. V33 is packaged but its private Kaggle upload

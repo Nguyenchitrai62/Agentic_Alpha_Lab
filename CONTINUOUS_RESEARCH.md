@@ -1,5 +1,10 @@
 # Continuous BTC research — active
 
+V40-V42 COMPLETE/REJECTED 2026-09-06: score tiers, cross-timeframe HGB
+features, and direction/horizon filters were run over the causal v30 output.
+None reached the5% monthly,20% global-DD,30-fill gate; the best was holding_7d
+at2.071% monthly in execution stress. Read `RESEARCH_V40_V42_RESULTS.md`.
+
 CURRENT BLOCKER 2026-09-06: v36-v39 local causal probes are complete and
 rejected; none reaches5% monthly,20% global drawdown, and30 fills in every
 scenario. Full metrics and hashes are in `RESEARCH_V36_V39_RESULTS.md`. V33

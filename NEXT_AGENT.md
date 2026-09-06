@@ -1,5 +1,11 @@
 # Handoff for the next coding agent
 
+V40-V42 COMPLETE/REJECTED: read `RESEARCH_V40_V42_RESULTS.md`. The strongest
+local result was the immutable-v30 holding_7d filter at2.071%/month in
+execution stress with15.531% DD and39 fills; it still misses5% monthly. The
+score-tier, cross-timeframe HGB, and direction probes are already run; do not
+repeat them without a new hypothesis.
+
 CURRENT BLOCKER: v36-v39 local causal probes are complete/rejected and no
 candidate reaches the5% monthly,20% global-DD,30-fill gate. See
 `RESEARCH_V36_V39_RESULTS.md`. V33 is packaged but its private Kaggle upload

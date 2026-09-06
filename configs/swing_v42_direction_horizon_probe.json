@@ -1,0 +1,9 @@
+{
+  "experiment": "swing-v42-causal-direction-horizon-probe",
+  "source": "artifacts/research/v30_v29_calibration/isotonic_4/signals.parquet",
+  "dataset": "data/processed/swing_regime_research_v4",
+  "variants": ["all", "long_only", "short_only", "holding_3d", "holding_7d", "long_7d"],
+  "selection": "Fixed diagnostic filters over immutable v30 selected signals; no filter is selected from a locked test and no live approval is implied.",
+  "target": "Calendar-geometric net >=5% monthly and global drawdown <=20% after normal fee, fee-stress and execution-stress scenarios; at least30 fills in each scenario.",
+  "compute": "Local replay/backtest only; no cloud upload."
+}

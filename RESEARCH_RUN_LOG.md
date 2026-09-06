@@ -1,5 +1,11 @@
 # BTC research ledger
 
+CURRENT 2026-09-06: v40-v42 causal probes are COMPLETE/REJECTED. Score tiers,
+cross-timeframe HGB features, and direction/horizon filters all missed the
+5% monthly,20% global-DD,30-fill gate; the strongest was v42 holding_7d at
+2.071%/month in execution stress. Read `RESEARCH_V40_V42_RESULTS.md` and
+preserve the JSON summaries.
+
 CURRENT BLOCKER 2026-09-06: v36-v39 local causal probes are COMPLETE/REJECTED;
 none reaches the5% monthly,20% global-DD,30-fill gate. Read
 `RESEARCH_V36_V39_RESULTS.md` for the exact normal/fee/execution tables and

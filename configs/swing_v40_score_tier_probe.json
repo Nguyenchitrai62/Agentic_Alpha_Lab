@@ -1,0 +1,15 @@
+{
+  "experiment": "swing-v40-causal-score-tier-probe",
+  "source": "artifacts/research/v30_v29_calibration/isotonic_4/predictions.npz",
+  "dataset": "data/processed/swing_regime_research_v4",
+  "thresholds_expected_net_percent": [0.3, 0.5, 0.75, 1.0, 1.25, 1.5, 2.0],
+  "unchanged_policy": {
+    "minimum_fill_score": 0.25,
+    "cooldown_days": 5,
+    "maximum_signals_per_month": 4,
+    "candidate_geometry": "source config unchanged"
+  },
+  "selection": "Fixed score-tier sensitivity; no threshold is selected from a locked test and no live approval is implied.",
+  "target": "Calendar-geometric net >=5% monthly and global drawdown <=20% after normal fee, fee-stress and execution-stress scenarios; at least30 fills in each scenario.",
+  "compute": "Local inference/replay/backtest only; no cloud upload."
+}
