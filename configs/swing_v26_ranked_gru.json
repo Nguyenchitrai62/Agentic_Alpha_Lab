@@ -1,0 +1,42 @@
+{
+  "experiment": "v26-ranked-gru-utility",
+  "model_family": "gru_temporal",
+  "cloud_driver": "train_gru_ranked.py",
+  "parent_plan": "configs/swing_v15_continuous_folds.json",
+  "dataset": "data/processed/swing_regime_research_v4",
+  "cache": "artifacts/features/swing_sequences_v13_20260905",
+  "seeds": [1729, 1730, 1731],
+  "network": {
+    "width": 48,
+    "dropout": 0.15
+  },
+  "training": {
+    "epochs": 16,
+    "batch_size": 64,
+    "accumulation_steps": 1,
+    "learning_rate": 0.0003,
+    "weight_decay": 0.01,
+    "gradient_clip": 1.0,
+    "amp": false,
+    "window_days": 730,
+    "embargo_days": 8,
+    "minimum_train_decisions": 200
+  },
+  "loss": {
+    "scale_percent": 2.0,
+    "ranking_weight": 0.5,
+    "fill_weight": 0.1,
+    "auxiliary_weight": 0.1,
+    "ranking_temperature_percent": 1.0,
+    "ranking_tie_band_percent": 0.25
+  },
+  "ensemble_branches": [
+    {"name": "mean", "penalty": 0.0},
+    {"name": "mean_minus_std", "penalty": 1.0}
+  ],
+  "exposures": [1.0, 0.5],
+  "hypothesis": "The small shared-GRU temporal encoder used by v13/v17 was the only recent learned architecture with positive continuous development net, while the larger TCN follow-ups and their gate/listwise objectives failed. Isolate the architecture effect by keeping the fixed v22 Huber plus pairwise utility ranking objective and using the causal 48-wide GRU over the same five closed-candle frames. All seeds and chronological folds remain mandatory; no threshold, seed or fold tuning.",
+  "selection": "Fixed16 epochs, all3 seeds x11 contiguous folds, no winner-seed or fold selection and no threshold/portfolio tuning. All dates are opened development, not an independent test.",
+  "target": "Calendar-geometric net >=5% monthly and global drawdown <=20% after normal fee, fee-stress and execution-stress scenarios; report gross, fees, funding, net, coverage and fills. No live approval.",
+  "compute": "Private free Kaggle T4x2 only for heavy training; local GTX1650 inference/replay/backtests. Do not mutate v19/v21/v22/v23/v25 exports."
+}

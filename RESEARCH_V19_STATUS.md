@@ -2,10 +2,25 @@
 
 ## Current verified state
 
-CURRENT2026-09-06: v21 is complete and failed the target; v22 ranked-loss TCN
-kernel `nguynchtrai/btc-swing-v22-ranked-20260906` version1 is running. Do not
-resubmit v22. After completion, download/audit all33 models and run the single
-continuous portfolio. See RESEARCH_V21_RESULTS.md for v21 evidence.
+CURRENT2026-09-06: v30 causal calibration of immutable v29 predictions is
+COMPLETE. Isotonic-4 at1x reached+122.798% normal net but DD20.086% and
++112.963% fee-stress net but DD20.473%; monthly geometric returns were2.405%
+and2.268%. Its0.5x row stayed below11% DD but reached only1.233% monthly.
+Read `RESEARCH_V30_RESULTS.md`; no mapping is approved. V29 residual-GRU and
+v28 hurdle-GRU are also complete, audited and rejected. Read
+`RESEARCH_V29_RESULTS.md` and `RESEARCH_V28_RESULTS.md`; do not resubmit them.
+
+V29 audit/portfolio provenance: private kernel
+`nguynchtrai/btc-swing-v29-residual-gru-20260906` finished all33 models on2×
+Tesla T4; local replay maximum error5.722e-6. Best normal row was
+mean-minus-std1x+29.138% net/DD26.255%;0.5x was+15.358%/DD13.481% and+0.425%
+monthly. V28 local replay maximum error7.153e-6; every branch failed. The
+private kernel `nguynchtrai/btc-swing-v25-ranked-gate-20260906` version1 has
+33/33 models, local replay/policy audit passed with maximum error2.1458e-6, and
+continuous replay failed all registered branches. Best mean-minus-std0.5x row:
+−14.207% net, DD31.939%, 107 fills. Read `RESEARCH_V25_RESULTS.md`; do not
+resubmit v25. V22, v23 and v24 are complete failed follow-ups; no deployment or
+live approval exists.
 
 FINAL2026-09-06: Full local audit PASSED; continuousv19 andall10v20calibration
 branches COMPLETE and FAIL usertarget. Read RESEARCH_V19_V20_RESULTS.md for full

@@ -35,7 +35,7 @@ def partition_indices(decisions,parent):
 
 
 def require_tcn_audit(plan,source,audit_path):
-    if plan.get("model_family")!="tcn_fusion":
+    if plan.get("model_family") not in {"tcn_fusion", "gru_temporal", "gru_hurdle", "gru_residual"}:
         return
     if audit_path is None:
         raise ValueError("TCN cloud exports require a completed local full-forecast audit")
@@ -45,6 +45,8 @@ def require_tcn_audit(plan,source,audit_path):
         raise ValueError("Cloud export incomplete or plan mismatch")
     if audit.get("state")!="passed" or not audit.get("all_forecasts_replayed"):
         raise ValueError("Local replay audit has not passed")
+    if audit.get("model_family") is not None and audit.get("model_family") != plan.get("model_family"):
+        raise ValueError("Replay audit architecture mismatch")
     if audit.get("source_summary_sha256")!=sha256(source/"summary.json"):
         raise ValueError("Audit belongs to another training export")
     if audit.get("dataset_manifest_sha256")!=sha256(Path(plan["dataset"])/"manifest.json"):

@@ -1,5 +1,55 @@
 # BTC research ledger
 
+CURRENT AUTHORITATIVE 2026-09-06: v30 causal calibration of v29 is COMPLETE
+as a read-only local probe. The strongest fixed map was isotonic-4 at1x:
+normal+122.798% net/DD20.086% and fee-stress+112.963%/DD20.473%, only
+2.405%/2.268% monthly; it misses both the5% monthly and20% DD gate. The
+0.5x isotonic-4 row stays below11% DD but reaches only1.233% monthly. Preserve
+all mappings; do not promote a map or increase leverage. Full table and hashes
+are in `RESEARCH_V30_RESULTS.md`.
+
+V29 COMPLETE 2026-09-06: residual-GRU cloud export finished once on2×Tesla T4,
+all33 models, and local replay audit passed with maximum error5.722e-6. Best
+normal row was mean-minus-std1x+29.138% net/DD26.255%; its0.5x row was
++15.358%/DD13.481%,+0.425% monthly. Diagnostics: MSE9.8944 vs constant8.3653,
+rank correlation.0739. Reject; read `RESEARCH_V29_RESULTS.md` and do not
+resubmit.
+
+V28 COMPLETE 2026-09-06: hurdle-GRU cloud export finished all33 models and
+local replay audit passed with maximum error7.153e-6. Every continuous branch
+failed; the best0.5x mean-minus-std row was−9.915% net/DD18.849%. Read
+`RESEARCH_V28_RESULTS.md`; do not resubmit.
+
+V26 COMPLETE 2026-09-06: small-GRU/pairwise-ranking export and full local audit
+passed; its best drawdown-safe0.5x branch was+9.539% net with12.302% DD and
+only0.271% monthly. V27 causal calibration improved development net but still
+missed5% monthly. Read `RESEARCH_V26_RESULTS.md` for provenance; no live
+approval.
+
+V25 COMPLETE 2026-09-06: ranked-gate TCN finished all33 private
+Kaggle models finished on2×T4; full local replay/policy audit passed, maximum
+error2.1458e-6. Continuous v25 failed every branch: mean1x normal−43.614% net /
+DD62.773% /110fills; best mean−std0.5x normal−14.207% /DD31.939% /107fills.
+Ensemble MSE9.1237 vs past constant8.3653, fill Brier.19558 vs.19556, rank
+correlation.0258; the fixed.3–1% bucket predicted.6127% but realized−.1156%.
+Full provenance/table in `RESEARCH_V25_RESULTS.md`. No live approval.
+
+V24 DIAGNOSTIC COMPLETE 2026-09-06: past-only isotonic calibration of v22
+predictions was run without retraining and did not meet target. The best fixed
+window probe was isotonic4 at1x net+1.74%, DD16.68%, only18fills; fee stress
+net+.46% and execution net−12.24%. It is not a candidate or a tuned result.
+
+V23 COMPLETE 2026-09-06: listwise WAIT-aware TCN export passed all33-model
+replay/policy audit, but mean1x normal ended−13.526% net /DD49.510%; mean−std
+0.5x ended−8.124% /DD26.535%. Forecast MSE9.9539, Brier.19483, rankcorr.0014.
+Reject; detailed artifact paths are preserved under v23 download/audit/portfolio.
+
+V22 COMPLETE 2026-09-06: ranked-loss TCN export passed all33-model replay and
+policy audit, then produced mean1x normal+17.690% net /DD35.015%, fee+11.186%
+/DD35.581%, execution+12.212% /DD35.578%; mean−std0.5x normal+3.335% /
+DD19.102%. Positive development net did not meet5% monthly,30-fill,or global
+DD20% gates. V25 was the fixed gate-margin follow-up; do not resubmit v22.
+
 V21 COMPLETE2026-09-06: nested180day validation/refit kernel finished with33/33
 models, full local replay/policy audit passed (max error2.861e-6), then failed
 continuous acceptance. Mean1x normal−33.684%/DD40.327%/22fills; fee stress

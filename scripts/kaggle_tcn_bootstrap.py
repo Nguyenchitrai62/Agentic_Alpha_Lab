@@ -50,9 +50,9 @@ def main():
     subprocess.run([sys.executable, "-m", "pip", "install", "--disable-pip-version-check",
                     "safetensors==0.6.2", "pyarrow>=18,<24"], check=True)
     plans = [p for p in (bundle / "configs").glob("*.json")
-             if json.loads(p.read_text()).get("model_family") == "tcn_fusion"]
+             if json.loads(p.read_text()).get("model_family") in {"tcn_fusion", "gru_temporal", "gru_hurdle", "gru_residual"}]
     if len(plans) != 1:
-        raise ValueError("Expected exactly one registered TCN plan")
+        raise ValueError("Expected exactly one registered temporal plan")
     plan_path = plans[0]
     plan = json.loads(plan_path.read_text())
     parent = json.loads((bundle / plan["parent_plan"]).read_text())
@@ -68,7 +68,8 @@ def main():
     workers = []
     driver = plan.get("cloud_driver", "train_tcn_kaggle.py")
     if driver not in ("train_tcn_kaggle.py", "train_tcn_validated.py", "train_tcn_ranked.py",
-                      "train_tcn_listwise.py", "train_tcn_ranked_gate.py"):
+                      "train_tcn_listwise.py", "train_tcn_ranked_gate.py", "train_gru_ranked.py",
+                      "train_gru_hurdle.py", "train_gru_residual.py"):
         raise ValueError("Unknown cloud driver")
     for shard in range(2):
         env = dict(os.environ, CUDA_VISIBLE_DEVICES=str(shard), PYTHONPATH=str(bundle / "src"),

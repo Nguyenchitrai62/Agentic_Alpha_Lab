@@ -1,10 +1,35 @@
 # Continuous BTC research — active
 
-V22 LIVE SUBMITTED2026-09-06: private kernel
-`nguynchtrai/btc-swing-v22-ranked-20260906` version1 is RUNNING after one
-successful push; dataset READY. Do not resubmit. It uses registered ranked-loss
-and reduced-capacity TCN config `configs/swing_v22_ranked_tcn.json`; wait for
-COMPLETE, then download, audit every33model and run one continuous portfolio.
+V30 COMPLETE 2026-09-06: the pre-registered causal calibration probe of
+immutable v29 predictions finished locally at
+`artifacts/research/v30_v29_calibration`. Isotonic-4 at1x reached+122.798%
+normal net with20.086% DD and+112.963% fee-stress net with20.473% DD; monthly
+geometric returns were2.405% and2.268%. At0.5x DD stayed below11% but monthly
+was only1.233%. No mapping passes the user gate; preserve every result and do
+not promote or increase leverage. Read `RESEARCH_V30_RESULTS.md`.
+
+V29 COMPLETE 2026-09-06: residual-GRU cloud export finished all33 models on
+2×Tesla T4; local audit passed at maximum error5.722e-6. Best normal row was
+mean-minus-std1x+29.138% net/DD26.255%; the0.5x row was+15.358%/DD13.481%
+and+0.425% monthly. Read `RESEARCH_V29_RESULTS.md`; do not resubmit.
+
+V28 COMPLETE 2026-09-06: hurdle-GRU export and all-33 local audit passed at
+maximum error7.153e-6, but every continuous branch failed. Read
+`RESEARCH_V28_RESULTS.md`; do not resubmit.
+
+CURRENT VERIFIED 2026-09-06: v25 ranked-gate TCN is COMPLETE and rejected.
+The private Kaggle kernel `nguynchtrai/btc-swing-v25-ranked-gate-20260906`
+version1 completed with 33/33 models, full local replay/policy audit passed
+(maximum error2.1458e-6), and the one-state continuous portfolio failed every
+registered branch. Best v25 row is mean-minus-std0.5x normal: net−14.2073%,
+DD31.9393%, 107 fills; mean1x normal is net−43.6138%, DD62.7726%, 110 fills.
+Read `RESEARCH_V25_RESULTS.md`; do not resubmit v25 or deploy it.
+
+V22 COMPLETE: ranked-loss TCN's mean1x normal row was net+17.6895% with
+DD35.0154%; positive development net but still failed the user target. V23
+listwise TCN and the v24 read-only calibration probes also failed. No accepted
+model exists; preserve all artifacts and register any next hypothesis before
+training.
 
 V21 COMPLETE2026-09-06: full audit passed but continuous net/drawdown/fill gate
 failed. Read RESEARCH_V21_RESULTS.md. No target met; v22 is the next hypothesis.
@@ -255,6 +280,12 @@ arrived and performed work, providing direct evidence of a subsequent scheduled 
 
 ## Ordered next work (update after actual evidence)
 
+0. v30 is complete and rejected: do not submit another calibration, residual
+   GRU or hurdle-GRU duplicate. The next research turn must first produce a
+   measured diagnosis of the remaining action-selection/label bottleneck and
+   register a materially different fixed hypothesis. Keep the current v29/v30
+   artifacts immutable; Kaggle quota is reserved until that diagnosis supports
+   one new private T4 job.
 1. Complete head diagnosis, log findings below. Do not lower the trading threshold
    on an opened test to make WAIT disappear. Retrieve full v2 weights for replay
    if needed, checking existing private kernel rather than resubmitting it.

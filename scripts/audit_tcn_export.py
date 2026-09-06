@@ -10,8 +10,11 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 from safetensors.torch import load_file
-from agentic_alpha_lab.models.tcn_fusion_value import TemporalValue
+from agentic_alpha_lab.models.tcn_fusion_value import TemporalValue as TCNTemporalValue
+from agentic_alpha_lab.models.temporal_value import TemporalValue as GRUTemporalValue
 from agentic_alpha_lab.models.temporal_value import predict
+from agentic_alpha_lab.models.hurdle_temporal_value import HurdleTemporalValue, hurdle_predict
+from agentic_alpha_lab.models.residual_temporal_value import ResidualTemporalValue, residual_predict
 from agentic_alpha_lab.models.ensemble_value import combine
 from agentic_alpha_lab.backtest.swing import swing_signals
 from train_tcn_kaggle import digest, fold_indices, load_inputs, stable_evaluation_backend, write_json
@@ -80,17 +83,31 @@ def main(a):
     torch.set_num_threads(2)
     stable_evaluation_backend()
     plan = json.loads(a.plan.read_text())
-    if plan.get("model_family") != "tcn_fusion":
-        raise ValueError("Unsupported architecture")
+    family = plan.get("model_family")
+    if family not in {"tcn_fusion", "gru_temporal", "gru_hurdle", "gru_residual"}:
+        raise ValueError("Unsupported temporal architecture")
     summary = json.loads((a.source / "summary.json").read_text())
     require_complete(summary, plan)
     if a.output.exists():
         raise FileExistsError("Use a new immutable audit directory")
     hashes = json.loads((a.source / "bundle-hashes.json").read_text())
+    architecture_name = {
+        "tcn_fusion": "src/agentic_alpha_lab/models/tcn_fusion_value.py",
+        "gru_temporal": "src/agentic_alpha_lab/models/temporal_value.py",
+        "gru_hurdle": "src/agentic_alpha_lab/models/hurdle_temporal_value.py",
+        "gru_residual": "src/agentic_alpha_lab/models/residual_temporal_value.py",
+    }[family]
     source_names = [a.plan.resolve().relative_to(ROOT).as_posix(), plan["parent_plan"],
                  "src/agentic_alpha_lab/models/tcn_fusion_value.py",
                  "src/agentic_alpha_lab/models/temporal_value.py",
                  "src/agentic_alpha_lab/models/macro_micro_value.py", "scripts/train_tcn_kaggle.py"]
+    if family in {"gru_temporal", "gru_hurdle", "gru_residual"}:
+        source_names += ["scripts/" + plan["cloud_driver"],
+                         "src/agentic_alpha_lab/models/ranked_loss.py"]
+    if family == "gru_hurdle":
+        source_names += ["src/agentic_alpha_lab/models/hurdle_ranked_loss.py"]
+    if family == "gru_residual":
+        source_names += ["src/agentic_alpha_lab/models/residual_ranked_loss.py"]
     if plan.get("epoch_selection"):
         source_names += ["scripts/train_tcn_validated.py", "src/agentic_alpha_lab/models/temporal_validation.py"]
     for name in source_names:
@@ -98,7 +115,6 @@ def main(a):
             raise ValueError(f"Export/local source identity mismatch: {name}")
     parent = json.loads(Path(plan["parent_plan"]).read_text())
     sequence, features, labels, decisions, candidates = load_inputs(plan)
-    del labels
     cfg = json.loads((Path(plan["dataset"]) / "config.json").read_text())
     a.output.mkdir(parents=True)
     records, forecast_hashes, weight_hashes, selection_hashes = [], {}, {}, {}
@@ -119,7 +135,7 @@ def main(a):
                 raise ValueError("Checkpoint experiment mismatch")
             if meta["dataset_manifest_sha256"] != digest(Path(plan["dataset"]) / "manifest.json") or meta["cache_manifest_sha256"] != digest(Path(plan["cache"]) / "manifest.json"):
                 raise ValueError("Checkpoint input identity mismatch")
-            if meta["model_source_sha256"] != hashes["src/agentic_alpha_lab/models/tcn_fusion_value.py"]:
+            if meta["model_family"] != family or meta["model_source_sha256"] != hashes[architecture_name]:
                 raise ValueError("Checkpoint architecture identity mismatch")
             train, test = fold_indices(decisions, parent, plan["training"], fold)
             with np.load(target / "indices.npz", allow_pickle=False) as saved:
@@ -129,9 +145,16 @@ def main(a):
             if digest(weights) != meta["weights_sha256"]:
                 raise ValueError("Checkpoint weights changed")
             weight_hashes[weights.relative_to(a.source).as_posix()] = digest(weights)
-            model = TemporalValue(candidates, **plan["network"])
+            architecture = {"tcn_fusion": TCNTemporalValue,
+                            "gru_temporal": GRUTemporalValue,
+                            "gru_hurdle": HurdleTemporalValue,
+                            "gru_residual": ResidualTemporalValue}[family]
+            model = architecture(candidates, **plan["network"])
             model.load_state_dict(load_file(str(weights)))
             np.testing.assert_array_equal(model.candidates.numpy(), candidates)
+            if family == "gru_residual":
+                np.testing.assert_allclose(model.candidate_prior.numpy(), labels[train, ..., 0].mean(0),
+                                           rtol=1e-5, atol=1e-6)
             np.testing.assert_allclose(model.feature_mean.numpy(), features[train].mean(0), rtol=1e-5, atol=1e-6)
             np.testing.assert_allclose(model.feature_scale.numpy(), np.maximum(features[train].std(0), 1e-6), rtol=1e-5, atol=1e-6)
             model.to(device)
@@ -141,7 +164,9 @@ def main(a):
             cloud = np.load(prediction_path, allow_pickle=False)
             if cloud.shape != (len(test), 16, 6):
                 raise ValueError("Invalid exported prediction shape")
-            local = predict(model, sequence[test], features[test], batch_size=a.batch_size)
+            predictor = {"gru_hurdle": hurdle_predict,
+                         "gru_residual": residual_predict}.get(family, predict)
+            local = predictor(model, sequence[test], features[test], batch_size=a.batch_size)
             error = check_numeric(local, cloud)
             row = {"seed": seed, "fold": fold, "decisions": len(test), "max_error": error}
             records.append(row)
@@ -170,7 +195,7 @@ def main(a):
         # and their clocks must be identical. A changed alert blocks evaluation.
         check_policy(ls, cs)
         signal_rows[branch["name"]] = len(ls)
-    result = {"state": "passed", "model_family": "tcn_fusion", "device": device, "torch": torch.__version__,
+    result = {"state": "passed", "model_family": family, "device": device, "torch": torch.__version__,
               "batch_size": a.batch_size, "rtol": .001, "atol": .001, "folds": records,
               "source_summary_sha256": digest(a.source / "summary.json"),
               "plan_sha256": digest(a.plan), "dataset_manifest_sha256": digest(Path(plan["dataset"]) / "manifest.json"),

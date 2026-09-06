@@ -1,10 +1,40 @@
 # Handoff for the next coding agent
 
-V22 RUNNING: private Kaggle kernel `nguynchtrai/btc-swing-v22-ranked-20260906`
-version1 was submitted once after full tests/package checks. Poll status/logs; do
-not resubmit. On COMPLETE download to a new ignored `artifacts/kaggle/v22_download`
-directory, run full audit with the existing TCN gate, then one-state continuous
-portfolio. v21 is complete and failed; read `RESEARCH_V21_RESULTS.md`.
+V30 COMPLETE: the pre-registered causal calibration probe of immutable v29
+predictions is finished at `artifacts/research/v30_v29_calibration`. Isotonic-4
+at1x reached+122.798% normal net but DD20.086%; fee stress reached+112.963%
+with DD20.473%; monthly geometric returns were2.405% and2.268%. The0.5x row
+stayed below11% DD but reached only1.233% monthly. Preserve every mapping; no
+mapping is a candidate and no leverage increase is approved. Read
+`RESEARCH_V30_RESULTS.md`.
+
+V29 COMPLETE and rejected: private Kaggle kernel
+`nguynchtrai/btc-swing-v29-residual-gru-20260906` finished once with 33/33
+models; local audit passed at maximum error5.722e-6. Best mean-minus-std1x
+normal was+29.138% net/DD26.255%;0.5x was+15.358%/DD13.481% and+0.425%
+monthly. Read `RESEARCH_V29_RESULTS.md`; do not resubmit.
+
+V28 COMPLETE and rejected: private Kaggle kernel
+`nguynchtrai/btc-swing-v28-hurdle-gru-20260906` finished all33 models and local
+audit passed at maximum error7.153e-6. Every branch failed the target. Read
+`RESEARCH_V28_RESULTS.md`; do not resubmit.
+
+V26 and v27 are complete development comparators; read
+`RESEARCH_V26_RESULTS.md`. No accepted model or independent test exists.
+
+V25 COMPLETE and rejected: private Kaggle kernel
+`nguynchtrai/btc-swing-v25-ranked-gate-20260906` version1 finished with 33/33
+models. Local TCN replay/policy audit passed (max error2.1458e-6), but the
+continuous portfolio failed every scenario. Best v25 mean-minus-std0.5x row is
+−14.207% net / 31.939% DD / 107 fills; mean1x normal is −43.614% / 62.773% /
+110 fills. Read `RESEARCH_V25_RESULTS.md`. Do not resubmit v25 or deploy it.
+
+V22-v29 and v30 are complete failed development experiments; no accepted model
+or independent test exists. Before a next heavy run, inspect the v29/v30
+diagnosis, register a materially different fixed hypothesis/config, check
+Kaggle jobs/quota, and submit at most one private free-T4 job. Keep local work
+to inference, replay and backtests; do not repeat a calibration or residual
+run without a new measured hypothesis.
 
 V21 COMPLETE: all33 nested-validation refits, local replay and policy parity
 passed, but mean1x net−33.684%/DD40.327%/22 fills and mean−std0.5x net−14.583%
