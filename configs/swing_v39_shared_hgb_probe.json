@@ -1,0 +1,18 @@
+{
+  "experiment": "swing-v39-shared-hgb-action-value-probe",
+  "dataset": "data/processed/swing_regime_research_v4",
+  "parent_plan": "configs/swing_v15_continuous_folds.json",
+  "variants": {
+    "leaf128": {"learning_rate": 0.05, "max_iter": 120, "max_leaf_nodes": 15, "min_samples_leaf": 128, "l2_regularization": 10.0, "max_bins": 127},
+    "leaf32": {"learning_rate": 0.05, "max_iter": 160, "max_leaf_nodes": 15, "min_samples_leaf": 32, "l2_regularization": 10.0, "max_bins": 127}
+  },
+  "training": {
+    "window_days": 730,
+    "embargo_days": 8,
+    "minimum_train_decisions": 200,
+    "targets": "unconditional net percent and fill probability, reshaped from causal labels"
+  },
+  "selection": "Fixed shared context+candidate regression; no winner fold, seed, threshold, or portfolio tuning.",
+  "target": "Calendar-geometric net >=5% monthly and global drawdown <=20% after normal fee, fee-stress and execution-stress scenarios; at least30 fills in each scenario.",
+  "compute": "Local CPU probe only; no cloud upload; research-only and no live approval."
+}

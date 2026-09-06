@@ -1,0 +1,19 @@
+{
+  "experiment": "swing-v38-causal-frequency-policy-probe",
+  "source": "artifacts/research/v30_v29_calibration/isotonic_4",
+  "dataset": "data/processed/swing_regime_research_v4",
+  "variants": [
+    {"name": "cooldown5_cap4", "cooldown_days": 5, "maximum_signals_per_month": 4},
+    {"name": "cooldown3_cap8", "cooldown_days": 3, "maximum_signals_per_month": 8},
+    {"name": "cooldown2_cap8", "cooldown_days": 2, "maximum_signals_per_month": 8},
+    {"name": "cooldown1_cap12", "cooldown_days": 1, "maximum_signals_per_month": 12}
+  ],
+  "unchanged_policy": {
+    "minimum_expected_net_percent": 0.3,
+    "minimum_fill_score": 0.25,
+    "candidate_geometry": "source config unchanged"
+  },
+  "selection": "Diagnostic sensitivity matrix; no variant is selected from a locked test and no live approval is implied.",
+  "target": "Calendar-geometric net >=5% monthly and global drawdown <=20% after normal fee, fee-stress and execution-stress scenarios; at least30 fills in each scenario.",
+  "compute": "Local inference/replay/backtest only; no cloud upload."
+}

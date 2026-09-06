@@ -2,6 +2,14 @@
 
 ## Current verified state
 
+CURRENT BLOCKER2026-09-06: v36-v39 local causal probes are COMPLETE/REJECTED;
+none reaches the5% monthly,20% global-DD,30-fill gate. Read
+`RESEARCH_V36_V39_RESULTS.md`. V33 is packaged but its private Kaggle upload
+was rejected by the approval boundary because it would send internal BTC
+research source/data to Kaggle; no upload occurred. Explicit user
+authorization is required before resuming, and no transport workaround is
+allowed.
+
 CURRENT2026-09-06: v33 separate candidate-vs-WAIT action-margin GRU is
 REGISTERED/PACKAGED but not submitted. Its fixed logit-margin inference adapter
 and loss are in `configs/swing_v33_action_margin_gru.json`; full pytest147 passed.
@@ -9,7 +17,7 @@ Package archive SHA-256
 `915f89e4476684646f11f44895830ec6d0eadd54b21e504b94ff27287e58766f`; bootstrap
 SHA-256 `5840bb415fde8bdec54153f45b4571fda8087c42e52f7bdc2939cfbb83de9515`.
 Inventory found v32 COMPLETE and no v33 kernel; latest quota snapshot was
-27.98/30.00 GPU-hours. Submit only once, then require all33 models and a full
+27.98/30.00 GPU-hours. After upload authorization, submit only once, then require all33 models and a full
 local audit before portfolio evaluation.
 
 CURRENT2026-09-06: v32 top-action/WAIT causal GRU is COMPLETE/REJECTED. Its

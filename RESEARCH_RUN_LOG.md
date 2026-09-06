@@ -1,14 +1,23 @@
 # BTC research ledger
 
-CURRENT REGISTERED/PACKAGED 2026-09-06: v33 separate candidate-vs-WAIT
-action-margin GRU is ready for one private Kaggle submission. The fixed
+CURRENT BLOCKER 2026-09-06: v36-v39 local causal probes are COMPLETE/REJECTED;
+none reaches the5% monthly,20% global-DD,30-fill gate. Read
+`RESEARCH_V36_V39_RESULTS.md` for the exact normal/fee/execution tables and
+hashes. V33 remains REGISTERED/PACKAGED but its private Kaggle upload is
+blocked: the approval boundary rejected sending internal BTC research source
+and data to Kaggle. No v33 data was uploaded. Resume that heavy round only
+after explicit user authorization; do not use another transport.
+
+V33 REGISTERED/PACKAGED 2026-09-06: separate candidate-vs-WAIT
+action-margin GRU was prepared for one private Kaggle submission. The fixed
 candidate-minus-WAIT inference margin, loss and 1x/0.5x branches are recorded
 in `configs/swing_v33_action_margin_gru.json`; full pytest is `147 passed` and
 the causal real-data smoke is finite. Package archive SHA-256 is
 `915f89e4476684646f11f44895830ec6d0eadd54b21e504b94ff27287e58766f`, bootstrap
 SHA-256 is `5840bb415fde8bdec54153f45b4571fda8087c42e52f7bdc2939cfbb83de9515`.
 Kaggle inventory shows v32 COMPLETE and no v33 kernel; the last quota snapshot
-was27.98 GPU-hours with refresh2026-09-12. Submit at most one v33 kernel, then
+was27.98 GPU-hours with refresh2026-09-12. Do not submit until the upload
+authorization blocker is resolved; then submit at most one v33 kernel and
 wait for all33 models before downloading or evaluating it.
 
 CURRENT 2026-09-06: v32 top-action/WAIT GRU is COMPLETE/REJECTED. The private

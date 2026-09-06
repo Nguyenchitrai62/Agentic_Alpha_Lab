@@ -1,12 +1,19 @@
 # Continuous BTC research — active
 
+CURRENT BLOCKER 2026-09-06: v36-v39 local causal probes are complete and
+rejected; none reaches5% monthly,20% global drawdown, and30 fills in every
+scenario. Full metrics and hashes are in `RESEARCH_V36_V39_RESULTS.md`. V33
+is packaged but not submitted because the approval boundary rejected sending
+internal BTC research source/data to Kaggle. No upload occurred. Further heavy
+progress requires explicit user authorization; do not bypass the boundary.
+
 V33 REGISTERED/PACKAGED 2026-09-06: separate candidate-vs-WAIT action-margin
-GRU is ready for one private Kaggle run. Its fixed logit-margin inference
+GRU was prepared for one private Kaggle run. Its fixed logit-margin inference
 adapter, chronology and loss are in `configs/swing_v33_action_margin_gru.json`;
 pytest passed147 tests. Package archive SHA-256 is
 `915f89e4476684646f11f44895830ec6d0eadd54b21e504b94ff27287e58766f` and the
 last quota snapshot was27.98 GPU-hours. Submit only once after confirming the
-inventory, then require all33 models, full replay audit and one continuous
+inventory and receiving upload authorization, then require all33 models, full replay audit and one continuous
 portfolio evaluation.
 
 V32 COMPLETE/REJECTED 2026-09-06: the top-action/WAIT causal GRU kernel

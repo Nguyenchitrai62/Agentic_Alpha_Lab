@@ -1,7 +1,15 @@
 # Handoff for the next coding agent
 
-V33 REGISTERED/PACKAGED: the separate candidate-vs-WAIT action-margin GRU is
-ready for one private Kaggle submission. Use
+CURRENT BLOCKER: v36-v39 local causal probes are complete/rejected and no
+candidate reaches the5% monthly,20% global-DD,30-fill gate. See
+`RESEARCH_V36_V39_RESULTS.md`. V33 is packaged but its private Kaggle upload
+was rejected by the approval boundary because the package contains internal
+BTC research source/data; no upload occurred. Do not retry through a browser or
+another transport. Continue only after explicit user authorization for that
+Kaggle upload.
+
+V33 REGISTERED/PACKAGED: the separate candidate-vs-WAIT action-margin GRU was
+prepared for one private Kaggle submission. Use
 `configs/swing_v33_action_margin_gru.json` and package directory
 `artifacts/kaggle/btc_swing_v33_action_margin_gru_20260906`; archive SHA-256 is
 `915f89e4476684646f11f44895830ec6d0eadd54b21e504b94ff27287e58766f`, bootstrap
@@ -9,7 +17,8 @@ SHA-256 is `5840bb415fde8bdec54153f45b4571fda8087c42e52f7bdc2939cfbb83de9515`.
 The causal probe was negative, but it did not include the registered sequence
 encoder; the cloud hypothesis is the explicit action-logit adapter. Inventory
 confirmed v32 COMPLETE, no v33 kernel, and the latest quota snapshot was
-27.98/30.00 GPU-hours (refresh2026-09-12). Submit at most once; then download,
+27.98/30.00 GPU-hours (refresh2026-09-12). Once upload authorization exists,
+submit at most once; then download,
 audit all33 models, run continuous replay and diagnostics. Do not use partial
 outputs as evidence.
 
