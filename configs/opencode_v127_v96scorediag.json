@@ -1,0 +1,85 @@
+{
+  "experiment": "opencode-v127-v96scorediag",
+  "mission": "TAI SAO attention FAIL ranking? So sanh frozen predictions v96 (Transformer 8.77M: frame-x5 d320/h8 + cross-x2, ListNet-listwise PRIMARY 2.0 tren value head TRADEABLE) vs v38 (multitask SSM ~0.6M: value 2.0 + pairwise-ranking 0.5 + aux + coverage-hinge) tren cung 4076 decisions, CUNG method family nhu v100 (smoothness gaps + Spearman + top-decile + past-only splits) + them entropy/concentration attention-specific. Analysis only, KHONG fitting, KHONG train, KHONG live.",
+  "owner": "R-DIAGNOSTIC worker (v100 scorediag found value-prior; now explain attention failure)",
+  "inputs": {
+    "v96_source": "artifacts/kaggle/v96_transformer_download/transformer-training (VERIFY presence; audit xác nhận 33 predictions.npy (n_test,16,6) map-v8 RAW TRADEABLE + replay PASS)",
+    "v38_source": "artifacts/kaggle/v38_rankloss_download/rankloss-training (33 predictions.npy (n_test,16,6) map-v8, VERBATIM v100)",
+    "dataset": "data/processed/swing_regime_research_v4 (decisions.parquet, candles.parquet, examples.npz labels (n,16,3), config.json)",
+    "parent_plan": "configs/swing_v15_continuous_folds.json (11 quarterly folds, 4076 decisions, embargo 8d)",
+    "rank_anchors": {
+      "v38_multitask_rank": "+0.066 overall (artifacts/research/opencode_v38b_replay/portfolio.json diagnostic_v34_lens.rank_en.rank_overall)",
+      "v96_transformer_rank": "-0.034 overall (artifacts/research/opencode_v96b_replay/portfolio.json rank_overall.rank_corr_mean -0.03422)",
+      "v96_transformer_bias": "+5.79 pred-minus-obs (artifacts/research/opencode_v96b_replay/portfolio.json topdecile.bias_pred_minus_obs 5.7929)",
+      "note": "v96 ListNet-PRIMARY 2.0 + 8.77M attention rank AM trong khi v38 ranking-phu 0.5 + 0.6M SSM rank DUONG: cau hoi diagnostic"
+    }
+  },
+  "ensemble": {
+    "seeds": [1729, 1730, 1731],
+    "v38": "mean 3 seeds qua agentic_alpha_lab.models.ensemble_value.combine(stacked, 0.0): E38 = details[mean_expected_net_percent] (n,16) (VERBATIM v100/v38b audit parity)",
+    "v96": "mean 3 seeds qua agentic_alpha_lab.models.ensemble_value.combine(stacked, 0.0): E96 = details[mean_expected_net_percent] (n,16) TRADEABLE percent (VERBATIM v96b audit parity: mean_3seeds trade+fill)",
+    "assembly": "per-fold concat theo thu tu fold 0..10 (khop partition chronological + label_end < complete_evaluation_until); assert moi fold file shape == (partition_len,16,6); assert finite",
+    "n_decisions": 4076
+  },
+  "scores": {
+    "s38_en_best": "max_k E38[k] (% unconditional net, cung don vi labels ch0) — scalar/decision cho smoothness + decision-rank agreement + top-decile v38",
+    "s96_en_best": "max_k E96[k] (% TRADEABLE, cung don vi percent nhu labels ch0) — scalar/decision cho smoothness + decision-rank agreement + top-decile v96",
+    "units_note": "s38 (%) vs s96 (%) CUNG don vi percent (ca hai map-v8 unconditional/tradeable): so sanh raw TRUC TIEP co nghia, khac v100 (logit vs % chi so rank-based)",
+    "top1_38": "argmax_k E38[k] (first-max) — candidate/decision (descriptive, KHONG phai policy deterministic_best_index)",
+    "top1_96": "argmax_k E96[k] (first-max) — candidate/decision (descriptive, KHONG phai policy)",
+    "candidate_matrices": "E38 (n,16) vs E96 (n,16) — cho within-decision candidate-rank agreement + per-decision softmax entropy"
+  },
+  "metrics": {
+    "a_smoothness": {
+      "order": "signal_time tang dan (== partition concat order fold0..fold10)",
+      "gaps": "d[i] = |s[i+1]-s[i]|, i=0..4074 (4075 gaps); within_fold gaps loai 10 bien fold",
+      "reported": "per model: mean/median/std/max gaps overall + within_fold; raw + standardized (z=(s-mean)/std full-sample, descriptive rescale, KHONG phai decision rule); ratio v96/v38 tren mean|d| standardized",
+      "files": ["smoothness.csv", "smoothness_by_fold.csv"]
+    },
+    "b_rank_agreement": {
+      "b1_decision_spearman": "Spearman(s38, s96) overall (n=4076) + per fold (11 folds, within-fold ranks): pandas average-rank + Pearson",
+      "b2_candidate_spearman": "per decision Spearman over 16 candidates giua E38[i,:] va E96[i,:]; report mean/median/std overall + mean per fold + invalid_n (zero-variance edge)",
+      "recompute_anchors": "recompute rank_corr_per_decision(E38 vs truth ch0) va (E96 vs truth ch0) overall de cross-check +0.066/-0.034 (cho phep sai so float tich luy nho)",
+      "files": ["rank_by_fold.csv"]
+    },
+    "c_disagreement_pockets": {
+      "primary_D": "D = |pct(s38) - pct(s96)|, pct = average-rank/n full-sample (0..1); high-D = top quintile (D >= p80, descriptive cut, KHONG phai decision rule)",
+      "secondary": "top1 candidate agreement (top1_38 == top1_96) + side agreement (sign direction giong nhau; directions tu grid(cfg): candidates 0..7 LONG, 8..15 SHORT)",
+      "reported_per_bucket": "n, mean_D, share_highD, top1_agree_rate, side_agree_rate",
+      "splits": "xem splits (tat ca past-only, KHONG fitting)",
+      "files": ["disagreement_by_bucket.csv"]
+    },
+    "d_topdecile": {
+      "k": 408,
+      "selection": "moi model top-408 theo score RIENG (s38 / s96, stable argsort desc); own top1 candidate; truth labels ch0/ch1/ch2 tai (order, top1)",
+      "reported": "per model: fill_rate, P(pos|fill)=mean(ch2[ch1==1]), P(net>0)=mean(ch0>0), obs_net_mean (ca 408), obs_net_filled_mean; overlap |A^B|; A-only / B-only / overlap means (descriptive)",
+      "units_note": "realized net = labels ch0 unconditional net (label %, exploratory, KHONG phai portfolio PnL; KHONG tru fee them)",
+      "files": ["topdecile.csv"]
+    },
+    "e_entropy_concentration": {
+      "softmax": "per decision p = softmax(E[i,:]/tau), tau=1.0 percent (VERBATIM ListNet tau cua v96 config + v55 style; affine-invariant theo shift, sigma hap thu vao tau)",
+      "reported_per_decision": "H = -sum(p log p) nats (max log16=2.7726), pmax = max(p), effN = exp(H), cand_std = std(E[i,:]) percent",
+      "reported": "overall mean/median/std cua H/pmax/effN/cand_std per model + paired delta (v96-v38) + per-fold means; across-decision std cua s38/s96 (score variance lien-decision)",
+      "question": "v96 co dot extreme mass len it candidates (H thap, pmax cao) hay phan tan deu (H cao, gan uniform)?",
+      "files": ["entropy.csv", "entropy_by_fold.csv"]
+    }
+  },
+  "splits": {
+    "causality_rule": "Tat ca descriptors chi dung thong tin dong truoc/sau signal_time (past-only, closed-candle). Bucket edges co dinh/tien dinh (absolute hoac ke thua config cu), KHONG uoc luong tu full-sample.",
+    "utc_session": "Ke thua VERBATIM configs/opencode_v07_session.json: s0004 [0,4), s0408 [4,8), s0812 [8,12), s1216 [12,16), s1620 [16,20), s2024 [20,24) theo signal_time UTC hour",
+    "weekend": "is_weekend_utc: Sat/Sun vs weekday (calendar, no fit)",
+    "vol_ann_30d": "Ke thua VERBATIM configs/opencode_v12_volregime.json: trailing-30-calendar-day std cua 5m close LOG-returns strictly before signal_time (closes[bi-8640:bi] qua bar_index, 1-microsecond cutoff semantics), annualized x sqrt(365.2425*288); bands low <0.30, mid 0.30-0.60, high >0.60",
+    "trend_24h_sign": "ret_24h = close[bi]/close[bi-288]-1 (causal, decision candle closed tai T); buckets co dinh: up >+0.25%, flat |.|<=0.25%, down <-0.25%",
+    "side": "top1_38 side (LONG/SHORT), top1_96 side, agree flag (past-only: model outputs, KHONG labels)"
+  },
+  "outputs": {
+    "dir": "artifacts/research/opencode_v127_v96scorediag",
+    "files": ["smoothness.csv", "smoothness_by_fold.csv", "rank_by_fold.csv", "disagreement_by_bucket.csv", "topdecile.csv", "entropy.csv", "entropy_by_fold.csv", "summary.json", "BAO_CAO.md"],
+    "no_overwrite": "script raise FileExistsError neu dir da ton tai"
+  },
+  "rules": ["analysis only, no fitting (descriptive stats + past-only splits)", "no live orders", "KHONG touch research/parallel/registry.json, CONTINUOUS_RESEARCH.md, NEXT_AGENT.md, research/parallel/rounds/*, ../Kronos, worktrees", "no register/assign/rotate", "no commit/push", "no overwrites; exploratory labels", "PowerShell `; if ($?) {}`"],
+  "causality": "past-only, closed-candle; percentile/standardize/softmax la descriptive rescaling, KHONG phai decision rule; labels exploratory",
+  "independent_test": false,
+  "exploratory": true,
+  "live_approved": false
+}

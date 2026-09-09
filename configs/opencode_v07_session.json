@@ -1,0 +1,37 @@
+{
+  "experiment": "opencode-v07-session",
+  "hypothesis": "Frozen v30 isotonic-4 signals may concentrate expectancy in specific UTC sessions; filter frozen signals by signal_time UTC hour (session is a function of signal_time only, inherently causal, past-only) crossed with {1x, dd_guard} sizing. No refitting; signals/scores untouched. Exploratory only.",
+  "signals": "artifacts/research/opencode_v02_reproduce_v30/isotonic_4/signals.parquet",
+  "candles": "data/processed/swing_regime_research_v4/candles.parquet",
+  "dataset_config": "data/processed/swing_regime_research_v4/config.json",
+  "parent_plan": "configs/swing_v15_continuous_folds.json",
+  "sessions": {
+    "control": null,
+    "s0004": {"start": 0, "end": 4},
+    "s0408": {"start": 4, "end": 8},
+    "s0812": {"start": 8, "end": 12},
+    "s1216": {"start": 12, "end": 16},
+    "s1620": {"start": 16, "end": 20},
+    "s2024": {"start": 20, "end": 24}
+  },
+  "session_key": "signal_time UTC hour h; keep signals with start <= h < end; control keeps all signals",
+  "sizings": ["1x", "dd_guard"],
+  "dd_trigger": 0.1,
+  "dd_guard_lev": 0.5,
+  "dd_guard_reference": "all-session control base-1x sampled equity (trade exit_time/equity_after), past-only 1-microsecond cutoff, 100.0 seed level; session-filtered signals reuse the control-run guard state at their own signal times",
+  "lev_min": 0.25,
+  "lev_max": 1.0,
+  "fee_stress_rate": 0.00055,
+  "stress": {
+    "entry_penetration_bps": 5,
+    "target_penetration_bps": 5,
+    "market_exit_slippage_bps": 5,
+    "market_exit_fee_rate": 0.00055,
+    "allow_limit_price_improvement": false
+  },
+  "gate": {
+    "monthly_min": 0.05,
+    "dd_max": 0.2,
+    "fills_min": 30
+  }
+}

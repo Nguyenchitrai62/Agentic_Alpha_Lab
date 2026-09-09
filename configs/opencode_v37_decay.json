@@ -1,0 +1,44 @@
+{
+  "experiment": "opencode-v37-decay",
+  "family": "R9-N neutral: alpha-decay horizon tren tin hieu frozen majority_1x (tiep noi N-latency v33)",
+  "hypothesis": "Neu edge cua majority_1x la alpha that thi duong cong Ret/Mo theo delay 1->6 se decay dan; neu la noise o bar t+1 thi se chet ngay o delay 2-3. Tim delay nao thi edge chet / DD vuot nguong de tra loi bot can nhanh toi muc nao.",
+  "bases": {
+    "majority_1x": "artifacts/research/opencode_v15_mapensemble/majority_1x/signals.parquet"
+  },
+  "candles": "data/processed/swing_regime_research_v4/candles.parquet",
+  "dataset_config": "data/processed/swing_regime_research_v4/config.json",
+  "parent_plan": "configs/swing_v15_continuous_folds.json",
+  "branches": ["majority_d1", "majority_d2", "majority_d3", "majority_d4", "majority_d6"],
+  "branch_specs": {
+    "majority_d1": {"base": "majority_1x", "entry_delay": 1},
+    "majority_d2": {"base": "majority_1x", "entry_delay": 2},
+    "majority_d3": {"base": "majority_1x", "entry_delay": 3},
+    "majority_d4": {"base": "majority_1x", "entry_delay": 4},
+    "majority_d6": {"base": "majority_1x", "entry_delay": 6}
+  },
+  "scenarios": ["normal", "fee_stress", "execution_stress"],
+  "scenario_plan": {
+    "majority_d1": ["normal"],
+    "majority_d2": ["normal", "fee_stress", "execution_stress"],
+    "majority_d3": ["normal"],
+    "majority_d4": ["normal"],
+    "majority_d6": ["normal", "fee_stress", "execution_stress"]
+  },
+  "scenario_cells": 9,
+  "scenario_cells_note": "5 normal (d1/d2/d3/d4/d6) + 2x2 tail-risk (d2,d6 x fee_stress,execution_stress) = 9 scenario-cells; brief noi ~11 la uoc luong, con so chinh xac pre-spec o day la 9.",
+  "fee_stress_rate": 0.00055,
+  "stress": {
+    "entry_penetration_bps": 5,
+    "target_penetration_bps": 5,
+    "market_exit_slippage_bps": 5,
+    "market_exit_fee_rate": 0.00055,
+    "allow_limit_price_improvement": false
+  },
+  "control": "majority_d1 (entry_delay=1 tren majority_1x) normal phai khop published majority_1x (+165.17829563633% total_return 1.6517829563633004, -20.09% max_drawdown -0.20086073993367803, 63 trades) trong 1e-9 hoac STOP",
+  "control_reference": {"total_return": 1.6517829563633004, "max_drawdown": -0.20086073993367803, "trades": 63},
+  "entry_window": "Control (delay=1): first_entry_bar = signal_index + 1, last_entry_bar = min(signal_index + entry_expiry_bars, len-1) — verbatim engine ohlc-v2. Delay (delay=k): first_entry_bar = signal_index + k, last_entry_bar = min(signal_index + entry_expiry_bars + k - 1, len-1) — giu nguyen do dai expiry (12 bars), holding_bars tinh tu entry thuc te nhu engine. Tai su dung truc tiep run_latency_backtest/run_latency_stress tu scripts/opencode_r8n_latency.py (khong copy-paste logic), chi tham so hoa entry_delay. Stress runner: range(index+delay, min(index+delay+expiry, len)).",
+  "monthly_formula": "ratio=final_equity/100; duration_years=(complete_evaluation_until - folds[0][0])/(365.2425*86400) theo configs/swing_v15_continuous_folds.json (giong v15/v30/v33); monthly_geometric_net=ratio^(1/(12*duration_years))-1; annual=ratio^(1/duration_years)-1.",
+  "engine_note": "Toan bo backtest con lai (stop/timeout market-like o scenario fee, TP1 50% + TP2, funding long 0.0001/8h short 0, stop-first intrabar, TP suppression tren intrabar entry candle, drawdown trade-candle-close sampled, compounding tu equity hien tai, overlap next_available_index, holding validation) GIU NGUYEN nhu engine ohlc-v2 qua driver v33. Chi cua so entry-search dich theo delay.",
+  "gate": {"monthly_min": 0.05, "dd_max": 0.2, "fills_min": 30},
+  "verdict_note": "Day la thang alpha-decay horizon (edge chet o delay nao), KHONG phai gate loi nhuan. Khong claim maker fill probability/queue tu OHLC; delay la gia dinh stress chu quan."
+}

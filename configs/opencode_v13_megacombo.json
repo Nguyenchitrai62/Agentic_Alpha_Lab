@@ -1,0 +1,42 @@
+{
+  "experiment": "opencode-v13-megacombo",
+  "family": "R3-E2 exploit: mega-combo of banked legs (scope filters x sizing on control geometry)",
+  "hypothesis": "Combine ONLY verified banked legs on frozen v30 isotonic-4 control geometry: scopes {all, long_only, s0004, t050, long_only+s0004, long_only+t050, s0004+t050} x sizing {1x, dd_guard}. All scope filters are causal functions of frozen signal fields known at signal time (direction, signal_time UTC hour, expected_net_percent). dd_guard is past-only sizing from the agent's own control-1x sampled equity. Exploratory only.",
+  "signals": "artifacts/research/opencode_v02_reproduce_v30/isotonic_4/signals.parquet",
+  "candles": "data/processed/swing_regime_research_v4/candles.parquet",
+  "dataset_config": "data/processed/swing_regime_research_v4/config.json",
+  "parent_plan": "configs/swing_v15_continuous_folds.json",
+  "geometry": "control only (frozen entry/stop/TP/holding levels untouched)",
+  "score_column": "expected_net_percent",
+  "scopes": {
+    "all": null,
+    "long_only": {"direction": 1},
+    "s0004": {"session_start_utc_hour_inclusive": 0, "session_end_utc_hour_exclusive": 4},
+    "t050": {"expected_net_percent_min": 0.5},
+    "long_only_s0004": {"direction": 1, "session_start_utc_hour_inclusive": 0, "session_end_utc_hour_exclusive": 4},
+    "long_only_t050": {"direction": 1, "expected_net_percent_min": 0.5},
+    "s0004_t050": {"session_start_utc_hour_inclusive": 0, "session_end_utc_hour_exclusive": 4, "expected_net_percent_min": 0.5}
+  },
+  "scope_key": "Post-filter on frozen signals only (causal/past-only): all keeps everything; long_only keeps direction==1; s0004 keeps signal_time UTC hour h with 0 <= h < 4; t050 keeps expected_net_percent >= 0.50; combos apply AND. All filter fields are known at signal time via the frozen signals file; no refit, no future data.",
+  "sizings": ["1x", "dd_guard"],
+  "branches": ["all_1x", "all_dd_guard", "long_only_1x", "long_only_dd_guard", "s0004_1x", "s0004_dd_guard", "t050_1x", "t050_dd_guard", "long_only_s0004_1x", "long_only_s0004_dd_guard", "long_only_t050_1x", "long_only_t050_dd_guard", "s0004_t050_1x", "s0004_t050_dd_guard"],
+  "control": "unfiltered all_1x must match published isotonic_4 exposure1.0 normal (+122.80% total_return, -20.09% max_drawdown, 65 trades) or STOP",
+  "dd_trigger": 0.1,
+  "dd_guard_lev": 0.5,
+  "dd_guard_reference": "OWN control run (all_1x) sampled equity from trade exit_time/equity_after, past-only 1-microsecond cutoff, 100.0 seed level; each dd_guard branch applies the guard state at its OWN scope-filtered signal times. Disclosed deviation from v03 (own-book per branch): single shared control reference keeps scopes comparable (same convention as v11).",
+  "lev_min": 0.25,
+  "lev_max": 1.0,
+  "fee_stress_rate": 0.00055,
+  "stress": {
+    "entry_penetration_bps": 5,
+    "target_penetration_bps": 5,
+    "market_exit_slippage_bps": 5,
+    "market_exit_fee_rate": 0.00055,
+    "allow_limit_price_improvement": false
+  },
+  "gate": {
+    "monthly_min": 0.05,
+    "dd_max": 0.2,
+    "fills_min": 30
+  }
+}

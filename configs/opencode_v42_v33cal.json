@@ -1,0 +1,114 @@
+{
+  "experiment": "opencode-v42-v33calibrate-first",
+  "family": "R11-B BREAKTHROUGH: calibrate-first + validation-percentile gate + coverage floor tren predictions v33 dong bang (local only, tiep noi R-diagnostic v34 proposal #2)",
+  "hypothesis": "v33 action-margin GRU co coverage (mean 3.26%/133, mms 3.02%/123) nhung rank AM (-0.028/-0.027) va overconfidence (bias mean +1.05, mms +0.68) voi KHONG calibration. Causal isotonic past-only + nguong phan vi validation + coverage floor co the cuu vot.",
+  "base": {
+    "ensemble": "mean_minus_std (penalty 1.0, mms la nhanh chinh; mean dung de doi chieu diagnostic)",
+    "source": "artifacts/kaggle/v33_actionmargin_download/tcn-training",
+    "source_note": "33 models = 11 folds x 3 seeds (1729/1730/1731), VERIFY presence truoc khi chay; neu thieu STOP",
+    "dataset": "data/processed/swing_regime_research_v4",
+    "decisions": "data/processed/swing_regime_research_v4/decisions.parquet",
+    "labels": "data/processed/swing_regime_research_v4/examples.npz",
+    "candles": "data/processed/swing_regime_research_v4/candles.parquet",
+    "dataset_config": "data/processed/swing_regime_research_v4/config.json",
+    "parent_plan": "configs/swing_v15_continuous_folds.json",
+    "plan": "configs/swing_v33_action_margin_gru.json",
+    "seeds": [1729, 1730, 1731]
+  },
+  "calibration": {
+    "method": "causal-isotonic past-only (src/agentic_alpha_lab/models/causal_calibration.py, pattern scripts/research_causal_calibration.py)",
+    "score": "selection_score_percent (mean - 1.0*std, unconditional net percent)",
+    "target": "labels[...,0] net percent (unconditional, 0 neu unfilled)",
+    "mapping": "IsotonicRegression(out_of_bounds=clip); output[...,0] = mapped / mean_fill_score (conditional cho choose)",
+    "window": "all-quarter (first=0; left=folds[0][0] cho moi fold)",
+    "asof": "parent folds[fold][0] (fold start)",
+    "embargo_days": 8,
+    "min_eligible_decisions": 50,
+    "warmup": "WAIT (mapped=zeros -> expected<gate -> khong signal trong fold do; fallback cung WAIT o warmup fold)",
+    "thresholds_from": "VALIDATION folds only (eligible history past-only, embargoed); never test (khong dung current fold distribution cho threshold, tru fallback top-8 ranking trong fold khong dung label)"
+  },
+  "branches": ["v33-identity", "v33-isoall", "v33-iso-topdec", "v33-iso-topdec-cov8"],
+  "branch_specs": {
+    "v33-identity": {
+      "calibration": "none (control)",
+      "gate": "absolute 0.3% expected + 0.25 fill via swing_signals (audit parity)",
+      "fallback": "none",
+      "sizing": "1x",
+      "note": "Phai khop R-audit mms_1x normal trong 1e-9 hoac STOP"
+    },
+    "v33-isoall": {
+      "calibration": "causal-isotonic all-quarter",
+      "gate": "absolute 0.3% + 0.25 fill via swing_signals tren predictions da calibrate (giu nguong tuyet doi de do bias-correction don thuan)",
+      "fallback": "none",
+      "sizing": "1x"
+    },
+    "v33-iso-topdec": {
+      "calibration": "causal-isotonic all-quarter (giong isoall)",
+      "gate": "REPLACE absolute bang validation-decile: per-fold t_f = 90th percentile cua history best-calibrated (max_k mapped tren eligible history) + fill>=0.25; custom loop (khong dung swing_signals 0.3); warmup WAIT",
+      "fallback": "none",
+      "sizing": "1x",
+      "note": "Day la proposal #2 'chon nguong tu phan vi validation thay vi so tuyet doi'"
+    },
+    "v33-iso-topdec-cov8": {
+      "calibration": "causal-isotonic all-quarter (giong topdec)",
+      "gate": "giong topdec (t_f + fill>=0.25)",
+      "fallback": "coverage-fallback top-8/fold: per fold (tru warmup), union top-8 decisions theo best mapped (fill>=0.25) forced eligible (bypass t_f, van giu fill gate), van chiu monthly cap 4 + cooldown 5d",
+      "sizing": "1x",
+      "note": "Coverage floor de tranh collapse; fallback ranking trong fold khong dung label (causal)"
+    }
+  },
+  "sizings": ["1x"],
+  "dd_guard_conditional": {
+    "run": "chi tren best calibrated branch theo normal monthly_geometric_net (trong 3 calibrated), NEU re (signals>0, backtest local vai phut) thi chay; else SKIP va ghi ly do",
+    "formula": "own-book 1x equity, trigger 10%, lev 0.5/1.0 past-only (1-microsecond cutoff, seed 100.0), giong v03/v28c/v33d; execution leverage=0.5/max=1.0",
+    "note": "Khong phai branch pre-spec chinh; ket qua luu rieng duoi cung output neu chay"
+  },
+  "scenarios": ["normal", "fee_stress", "execution_stress"],
+  "scenario_specs": {
+    "normal": "fee_rate_per_fill=0.0002 (dataset costs)",
+    "fee_stress": "fee_rate_per_fill=0.00055",
+    "execution_stress": "FillStress(5,5,5,0.00055,False) + fee 0.0002 base (market_exit_fee 0.00055)"
+  },
+  "stress": {
+    "entry_penetration_bps": 5,
+    "target_penetration_bps": 5,
+    "market_exit_slippage_bps": 5,
+    "market_exit_fee_rate": 0.00055,
+    "allow_limit_price_improvement": false
+  },
+  "execution": {
+    "entry_expiry_bars": 12,
+    "holding_cap_bars": 2016,
+    "leverage_1x": 1.0
+  },
+  "monthly_formula": "ratio=final_equity/100; duration_years=(complete_evaluation_until - folds[0][0])/(365.2425*86400) theo configs/swing_v15_continuous_folds.json (giong v33d); monthly_geometric_net=ratio^(1/(12*duration_years))-1; annual=ratio^(1/duration_years)-1",
+  "engine_note": "ohlc-v2: limit entry tu nen ke tiep, expiry 12 bars, stop-first intrabar, TP suppression tren intrabar entry candle, stop/timeout market-like o scenario fee, funding long 0.0001/8h short 0, compounding tu equity hien tai, overlap next_available_index, drawdown trade-candle-close sampled (khong phai mark/intrabar day du). Khong claim maker fill/queue tu OHLC.",
+  "gate": {"monthly_min": 0.05, "dd_max": 0.2, "fills_min": 30},
+  "control_reference": {
+    "branch": "mms_1x normal (R-audit v33d portfolio.json)",
+    "total_return": -0.05910815097428124,
+    "max_drawdown": -0.23803444636085724,
+    "trades": 77,
+    "n_signals": 123,
+    "coverage": 0.03017664376840039,
+    "tolerance": "1e-9 cho total_return/max_drawdown + exact trades/signals hoac STOP"
+  },
+  "diagnostic_lens_v34": {
+    "bias": "top-decile (n=408) pred_exp_mean vs obs_net_mean truoc/sau calibrate",
+    "rank": "rank_corr_per_decision (Spearman-style per-decision tren 16 candidates) mean/std",
+    "coverage": "n_signals/4076 + by_month + active_months"
+  },
+  "output": "artifacts/research/opencode_v42_v33cal",
+  "driver": "scripts/opencode_r11b_v33cal.py",
+  "rules": [
+    "no live orders; local only",
+    "NEVER touch research/parallel/registry.json, CONTINUOUS_RESEARCH.md, NEXT_AGENT.md, research/parallel/rounds/*, ../Kronos, C:/Users/trait/.codex/worktrees/*",
+    "no register/assign/rotate; no commit/push; no overwrites (output dir phai chua ton tai)",
+    "causal past-only (maps fit tren earlier folds only, 8-day embargo; thresholds tu validation history only)",
+    "exploratory labels; opened 2023-2026 development interval, NOT independent test",
+    "pre-specify matrix trong config nay TRUOC khi chay (script assert branches)"
+  ],
+  "independent_test": false,
+  "exploratory": true,
+  "live_approved": false
+}

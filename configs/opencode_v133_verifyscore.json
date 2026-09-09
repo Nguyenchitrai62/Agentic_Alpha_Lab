@@ -1,0 +1,61 @@
+{
+  "experiment": "opencode-v133-verifyscore",
+  "mission": "Xac minh doc lap (A2-ARCH, verification duty): tu frozen predictions v38 + v96 va labels examples.npz, tinh lai rieng 3 neo diagnostic cua R v127 bang code tu viet (KHONG import driver cua R): (a) rank-correlation tong the v38/v96, (b) top-decile realized means cho 3 nhom v38-only/v96-only/overlap, (c) entropy trung binh tau=1.0%. Analysis only, KHONG fitting, KHONG train, KHONG live.",
+  "owner": "A2-ARCH verification (10th verification)",
+  "inputs": {
+    "v38_source": "artifacts/kaggle/v38_rankloss_download/rankloss-training (33 predictions.npy (n_test,16,6) map-v8)",
+    "v96_source": "artifacts/kaggle/v96_transformer_download/transformer-training (33 predictions.npy (n_test,16,6) map-v8 RAW TRADEABLE)",
+    "dataset": "data/processed/swing_regime_research_v4 (decisions.parquet, examples.npz labels (n,16,3))",
+    "parent_plan": "configs/swing_v15_continuous_folds.json (11 quarterly folds, 4076 decisions, embargo 8d)",
+    "n_decisions": 4076,
+    "seeds": [1729, 1730, 1731]
+  },
+  "ensemble_independent": "E = mean tren 3 seeds cua (ch0 * sigmoid(ch4)) voi sigmoid clip ch4 trong [-40,40]; ghep per-fold concat theo thu tu fold 0..10 (khop partition chronological + label_end < complete_evaluation_until); assert moi fold shape == (partition_len,16,6) va finite. KHONG import driver R (opencode_r47a_v96scorediag) va KHONG import ham combine; cong thuc tu viet nhung tuong duong dai so voi mean_expected_net_percent.",
+  "spearman_definition": "Per-decision Spearman tren 16 candidates giua E[i,:] va truth ch0[i,:] = Pearson tren average-rank (pandas rank axis=1, method=average, ascending True), tru mean, den = sqrt(sum(a^2)*sum(b^2)); decision hop le iff den>0; overall = mean tren cac decision hop le. Giong dinh nghia v100/v127 (rank_corr_per_decision). Document tai day de doi chieu.",
+  "metrics": {
+    "a_rank": {
+      "v38_anchor_mean": 0.06603817207756009,
+      "v96_anchor_mean": -0.03422260245521851,
+      "v38_anchor_n_valid": 4075,
+      "v96_anchor_n_valid": 4075,
+      "tol_rank": 1e-06
+    },
+    "b_topdecile": {
+      "k": 408,
+      "construction": "moi model top-408 theo score RIENG s=max_k E[k] (stable argsort desc); own top1 = argmax first-max; realized = labels ch0 (unconditional net, label %, exploratory) tai (order, own top1)",
+      "anchor_overlap_n": 147,
+      "anchor_v38_only_n": 261,
+      "anchor_v96_only_n": 261,
+      "anchor_v38_only_mean": 0.541165292263031,
+      "anchor_v96_only_mean": -0.8505971431732178,
+      "anchor_overlap_mean_v38cand": -0.39405152201652527,
+      "anchor_v38_obs_net_mean": 0.20421218872070312,
+      "anchor_v96_obs_net_mean": -0.7906320691108704,
+      "tol_mean": 0.0001
+    },
+    "c_entropy": {
+      "tau_percent": 1.0,
+      "definition": "per decision p = softmax(E[i,:]/tau), tru max de on dinh; H = -sum(p log p) nats (p clip [1e-300,1.0] truoc log); mean tren 4076 decisions",
+      "anchor_H38_mean": 2.482179048877679,
+      "anchor_H96_mean": 2.3217589352242425,
+      "anchor_delta_H96_minus_H38": -0.16042011365343695,
+      "tol_mean": 0.0001
+    }
+  },
+  "pass_rules": {
+    "ranks": "abs(recomputed - anchor) <= 1e-6 cho v38_rank_corr_mean va v96_rank_corr_mean; n_valid phai EXACT 4075/4075",
+    "means": "abs(recomputed - anchor) <= 1e-4 cho cac realized means (v38-only, v96-only, overlap) va entropy means (H38, H96)",
+    "counts": "EXACT cho overlap_n=147, v38_only_n=261, v96_only_n=261, topk n=408/408",
+    "mismatch_policy": "mismatch -> dieu tra + neu ro nguyen nhan (dinh nghia / ensemble / partition / label channel / tie-break / float); KHONG sua so lieu R"
+  },
+  "outputs": {
+    "dir": "artifacts/research/opencode_v133_verifyscore",
+    "files": ["rank_recompute.csv", "topdecile_groups.csv", "entropy_compare.csv", "summary.json"],
+    "no_overwrite": "script raise FileExistsError neu dir da ton tai"
+  },
+  "rules": ["verification analysis only (no fitting)", "no live orders", "KHONG touch research/parallel/registry.json, CONTINUOUS_RESEARCH.md, NEXT_AGENT.md, research/parallel/rounds/*, ../Kronos, worktrees", "no register/assign/rotate", "no commit/push", "no overwrites; exploratory labels", "PowerShell `; if ($?) {}`"],
+  "causality": "past-only, closed-candle; percentile/softmax la descriptive rescaling, KHONG phai decision rule; labels exploratory",
+  "independent_test": false,
+  "exploratory": true,
+  "live_approved": false
+}

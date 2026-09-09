@@ -1,0 +1,42 @@
+{
+  "experiment": "opencode-v48-triple",
+  "family": "R14-E-triple exploit: scope s0004+t050 (signal_time UTC hour 0-4 AND expected_net_percent>=0.50) on v15 ensemble bases",
+  "hypothesis": "Banked legs s0004 (session 0-4 UTC carries book, R1-C) + t050 (premium risk-adjusted PF 3.13, N1) stack on the new v15 ensemble bases (majority/confirmed carry iso4 geometry on agreement rows). Triple combo never tested per ledger round14 E-triple. Round12 lesson honored: s0004+t050 keeps ~47/46 pre-loop signals on these bases (verified before running), so coverage should survive the 30-fill gate unlike pctgate/1m-entry. Exploratory only.",
+  "bases": {
+    "majority": "artifacts/research/opencode_v15_mapensemble/majority_1x/signals.parquet",
+    "confirmed": "artifacts/research/opencode_v15_mapensemble/confirmed_1x/signals.parquet"
+  },
+  "base_provenance": "frozen v15 map-ensemble outputs: majority = 2-of-3 vote with iso4 in majority, confirmed = iso4-confirmed-by-isoall; geometry is iso4 choose() output on agreement rows (see configs/opencode_v15_mapensemble.json). Verified before pre-spec: both bases contain signal_time + direction + expected_net_percent columns (t050 column present, no STOP). Pre-loop counts: majority n=94 (s0004=59, t050=71, s0004+t050=47); confirmed n=94 (s0004=55, t050=76, s0004+t050=46).",
+  "candles": "data/processed/swing_regime_research_v4/candles.parquet",
+  "dataset_config": "data/processed/swing_regime_research_v4/config.json",
+  "parent_plan": "configs/swing_v15_continuous_folds.json",
+  "geometry": "control only (frozen entry/stop/TP/holding levels untouched)",
+  "score_column": "expected_net_percent",
+  "scopes": {
+    "all": null,
+    "s0004_t050": {"session_start_utc_hour_inclusive": 0, "session_end_utc_hour_exclusive": 4, "expected_net_percent_min": 0.5}
+  },
+  "scope_key": "Post-filter on frozen v15 base signals only (causal/past-only): all keeps everything; s0004_t050 keeps signal_time UTC hour h with 0 <= h < 4 AND expected_net_percent >= 0.50 (AND). All filter fields known at signal time via frozen signals files; no refit, no future data.",
+  "sizings": ["1x", "dd_guard"],
+  "branches": ["majority_all_1x", "majority_all_dd_guard", "majority_s0004_t050_1x", "majority_s0004_t050_dd_guard", "confirmed_all_1x", "confirmed_all_dd_guard", "confirmed_s0004_t050_1x", "confirmed_s0004_t050_dd_guard"],
+  "control": "DUAL reproduction gate or STOP: majority_all_1x normal must match B4 majority_1x (+165.17829563633006% total_return 1.6517829563633004, -20.086073993367803% max_drawdown -0.20086073993367803, 63 trades) AND confirmed_all_1x normal must match B4 confirmed_1x (+157.85811193475512% total_return 1.5785811193475512, -16.094964732093653% max_drawdown -0.16094964732093653, 60 trades). Tolerance 1e-6 on return/drawdown, exact on trades.",
+  "control_reference": {"majority": {"total_return": 1.6517829563633004, "max_drawdown": -0.20086073993367803, "trades": 63}, "confirmed": {"total_return": 1.5785811193475512, "max_drawdown": -0.16094964732093653, "trades": 60}},
+  "dd_trigger": 0.1,
+  "dd_guard_lev": 0.5,
+  "dd_guard_reference": "OWN majority-control run (majority_all_1x) sampled equity from trade exit_time/equity_after, past-only 1-microsecond cutoff, 100.0 seed level; each dd_guard branch applies the guard state at its OWN base+scope-filtered signal times. Single shared majority-control reference keeps bases/scopes comparable (same convention as v11/v13/v18). Disclosed per mission.",
+  "lev_min": 0.25,
+  "lev_max": 1.0,
+  "fee_stress_rate": 0.00055,
+  "stress": {
+    "entry_penetration_bps": 5,
+    "target_penetration_bps": 5,
+    "market_exit_slippage_bps": 5,
+    "market_exit_fee_rate": 0.00055,
+    "allow_limit_price_improvement": false
+  },
+  "gate": {
+    "monthly_min": 0.05,
+    "dd_max": 0.2,
+    "fills_min": 30
+  }
+}

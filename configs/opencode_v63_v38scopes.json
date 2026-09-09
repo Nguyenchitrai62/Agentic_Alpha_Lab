@@ -1,0 +1,85 @@
+{
+  "experiment": "opencode-v63-v38scopes",
+  "family": "R20 E-EXPLOIT: scopes {all, long_only, s0004, t050} x sizing {1x, dd_guard} tren chan v38-isoall dong bang (local only)",
+  "hypothesis": "Scope legs that fail tren selective ensemble bases (majority-94: v18/v48) co the hanh xu khac tren v38-isoall (122 signals/68 fills, FATTER + DD-safe +83.46%/-18.76% normal, monthly 1.82%). Test trung thuc: loc causal tren frozen signal fields, khong refit, control all-1x phai reproduce hoac STOP.",
+  "base": {
+    "name": "v38-isoall (R19 v59 calibrated leg, DD-safe, banked)",
+    "signals": "artifacts/research/opencode_v59_v38cal/v38-isoall/signals.parquet",
+    "path_note": "Mission viet 'v38-isoall_1x/signals.parquet' (shorthand); duong dan thuc te la v38-isoall/signals.parquet (khong co _1x). Deviation ghi nhan, khong doi noi dung.",
+    "round19_banked": {"total_return": 0.8346160986405058, "max_drawdown": -0.18761375448862916, "monthly_geometric_net": 0.01816512844871787, "trades": 68, "n_signals": 122}
+  },
+  "column_verification": {
+    "direction": true,
+    "signal_time": true,
+    "score_like": "expected_net_percent (CHON lam score cot cho t050; cac dong dau am, e.g. -0.45; mean 0.518, p50 0.224, max 4.65)",
+    "also_present": ["en_best", "ohlc_fill_score", "calibrated", "candidate_id", "fold_test"],
+    "t050_applicable": true,
+    "t050_skipped": false,
+    "census_frozen": {"n": 122, "long_only": 74, "short": 48, "s0004_utc0_4": 97, "t050_expnet_ge_050": 45, "t050_note": "s0004 giu 79.5% book (v38-isoall da tap trung phien A); t050 giu 36.9%"}
+  },
+  "branches": ["v38iso_all_1x", "v38iso_all_dd_guard", "v38iso_long_only_1x", "v38iso_long_only_dd_guard", "v38iso_s0004_1x", "v38iso_s0004_dd_guard", "v38iso_t050_1x", "v38iso_t050_dd_guard"],
+  "scopes": {
+    "all": "khong loc (control, phai reproduce +83.46%/-18.76%/68 normal hoac STOP)",
+    "long_only": "direction == 1 (frozen field, causal post-filter)",
+    "s0004": "0 <= UTC hour(signal_time) < 4 (quy uoc R1-C/v48, frozen field)",
+    "t050": "expected_net_percent >= 0.50 (quy uoc v11/v13/v18/v48 T050=0.50, ap tren score cot expected_net_percent)"
+  },
+  "sizings": ["1x", "dd_guard"],
+  "dd_guard": {
+    "reference": "OWN control v38iso_all_1x 1x equity (tu control cua chinh round nay, khong dung book ngoai)",
+    "formula": "tai moi signal_time rieng cua branch: lev=0.5 neu equity control qua khu (cutoff 1-microsecond, seed 100.0) hon 10% duoi trailing peak, else 1.0; past-only",
+    "execution": "signals mang cot leverage {0.5,1.0}; ExecutionConfig leverage=0.5/max_leverage=1.0 (quy uoc v59 cung model family)",
+    "trigger": 0.1,
+    "guard_lev": 0.5,
+    "lev_min": 0.5,
+    "lev_max": 1.0
+  },
+  "score_column": "expected_net_percent",
+  "t050": 0.5,
+  "session_utc": [0, 4],
+  "scenarios": ["normal", "fee_stress", "execution_stress"],
+  "scenario_specs": {
+    "normal": "fee_rate_per_fill=0.0002 (dataset costs)",
+    "fee_stress": "fee_rate_per_fill=0.00055",
+    "execution_stress": "FillStress(5,5,5,0.00055,False) + fee 0.0002 base (market_exit_fee 0.00055)"
+  },
+  "stress": {
+    "entry_penetration_bps": 5,
+    "target_penetration_bps": 5,
+    "market_exit_slippage_bps": 5,
+    "market_exit_fee_rate": 0.00055,
+    "allow_limit_price_improvement": false
+  },
+  "execution": {
+    "entry_expiry_bars": 12,
+    "holding_cap_bars": 2016,
+    "leverage_1x": 1.0
+  },
+  "fee_stress_rate": 0.00055,
+  "monthly_formula": "ratio=final_equity/100; duration_years=(complete_evaluation_until - folds[0][0])/(365.2425*86400) theo configs/swing_v15_continuous_folds.json; monthly_geometric_net=ratio^(1/(12*duration_years))-1; annual=ratio^(1/duration_years)-1",
+  "gate": {"monthly_min": 0.05, "dd_max": 0.2, "fills_min": 30},
+  "control_reference": {
+    "branch": "v38iso_all_1x normal (artifacts/research/opencode_v59_v38cal/v38-isoall/normal_metrics.json)",
+    "total_return": 0.8346160986405058,
+    "max_drawdown": -0.18761375448862916,
+    "trades": 68,
+    "n_signals": 122,
+    "tolerance": "1e-6 cho total_return/max_drawdown + exact trades/n_signals hoac STOP"
+  },
+  "candles": "data/processed/swing_regime_research_v4/candles.parquet",
+  "dataset_config": "data/processed/swing_regime_research_v4/config.json",
+  "parent_plan": "configs/swing_v15_continuous_folds.json",
+  "output": "artifacts/research/opencode_v63_v38scopes",
+  "driver": "scripts/opencode_r20e_v38scopes.py",
+  "rules": [
+    "no live orders; local backtests only",
+    "NEVER touch research/parallel/registry.json, CONTINUOUS_RESEARCH.md, NEXT_AGENT.md, research/parallel/rounds/*, ../Kronos, C:/Users/trait/.codex/worktrees/*",
+    "no register/assign/rotate; no commit/push; no overwrites (output dir phai chua ton tai; config/script new only)",
+    "causal past-only (scopes la post-filter tren frozen fields; dd_guard chi dung control equity qua khu; fill tu nen ke tiep)",
+    "exploratory labels; opened 2023-2026 development interval, NOT independent test",
+    "pre-specify matrix trong config nay TRUOC khi chay (script assert branches)"
+  ],
+  "independent_test": false,
+  "exploratory": true,
+  "live_approved": false
+}

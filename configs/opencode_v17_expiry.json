@@ -1,0 +1,44 @@
+{
+  "experiment": "opencode-v17-expiry",
+  "family": "R3-N4 neutral: limit-entry patience (entry_expiry_bars) matrix on frozen v30 isotonic-4 x {1x, dd_guard}",
+  "hypothesis": "Limit-entry patience (how many 5-min bars a resting entry limit stays live after signal close) may move the fill-rate vs fill-quality frontier: short patience (6 bars = 30 min) skips late fills; long patience (24 bars = 2 h) harvests more fills at possibly worse prices. Varying ONLY entry_expiry_bars in ExecutionConfig on the frozen v30 isotonic-4 signal set (94 signals, scores untouched) tests this in isolation. Exploratory only.",
+  "signals": "artifacts/research/opencode_v02_reproduce_v30/isotonic_4/signals.parquet",
+  "candles": "data/processed/swing_regime_research_v4/candles.parquet",
+  "dataset_config": "data/processed/swing_regime_research_v4/config.json",
+  "parent_plan": "configs/swing_v15_continuous_folds.json",
+  "base_entry_expiry_bars": 12,
+  "base_source": "data/processed/swing_regime_research_v4/config.json entry_expiry_bars (read before running; equals frozen per-signal entry_expiry_bars column value 12, which is inert metadata — engines use ExecutionConfig only)",
+  "expiries": [6, 12, 24],
+  "expiry_rule": "base is 12, so matrix is {base/2, base, base*2} = {6, 12, 24} bars of 5-min candles (30 min / 60 min / 120 min patience)",
+  "sizings": ["1x", "dd_guard"],
+  "branches": ["e6_1x", "e12_1x", "e24_1x", "e6_dd_guard", "e12_dd_guard", "e24_dd_guard"],
+  "branch_map": {
+    "e6_1x": {"entry_expiry_bars": 6, "sizing": "1x"},
+    "e12_1x": {"entry_expiry_bars": 12, "sizing": "1x"},
+    "e24_1x": {"entry_expiry_bars": 24, "sizing": "1x"},
+    "e6_dd_guard": {"entry_expiry_bars": 6, "sizing": "dd_guard"},
+    "e12_dd_guard": {"entry_expiry_bars": 12, "sizing": "dd_guard"},
+    "e24_dd_guard": {"entry_expiry_bars": 24, "sizing": "dd_guard"}
+  },
+  "control": "base-expiry e12_1x normal must reproduce published isotonic_4 exposure1.0 (+122.80% total_return, -20.09% max_drawdown, 65 trades) or STOP",
+  "frozen": "identical frozen 94-signal set for every branch; no filtering, no refit; ONLY ExecutionConfig.entry_expiry_bars varies (6/12/24); max_holding_bars=2016 (7d*288), tp1_fraction=0.5, intrabar_policy=stop_first frozen",
+  "causality_note": "entry_expiry_bars is a frozen constant per branch (no adaptation, no lookahead); entry window is signal_index+1 .. signal_index+expiry inclusive in both run_backtest and run_stress",
+  "dd_trigger": 0.1,
+  "dd_guard_lev": 0.5,
+  "dd_guard_reference": "base-expiry control (e12_1x) sampled equity (trade exit_time/equity_after), past-only 1-microsecond cutoff, 100.0 seed level; each branch applies the guard state at its OWN signal times (all branches share the same 94 signal times; only leverage differs). Disclosed shared-reference design per v11 (deviation from v03 own-book reference) to keep expiries comparable.",
+  "lev_min": 0.25,
+  "lev_max": 1.0,
+  "fee_stress_rate": 0.00055,
+  "stress": {
+    "entry_penetration_bps": 5,
+    "target_penetration_bps": 5,
+    "market_exit_slippage_bps": 5,
+    "market_exit_fee_rate": 0.00055,
+    "allow_limit_price_improvement": false
+  },
+  "gate": {
+    "monthly_min": 0.05,
+    "dd_max": 0.2,
+    "fills_min": 30
+  }
+}

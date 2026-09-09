@@ -1,0 +1,58 @@
+{
+  "experiment": "opencode-v101-distill",
+  "mission": "Distillation targets ONLY (local data artifact, KHONG training): tao soft-target files de model student TUONG LAI distill kien thuc v38-ensemble thay vi ListNet-tren-raw-labels. KHONG fit bat ky student nao o day.",
+  "owner": "R-DIAGNOSTIC worker (scorediag v100: mechanism value-prior neo magnitude + regularize order; v38-only top-decile +0.196% vs v55c-only -0.727%)",
+  "mechanism_recap": "Value-prior giup ranking vi cho encoder gradient tuyet doi doc lap tren MOI candidate (neo magnitude), vua regularize thu tu within-decision vua lam score lien-decision muot/so sanh duoc (standardized mean|d| 0.410 vs 0.677, thang 11/11 folds). Rank-only ListNet chi hoc thu tu tuong doi qua softmax nen margin lien-decision la jitter ordinal, top-picks am (top-decile +0.204% vs -0.493%, v55c-only -0.727%). Implication: distill rank-head tren soft-target E38 (giu neo magnitude) thay vi ListNet tren label tho.",
+  "inputs": {
+    "v38_source": "artifacts/kaggle/v38_rankloss_download/rankloss-training (DA VERIFY: 33 predictions.npy (n_test,16,6) map-v8, 3 seeds x 11 folds)",
+    "v38b_policy_ref": "artifacts/research/opencode_v38b_replay/audit.json (DA VERIFY: policy ensemble mean_3seeds combine penalty 0.0; gate en_best>0.0 + fallback top-8/fold-test; candidate argmax expected s.t. fill>=0.25). Policy nay la context cho student TUONG LAI, KHONG ap policy len soft-targets (soft-targets bao toan full (n,16)).",
+    "labels": "data/processed/swing_regime_research_v4/examples.npz (DA VERIFY: labels (5628,16,3) float32; ch0 unconditional net %, ch1 fill, ch2 positive-net; exploratory)",
+    "decisions": "data/processed/swing_regime_research_v4/decisions.parquet (DA VERIFY: 5628 rows, cols bar_index/signal_time/label_end/close/atr5/atr4)",
+    "parent_plan": "configs/swing_v15_continuous_folds.json (11 quarterly folds, 4076 decisions, complete_evaluation_until 2026-03-23)",
+    "v100_anchor": "artifacts/research/opencode_v100_scorediag/summary.json (rank +0.066 vs +0.022; top-decile v38-only +0.196% vs v55c-only -0.727%)"
+  },
+  "ensemble": {
+    "method": "VERBATIM audit v38b: mean 3 seeds qua agentic_alpha_lab.models.ensemble_value.combine(stacked, 0.0); E38 = details[mean_expected_net_percent] (n,16), expected = ch0*sigmoid(ch4) per seed",
+    "assembly": "per-fold concat theo thu tu fold 0..10 (khop partition chronological + label_end < complete_evaluation_until); assert moi fold file length == partition length; assert finite; assert n == 4076",
+    "n_decisions": 4076
+  },
+  "temperature": {
+    "why_past_folds": "Cloud export chi co test-fold predictions, KHONG co validation predictions (gioi han da biet tu v38b audit: calibrate-first KHONG kha thi voi export hien tai). Nen validation cho tau_f = cac test-folds QUA KHU (fold_of < f) — strictly causal, no test peek.",
+    "per_fold": "tau_f fit tren rows co fold_of < f; fold 0 khong co qua khu -> fallback tau=1.0 (ghi ro fallback, khong peek).",
+    "objective": "NLL (cross-entropy) cua softmax(E38/tau) vs hard oracle class = argmax_k truth ch0 (first-max deterministic) tren validation-qua-khu; chon tau argmin NLL (first-min tren grid). Day la temperature scaling chuan (Guo et al. 2017) ap cho teacher top-1 calibration.",
+    "grid": [0.25, 0.5, 0.75, 1.0, 1.5, 2.0, 3.0, 5.0, 8.0],
+    "numerics": "stable log-softmax (tru max per-row); clip prob 1e-12 khi tinh NLL; E38 don vi % net.",
+    "record": "taus.json: per-fold {tau, n_val, fallback, nll_per_tau, top1_conf_mean, top1_accuracy, cal_gap=|conf-acc|} + grid + objective + fallback rule"
+  },
+  "soft_targets": {
+    "formula": "soft[i,:] = stable_softmax(E38[i,:] / tau_{fold_of[i]}) per decision; float32 (n,16); moi row sum-to-1 (assert allclose 1e-5).",
+    "bundle_npz": "soft_targets.npz keys: soft_targets (4076,16 float32), teacher_expected_net (4076,16 float32, E38), fold_of (4076 int64), indices (4076 int64, vi tri vao decisions_all/examples), tau_per_row (4076 float64), oracle_top1 (4076 int64, argmax ch0 first-max)"
+  },
+  "teacher_diagnostic": {
+    "question": "Teacher co thang hard labels tren validation khong? Neu teacher thua o dau thi ghi trung thuc o do.",
+    "definitions": "teacher_top1 = argmax E38 (first-max); oracle_top1 = argmax truth ch0 (first-max, dung future -> chi mo ta exploratory, KHONG lam rule); uniform_baseline = mean truth ch0 tren 16 candidates/decision (no-skill baseline).",
+    "per_fold_metrics": ["n", "agree_rate (teacher==oracle)", "chance=1/16", "teacher_realized_mean (ch0 tai teacher_top1)", "oracle_realized_mean", "uniform_realized_mean", "teacher_minus_uniform", "p_net_positive_teacher", "fill_rate_teacher (ch1 tai teacher_top1)", "pos_given_fill_teacher (ch2|fill)", "top1_conf_mean (tai tau_f)", "top1_accuracy", "cal_gap"],
+    "loses_where": "folds co teacher_realized_mean < uniform_realized_mean HOAC agree_rate < chance -> liet ke explicit trong teacher_diagnostic.json (honest, khong giau).",
+    "scope": "mo ta tren moi fold test-decisions (exploratory labels, giong pattern v100) + luu y taus fit past-only nen diagnostic doc lap voi fitting."
+  },
+  "student_spec_future": {
+    "note": "CHI spec cho TUONG LAI, KHONG thuc thi o v101 (no student training).",
+    "loss": "L = KL(softmax(student_logits) || soft_targets co dinh) + lambda_rank * ranking_loss(student_logits, hard labels); KL la so hang chinh (distill magnitude-neo tu E38), ranking-on-hard la so hang nho giu ap luc thu tu.",
+    "lambda_rank_suggestion": "0.1-0.25 (nho hon ranking 0.5 cua v38 vi soft-target da chua tin hieu thu tu; tune tren validation past-only, KHONG tune tren test).",
+    "temperature_handling": "soft_targets da scale boi tau_f o v101 -> student hoc voi KL o T=1 (khong them temperature nua); student logits tu do, khong rang buoc don vi %.",
+    "architecture": "architecture-free: bat ky head nao output (n,16) logits (SSM/TCN/GRU/MLP deu duoc; khuyen nghi giu encoder family ~0.6M Selective-SSM de so sanh cong bang voi v38/v55c).",
+    "causality": "train/val chi rows co label_end < fold_start - 8d embargo (nested_split past-only); normalization fit train-only; khong chon seed/fold/epoch/threshold theo PnL; labels exploratory.",
+    "budget": "Heavy training CHI tren Kaggle PRIVATE (T4x2, <=10 GPU-h, fixed epochs, khong early-stop theo PnL); local GTX1650 chi inference/replay/backtest; tua theo AGENTS.md compute preference 2026-09-06.",
+    "eval": "replay parity (rtol/atol 1e-3) + portfolio 2 branches (1x, dd_guard) x 3 scenarios + gate monthly>=5%/DD<=20%/fills>=30 + diagnostic lens (rank/coverage/bias/topdecile) truoc moi ket luan."
+  },
+  "outputs": {
+    "dir": "artifacts/research/opencode_v101_distill",
+    "files": ["soft_targets.npz", "taus.json", "teacher_diagnostic.json", "summary.json"],
+    "no_overwrite": "script raise FileExistsError neu dir da ton tai"
+  },
+  "rules": ["targets only, KHONG student training", "no live orders", "KHONG touch research/parallel/registry.json, CONTINUOUS_RESEARCH.md, NEXT_AGENT.md, research/parallel/rounds/*, ../Kronos, C:/Users/trait/.codex/worktrees/*", "no register/assign/rotate", "no commit/push", "no overwrites; causal (fold structure respected, no test peek); exploratory labels", "PowerShell `; if ($?) {}`"],
+  "causality": "past-only, closed-candle; tau_f chi fit tren folds qua khu; labels exploratory mo ta",
+  "independent_test": false,
+  "exploratory": true,
+  "live_approved": false
+}

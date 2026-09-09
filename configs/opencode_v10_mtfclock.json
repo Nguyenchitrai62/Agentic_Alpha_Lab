@@ -1,0 +1,78 @@
+{
+  "experiment": "opencode-v10-mtfclock",
+  "hypothesis": "5m decision noise is the enemy: a lower-frequency decision clock on the SAME frozen calibrated v30 isotonic-4 scores may raise monthly expectancy. All repo work uses the base decision clock; thinned clocks are untried.",
+  "family": "decision-clock thinning (lower-frequency) on frozen calibrated predictions",
+  "predictions": "artifacts/research/opencode_v02_reproduce_v30/isotonic_4/predictions.npz",
+  "decisions": "data/processed/swing_regime_research_v4/decisions.parquet",
+  "candles": "data/processed/swing_regime_research_v4/candles.parquet",
+  "dataset_config": "data/processed/swing_regime_research_v4/config.json",
+  "parent_plan": "configs/swing_v15_continuous_folds.json",
+  "grid_discovery": {
+    "note": "The frozen frame holds 4076 rows on a perfectly regular 6-hourly grid (00/06/12/18 UTC, 4 rows/day x 1019 days, 2023-06-01 to 2026-03-15). The brief's '5m clock' label refers to the 5-minute base candle resolution; the actual decision clock is 6-hourly (stride 72, see tests/test_decision_clock.py). No 5-minute decision frame exists in this dataset.",
+    "literal_1h_audit": "Keeping the FIRST decision row of each UTC hour keeps 4076/4076 rows (identity): every row is alone in its hour. Asserted at runtime.",
+    "literal_4h_audit": "Keeping the FIRST decision row of each 4h block (00/04/08/12/16/20 UTC) keeps 4076/4076 rows (identity): hours 00/06/12/18 fall in distinct blocks 00/04/12/16. Asserted at runtime.",
+    "consequence": "Literal 1h/4h rules are vacuous on this grid, so the 1h/4h branch slots execute the nearest achievable lower-frequency thinnings (12-hourly and 24-hourly/daily) with frozen prediction vectors carried unchanged. This isolates the clock effect exactly as the hypothesis intends. Branch names keep the assigned {5m-control, 1h, 4h} labels; each branch records its actual_decision_grid."
+  },
+  "clocks": {
+    "5m-control": {
+      "actual_decision_grid": "6h-full (all frozen rows; the base 6-hourly clock, mislabeled 5m in the brief)",
+      "rule": "keep every frozen row",
+      "keep_hours_utc": [0, 6, 12, 18],
+      "expected_rows": 4076
+    },
+    "1h": {
+      "actual_decision_grid": "12h (00 and 12 UTC rows only; half decision rate)",
+      "rule": "keep rows with UTC hour in [0, 12]; each kept row carries its frozen calibrated prediction vector unchanged",
+      "keep_hours_utc": [0, 12],
+      "expected_rows": 2038
+    },
+    "4h": {
+      "actual_decision_grid": "24h/daily (00 UTC rows only; quarter decision rate)",
+      "rule": "keep rows with UTC hour == 0; each kept row carries its frozen calibrated prediction vector unchanged",
+      "keep_hours_utc": [0],
+      "expected_rows": 1019
+    }
+  },
+  "sizings": ["1x", "dd_guard"],
+  "dd_guard": {
+    "reference": "5m-control_1x run sampled equity (trade exit_time/equity_after), applied at each branch signal's own signal_time",
+    "trigger": 0.1,
+    "guard_lev": 0.5,
+    "cutoff": "1-microsecond (only exits strictly before the signal count; past-only, 100.0 seed)",
+    "caveat": "trade-candle-close sampled equity, NOT mark-price or full intrabar drawdown"
+  },
+  "lev_min": 0.25,
+  "lev_max": 1.0,
+  "fee_stress_rate": 0.00055,
+  "stress": {
+    "entry_penetration_bps": 5,
+    "target_penetration_bps": 5,
+    "market_exit_slippage_bps": 5,
+    "market_exit_fee_rate": 0.00055,
+    "allow_limit_price_improvement": false
+  },
+  "control_reproduction": {
+    "branch": "5m-control_1x",
+    "scenario": "normal",
+    "expected_total_return": 1.2279837998661565,
+    "expected_max_drawdown": -0.20086073993367803,
+    "expected_trades": 65,
+    "tolerance": 1e-09,
+    "on_mismatch": "STOP: raise before running any other branch and report"
+  },
+  "gate": {
+    "monthly_min": 0.05,
+    "dd_max": 0.2,
+    "fills_min": 30
+  },
+  "branches": [
+    {"name": "5m-control_1x", "clock": "5m-control", "sizing": "1x"},
+    {"name": "5m-control_dd_guard", "clock": "5m-control", "sizing": "dd_guard"},
+    {"name": "1h_1x", "clock": "1h", "sizing": "1x"},
+    {"name": "1h_dd_guard", "clock": "1h", "sizing": "dd_guard"},
+    {"name": "4h_1x", "clock": "4h", "sizing": "1x"},
+    {"name": "4h_dd_guard", "clock": "4h", "sizing": "dd_guard"}
+  ],
+  "causality": "Thinning masks are pure functions of each row's own signal_time (UTC hour); every kept decision uses only past data. No refit of any kind: frozen calibrated vectors are carried unchanged. Fold structure (quarterly, 8-day embargo embodied in the frozen calibrators) is preserved: every fold retains coverage, logged per branch. Frequency policy (cooldown + monthly cap via swing_signals) and backtest chain are IDENTICAL on each subsampled frame.",
+  "notes": "PRE-SPECIFIED matrix: 3 clocks x 2 sizings = 6 branches; 3 scenarios per branch (normal / fee_stress fee .00055 / execution_stress FillStress(5,5,5,.00055,False)). No matrix changes permitted after backtests. Exploratory on the opened 2023-2026 development interval only; NOT an independent test."
+}

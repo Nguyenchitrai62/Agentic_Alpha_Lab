@@ -1,0 +1,74 @@
+{
+  "experiment": "opencode-v142-ethscout",
+  "round": "round55-B-ethscout",
+  "hypothesis": "ETH-as-primary-book is untried (ETH only tried as BTC filter, v46 DEAD dilutive). All BTC-model lines are dead/audited with rank ~0 everywhere (best fresh rank +0.0727 v41 / +0.066 v38 / +0.074 v29-residual). Scout whether an ETH 6h-clock book carries cheap HGB-predictable direction edge before any full training.",
+  "scope": "SCOUT ONLY: data check + small decision-clock/label build mirroring BTC v4 + cheap CPU HGB walk-forward diagnostics. NO full training, NO cloud submit, NO portfolio/backtest, NO live orders.",
+  "data_inventory": {
+    "eth_6h": "data/raw/opencode_eth_6h_20260907/eth_ETHUSDT_6h.parquet (4104 bars, 2023-06-01 -> 2026-03-22, 0 gaps, clock 00/06/12/18 UTC verified)",
+    "eth_funding": "data/raw/opencode_funding_20260907/funding_ETHUSDT.parquet (5132 rows, 2022-01-01 -> 2026-09-07, 0 gaps >9h)",
+    "eth_5m": "MISSING locally (only BTCUSDT 5m exists). Crawl ETHUSDT 5m 2022-01-01 -> 2026-03-23 public klines (same pagination pattern as scripts/opencode_crawl_eth.py) into NEW data/raw/opencode_eth_5m_*/ for coverage/gap record. Baseline diagnostics do NOT need 5m (6h closes suffice); 5m is coverage inventory for any future full-training decision only."
+  },
+  "decision_clock": {
+    "grid": "ETH 6h bars, 00/06/12/18 UTC (same grid as BTC v4 stride-72 6h decisions)",
+    "signal_time": "close_time of 6h bar t (decision strictly after candle t closes; labels use bars strictly after t, so no fill before t+1 by construction)",
+    "warmup_bars": 120,
+    "horizons_6h_bars": {"h3d": 12, "h7d": 28},
+    "label_end": "close_time of bar t+28 (max horizon 7d, mirrors BTC v4 holding_days [3,7])",
+    "cutoff": "2026-03-23T00:00:00Z (label_end must be < cutoff; mirrors BTC development cutoff)",
+    "embargo_days": 8,
+    "note": "Mirror only, no label innovation."
+  },
+  "labels": {
+    "fwd7": "log(close[t+28]/close[t]) -- PRIMARY horizon (7d)",
+    "fwd3": "log(close[t+12]/close[t]) -- reference horizon (3d)",
+    "three_class": "up if fwd > +0.02, down if fwd < -0.02, else flat (fixed +/-2% thresholds, pre-specified from ETH 7d marginal scale sigma~9%: P(up)~39%/P(down)~38%/P(flat)~24%, balanced by construction of the marginal, NOT tuned on any model outcome)",
+    "primary_target": "class7 (7d three-class)",
+    "exploratory": true
+  },
+  "features_past_only": [
+    "lr1, lr2, lr4, lr8, lr16, lr28 (log close[t]/close[t-k], bars <= t only)",
+    "hl1 = log(high[t]/low[t]), hl_mean4",
+    "vol1 = log(volume[t]+1), vol_ratio4, vol_ratio28, volz28",
+    "rsi14 on closes up to t (Wilder, causal)",
+    "dist_sma28 = close[t]/sma28 - 1",
+    "realized vol: std of 6h log-returns over last 12 and 28 bars",
+    "range28 = (max high28 - min low28)/close[t]",
+    "funding_last = last fundingRate with funding_time <= signal_time (causal join), funding_chg8h, funding_mask",
+    "hour = open_time hour in {0,6,12,18}"
+  ],
+  "walk_forward": {
+    "pattern": "B1 purged monthly (mirrors configs/opencode_v09_deriv.json folds)",
+    "fit_at": "first-of-month 00:00Z",
+    "train_mask": "label_end < fit_at - 8d AND signal_time >= fit_at - 730d (embargo 8d >= 7d max horizon)",
+    "min_train_decisions": 200,
+    "insufficient_rule": "skip fold with note (no threshold/fold tuning on outcomes)",
+    "oos": "all decisions with signal_time in month M, predicted by fit_at(M) model only; signal_time >= fit_at enforced by assert"
+  },
+  "model": {
+    "kind": "HistGradientBoostingClassifier (CPU-only, cheap baseline)",
+    "max_iter": 100,
+    "max_leaf_nodes": 15,
+    "min_samples_leaf": 50,
+    "learning_rate": 0.05,
+    "l2_regularization": 10.0,
+    "max_bins": 127,
+    "early_stopping": false,
+    "random_state": 1729,
+    "note": "Single fixed seed (CPU budget, HGB near-deterministic); mirrors B1 single-seed discipline."
+  },
+  "metrics_oos_pooled_diagnostic_only": {
+    "rank_primary": "Spearman(P(up), realized fwd7) pooled over all OOS decisions",
+    "rank_secondary": "Spearman(P(up)-P(down), realized fwd7)",
+    "topdecile_hit_primary": "P(fwd7 > 0 | top-decile by P(up)) (top 10%, k = max(10, n//10))",
+    "topdecile_hit_secondary": "P(class7 == up | top-decile), bottom-decile P(fwd7>0) for spread context",
+    "calibration_in_the_large": "mean P(up/down/flat) vs empirical class frequencies + bias = mean_pred - observed",
+    "context_only": "accuracy, log-loss, per-fold rank mean (no decisions taken on them)"
+  },
+  "go_nogo_rule_prespecified": {
+    "GO_iff": "OOS rank_primary > 0.05 AND topdecile_hit_primary > 0.55",
+    "reference": "BTC best was rank 0.074 (v29 residual, overall) / hit ~49% (v29 obs P(net>0|fill) 0.48-0.49, v30 0.45). ETH must beat BTC diagnostics (stricter hit bar 55% vs 49%, rank bar 0.05 vs 0.074 best) to justify full training.",
+    "else": "NO-GO with numbers (kills the direction cheaply). NO-GO is an acceptable honest result.",
+    "frozen": "This rule is frozen in this config BEFORE fitting; the HGB script asserts its copy matches this file."
+  },
+  "rules": ["scout only", "no live orders", "no cloud submit", "causal past-only", "no tuning on OOS outcomes", "no overwrites (new dirs only)", "exploratory labels", "PowerShell ; if ($?) {}"]
+}

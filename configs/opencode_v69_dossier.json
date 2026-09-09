@@ -1,0 +1,308 @@
+{
+ "artifact_policy": "copy exact floats from summary.json/portfolio.json; never invent numbers; skip missing files with note",
+ "branch_select_rule": "max normal monthly_geometric_net among listed candidates",
+ "concentration": {
+  "agreeweight_dd": "v61:U1_agreeweight_dd_guard",
+  "band2confirmed": "v61:confirmed_band2_1x (measured on 1x variant)",
+  "confirmed_dd_guard": "v61:confirmed_dd_guard",
+  "default": "unknown",
+  "majority_1x": "v61:majority_1x",
+  "v38_isoall": "v62:v38-isoall_1x"
+ },
+ "concentration_sources": [
+  "artifacts/research/opencode_v61_monthattr/summary.json",
+  "artifacts/research/opencode_v62_v38conc/summary.json"
+ ],
+ "covers_minimum": [
+  "v30-iso4",
+  "majority_1x",
+  "confirmed_dd_guard",
+  "band2confirmed",
+  "s0004_t050",
+  "t050",
+  "agreeweight_dd",
+  "v38-isoall",
+  "v33-topdec",
+  "A1-mean",
+  "v28-mean",
+  "v33-mms",
+  "A2-p50gate",
+  "long_only",
+  "mid-band",
+  "risk_off",
+  "h14",
+  "tp075-confirmed",
+  "fee-ladder finding",
+  "decay horizon",
+  "volcap/capacity thresholds",
+  "probfill survival"
+ ],
+ "csv_columns": [
+  "family",
+  "best_branch",
+  "normal_Ret",
+  "normal_DD",
+  "normal_Mo",
+  "normal_fills",
+  "normal_PF",
+  "normal_WR",
+  "fee_Mo",
+  "exec_Mo",
+  "exec_fills",
+  "dd_gate_all3",
+  "fills_gate_all3",
+  "monthly_best",
+  "concentration_flag",
+  "verdict",
+  "artifact_path"
+ ],
+ "exploratory": true,
+ "experiment": "opencode-v69-dossier-prespec",
+ "family": "R22 E-dossier: pre-registered branch-family-best list + ranking rules for the one promotion dossier (analysis only, no backtests)",
+ "gate": {
+  "dd_max": 0.2,
+  "fills_min": 30,
+  "fills_rule": "trades>=30 in ALL of normal/fee_stress/execution_stress",
+  "monthly_min": 0.05
+ },
+ "hypothesis": "No branch passes the 5%/mo gate; the dossier ranks family-bests by Normal monthly and risk-adjusted PF/DD only to name comparison anchors, not to promote. Expected outcome per ledger rounds 1-21: NONE qualifies for paper (ceiling ~2.9%/mo, concentration caveats, no forward test, no live weights).",
+ "live_approved": false,
+ "monthly_best_rule": "numeric max(normal_Mo,fee_Mo,exec_Mo) EXCEPT finding-families (fee_ladder, decay_horizon, volcap_capacity) where monthly_best carries the headline finding string verbatim from the artifact/synthesis",
+ "paper_candidate_rule": "MUST satisfy normal_Mo>=0.05 AND dd_gate_all3=y AND fills_gate_all3=y; else verdict NONE with explicit why + missing pieces (forward test, live weights)",
+ "ranking_rules": {
+  "top3_risk_adjusted": "sort by normal profit_factor desc, tie-break max_drawdown asc (closest to zero)",
+  "top5_monthly": "sort by normal monthly_geometric_net desc, report DD/fills caveats inline"
+ },
+ "rows": [
+  {
+   "artifact": "artifacts/research/opencode_v02_reproduce_v30/summary.json",
+   "candidates": [
+    "isotonic_4_1.0"
+   ],
+   "family": "v30_iso4_base",
+   "finding": null,
+   "verdict": "leg"
+  },
+  {
+   "artifact": "artifacts/research/opencode_v15_mapensemble/summary.json",
+   "candidates": [
+    "majority_1x"
+   ],
+   "family": "majority_1x",
+   "finding": null,
+   "verdict": "standing-best"
+  },
+  {
+   "artifact": "artifacts/research/opencode_v15_mapensemble/summary.json",
+   "candidates": [
+    "confirmed_dd_guard"
+   ],
+   "family": "confirmed_dd_guard",
+   "finding": null,
+   "verdict": "standing-best"
+  },
+  {
+   "artifact": "artifacts/research/opencode_v49_band2conf/summary.json",
+   "candidates": [
+    "confirmed_band2_1x",
+    "confirmed_band2_dd_guard"
+   ],
+   "family": "band2confirmed",
+   "finding": null,
+   "verdict": "leg"
+  },
+  {
+   "artifact": "artifacts/research/opencode_v13_megacombo/summary.json",
+   "candidates": [
+    "s0004_t050_1x",
+    "s0004_t050_dd_guard"
+   ],
+   "family": "s0004_t050",
+   "finding": null,
+   "verdict": "leg"
+  },
+  {
+   "artifact": "artifacts/research/opencode_v11_threshold/summary.json",
+   "candidates": [
+    "t050_1x"
+   ],
+   "family": "t050",
+   "finding": null,
+   "verdict": "leg"
+  },
+  {
+   "artifact": "artifacts/research/opencode_v54_agreeweight/summary.json",
+   "candidates": [
+    "U1_agreeweight",
+    "U1_agreeweight_dd_guard"
+   ],
+   "family": "agreeweight_dd",
+   "finding": null,
+   "verdict": "leg"
+  },
+  {
+   "artifact": "artifacts/research/opencode_v59_v38cal/summary.json",
+   "candidates": [
+    "v38-isoall_1x",
+    "v38-isoall_1x_dd_guard"
+   ],
+   "family": "v38_isoall",
+   "finding": null,
+   "verdict": "leg"
+  },
+  {
+   "artifact": "artifacts/research/opencode_v42_v33cal/summary.json",
+   "candidates": [
+    "v33-iso-topdec_1x",
+    "v33-iso-topdec-cov8_1x",
+    "v33-iso-topdec_1x_dd_guard"
+   ],
+   "family": "v33_topdec",
+   "finding": null,
+   "verdict": "leg"
+  },
+  {
+   "artifact": "artifacts/research/opencode_v29a_a1_replay/portfolio.json",
+   "candidates": [
+    "mean_1x",
+    "mean_dd_guard"
+   ],
+   "family": "A1_mean",
+   "finding": null,
+   "verdict": "dead"
+  },
+  {
+   "artifact": "artifacts/research/opencode_v28c_replay/portfolio.json",
+   "candidates": [
+    "mean_1x",
+    "mean_dd_guard"
+   ],
+   "family": "v28_mean",
+   "finding": null,
+   "verdict": "dead"
+  },
+  {
+   "artifact": "artifacts/research/opencode_v33d_replay/portfolio.json",
+   "candidates": [
+    "mean_minus_std_1x",
+    "mean_minus_std_0.5x",
+    "mean_minus_std_dd_guard"
+   ],
+   "family": "v33_mms",
+   "finding": null,
+   "verdict": "dead"
+  },
+  {
+   "artifact": "artifacts/research/opencode_v26c_replay/portfolio.json",
+   "candidates": [
+    "mt_p50gate_1x",
+    "mt_p50gate_dd_guard"
+   ],
+   "family": "A2_p50gate",
+   "finding": null,
+   "verdict": "dead"
+  },
+  {
+   "artifact": "artifacts/research/opencode_v04_side_ddguard/summary.json",
+   "candidates": [
+    "long_only_1x",
+    "long_only_dd_guard"
+   ],
+   "family": "long_only",
+   "finding": null,
+   "verdict": "leg"
+  },
+  {
+   "artifact": "artifacts/research/opencode_v12_volregime/summary.json",
+   "candidates": [
+    "mid_1x",
+    "mid_dd_guard"
+   ],
+   "family": "mid_band",
+   "finding": null,
+   "verdict": "dead"
+  },
+  {
+   "artifact": "artifacts/research/opencode_v24_macro/summary.json",
+   "candidates": [
+    "risk_off_only_1x",
+    "risk_off_only_dd_guard"
+   ],
+   "family": "risk_off",
+   "finding": null,
+   "verdict": "dead"
+  },
+  {
+   "artifact": "artifacts/research/opencode_v05_holding/summary.json",
+   "candidates": [
+    "h14_1x",
+    "h14_dd_guard"
+   ],
+   "family": "h14",
+   "finding": null,
+   "verdict": "dead"
+  },
+  {
+   "artifact": "artifacts/research/opencode_v41_tp075maj/summary.json",
+   "candidates": [
+    "confirmed_tp075_1x",
+    "confirmed_tp075_dd_guard"
+   ],
+   "family": "tp075_confirmed",
+   "finding": null,
+   "verdict": "dead"
+  },
+  {
+   "artifact": "artifacts/research/opencode_v39_feeladder/summary.json",
+   "candidates": [
+    "fee0002_1x"
+   ],
+   "family": "fee_ladder",
+   "finding": "break-even ~79bps/fill; bot survives every realistic fee tier; dd_guard does not extend break-even",
+   "verdict": "leg"
+  },
+  {
+   "artifact": "artifacts/research/opencode_v40_decayext/opencode-profit-round1/summary.json",
+   "candidates": [
+    "majority_d12",
+    "majority_d24",
+    "majority_d48"
+   ],
+   "family": "decay_horizon",
+   "finding": "alpha-decay horizon (2h,4h]: alive at d24 (+89% total), dead at d48 (fee-negative)",
+   "verdict": "leg"
+  },
+  {
+   "artifact": "artifacts/research/opencode_v36_volscale/summary.json",
+   "candidates": [
+    "cap100_k05"
+   ],
+   "family": "volcap_capacity",
+   "finding": "capacity thresholds ~130k capital @k=5%, ~27k @k=1%; v32: 0 bars capped even k=5% at indexed-100 (immune at small size)",
+   "verdict": "leg"
+  },
+  {
+   "artifact": "artifacts/research/opencode_v30_probfill/summary.json",
+   "candidates": [
+    "majority_pf020_ps00",
+    "majority_pf020_ps50",
+    "confirmed_pf020_ps50"
+   ],
+   "family": "probfill_survival",
+   "finding": null,
+   "verdict": "leg"
+  }
+ ],
+ "scenario_keys": [
+  "normal",
+  "fee_stress",
+  "execution_stress"
+ ],
+ "schema_variants": [
+  "branches->{branch}->{scenarios|direct}",
+  "results->{branch}->scenarios",
+  "portfolio.json branches->{branch}->scenarios"
+ ],
+ "verdict_rule": "standing-best = ledger comparison anchors only (majority_1x profit anchor, confirmed_dd_guard safe anchor); leg = ledger-banked combo/robustness/finding leg; dead = rejected standalone (pre-assigned per row above, script copies verbatim)",
+ "addendum_r22e_schema_variants": "4 families use non-standard layouts, handled WITHOUT inventing numbers: fee_ladder=v39 flat per-fee-tier branch nodes (single scenario each; fee/exec=null+note); decay_horizon=v40/volcap_capacity=v36/probfill_survival=v30 run partial scenarios only (available normal+fee or normal-only; null+note; gates over available scenarios, paper rule additionally requires all 3 scenarios present). Branch selection rule unchanged (max normal Mo)."
+}

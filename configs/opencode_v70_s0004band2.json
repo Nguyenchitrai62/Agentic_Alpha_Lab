@@ -1,0 +1,95 @@
+{
+ "band2": {
+  "fund_7d_min": 5e-05,
+  "ghi_chu": "Tai su dung NGUYEN VAN tu D1 (configs/opencode_v23_fundingfeat.json:ban_b2_am): giu tin hieu co fund_7d >= +5e-05, khong chan tren. Khong tinh lai funding, khong doc funding raw, khong rolling, khong refit.",
+  "nguon": "configs/opencode_v23_fundingfeat.json:ban_b2_am"
+ },
+ "base_provenance": "Tin hieu confirmed dong bang artifacts/research/opencode_v15_mapensemble/confirmed_1x/signals.parquet (n=94). Da VERIFY truoc khi pre-spec: co cot signal_time + direction; signal_time khop clock D1; join fund_7d qua bar_index 94/94 khong NA. Loc tien-dinh chi dung truong co tai signal_time (signal_time UTC hour, fund_7d qua khu). Preview kiem tra (khong tuning, khong chay backtest): all=94 (long 58/short 36), s0004_only=55 (32/23), band2_only=50 (25/25), s0004_AND_band2=33 (17/16).",
+ "bases": {
+  "confirmed": "artifacts/research/opencode_v15_mapensemble/confirmed_1x/signals.parquet"
+ },
+ "branches": [
+  "confirmed_all_1x",
+  "confirmed_all_dd_guard",
+  "confirmed_s0004_1x",
+  "confirmed_s0004_dd_guard",
+  "confirmed_band2_1x",
+  "confirmed_band2_dd_guard",
+  "confirmed_s0004_band2_1x",
+  "confirmed_s0004_band2_dd_guard"
+ ],
+ "candles": "data/processed/swing_regime_research_v4/candles.parquet",
+ "control": "confirmed_all_1x normal phai khop confirmed_1x da xuat ban (+157.85811193475512% total_return, -16.094964732093653% max_drawdown, 60 trades; sai so < 1e-6, trades exact) neu khong thi STOP",
+ "control_reference": {
+  "max_drawdown": -0.16094964732093653,
+  "total_return": 1.5785811193475512,
+  "trades": 60
+ },
+ "dataset_config": "data/processed/swing_regime_research_v4/config.json",
+ "dd_guard_lev": 0.5,
+ "dd_guard_reference": "Equity mau (exit_time/equity_after) cua confirmed_all_1x CUA CHINH EXPERIMENT NAY (fresh reference run, qua khu, cat 1-microsecond, moc 100.0). Moi nhanh dd_guard ap dung trang thai guard tai thoi diem tin hieu DA LOC scope cua chinh nhanh do. Quy uoc v11/v13/v18/v23/v49.",
+ "dd_trigger": 0.1,
+ "experiment": "opencode-v70-s0004band2",
+ "exploratory_note": "Khoang 2023-2026 da mo (den complete_evaluation_until), KHONG phai kiem dinh doc lap. Chi backtest local, khong dat lenh live. Drawdown lay mau theo gia dong nen trade, khong phai drawdown mark-price/intrabar thuc. Exit stop/timeout dang market-like theo fee kich ban, khong phai fill maker/limit dam bao. Khong suy doan xac suat fill maker hay vi tri hang doi tu OHLC.",
+ "family": "R23-M micro-combo: s0004 session (R1-C leg, session 0-4 UTC carries book) x band2confirmed (R14-N leg, PF 6.6-7.2 / WR 80% / DD<8% tren confirmed) x {1x, dd_guard} — scope×scope combo cuoi cung chua test theo ledger",
+ "fee_stress_rate": 0.00055,
+ "funding_features": "artifacts/research/opencode_v23_fundingfeat/decisions_funding_features.parquet",
+ "funding_features_source": "D1 v23: as-of join funding BTCUSDT qua khu theo decision clock (5628 dong). v70 KHONG tinh lai — join lai qua bar_index/signal_time va lay cot fund_7d NGUYEN VAN, verbatim v49.",
+ "funding_method_verbatim": {
+  "fund_30d": "trung binh 90 ky funding (30d) truoc signal_time (qua khu, min_periods=90)",
+  "fund_7d": "trung binh 21 ky funding (7d) truoc signal_time (qua khu, min_periods=21)",
+  "fund_rate": "funding rate cua ky funding da cong bo gan nhat TRUOC signal_time (tuyet doi qua khu)",
+  "fund_slope_7d": "fund_7d hien tai tru fund_7d cach 21 ky (do thay doi cua trung binh 7d sau 7d, qua khu)",
+  "fund_z30": "(fund_rate - fund_30d)/std30 (std cua 90 ky truoc, qua khu)",
+  "join": "as-of: moi decision/signal chi dung cac ky co funding_time < signal_time (searchsorted side=left tru 1). Funding cong bo moi 8h (00/08/16 UTC). Khong dung tuong lai.",
+  "nguon": "configs/opencode_v23_fundingfeat.json:dinh_nghia_feature (reuse verbatim, khong tinh lai)"
+ },
+ "gate": {
+  "dd_max": 0.2,
+  "fills_min": 30,
+  "monthly_min": 0.05
+ },
+ "hypothesis": "s0004 (session 0-4 UTC, banked tu R1-C/E2/v18: carries book) va band2 (fund_7d>=5e-05, banked tu D1/v49: PF dep nhat) la 2 leg chat-luong chua bao gio ket hop scope×scope. AND co the giu PF/WR/DD dep o muc monthly chap nhan duoc; hoac coverage rot duoi gate fills (band2 tren confirmed da 28 exec < 30 o v49; AND chi 33 pre-loop). Exploratory, ky vong thap, bao cao day du 8 nhanh x 3 kich ban.",
+ "join": {
+  "khoa": "bar_index (kiem tra cheo signal_time khop clock D1)",
+  "lay_cot": "fund_7d NGUYEN VAN tu decisions_funding_features.parquet",
+  "tinh_lai": "KHONG — tai su dung verbatim v23/v49"
+ },
+ "lev_max": 1.0,
+ "lev_min": 0.25,
+ "matran": "scopes {all-control, s0004_only, band2_only, s0004_AND_band2} x sizing {1x, dd_guard} = 8 nhanh co dinh, moi nhanh x 3 kich ban (normal / fee_stress / execution_stress)",
+ "parent_plan": "configs/swing_v15_continuous_folds.json",
+ "scenarios": [
+  "normal",
+  "fee_stress",
+  "execution_stress"
+ ],
+ "scope_key": "Post-filter tren tin hieu confirmed dong bang (causal/past-only, chi truong co tai signal_time): all giu tat ca; s0004_only giu signal_time UTC hour h voi 0<=h<4; band2_only giu fund_7d>=5e-05 (verbatim D1); s0004_AND_band2 giu ca 2 (AND). Khong refit, khong du lieu tuong lai.",
+ "scopes": {
+  "all": null,
+  "s0004_only": {
+   "session_end_utc_hour_exclusive": 4,
+   "session_start_utc_hour_inclusive": 0
+  },
+  "band2_only": {
+   "fund_7d_min": 5e-05
+  },
+  "s0004_AND_band2": {
+   "fund_7d_min": 5e-05,
+   "session_end_utc_hour_exclusive": 4,
+   "session_start_utc_hour_inclusive": 0
+  }
+ },
+ "sizings": [
+  "1x",
+  "dd_guard"
+ ],
+ "sizing": "1x: leverage 1.0 (max 1.0), exposure<=1x. dd_guard: lev=0.5 khi equity mau control dang >10% duoi dinh truoc do (qua khu), nguoc lai 1.0; ap dung tai signal_time DA LOC; ExecutionConfig leverage=0.25 max=1.0 (quy uoc v11/v13/v18/v23/v49).",
+ "stress": {
+  "allow_limit_price_improvement": false,
+  "entry_penetration_bps": 5,
+  "market_exit_fee_rate": 0.00055,
+  "market_exit_slippage_bps": 5,
+  "target_penetration_bps": 5
+ }
+}

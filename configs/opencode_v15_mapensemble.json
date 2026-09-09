@@ -1,0 +1,42 @@
+{
+  "experiment": "opencode-v15-mapensemble",
+  "family": "R3-B4 breakthrough: calibration-mapping ensemble vote on frozen v30 outputs",
+  "hypothesis": "Agreement across calibration mappings (isotonic_2/4/all) is a stronger confidence signal than any single map: ensemble vote as filter. Untried per ledger round3 B4.",
+  "predictions": {
+    "isotonic_2": "artifacts/research/opencode_v02_reproduce_v30/isotonic_2/predictions.npz",
+    "isotonic_4": "artifacts/research/opencode_v02_reproduce_v30/isotonic_4/predictions.npz",
+    "isotonic_all": "artifacts/research/opencode_v02_reproduce_v30/isotonic_all/predictions.npz"
+  },
+  "decisions": "data/processed/swing_regime_research_v4/decisions.parquet",
+  "candles": "data/processed/swing_regime_research_v4/candles.parquet",
+  "dataset_config": "data/processed/swing_regime_research_v4/config.json",
+  "parent_plan": "configs/swing_v15_continuous_folds.json",
+  "method": "Per decision row (same-row only, frozen mappings, never refit): compute choose() per map with the identical dataset policy config. Direction per map: LONG=+1, SHORT=-1, WAIT=0. Vote filters below gate rows BEFORE the frequency loop. Each branch then runs the IDENTICAL frequency loop (monthly cap 4 + 5-day cooldown, time order, causal past-only) over its passing rows; emitted geometry/scores are ALWAYS the iso4 choose() output on that row. No cross-row or future information; no threshold tuning.",
+  "votes": {
+    "iso4_only": "control: iso4 direction != WAIT (d4 != 0). Geometry = iso4 choose output.",
+    "majority": "2-of-3 agree on direction: exists d in {+1,-1} with count({d2,d4,dAll} == d) >= 2 AND d4 == d (iso4 participates in the majority; take iso4 geometry on agreement rows). WAIT rows excluded.",
+    "unanimous": "3-of-3 agree: d2 == d4 == dAll != 0. Geometry = iso4 choose output.",
+    "confirmed": "iso4-confirmed-by-isoall: d4 != 0 AND dAll == d4 (both non-WAIT same direction; iso2 ignored). Geometry = iso4 choose output."
+  },
+  "branches": ["iso4_only_1x", "iso4_only_dd_guard", "majority_1x", "majority_dd_guard", "unanimous_1x", "unanimous_dd_guard", "confirmed_1x", "confirmed_dd_guard"],
+  "sizings": ["1x", "dd_guard"],
+  "control": "iso4_only_1x must match published isotonic_4 exposure1.0 normal (+122.80% total_return 1.2279837998661565, -20.09% max_drawdown -0.20086073993367803, 65 trades) or STOP",
+  "dd_trigger": 0.1,
+  "dd_guard_lev": 0.5,
+  "dd_guard_reference": "YOUR control-branch (iso4_only_1x) sampled equity (trade exit_time/equity_after), past-only 1-microsecond cutoff, 100.0 seed level; each branch applies the guard state at its OWN signal times. Same formula as scripts/opencode_r1a_holding_probe.py.",
+  "lev_min": 0.25,
+  "lev_max": 1.0,
+  "fee_stress_rate": 0.00055,
+  "stress": {
+    "entry_penetration_bps": 5,
+    "target_penetration_bps": 5,
+    "market_exit_slippage_bps": 5,
+    "market_exit_fee_rate": 0.00055,
+    "allow_limit_price_improvement": false
+  },
+  "gate": {
+    "monthly_min": 0.05,
+    "dd_max": 0.2,
+    "fills_min": 30
+  }
+}

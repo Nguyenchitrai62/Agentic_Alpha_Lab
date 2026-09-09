@@ -1,0 +1,135 @@
+{
+  "experiment": "opencode-v149-verifyregime",
+  "role": "A2-ARCH VERIFICATION (11th): independent rebuild of R-regime audit (v145b) rank_en_1x, rebuild don't copy",
+  "lineage": "v145 regime-quiet SSM (configs/opencode_v145_regime.json, 3 seeds x 11 folds, FIXED 16ep, upweight quiet 2.0x ranking-only) -> R-audit v145b replay+portfolio (artifacts/research/opencode_v145b_replay, rank_en_1x normal +138.97%/-36.32%/269 monthly +2.618%) -> THIS v149 independent verify (own driver scripts/opencode_r61a_verifyregime.py, never imports R driver scripts/opencode_r56a_harness.py nor scripts/opencode_r56m_regime_* nor src/agentic_alpha_lab/models/ensemble_value nor src/agentic_alpha_lab/data/swing nor scripts/opencode_r30m_v41_model)",
+  "mission_claim": {
+    "rank_en_1x_normal": {"total_return": 1.3897162218511814, "max_drawdown": -0.3631675532637991, "monthly_geometric_net": 0.02618074086534694, "trades": 269},
+    "note": "R-regime audit (round60 v145b) claims rank_en_1x normal = +138.97% total / -36.32% DD / 269 trades (monthly approx +2.62%). Fee-stress leg same frame at fee 0.00055. Verifier pre-finding (from READING R artifacts BEFORE running): R portfolio policy_spec text says geometry_frequency cfg prices + monthly-cap/cooldown loop (harness), BUT R actual n_signals (3844) == n_selected (3844) == sum gate_hits proves frequency filtering was BYPASSED/disabled for regime (vs v41 where 3848 selected -> 135 signals after cap4+cd5). v145 config itself contains NO frequency spec (only gate + tie-break). This verify therefore rebuilds R ACTUAL method (identity frequency pass-through) and compares against R ACTUAL published numbers frozen below. A spec-faithful cap4+cd5 diagnostic is recorded in triage (would give ~135 signals like v41, mismatch by construction)."
+  },
+  "branches": [
+    "verify_identity_1x_normal",
+    "verify_identity_1x_fee055"
+  ],
+  "branch_spec": {
+    "verify_identity_1x_normal": {
+      "fee_rate_per_fill": 0.0002,
+      "purpose": "Control: must reproduce R rank_en_1x normal (+138.9716%/-36.3168%/269, monthly +2.618074%).",
+      "r_branch": "rank_en_1x",
+      "r_scenario": "normal",
+      "signals": "identity rank_en rebuilt from frozen RAW predictions (ensemble mean-expected float64, gate en_best>0 + top8 fallback, candidate deterministic_best_index eps1e-6 RAW select-raw no-clip, geometry own prices verbatim, frequency identity pass-through)",
+      "sizing": "1x (drop leverage column; ExecutionConfig leverage=1.0 max=1.0)"
+    },
+    "verify_identity_1x_fee055": {
+      "fee_rate_per_fill": 0.00055,
+      "purpose": "Stress: must reproduce R rank_en_1x fee_stress (+97.9659%/-37.3006%/269, monthly +2.046596%). Same identity frame, fee-only change.",
+      "r_branch": "rank_en_1x",
+      "r_scenario": "fee_stress",
+      "signals": "same identity frame as normal (shared rebuild, no re-selection per fee)",
+      "sizing": "1x (same frame, fee-only scenario change)"
+    }
+  },
+  "r_published_exact": {
+    "verify_identity_1x_normal": {
+      "maps_to": "rank_en_1x normal (artifacts/research/opencode_v145b_replay/portfolio.json)",
+      "final_equity": 238.97162218511812,
+      "total_return": 1.3897162218511814,
+      "max_drawdown": -0.3631675532637991,
+      "monthly_geometric_net": 0.02618074086534694,
+      "trades": 269,
+      "long_trades": 146,
+      "short_trades": 123,
+      "n_signals": 3844
+    },
+    "verify_identity_1x_fee055": {
+      "maps_to": "rank_en_1x fee_stress (artifacts/research/opencode_v145b_replay/portfolio.json)",
+      "final_equity": 197.96586940539598,
+      "total_return": 0.9796586940539598,
+      "max_drawdown": -0.3730056447839166,
+      "monthly_geometric_net": 0.020465956708682898,
+      "trades": 269,
+      "long_trades": 146,
+      "short_trades": 123,
+      "n_signals": 3844
+    }
+  },
+  "pass_criterion": {
+    "tolerance_abs": 1e-06,
+    "float_keys": ["total_return", "max_drawdown", "monthly_geometric_net", "final_equity"],
+    "exact_keys": ["trades", "long_trades", "short_trades", "n_signals"],
+    "rule": "PASS iff BOTH branches match on ALL float keys within 1e-6 AND ALL exact keys equal; else FAIL + name cause, no number adjustment"
+  },
+  "frozen_inputs": {
+    "predictions_dir": "artifacts/kaggle/v145_regime_download/regime-training",
+    "predictions_n_expected": 33,
+    "predictions_pattern": "seed{seed}/temporal_neural/fold_{fold}/predictions.npy",
+    "decisions": "data/processed/swing_regime_research_v4/decisions.parquet",
+    "candles": "data/processed/swing_regime_research_v4/candles.parquet",
+    "dataset_config": "data/processed/swing_regime_research_v4/config.json",
+    "parent_plan": "configs/swing_v15_continuous_folds.json",
+    "v145_config_read_only": "configs/opencode_v145_regime.json",
+    "r_audit_read_only": "artifacts/research/opencode_v145b_replay/audit.json",
+    "r_portfolio_read_only": "artifacts/research/opencode_v145b_replay/portfolio.json",
+    "r_signals_read_only": "artifacts/research/opencode_v145b_replay/rank_en_1x/signals.parquet"
+  },
+  "frozen_constants": {
+    "seeds": [1729, 1730, 1731],
+    "n_folds": 11,
+    "n_decisions_expected": 4076,
+    "n_signals_expected": 3844,
+    "picks_pre_frequency_expected": 3844,
+    "gate_hits_by_fold_expected": {"0": 343, "1": 326, "2": 323, "3": 349, "4": 332, "5": 361, "6": 335, "7": 358, "8": 367, "9": 353, "10": 397},
+    "fallback_adds_by_fold_expected": {"0": 0, "1": 0, "2": 0, "3": 0, "4": 0, "5": 0, "6": 0, "7": 0, "8": 0, "9": 0, "10": 0},
+    "policy_margin": 0.0,
+    "policy_n_min": 8,
+    "tie_break_eps": 1e-06,
+    "tp1_fraction": 0.5,
+    "entry_expiry_bars_expected": 12,
+    "holding_cap_bars_expected": 2016,
+    "dataset_base_fee": 0.0002,
+    "fee_stress_rate": 0.00055,
+    "initial_equity": 100.0,
+    "model_family_expected": "regime_quiet_ssm_v145",
+    "dataset_policy_max_per_month": 4,
+    "dataset_policy_cooldown_days": 5
+  },
+  "policy_frozen": {
+    "ensemble": "mean_3seeds of expected (per-seed expected=ch0*sigmoid(ch4) float64, arithmetic mean across seeds 1729/1730/1731 per fold-test, penalty 0.0, no median/weighting; fill prob = mean sigmoid(ch4) across seeds, fill logit = logit(mean prob) for tie-break ordering only)",
+    "gate": "en_best = max_k mean-expected > 0.0 strict + fallback top-8/fold-test by en_best (no clip, tie-break deterministic; pre-spec, same every fold/seed, no PnL tuning)",
+    "candidate": "deterministic_best_index on RAW mean-expected + fill-logit: max(exp) then fill-desc then holding-asc (3 before 7) then index-min, eps=1e-6 (select-raw, no clip; sizing cap only on separate file, never for selection)",
+    "geometry": "own prices verbatim: unit=max(atr4, close*minimum_risk_fraction); entry=close-side*offset*atr5; stop=entry-side*stop*unit; tp1=entry+side*tp1*unit; tp2=entry+side*tp2*unit; ordered-bracket check; holding_bars=days*288",
+    "frequency": "identity pass-through (no monthly cap / cooldown filtering) to rebuild R ACTUAL (n_signals==n_selected==3844 proves bypass; v145 config has no frequency spec). Diagnostic: dataset-cfg cap4+cd5 would give ~135 signals like v41, mismatch by construction (recorded in triage).",
+    "execution": {"entry_expiry_bars": 12, "holding_cap_bars": 2016, "leverage": 1.0, "max_leverage": 1.0, "tp1_fraction": 0.5}
+  },
+  "own_method": {
+    "combine": "own mean-expected: per-seed exp=ch0*sigmoid(ch4) float64 then mean across 3 seeds per fold-test; own avg-fill = mean sigmoid(ch4); own fill-logit=log(avg/(1-avg)) clipped 1e-6 for tie-break ordering; never imports ensemble_value.combine nor R driver",
+    "gate": "own gate: en_best>0.0 strict per fold-test + top-8 fallback by en_best stable argsort; tie -> fallback; never imports R driver",
+    "candidate": "own tie-break: m=max(exp); tied={k: m-exp[k]<1e-6}; fill-desc (1e-9); holding-asc (1e-12); index-min; eps must equal 1e-6; never imports opencode_r30m_v41_model nor R driver",
+    "geometry": "own grid (side outer 1/-1, entry_atr_5m, brackets_atr_4h, holding_days inner) + own prices formulas from dataset config with min-risk unit + ordered-bracket checks; never imports agentic_alpha_lab.data.swing nor R driver",
+    "frequency": "own identity: selected in partition order fold0..fold10, no monthly/cooldown skip (to match R ACTUAL 3844); monthly/cooldown counters still computed for diagnostic proof that cap4 would filter to ~135",
+    "monthly": "own monthly: ratio=final/100; years from parent plan complete_evaluation_until minus folds[0][0] over 365.2425d; monthly=ratio^(1/(12*years))-1; annual=ratio^(1/years)-1",
+    "engine": "shared ohlc-v2 run_backtest infra only (CostModel fee per branch, ExecutionConfig expiry12/cap2016/lev1x/tp1 0.5); signals carry no leverage col; NO run_stress here (fee leg via run_backtest mirrors R run_branch fee leg)",
+    "calibration": "none (identity; NO isotonic, NO winsor, faithful to R v145b rank_en)"
+  },
+  "monthly_formula": "ratio=final_equity/100; duration_years=(complete_evaluation_until - folds[0][0])/(365.2425*86400) per configs/swing_v15_continuous_folds.json; monthly_geometric_net=ratio^(1/(12*duration_years))-1",
+  "causal_notes": [
+    "Frozen v145 test-fold RAW predictions only (33 files, (n,16,6) map-v8), never refit; no train predictions; no threshold tuning on PnL (gate 0.0 + top8 pre-spec).",
+    "Partitions are frozen quarterly folds with label_end < complete_evaluation_until (past-only assembly, same as audit).",
+    "Gate is per-fold-test on mean-expected only, strict >, no PnL (no future).",
+    "Frequency identity is causal pass-through (no future); diagnostic cap4+cd5 also causal but not used for primary rebuild.",
+    "No maker-fill/queue claims; stop/timeout exits market-like at branch fee; DD trade-candle-close sampled.",
+    "Opened development interval only (2023-2026), NOT independent test."
+  ],
+  "output": "artifacts/research/opencode_v149_verifyregime",
+  "driver": "scripts/opencode_r61a_verifyregime.py --config configs/opencode_v149_verifyregime.json --output artifacts/research/opencode_v149_verifyregime",
+  "rules": [
+    "verification backtests only (no new hypotheses)",
+    "no live orders",
+    "NEVER touch research/parallel/registry.json, CONTINUOUS_RESEARCH.md, NEXT_AGENT.md, research/parallel/rounds/*, ../Kronos, C:/Users/trait/.codex/worktrees/*",
+    "no register/assign/rotate; no commit/push; no overwrites (output dir must not exist)",
+    "causal past-only; exploratory labels; opened 2023-2026 interval, NOT independent test",
+    "pre-specified here BEFORE running (driver asserts branches + tolerance + constants)"
+  ],
+  "independent_test": false,
+  "exploratory": true,
+  "live_approved": false
+}

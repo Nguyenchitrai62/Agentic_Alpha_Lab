@@ -1,0 +1,82 @@
+{
+  "experiment": "opencode-v52-unionbook",
+  "family": "R16-E-unionbook: dedup UNION of frozen quality legs (add coverage, mirror of filtering)",
+  "hypothesis": "Round15: every filter on selective bases kills coverage. Mirror hypothesis: UNION of quality legs ADDS coverage and may add monthly. Genuinely untested direction per ledger round15_synthesis.",
+  "sources": {
+    "majority": "artifacts/research/opencode_v15_mapensemble/majority_1x/signals.parquet",
+    "confirmed": "artifacts/research/opencode_v15_mapensemble/confirmed_1x/signals.parquet",
+    "band2confirmed": "artifacts/research/opencode_v49_band2conf/confirmed_band2_1x/signals.parquet",
+    "s0004_t050": "artifacts/research/opencode_v13_megacombo/s0004_t050_1x/signals.parquet"
+  },
+  "source_n_signals": {
+    "majority": 94,
+    "confirmed": 94,
+    "band2confirmed": 50,
+    "s0004_t050": 47
+  },
+  "union_rule": {
+    "key": ["bar_index", "direction"],
+    "dedup": "one row per (bar_index, direction)",
+    "conflict_priority": "majority > confirmed > band2confirmed > s0004_t050 (keep majority row on conflict)",
+    "geometry": "each union member keeps its own geometry; no refit, no recompute",
+    "hygiene": "drop redundant 'action' column from s0004_t050 (direction carries it); sort union by signal_time; reset index",
+    "note": "band2confirmed is a subset of confirmed by construction (v49), so U2 ≈ U1 + s0004_t050 ex ante; report overlap stats honestly"
+  },
+  "sets": {
+    "majority_control": "majority verbatim (94)",
+    "confirmed_control": "confirmed verbatim (94)",
+    "U1": "majority ∪ confirmed",
+    "U2": "majority ∪ confirmed ∪ band2confirmed ∪ s0004_t050"
+  },
+  "branches": [
+    "majority_control_1x",
+    "majority_control_dd_guard",
+    "confirmed_control_1x",
+    "confirmed_control_dd_guard",
+    "U1_1x",
+    "U1_dd_guard",
+    "U2_1x",
+    "U2_dd_guard"
+  ],
+  "sizings": ["1x", "dd_guard"],
+  "sizing": {
+    "1x": "fixed 1.0 (ExecutionConfig 1.0/1.0)",
+    "dd_guard": "lev=0.5 when majority_control_1x equity of THIS experiment is >10% under trailing peak (past-only, 1-microsecond cutoff, 100.0 seed), else 1.0; applied at each branch's own signal times"
+  },
+  "dd_guard_reference": "Fresh majority_control_1x run of THIS experiment (exit_time/equity_after), past-only 1-microsecond cutoff, 100.0 seed level. Same formula as scripts/opencode_r1a_holding_probe.py.",
+  "dd_trigger": 0.1,
+  "dd_guard_lev": 0.5,
+  "lev_min": 0.25,
+  "lev_max": 1.0,
+  "control_majority": "majority_control_1x normal must match published majority_1x (+165.17829563633006% total_return 1.6517829563633004, -20.086073993367803% max_drawdown -0.20086073993367803, 63 trades; tol 1e-6) or STOP",
+  "control_majority_reference": {
+    "total_return": 1.6517829563633004,
+    "max_drawdown": -0.20086073993367803,
+    "trades": 63
+  },
+  "control_confirmed_check": "confirmed_control_1x normal checked (not fatal) vs published confirmed_1x (+157.86% total_return 1.5785811193475512, -16.09% max_drawdown -0.16094964732093653, 60 trades)",
+  "control_confirmed_reference": {
+    "total_return": 1.5785811193475512,
+    "max_drawdown": -0.16094964732093653,
+    "trades": 60
+  },
+  "candles": "data/processed/swing_regime_research_v4/candles.parquet",
+  "dataset_config": "data/processed/swing_regime_research_v4/config.json",
+  "parent_plan": "configs/swing_v15_continuous_folds.json",
+  "fee_stress_rate": 0.00055,
+  "stress": {
+    "entry_penetration_bps": 5,
+    "target_penetration_bps": 5,
+    "market_exit_slippage_bps": 5,
+    "market_exit_fee_rate": 0.00055,
+    "allow_limit_price_improvement": false
+  },
+  "matrix": "sets {majority_control, confirmed_control, U1, U2} x sizing {1x, dd_guard} = 8 branches, fixed BEFORE running",
+  "scenarios": ["normal", "fee_stress", "execution_stress"],
+  "gate": {
+    "monthly_min": 0.05,
+    "dd_max": 0.2,
+    "fills_min": 30
+  },
+  "exploratory_note": "Khoang 2023-2026 da mo (den complete_evaluation_until), KHONG phai kiem dinh doc lap. Chi backtest local, khong dat lenh live. Set ops tren tin hieu dong bang (past-only, khong refit). Drawdown lay mau theo gia dong nen trade. Exit stop/timeout dang market-like theo fee kich ban. Khong suy doan fill maker/hang doi tu OHLC."
+}

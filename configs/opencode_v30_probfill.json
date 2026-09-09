@@ -1,0 +1,39 @@
+{
+  "experiment": "opencode-v30-probfill",
+  "family": "R7-N neutral: thang execution-realism prob-fill tren tin hieu frozen tot nhat (Nautilus idea)",
+  "hypothesis": "Engine ohlc-v2 lac quan nhat co the: gia CHAM entry_limit la khop 100% o gia limit. Chua ai do do mong manh nay. Do su song sot (robustness) cua majority_1x (va confirmed_1x base thu hai) duoi mo hinh khop xac suat seeded-deterministic: cham-ma-khong-xuyen chi khop voi p_fill, moi fill chiu slippage 1 tick adverse voi p_slip. Muc tieu la do survival, KHONG phai tang loi nhuan.",
+  "bases": {
+    "majority_1x": "artifacts/research/opencode_v15_mapensemble/majority_1x/signals.parquet",
+    "confirmed_1x": "artifacts/research/opencode_v15_mapensemble/confirmed_1x/signals.parquet"
+  },
+  "candles": "data/processed/swing_regime_research_v4/candles.parquet",
+  "dataset_config": "data/processed/swing_regime_research_v4/config.json",
+  "parent_plan": "configs/swing_v15_continuous_folds.json",
+  "seed_base": 1729,
+  "tick": 0.1,
+  "p_fill": [1.0, 0.5, 0.2],
+  "p_slip": [0.0, 0.5],
+  "branches": ["majority_pf100_ps00", "majority_pf100_ps50", "majority_pf050_ps00", "majority_pf050_ps50", "majority_pf020_ps00", "majority_pf020_ps50", "confirmed_pf100_ps00", "confirmed_pf020_ps50"],
+  "branch_specs": {
+    "majority_pf100_ps00": {"base": "majority_1x", "p_fill": 1.0, "p_slip": 0.0},
+    "majority_pf100_ps50": {"base": "majority_1x", "p_fill": 1.0, "p_slip": 0.5},
+    "majority_pf050_ps00": {"base": "majority_1x", "p_fill": 0.5, "p_slip": 0.0},
+    "majority_pf050_ps50": {"base": "majority_1x", "p_fill": 0.5, "p_slip": 0.5},
+    "majority_pf020_ps00": {"base": "majority_1x", "p_fill": 0.2, "p_slip": 0.0},
+    "majority_pf020_ps50": {"base": "majority_1x", "p_fill": 0.2, "p_slip": 0.5},
+    "confirmed_pf100_ps00": {"base": "confirmed_1x", "p_fill": 1.0, "p_slip": 0.0},
+    "confirmed_pf020_ps50": {"base": "confirmed_1x", "p_fill": 0.2, "p_slip": 0.5}
+  },
+  "control": "majority_pf100_ps00 (p_fill=1.0/p_slip=0.0 tren majority_1x) normal phai khop published majority_1x (+165.17829563633% total_return 1.6517829563633004, -20.09% max_drawdown -0.20086073993367803, 63 trades) hoac STOP",
+  "control_reference": {"total_return": 1.6517829563633004, "max_drawdown": -0.20086073993367803, "trades": 63},
+  "fee_stress_rate": 0.00055,
+  "scenarios": ["normal", "fee_stress"],
+  "execution": {"leverage": 1.0, "max_leverage": 1.0, "tp1_fraction": 0.5, "intrabar_policy": "stop_first"},
+  "touch_definition": "LONG: no-touch neu bar.low > limit; open-through neu low <= limit VA open <= limit (nen mo cua da xuyen, limit thanh marketable, khop dam bao khong draw); touch-only neu low <= limit VA open > limit (gia phai di intrabar xuong limit, hang doi maker khong chac chan, ap p_fill). SHORT doi xứng: no-touch neu high < limit; open-through neu high >= limit VA open >= limit; touch-only neu high >= limit VA open < limit. Phan loai nay khop nhanh re cua engine _entry_fill (min(open,limit)/limit cho LONG, max(open,limit)/limit cho SHORT). Voi majority_1x, 76/94 tin hieu co first-touch la touch-only, 0 open-through, 18 no-fill trong 12-bar expiry: stress co y nghia.",
+  "rng_scheme": "Tien xu ly (precompute) deterministic per-signal: voi tin hieu thu j (0-indexed trong signals sort by bar_index), rng_j = numpy.random.default_rng(seed_base + j), seed_base=1729. Duyet expiry theo thu tu bar: open-through -> fill ngay (khong tieu draw fill); touch-only -> draw U=rng_j.random(), fill neu U < p_fill (p_fill=1.0 luon pass vi U in [0,1)), fail thi bo bar do va thu bar ke tiep trong expiry; no-touch -> tiep. Neu fill -> draw them 1 U_slip=rng_j.random(), slip neu U_slip < p_slip thi entry_price += direction*tick (LONG +0.1, SHORT -0.1, adverse). Moi branch reset RNG tu dau (cong bang so sanh). Dem draws: n_fill_draws (so bar touch-only da danh gia) + n_slip_draws (1 moi precomputed fill) tren TOAN BO signals; summary ghi ca executed slipped fills.",
+  "slippage": "tick BTCUSDT 0.1, adverse: LONG entry_price + 0.1, SHORT entry_price - 0.1, khi slip draw trung. Khong doi stop/TP (giua nguyen nhu frozen).",
+  "monthly_formula": "ratio=final_equity/100; duration_years=(complete_evaluation_until - folds[0][0])/(365.2425*86400) theo parent_plan (giong v15); monthly_geometric_net=ratio^(1/(12*duration_years))-1; annual=ratio^(1/duration_years)-1.",
+  "engine_note": "Phan con lai cua backtest (stop/timeout market-like o scenario fee, TP1 50% + TP2, funding long 0.0001/8h short 0, stop-first intrabar, TP suppression tren intrabar entry candle, drawdown trade-candle-close sampled, compounding tu equity hien tai, overlap next_available_index, holding validation) GIU NGUYEN nhu engine ohlc-v2 run_backtest. Chi khoi entry-search duoc thay bang precomputed probfill entry + slippage shift. p_fill=1.0/ps=0.0 phai bit-identical voi engine (control gate).",
+  "gate": {"monthly_min": 0.05, "dd_max": 0.2, "fills_min": 30},
+  "verdict_note": "Day la thang robustness (do survival khi p_fill giam), KHONG phai gate loi nhuan. Khong claim maker fill probability/queue tu OHLC; p_fill/p_slip la gia dinh stress chu quan co seed, khong suy ra tu microstructure that."
+}

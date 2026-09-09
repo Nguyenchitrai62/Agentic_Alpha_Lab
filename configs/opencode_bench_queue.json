@@ -1,0 +1,40 @@
+{
+  "standing_order": "A2-ARCH benchmark queue: khi model cloud tiep theo hoan tat audit (v55c / v41 / Transformer), benchmark no bang harness nay roi luu weights duoi artifacts/models/<name>/ (local storage registry + SHA + origin kernel + audit verdict). Models stay gitignored (artifacts/ da gitignore).",
+  "harness": "scripts/opencode_bench_infer.py",
+  "harness_cli_template": ".venv\\Scripts\\python.exe scripts/opencode_bench_infer.py --ckpt artifacts/models/<name> --out artifacts/research/opencode_bench/<name>_report.json [--ref <predictions.npy>]",
+  "metrics_per_model": ["load_ms", "latency_ms batch 1/8/32 (median, 200 runs post-warmup 20)", "vram_peak_mb (max_memory_allocated, reset first)", "throughput_wps", "parity max_abs_diff (reference neu co, else reload self-consistency)"],
+  "queue": [
+    {
+      "name": "v55c",
+      "family": "ranking-alone SSM 597k + ListNet + fixed 16ep (allowlist fix)",
+      "status": "SUBMITTED RUNNING (round30); benchmark khi audit terminal",
+      "ckpt_target": "artifacts/models/v55c/",
+      "report_target": "artifacts/research/opencode_bench/v55c_report.json"
+    },
+    {
+      "name": "v41",
+      "family": "value-scale-at-origin + no-clip-selection + tie-break + val-export",
+      "status": "staged 7th, submit sau v55c terminal; benchmark khi audit terminal",
+      "ckpt_target": "artifacts/models/v41/",
+      "report_target": "artifacts/research/opencode_bench/v41_report.json"
+    },
+    {
+      "name": "transformer_next",
+      "family": "Big Transformer 8-12M + ranking + scale-at-origin (round32 M-transformer)",
+      "status": "chua package; benchmark khi audit terminal",
+      "ckpt_target": "artifacts/models/transformer_next/",
+      "report_target": "artifacts/research/opencode_bench/transformer_next_report.json"
+    }
+  ],
+  "storage_registry_schema": {
+    "dir": "artifacts/models/<name>/",
+    "required": ["weights (model.safetensors|model.pt, NGUYEN BAN download tu Kaggle output)", "origin.json {kaggle_kernel_slug, dataset_slug, account, kernel_version, output_path}", "sha256.txt (SHA256 cua weights)", "audit_verdict.json {replay_max_abs_diff, portfolio_headline_normal, gate_verdict, audit_artifact_path}", "bench_report_path (artifacts/research/opencode_bench/<name>_report.json)"],
+    "rules": ["KHONG rename/sua weights goc; moi derived file co ten moi", "KHONG commit/push models (gitignored)", "chi benchmark local GTX1650, khong training lai", "harness hien tai ho tro engineered_multiframe_mlp_v1 + tiny_mlp; arch moi (SSM/Transformer) can them loader truoc khi bench (file harness moi version, khong overwrite)"]
+  },
+  "validated_plumbing": {
+    "checkpoint": "artifacts/checkpoints/mlp_20260905_v2/",
+    "reason": "restitution-cheapest local ckpt (31KB, load <1s); Kronos-mini can download -> bo qua cho plumbing validation",
+    "report": "artifacts/research/opencode_bench/mlp_20260905_v2_report.json",
+    "verdict": "PASS (parity reload 0.0; xem summary.json)"
+  }
+}

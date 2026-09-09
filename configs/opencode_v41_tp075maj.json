@@ -1,0 +1,42 @@
+{
+  "experiment": "opencode-v41-tp075maj",
+  "family": "R11-E exploit: tp075 exit fraction x ensemble bases (majority/confirmed) x sizing",
+  "hypothesis": "tp075 (share of notional closed at TP1, remainder to TP2/timeout) was only tested on iso4 signals (v16); majority/confirmed ensemble signal sets are different frozen books (94/94 signals, 63/60 fills) and may interact better with faster TP1. tp1_fraction is a frozen ExecutionConfig constant per branch (0<f<1, causal past-only, known at signal time). Engine default 0.5 is the control. Exploratory only.",
+  "bases": {
+    "majority": "artifacts/research/opencode_v15_mapensemble/majority_1x/signals.parquet",
+    "confirmed": "artifacts/research/opencode_v15_mapensemble/confirmed_1x/signals.parquet"
+  },
+  "base_provenance": "frozen v15 map-ensemble outputs: majority = 2-of-3 vote with iso4 in majority (94 signals), confirmed = iso4-confirmed-by-isoall (94 signals); geometry is iso4 choose() output on agreement rows (see configs/opencode_v15_mapensemble.json). Both files carry a frozen tp1_fraction=0.5 provenance column that the engine ignores (engine reads ExecutionConfig only); the driver overwrites that column per branch for artifact provenance with no engine effect. No per-signal fitting; same frozen signal rows in every branch of a base.",
+  "candles": "data/processed/swing_regime_research_v4/candles.parquet",
+  "dataset_config": "data/processed/swing_regime_research_v4/config.json",
+  "parent_plan": "configs/swing_v15_continuous_folds.json",
+  "tp1_fractions": {
+    "tp050": 0.5,
+    "tp075": 0.75
+  },
+  "tp1_note": "tp1_fraction is a frozen ExecutionConfig constant per branch (0<f<1, asserted at runtime). Frozen signals carry a tp1_fraction=0.5 column that the engine ignores (engine reads ExecutionConfig only); the probe overwrites that column per branch for artifact provenance with no engine effect. No per-signal fitting.",
+  "sizings": ["1x", "dd_guard"],
+  "branches": ["majority_tp050_1x", "majority_tp050_dd_guard", "majority_tp075_1x", "majority_tp075_dd_guard", "confirmed_tp050_1x", "confirmed_tp050_dd_guard", "confirmed_tp075_1x", "confirmed_tp075_dd_guard"],
+  "control": "majority_tp050_1x (majority base, tp1=0.5, 1x) must match B4 majority_1x published normal (+165.17829563633006% total_return 1.6517829563633004, -20.086073993367803% max_drawdown -0.20086073993367803, 63 trades) or STOP",
+  "control_reference": {"total_return": 1.6517829563633004, "max_drawdown": -0.20086073993367803, "trades": 63},
+  "secondary_reference": {"branch": "confirmed_tp050_1x", "total_return": 1.5785811193475512, "max_drawdown": -0.16094964732093653, "trades": 60, "note": "informational only (logged PASS/FAIL, never STOPs the run)"},
+  "dd_trigger": 0.1,
+  "dd_guard_lev": 0.5,
+  "dd_guard_reference": "YOUR majority_tp050_1x control sampled equity from THIS run (trade exit_time/equity_after), past-only 1-microsecond cutoff, 100.0 seed level; each dd_guard branch applies the guard state at its OWN base+tp1 signal times (signal leverage column only, geometry untouched). Single shared majority-control reference keeps tp fractions AND bases comparable (same convention as v16 shared-tp050-control and v18 shared-majority-control). Disclosed deviation from v03 (own-book per branch).",
+  "lev_min": 0.25,
+  "lev_max": 1.0,
+  "fee_stress_rate": 0.00055,
+  "stress": {
+    "entry_penetration_bps": 5,
+    "target_penetration_bps": 5,
+    "market_exit_slippage_bps": 5,
+    "market_exit_fee_rate": 0.00055,
+    "allow_limit_price_improvement": false
+  },
+  "stress_path_note": "Pre-run code inspection: src/agentic_alpha_lab/backtest/execution_stress.py run_stress line 128 close_fraction(fill, execution.tp1_fraction, ...) honors ExecutionConfig.tp1_fraction; line 53-54 validates 0<tp1_fraction<1 (0 < execution.tp1_fraction < 1). Runtime re-asserted in driver via source check.",
+  "gate": {
+    "monthly_min": 0.05,
+    "dd_max": 0.2,
+    "fills_min": 30
+  }
+}

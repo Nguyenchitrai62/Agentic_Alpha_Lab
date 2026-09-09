@@ -1,0 +1,31 @@
+{
+  "experiment": "opencode-v04-side-ddguard",
+  "hypothesis": "Frozen v30 isotonic-4 signals carry the only demonstrated positive expectancy; decompose by side (all / long-only / short-only) crossed with the causal dd_guard overlay (0.5x while base-1x-ALL sampled equity is >10% under its trailing peak, past-only) to test whether either side or the guard improves the risk profile. No refitting; signals/scores untouched.",
+  "signals": "artifacts/research/opencode_v02_reproduce_v30/isotonic_4/signals.parquet",
+  "candles": "data/processed/swing_regime_research_v4/candles.parquet",
+  "dataset_config": "data/processed/swing_regime_research_v4/config.json",
+  "parent_plan": "configs/swing_v15_continuous_folds.json",
+  "sides": {
+    "all": null,
+    "long_only": 1,
+    "short_only": -1
+  },
+  "sizings": ["1x", "dd_guard"],
+  "dd_trigger": 0.1,
+  "dd_guard_lev": 0.5,
+  "lev_min": 0.25,
+  "lev_max": 1.0,
+  "fee_stress_rate": 0.00055,
+  "stress": {
+    "entry_penetration_bps": 5,
+    "target_penetration_bps": 5,
+    "market_exit_slippage_bps": 5,
+    "market_exit_fee_rate": 0.00055,
+    "allow_limit_price_improvement": false
+  },
+  "gate": {
+    "monthly_min": 0.05,
+    "dd_max": 0.2,
+    "fills_min": 30
+  }
+}

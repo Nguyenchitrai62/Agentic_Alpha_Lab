@@ -1,0 +1,44 @@
+{
+  "tool": "opencode_gatecheck",
+  "version": "1.0.0",
+  "purpose": "Reusable promotion gate-checker: read ANY branch summary.json + its normal_trades.csv (standard asdict-Trade schema) and emit gate verdict + concentration + robustness + one-line PROMOTE/HOLD/REJECT. Analysis/code only; no backtests, no training, no live orders.",
+  "gate": {
+    "monthly_min": 0.05,
+    "dd_max": 0.2,
+    "fills_min": 30,
+    "rule": "ALL present scenarios must pass ALL three sub-gates (monthly_geometric_net >= 0.05 AND max_drawdown >= -0.20 AND trades >= 30). A scenario missing from the summary is reported as missing, never assumed to pass.",
+    "scenarios_expected": ["normal", "fee_stress", "execution_stress"]
+  },
+  "concentration_rule": {
+    "decision": "FAIL (concentrated) if top3_months_share > 0.60 OR top1_month_share > 0.35 OR total_net <= 0; else PASS (diffuse). Method is v61 (scripts/opencode_r19e_monthattr.py): calendar-month zero-filled series, Gini = relative mean absolute difference, trade shares from net_pnl-sorted trades.",
+    "top1_month_share_gt": 0.35,
+    "top3_months_share_gt": 0.6
+  },
+  "trade_concentration_notes": {
+    "note": "Trade-level shares are ADVISORY caveats only; they never flip the decision by themselves (month-level rule decides concentration verdict).",
+    "top5_share_warn_gt": 0.5,
+    "top5_share_severe_gt": 0.7
+  },
+  "robustness": {
+    "note": "Informational: fee_drag_pp = normal_mo - fee_mo; exec_drop_pp = normal_mo - exec_mo; dd_margin = dd_max - |worst DD over present scenarios|; fee_slope = OLS d(monthly)/d(fee_rate) over sibling fee-tier branches when present (fee-ladder summaries), else null. Warn thresholds below are advisory caveats, not gates.",
+    "exec_drop_warn_pp_gt": 0.005,
+    "dd_margin_warn_lt": 0.02
+  },
+  "decision_rule": {
+    "PROMOTE": "gate overall PASS on all present scenarios AND concentration diffuse (PASS) AND total_net > 0.",
+    "REJECT": "fills fail in ANY present scenario (incl. fills-exec-fail) OR concentration FAIL OR total_net <= 0.",
+    "HOLD": "everything else (typically monthly-fail and/or dd-breach with fills intact and concentration diffuse: banked-leg territory, needs a monthly breakthrough, not dead)."
+  },
+  "fail_reason_tokens": {
+    "monthly-fail": "monthly_geometric_net < 0.05 in >=1 present scenario; per-scenario form monthly-fail(<scenario>).",
+    "fills-exec-fail": "execution_stress fills < 30; per-scenario form fills-fail(<scenario>).",
+    "dd-breach": "max_drawdown < -0.20 in >=1 present scenario; per-scenario form dd-breach(<scenario>).",
+    "concentrated": "month-concentration rule FAIL."
+  },
+  "warnings": [
+    "EXPLORATORY on the opened development interval only; not an independent test.",
+    "Drawdown is trade-candle-close sampled, not true mark-price or full intrabar drawdown.",
+    "Stop/timeout exits are market-like at the scenario fee, NOT guaranteed maker/limit fills.",
+    "Do not claim maker fill probability or queue position from OHLC alone."
+  ]
+}

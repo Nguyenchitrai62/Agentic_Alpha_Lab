@@ -1,0 +1,65 @@
+{
+  "experiment": "opencode-v44-1mentry",
+  "family": "R12-B breakthrough: 1m-refined entry limits on frozen majority_1x (causal, signal-candle 1m only)",
+  "hypothesis": "Round8 N-1m proved 42.9% touch-no-cross at entry bar: the 5m-close-based entry_limit (close -/+ offset*atr5) is the leaky point but edge is not noise. Refining the limit with the 5x1m sub-bars OF THE SIGNAL CANDLE ONLY (all known at 5m close, strictly causal) may convert touch-no-cross into fills or improve fill prices. Stop/TP/holding kept IDENTICAL to frozen to isolate the entry effect.",
+  "base": {
+    "signals": "artifacts/research/opencode_v15_mapensemble/majority_1x/signals.parquet",
+    "candles_5m": "data/processed/swing_regime_research_v4/candles.parquet",
+    "decisions": "data/processed/swing_regime_research_v4/decisions.parquet",
+    "dataset_config": "data/processed/swing_regime_research_v4/config.json",
+    "parent_plan": "configs/swing_v15_continuous_folds.json",
+    "m1dir": "data/raw/opencode_1m_audit_20260907",
+    "n_signals_frozen": 94
+  },
+  "entry_formulas": {
+    "note": "offset and atr5 recovered per signal from frozen decisions (close, atr5 at bar_index); offset must be in {0.5, 1.5} within 1e-9 else STOP. Frozen 5m entry: LONG close5 - offset*atr5, SHORT close5 + offset*atr5.",
+    "control": "entry_limit unchanged (frozen 5m entry).",
+    "m1close": "LAST 1m close of the signal 5m candle replaces 5m close, same offset formula: LONG last1m_close - offset*atr5; SHORT last1m_close + offset*atr5.",
+    "m1extreme": "LONG: min(1m low over 5 sub-bars) - offset*atr5; SHORT: max(1m high over 5 sub-bars) + offset*atr5.",
+    "m1vwap": "VWAP-ish: mean of the 5 sub-bar 1m closes: LONG mean1m_close - offset*atr5; SHORT mean1m_close + offset*atr5."
+  },
+  "coverage_policy": {
+    "keep_rule": "keep a signal iff all 5 1m sub-bars (signal-candle open + 0..4 min) are present AND each 1m close_time <= 5m signal close (causal); else DROP the signal, REPORT the count, NEVER extrapolate.",
+    "control_full": "control_full runs on all 94 frozen signals (reproduction gate; untouched).",
+    "comparison_set": "control + all 3 refined branches run on the KEPT subset only (apples-to-apples; same signal rows everywhere).",
+    "precrawl_check": "312 files; 79/94 signal candles fully covered (5/5), 15/94 with 0/5 (all-or-nothing, no partials). Expect kept=79, dropped=15."
+  },
+  "frozen_identical": ["stop_loss", "take_profit_1", "take_profit_2", "holding_bars", "entry_expiry_bars", "tp1_fraction", "direction", "bar_index", "signal_time"],
+  "isolation_note": "stop/TP/holding NOT recomputed from the refined entry (entry-to-stop risk distance changes as a side effect; disclosed, not hidden). Only entry_limit varies across comparison branches.",
+  "branches": ["control_full", "control", "m1close", "m1extreme", "m1vwap"],
+  "sizings": ["1x"],
+  "control": "control_full (94 signals, frozen 5m entry) must match B4 majority_1x published normal (+165.17829563633006% total_return 1.6517829563633004, -20.086073993367803% max_drawdown -0.20086073993367803, 63 trades) within 1e-6 / exact trades or STOP the run.",
+  "control_reference": {"total_return": 1.6517829563633004, "max_drawdown": -0.20086073993367803, "trades": 63},
+  "dd_guard_policy": {
+    "rule": "1x only for the 5 pre-specified branches; PLUS one dd_guard branch on the BEST refined variant by normal monthly_geometric_net (tie-break: higher normal total_return, then higher normal trades). Selection rule frozen here before running.",
+    "name": "{best_of_m1close_m1extreme_m1vwap}_dd_guard",
+    "reference": "control (kept-subset, 1x) sampled equity from THIS run (trade exit_time/equity_after), past-only 1-microsecond cutoff, 100.0 seed; trigger 10%, lev 0.5; applied at the selected branch's OWN signal times via leverage column only (geometry untouched). Disclosed deviation from v03 own-book reference; same convention as v41 shared-control reference.",
+    "skip": "if the extra run is not cheap (error or >10 min), SKIP and record reason in summary.json."
+  },
+  "scenarios": ["normal", "fee_stress", "execution_stress"],
+  "fee_stress_rate": 0.00055,
+  "stress": {
+    "entry_penetration_bps": 5,
+    "target_penetration_bps": 5,
+    "market_exit_slippage_bps": 5,
+    "market_exit_fee_rate": 0.00055,
+    "allow_limit_price_improvement": false
+  },
+  "monthly_note": "monthly/annual geometric from parent_plan duration (complete_evaluation_until minus folds[0][0], 365.2425d year), same formula as v41.",
+  "gate": {
+    "monthly_min": 0.05,
+    "dd_max": 0.2,
+    "fills_min": 30
+  },
+  "diagnostics": {
+    "fill_rate": "trades / n_signals per branch per scenario; engine rejected_or_unfilled_signals reported alongside.",
+    "touch_conversion": "for each control-unfilled kept signal, re-check _entry_fill over its t+1..t+12 window with each refined limit (same OHLC logic as engine): counts how many refined limits WOULD have filled where control did not (and vice versa). Direct answer to 'does refinement convert touch-no-cross into fills'.",
+    "limit_shift_bps": "mean/median (refined_limit - control_limit)/price * direction * 1e4 (signed: + means more aggressive/closer to price for that side)."
+  },
+  "labels": {
+    "causal": "refined entries use only 1m bars with close_time <= 5m signal close (signal candle's own 5 sub-bars); entry seeking still starts at t+1; no future information.",
+    "exploratory": true,
+    "independent_test": false,
+    "live_approved": false
+  }
+}

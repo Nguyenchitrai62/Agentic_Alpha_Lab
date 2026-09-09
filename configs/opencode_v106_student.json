@@ -1,0 +1,334 @@
+{
+ "absolute_rules": [
+  "KHONG dat lenh live",
+  "KHONG touch research/parallel/registry.json, CONTINUOUS_RESEARCH.md, NEXT_AGENT.md, research/parallel/rounds/*, ../Kronos, worktrees",
+  "KHONG register/assign/rotate",
+  "KHONG commit/push",
+  "KHONG training nang LOCAL (smoke CPU nhe only)",
+  "KHONG in token (either account)",
+  "KHONG secret trong bundle",
+  "causal walk-forward + embargo",
+  "exploratory labels",
+  "PowerShell `; if ($?) {}`"
+ ],
+ "architecture": {
+  "builders_reuse": "TAI DUNG VERBATIM: scripts/opencode_r9m_nextarch_model.py (SelectiveSSM1D + SelectiveSSMTemporal encoder/context/action wiring, causal) + scripts/opencode_r30m_v41_features.py wrapper (133F layout) + src/agentic_alpha_lab/models/ranked_loss.py pairwise_expected_rank_loss (temp/tie). Student head ONLY diff: final Linear(192,1) thay vi Linear(192,2) -> logits (n,16) free units (khong percent, khong destandardize, khong mu/sigma). Encoder/action dims/wiring GIU NGUYEN.",
+  "cross_frame": {
+   "d_model": 192,
+   "d_state": 16,
+   "dropout": 0.1,
+   "kind": "1 x SelectiveSSM1D causal tren chuoi 5 frame vectors (GIU NGUYEN nhu v35/v38/v39/v40/v41)",
+   "layers": 1
+  },
+  "dropout": 0.1,
+  "frame_encoder": {
+   "conv_k": 4,
+   "d_model": 64,
+   "d_state": 16,
+   "dropout": 0.1,
+   "kind": "shared SelectiveSSM1D x2 lop + depthwise causal conv + SiLU gate (weight-shared tren 5 frames), pool concat(last,mean) -> Linear 128->192 (GIU NGUYEN)",
+   "layers": 2
+  },
+  "fusion": "macro/micro/action GIU NGUYEN hinh dang v28/v35/v38/v39/v40/v41 (width 192); KHONG doi dims/wiring ngoai final head 2->1",
+  "kind": "Selective-SSM student (Mamba-style, pure-PyTorch, causal) + single-logit head per candidate -> (n,16) student_logits (free units, T=1 KL truc tiep vs soft-targets da scale tau_f)",
+  "params_target": {
+   "band": "0.4-2.0M",
+   "estimate": "~0.6M (encoder DONG KICH THUOC v35/v41 600875; head 2->1 giam ~193 params -> ~600682, van ~0.6M; smoke do + ghi thuc te)",
+   "reference_verbatim": 600875
+  }
+ },
+ "backtest_deferred": "Portfolio evaluation (run_backtest/run_stress, normal + fee_stress + execution_stress, gross/fees/funding/net/drawdown/trades/coverage, 2 branches 1x + dd_guard) chay LOCAL sau khi tai checkpoint (audit-series nhu v28c/v35b/v38b). So voi standing_best CHI SAU outputs + audit (khong claim truoc).",
+ "branches_eval": [
+  "rank_en_1x",
+  "rank_en_dd_guard"
+ ],
+ "budget": {
+  "batch_size": 64,
+  "comparison": "v41: 33 jobs x FIXED 16ep x ~0.6M + val-pred export, guard 16200s (~9 GPU-h). v106: 33 jobs x FIXED 16ep x ~0.6M + val-logits export (nhe hon v41: single head, KHONG quantile/excursion/CE), guard 16200s (~9 GPU-h). Tran 10 GPU-h.",
+  "epochs_fixed": 16,
+  "epochs_max": 16,
+  "guard_wall_seconds": 16200,
+  "gpu_hours_max": 9.5,
+  "seeds_fold_jobs": 33
+ },
+ "cache": "artifacts/features/swing_sequences_v13_20260905",
+ "causality": {
+  "deriv40": "GIU theo kich ban lag48 cua B1 (source_day+48h). Chua xac minh receipt-time lich su -> disclosure exploratory.",
+  "embargo_days": 8,
+  "flow40": "GIU. Chi nen dong truoc signal_time (merge_asof backward, stale -> raise).",
+  "funding": "GIU. As-of: chi ky co funding_time < signal_time; upweight descriptors (fund_last, atr_ratio) CHI past-only tai decision T.",
+  "macro": "GIU SPY/DXY (lag T-1 nghiem ngat: macro date < UTC date signal). LOAI GLD/GC-future.",
+  "normalization": "mean/std features CHI fit tren train-window tung fold (val/test chi transform, past-only). KHONG fit bat ky threshold/weight nao tren labels o day (VOL_CUT reuse v56, FUND_ABS fixed, weights pre-spec).",
+  "price40": "GIU (frozen, past-only).",
+  "rule": "Train/val chi rows co label_end < fold_start - 8d; FIXED 16 epochs, khong chon epoch/fold/seed/threshold theo PnL; labels exploratory; soft-targets frozen (khong refit tau); upweight rule past-only.",
+  "soft_targets_causality": "soft_targets.npz da causal (tau_f fit past-folds only, fold0 fallback 1.0). Student train moi fold f CHI rows train-window past-only (label_end < fold_start - 8d); KL chi tren subset co soft (intersect train x soft-universe, ca hai past-only); fold0 train_soft=0 -> KL=0 (ranking-only fallback, pre-spec, khong peek).",
+  "upweight_causality": "vol_high/fund_high CHI tu atr4/close tai T + funding as-of strict (funding_time < signal_time, merge_asof backward, allow_exact_matches=False). KHONG dung future, KHONG fit threshold."
+ },
+ "cloud": {
+  "dataset_slug_suggestion": "opencode-trackm-student-v106-data",
+  "jit_guard": "Bootstrap guard 16200s wall; peer-failure -> dung, giu checkpoint.",
+  "kernel_slug_suggestion": "opencode-trackm-student-v106",
+  "mode": "PRIVATE T4x2, 2 workers doc lap (khong DDP)",
+  "note": "Queue sau v41 (v41 RUNNING on account-2 expected -> hold). Max MOT submission (account-1 default; failover account-2 ONLY on explicit quota-exhaustion evidence).",
+  "submit_rule": "CHI submit 1 dataset + 1 kernel khi (a) NO RUNNING/QUEUED ON EITHER ACCOUNT VA (b) v41 terminal (COMPLETE/ERROR/CANCELLED). Neu 1 dieu kien thieu -> package-ready + blockers, KHONG submit. Dataset-ready gate: doi dataset READY + gap >=60s truoc kernels push (bai hoc v55 race 3-6s). Kernel re-push only neu ERROR empty-input."
+ },
+ "cloud_driver": "scripts/opencode_r37m_student_train.py",
+ "compute": "Chi train nang tren Kaggle PRIVATE T4x2. Local CPU chi smoke/replay/backtest/audit. Khong fallback tra phi. GPU-agnostic guard: GPU la (hoc tu A2 P100 sm_60) -> WARN va tiep tuc CPU, KHONG raise tu huy.",
+ "coverage_floor": {
+  "loss_mechanism": {
+   "domain": "STUDENT-LOGIT (free units, T=1; hinge la safety net, inactive khi healthy — giong triet ly v41)",
+   "formula": "en_best_logit = max_k student_logits; mean_pos = mean(relu(en_best_logit)) tren train-batch (causal, train-only); coverage_loss = 3.0 * relu(1 - mean_pos/5e-4)^2.",
+   "params": {
+    "FLOOR_POS": 0.0005,
+    "LAMBDA_COV": 3.0
+   }
+  },
+  "policy_mechanism": {
+   "N_MIN_PER_FOLD_TEST": 8,
+   "fallback": "neu gate cho < 8 tin hieu trong mot fold-test, lay bu top-N_MIN theo en_best_logit (tie-break deterministic; pre-spec, giong nhau moi fold/seed, khong tune theo PnL)",
+   "global_floor_math": "8 x 11 fold-tests ~= 88 tin hieu global toi thieu >> fills gate 30",
+   "primary_gate": "en_best_logit > 0.0 (zero-margin TREN LOGITS free units; nguong calibrated tu phan vi validation o audit local sau)"
+  }
+ },
+ "data_frozen": {
+  "calendar_cal4": [
+   "bars_to_funding (lich UTC 00/08/16 deterministic)",
+   "sin_utc_hour",
+   "cos_utc_hour",
+   "is_weekend_utc"
+  ],
+  "deriv_deriv40": "artifacts/features/btc_derivatives_lag48_v1/features.npz:features (20 log-level/change + 20 missing masks, 5628x40, finite 100%)",
+  "flow_flow40": "tinh trong-script bang agentic_alpha_lab.data.flow_features tren candles tai signal_times (40 buy-imbalance/activity/volume x 5 khung, causal, finite 100%)",
+  "funding_fund5": [
+   "fund_rate (ky gan nhat TRUOC signal)",
+   "fund_7d (mean 21 ky truoc)",
+   "fund_30d (mean 90 ky truoc)",
+   "fund_slope_7d",
+   "fund_z30"
+  ],
+  "layout": "[:40] price, [40:80] deriv, [80:120] flow, [120:125] funding, [125:129] macro, [129:133] calendar (DONG BANG nhu v28/v35/v38/v39/v40/v41)",
+  "macro_dropped": [
+   "GLD/GC-future: chi coverage, KHONG lam feature."
+  ],
+  "macro_macro4": [
+   "risk_on SPY>MA50 (T-1)",
+   "spy_gap_ma50",
+   "dxy_z60 (mean/std 60d ket thuc T-1)",
+   "spy_amp20"
+  ],
+  "price_price40": "data/processed/swing_regime_research_v4/examples.npz:features (40, frozen)",
+  "reuse": "Tai su dung VERBATIM builders cua v28 qua wrapper v35 (scripts/opencode_r9m_nextarch_features.py, da audit causal-join OK) qua wrapper scripts/opencode_r37m_student_features.py + assert shape/layout/finite. Khong viet lai join.",
+  "total_flat": 133
+ },
+ "dataset": "data/processed/swing_regime_research_v4",
+ "decisions": "data/processed/swing_regime_research_v4/decisions.parquet",
+ "deliverables": [
+  "scripts/opencode_r37m_student_model.py",
+  "scripts/opencode_r37m_student_features.py",
+  "scripts/opencode_r37m_student_train.py",
+  "scripts/opencode_r37m_student_smoke.py",
+  "scripts/opencode_r37m_student_package.py",
+  "configs/opencode_v106_student.json (file nay, DONG BANG truoc dong goi)",
+  "artifacts/kaggle/opencode_trackM_v106/ (gitignored staging)",
+  "artifacts/research/opencode_v106_student/... + summary.json (gitignored)"
+ ],
+ "diagnostic_lineage": [
+  "v34: ranking + fixed-epoch (sua underfit)",
+  "v38: rank FIXED +0.066 nhung overconfidence bias +3.81 (DD breach)",
+  "v39: scale-cap sua bias nhung giet rank-gradient (loss flat)",
+  "v40: rank-on-raw + cap-at-policy (rank +0.052 nhung clip saturation 95% -> selection noise)",
+  "v41 (RUNNING acc2): value-scale-at-origin + select-raw (cho audit)",
+  "v100 (scorediag): mechanism value-prior neo magnitude (standardized mean|d| 0.410 vs 0.677, thang 11/11 folds); rank-only ListNet margin lien-decision la jitter ordinal",
+  "v101 (distill): soft-targets E38/tau_f frozen (4076,16) + student_spec KL(T=1) + lambda_rank 0.1-0.25",
+  "v103 (teacherlose): opt_B_UPWEIGHT (8 flagged + oracle gap L 3.59pp) -> upweight L-like trong ranking-on-hard"
+ ],
+ "epoch_selection": {
+  "embargo_days": 8,
+  "minimum_train": 200,
+  "minimum_validation": 100,
+  "mode": "FIXED 16 epochs, KHONG early-stop (giu tu v38/v39/v40/v41)",
+  "validation_days": 180,
+  "validation_role": "giam sat + EXPORT val-logits (val_predictions_logits.npy, free units) de calibrate-first outlier-robust o audit local sau (khong chon epoch, khong tune theo PnL)",
+  "window_days": 730
+ },
+ "experiment": "opencode-r37m-student-from-distill-v106",
+ "export_spec": {
+  "indices": "seed{seed}/checkpoints/fold_{fold}/indices.npz: {train, validation, test} (past-only, embargo 8d, giong v38/v39/v40/v41) + soft_rows.json {n_train_soft, n_val_soft} + upweight_stats.json {frac_Llike, mean_w_Llike, mean_w_rest}",
+  "parity": "save/reload parity tren test-sample (rtol 1e-4/atol 1e-4) + val finite check + tie-break deterministic check; replay audit local verify",
+  "policy_logits_free": "predictions (test + val) la LOGITS free units (T=1, khong percent, khong clip); gate + tie-break + calibrate-first o audit local sau (percentile tu phan vi validation, isotonic outlier-robust).",
+  "prohibited": "KHONG export train predictions; KHONG chon epoch/fold/seed/threshold theo PnL; KHONG fit bat ky threshold/weight nao theo test; KHONG dung sizing-capped (student free units, khong sizing file)",
+  "soft_targets_bundle": "bundle FROZEN soft_targets.npz (bytes-identical distill artifact, sha256 ff170795dde5342e5becd401e727daa10c0025a57047c07a9f1217e912556ae1) trong dataset PRIVATE de cloud train offline (khong tai tinh, khong refit tau).",
+  "test_predictions": "seed{seed}/temporal_neural/fold_{fold}/predictions_logits.npy: (n_test,16) float32 student_logits free units, finite, sha256 trong metadata",
+  "tie_break_export": "best-candidate moi decision xac dinh bang deterministic_best_index tren LOGITS-row (eps 1e-6, holding-asc, index-min); audit co the tai-lap tu logits + candidates",
+  "val_predictions": "seed{seed}/temporal_neural/fold_{fold}/val_predictions_logits.npy: (n_val,16) float32, cung model FIXED-epoch, finite, sha256 trong metadata"
+ },
+ "family": "R37-M: SSM student-from-distill (~0.6M Selective-SSM, reuse v35/v41 builders) + KL(student||frozen-v38-soft-targets, T=1) + upweighted-ranking-on-hard (opt_B) + coverage-hinge + FIXED-epoch + VAL-LOGITS EXPORT, walk-forward quarterly, Kaggle conditional-submit (sau v41)",
+ "folds": {
+  "embargo_days": 8,
+  "folds_note": "11 quarterly folds (giong v28/v35/v38/v39/v40/v41); train = trailing 730d past-only (label_end < fold_start - 8d) tren full 5628; KL chi tren intersect train x soft-universe (4076, indices 1552..5627); test = partition f (co soft, de danh gia distill).",
+  "minimum_train_decisions": 200,
+  "parent": "configs/swing_v15_continuous_folds.json",
+  "soft_universe": {
+   "fold_lens": [
+    368,
+    364,
+    364,
+    368,
+    368,
+    364,
+    360,
+    368,
+    368,
+    364,
+    420
+   ],
+   "indices": "1552..5627 contiguous (4076 rows)",
+   "n": 4076,
+   "note": "fold0 train_soft=0 -> KL=0 ranking-only fallback (pre-spec); folds 1..10 train_soft 308..2860"
+  },
+  "trailing_window_days": 730
+ },
+ "funding_source": {
+  "dir": "data/raw/opencode_funding_20260907",
+  "file": "data/raw/opencode_funding_20260907/funding_BTCUSDT.parquet",
+  "note": "ETHUSDT chi du phong, KHONG dung. Upweight join dung file nay (as-of strict)."
+ },
+ "gate": {
+  "drawdown_max": 0.2,
+  "fills_min": 30,
+  "monthly_geometric_net_min": 0.05,
+  "scenarios": [
+   "normal",
+   "fee_stress",
+   "execution_stress"
+  ]
+ },
+ "hypothesis": "v38 co rank (+0.066) nhung overconfidence; ListNet-only mat neo magnitude (v100); soft-targets E38/tau_f giu neo magnitude + order (v101); teacher thua o L-like quiet samples nhung oracle ceiling van cao 3.59pp (v103 opt_B) -> student SSM ~0.6M distill KL(T=1) + ranking-on-hard upweight L-like (khong loai) se giu rank-gradient + hoc vung teacher-thua, trong khi coverage-hinge + fixed-epoch + val-export giu bai hoc underfit/calibration. Ky vong smoke: KL giam (neu flat thi STOP); audit sau moi so standing_best.",
+ "labels_exploratory": {
+  "direction": "KHONG dung CE head o student (loss = KL + ranking + coverage only). Hard labels cho ranking: examples.npz ch0 unconditional net PERCENT (zeros cua unfilled GIU NGUYEN, giong v29/v38).",
+  "ranking_labels": "pairwise_expected_rank_loss(student_logits, labels, temperature_percent=1.0, tie_band_percent=0.25) VERBATIM don vi percent (giong v29/v38/v40/v41) — ranking tren logits free units van hop le vi chi can thu tu (affine/monotone invariant); temp/tie giu de so sanh.",
+  "soft_labels": "soft_targets.npz soft_targets (4076,16) float32, rows sum-to-1, frozen, T=1 (da scale tau_f o v101).",
+  "value_labels": "examples.npz labels (n,16,3) giong A1/B1/v28/v35/v38/v39/v40/v41 (ch0 unconditional net PERCENT, ch1 fill, ch2 positive-net); student KHONG hoi quy truc tiep, chi ranking-on-hard."
+ },
+ "live_approved": false,
+ "loss": {
+  "KL": {
+   "direction": "KL(student || teacher) = mean_i sum_k student_prob[i,k] * (log student_prob[i,k] - log soft[i,k]) (student-first, dung chu mission + v101 student_spec).",
+   "formula_torch": "student_logprob = log_softmax(student_logits, dim=1); teacher_prob = clamp(soft_targets, 1e-12, 1.0); kl_per_row = (exp(student_logprob) * (student_logprob - log(teacher_prob))).sum(1); KL = kl_per_row.mean() tren soft-subset (train) / val-soft-subset (monitor).",
+   "temperature": 1.0,
+   "weight_kl": 1.0,
+   "weight_kl_why": "KL la so hang CHINH (distill magnitude-neo tu E38); ranking-on-hard la so hang nho giu ap luc thu tu (v101)."
+  },
+  "coverage": {
+   "floor_pos": 0.0005,
+   "lambda_cov": 3.0
+  },
+  "ranking_on_hard": {
+   "applies_to": "student_logits (n,16) free units vs hard labels ch0 (percent, zeros giu) + WAIT=0 reference (VERBATIM pairwise_expected_rank_loss).",
+   "formula": "per-row ranking loss (VERBATIM pairwise logic) -> weighted mean voi w_i (upweight). Chi tiet o upweight.",
+   "reference": "configs/swing_v29_residual_gru.json: ranking_weight 0.5, temperature 1.0%, tie-band 0.25% (v106 giam con 0.2 vi soft da chua order — pre-spec).",
+   "temperature_percent": 1.0,
+   "tie_band_percent": 0.25,
+   "weight_lambda_rank": 0.2,
+   "weight_lambda_rank_why": "0.2 trong khoang pre-spec v101 0.1-0.25 (nho hon 0.5 cua v38 vi soft-target da chua tin hieu thu tu); tune tren validation past-only NEU can (khong tune tren test); FIXED o day truoc packaging."
+  },
+  "total": "L = 1.0*KL(student||soft, T=1, soft-subset) + 0.2*weighted_ranking(student, hard, upweight L-like, all-train) + 3.0*coverage_hinge(logits). KHONG CE/quantile/excursion heads (student-only, nhe hon v41)."
+ },
+ "macro_source": {
+  "dir": "data/raw/opencode_macro_yahoo_20220101_20260907",
+  "note": "Yahoo Finance Chart API v8 (free, no key); Stooq bi chan tren host.",
+  "symbols_used": {
+   "dxy": "DX-Y.NYB (dxy_z60)",
+   "spy": "SPY (risk_on/gap/amp20)"
+  }
+ },
+ "model_family": "distill_student_ssm_v106",
+ "owner_slug_suggestion": {
+  "owner": "nguynchtrai",
+  "slug": "opencode-trackm-student-v106"
+ },
+ "queue": {
+  "max_submissions": 1,
+  "position": "8th (sau v41 7th: A2-fix > v55 > v39 > v55b > M-v40 > B-v55c > M-v41 > M-v106)"
+ },
+ "seeds": [
+  1729,
+  1730,
+  1731
+ ],
+ "selection": "FIXED 16 epochs, tat ca 3 seeds x 11 folds (=33 jobs). Khong chon seed/fold/epoch/threshold theo portfolio. Tat ca ngay da mo la development, khong phai independent test.",
+ "smoke": "Local CPU nhe: coverage audit 5 nguon + build flat (5628,133) + soft-targets load (4076,16) + upweight descriptors (past-only) + 1 fold (fold_1, co 308 soft-train) x 1 seed (1729) x 3 epochs batch 32 (forward/backward KL+weighted-ranking+coverage finite, KL-DECREASING proof (kl_last < kl_first — neu flat thi STOP, khong package), RANKING finite, UPWEIGHT-ACTIVE proof (mean_w_Llike=2.0 vs rest=1.0 + frac + counts), save/reload parity, predict logits, tie-break deterministic, val-export logits). Ket qua smoke KHONG phai ket qua nghien cuu.",
+ "soft_targets_frozen": {
+  "bytes_sha256": "ff170795dde5342e5becd401e727daa10c0025a57047c07a9f1217e912556ae1",
+  "file": "artifacts/research/opencode_v101_distill/soft_targets.npz",
+  "keys": {
+   "fold_of": "(4076,) int64 (fold 0..10)",
+   "indices": "(4076,) int64 (vi tri vao decisions_all/examples, 1552..5627)",
+   "oracle_top1": "(4076,) int64 (argmax ch0 first-max, exploratory)",
+   "soft_targets": "(4076,16) float32 (rows sum-to-1, softmax(E38/tau_f))",
+   "tau_per_row": "(4076,) float64",
+   "teacher_expected_net": "(4076,16) float32 (E38, percent)"
+  },
+  "taus_reused_verbatim_v101": [
+   1.0,
+   3.0,
+   8.0,
+   8.0,
+   8.0,
+   8.0,
+   8.0,
+   8.0,
+   8.0,
+   8.0,
+   8.0
+  ],
+  "temperature_handling": "soft_targets da scale boi tau_f o v101 -> student hoc voi KL o T=1 (khong them temperature nua); student logits tu do, khong rang buoc don vi %."
+ },
+ "standing_best_anchor": {
+  "confirmed_dd_guard": "2.79/2.67/2.06 DD-safe all scenarios (so sanh SAU full train + audit local, khong claim truoc)",
+  "majority_1x": "2.935%/mo (DD breach)",
+  "rule": "CHI so sau outputs + audit (replay parity + portfolio 2 branches x 3 scenarios + diagnostic rank/coverage/bias/topdecile). Smoke KHONG so."
+ },
+ "tie_break": {
+  "diff_vs_v41": "BO fill-desc (student KHONG train fill head -> fill logit random, dung lam selector se la noise). Giu eps + holding-asc + index-min.",
+  "eps": 1e-06,
+  "inputs_causal": "student_logits tai decision T + bang candidates tinh (side/entry/brackets/holding, khong future, khong PnL). Khong fit, khong tune.",
+  "record": "quy tac ghi trong config nay + ham deterministic_best_index() trong scripts/opencode_r37m_student_model.py; smoke phai chung minh deterministic (2 lan goi giong nhau bit-identical) + dung thu tu (holding-asc).",
+  "rule": "deterministic_best_index(student_logits_row, candidates): (1) m = max(logits); (2) T = {k: m - logits[k] < 1e-6}; (3) trong T chon holding nho nhat (candidates[k,5] trong {3,7}); (4) neu van tie chon index nho nhat. Ap dung cho moi decision (n,16) doc lap, TREN LOGITS free units."
+ },
+ "training": {
+  "accumulation_steps": 2,
+  "amp": true,
+  "batch_size": 64,
+  "coverage_floor_pos": 0.0005,
+  "coverage_lambda": 3.0,
+  "gradient_clip": 1.0,
+  "kl_weight": 1.0,
+  "learning_rate": 0.0003,
+  "ranking_temperature_percent": 1.0,
+  "ranking_tie_band_percent": 0.25,
+  "ranking_weight_lambda": 0.2,
+  "upweight_Llike_factor": 2.0,
+  "weight_decay": 0.01,
+  "epochs": 16,
+  "epochs_max": 16
+ },
+ "upweight_opt_B": {
+  "applies_to": "CHI ranking term (weighted mean); KL giu unweighted (distill teacher fully); coverage giu unweighted. KHONG loai/exclude bat ky sample nao.",
+  "descriptors_exact_v103": {
+   "atr_ratio": "atr4/close (past-only, tai decision time)",
+   "fund_high": "|fund_last| >= 0.0001 (fixed 1bp/8h step, no fitting)",
+   "fund_last": "fundingRate gan nhat co funding_time < signal_time (strict as-of, merge_asof backward, allow_exact_matches=False, past-only)",
+   "vol_high": "atr_ratio >= 0.01338037015711381 (reuse VERBATIM v56 pre-2025 median fit, no label use, no refit)"
+  },
+  "expected_stats": {
+   "frac_Llike_fold1_train": "~0.31 (578/1860, do local; cloud metadata ghi thuc te moi fold)",
+   "frac_Llike_global": "~0.331 (1863/5628, do local 2026-09-08)"
+  },
+  "formula_torch": "w_i = 2.0 neu (vol_high_i==0 & fund_high_i==0) else 1.0; rank_per_row_i = (penalties_i * comparable_i).sum() / comparable_i.sum().clamp_min(1) (VERBATIM pairwise logic per-row, kem WAIT=0 reference); weighted_rank = (w * rank_per_row).sum() / w.sum().",
+  "l_like_rule": "L-like (quiet) = (vol_high == 0) & (fund_high == 0) (low-vol + low-funding, per v103 rule — implement EXACTLY).",
+  "record_weights": "metadata moi fold/seed: {n_train, n_train_soft, n_Llike_train, frac_Llike_train, mean_w_Llike (=2.0), mean_w_rest (=1.0), eff_sample_size=(w.sum()^2/(w^2).sum())}; smoke in proof mean_w_Llike vs rest + counts.",
+  "upweight_factor": 2.0,
+  "upweight_factor_why": "2.0x (bao thu, pre-spec): gap doi gradient tren quiet samples teacher-thua ma khong ap dao (khong loai, KL van full); phan biet ro trong proof (2.0 vs 1.0); tune NEU can tren validation past-only (khong test); FIXED o day truoc packaging."
+ }
+}

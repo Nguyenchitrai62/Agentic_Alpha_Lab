@@ -1,0 +1,99 @@
+{
+  "experiment": "opencode-v88-verifyfee",
+  "role": "A2-ARCH worker: independent verification of M-feeladder-combo v81 fee branches (rebuild, don't copy)",
+  "lineage": "L1 v72 pool (326 sigs) -> L2 v73 s0004_1x (210 signals, 101 fills) -> L3 v75 dd_guard_tp075 (210 frozen combo, 203x1.0+7x0.5, tp1 0.75) -> v81 feecombo (3 fee tiers) -> v88 independent verify (this config, 2 branches)",
+  "frozen_inputs": {
+    "signals": "artifacts/research/opencode_v75_L3real/dd_guard_tp075/signals.parquet",
+    "signals_n_expected": 210,
+    "guard_low_n_expected": 7,
+    "candles": "data/processed/swing_regime_research_v4/candles.parquet",
+    "dataset_config": "data/processed/swing_regime_research_v4/config.json",
+    "parent_plan": "configs/swing_v15_continuous_folds.json",
+    "m_config_read_only": "artifacts/research/opencode_v81_feecombo/config.json",
+    "m_summary_read_only": "artifacts/research/opencode_v81_feecombo/summary.json"
+  },
+  "branches": [
+    "verify_fee0002_1x",
+    "verify_fee0010_1x"
+  ],
+  "branch_spec": {
+    "verify_fee0002_1x": {
+      "fee_rate_per_fill": 0.0002,
+      "sizing": "as-combo-frozen-1xcap",
+      "purpose": "Control: must reproduce M fee0002_combo normal (+165.90%/-16.57%/101)."
+    },
+    "verify_fee0010_1x": {
+      "fee_rate_per_fill": 0.001,
+      "sizing": "as-combo-frozen-1xcap",
+      "purpose": "Stress: must reproduce M fee0010_combo (+127.13%/-19.07%/101)."
+    }
+  },
+  "sizing_def": {
+    "as-combo-frozen-1xcap": "Keep frozen per-signal leverage column VERBATIM (203x1.0 + 7x0.5, no re-derivation, no guard recompute); ExecutionConfig leverage floor 0.25 / max 1.0 (1x cap) / tp1_fraction 0.75 so engine clip preserves 0.5/1.0 exactly."
+  },
+  "frozen_constants": {
+    "lev_floor": 0.25,
+    "lev_cap_max": 1.0,
+    "tp1_fraction": 0.75,
+    "initial_equity": 100.0,
+    "entry_expiry_bars_expected": 12,
+    "holding_cap_bars_expected": 2016,
+    "dataset_base_fee": 0.0002
+  },
+  "scenarios": [
+    "fee_as_branch"
+  ],
+  "scenario_note": "Fee IS the scenario (one fee per branch, frozen/causal). No extra fee_stress/execution_stress runs. Funding (long 0.0001/8h, short 0) and execution horizon from dataset config.",
+  "monthly_formula": "ratio=final_equity/100; duration_years=(complete_evaluation_until - folds[0][0])/(365.2425*86400) per configs/swing_v15_continuous_folds.json; monthly_geometric_net=ratio^(1/(12*duration_years))-1",
+  "m_published_exact": {
+    "verify_fee0002_1x": {
+      "total_return": 1.6590074162267956,
+      "max_drawdown": -0.16573345360670333,
+      "monthly_geometric_net": 0.029436464245190752,
+      "final_equity": 265.90074162267956,
+      "trades": 101,
+      "long_trades": 62,
+      "short_trades": 39
+    },
+    "verify_fee0010_1x": {
+      "total_return": 1.2713342506655692,
+      "max_drawdown": -0.19073559597479695,
+      "monthly_geometric_net": 0.024635221407820262,
+      "final_equity": 227.13342506655692,
+      "trades": 101,
+      "long_trades": 62,
+      "short_trades": 39
+    }
+  },
+  "pass_criterion": {
+    "tolerance_abs": 1e-06,
+    "metrics": [
+      "total_return",
+      "max_drawdown",
+      "monthly_geometric_net",
+      "final_equity"
+    ],
+    "trades": "exact integer match",
+    "verdict_pass": "both branches: all |repro - published| <= 1e-6 on the 4 float metrics AND trades exact",
+    "on_mismatch": "investigate and name the cause (fee application? leverage-column handling? tp1/execution mismatch? monthly/duration formula drift? signal order/count drift? engine version drift?); do NOT silently adjust numbers to match"
+  },
+  "driver": "scripts/opencode_r29a_verifyfee.py --config configs/opencode_v88_verifyfee.json --output artifacts/research/opencode_v88_verifyfee",
+  "output": "artifacts/research/opencode_v88_verifyfee",
+  "causal_notes": [
+    "Frozen L3 combo signals only (210 rows), never refit; leverage column kept verbatim.",
+    "Fee is a frozen per-branch constant (causal); fee IS the scenario, no additional stresses.",
+    "No maker-fill/queue claims; stop/timeout exits market-like at branch fee; DD trade-candle-close sampled.",
+    "Per-signal holding_bars preserved verbatim; signals sorted by bar_index for determinism (order diagnostic recorded).",
+    "Opened development interval only, NOT independent test."
+  ],
+  "rules": [
+    "verification backtests only (no new hypotheses)",
+    "no live orders",
+    "NEVER touch research/parallel/registry.json, CONTINUOUS_RESEARCH.md, NEXT_AGENT.md, research/parallel/rounds/*, ../Kronos, C:/Users/trait/.codex/worktrees/*",
+    "no register/assign/rotate; no commit/push; no overwrites (output dir must not exist)",
+    "causal past-only; exploratory labels"
+  ],
+  "independent_test": false,
+  "exploratory": true,
+  "live_approved": false
+}

@@ -1,0 +1,84 @@
+{
+  "experiment": "opencode-v74-L3risk",
+  "layer": "L3-BUILDER (RISK REDUCER): trade profit for DD/MAE caps",
+  "hypothesis": "Proven risk legs (dd_guard, tp075) plus a NEW per-trade MAE-stop tighten the book's adverse excursion and drawdown at a measurable monthly cost. Exploratory only.",
+  "l2_expected": "artifacts/research/opencode_v73_L2filter/<best-filter>/signals.parquet",
+  "l2_status_at_prespec": "ABSENT (checked 2026-09-08): no L2 output exists, no data invented. This config freezes the full L3 matrix + smoke constants; smoke runs on v38-identity alone.",
+  "smoke_base": "artifacts/research/opencode_v59_v38cal/v38-identity/signals.parquet",
+  "smoke_base_note": "Frozen v38 rank_en signals (raw, WITHOUT isoall calibration; 135 signals). Smoke-only stand-in. L2 rerun will point --signals at the L2 parquet and amend only: signals path, control-check values, mae_cap_X (rule below).",
+  "candles": "data/processed/swing_regime_research_v4/candles.parquet",
+  "dataset_config": "data/processed/swing_regime_research_v4/config.json",
+  "parent_plan": "configs/swing_v15_continuous_folds.json",
+  "branches": [
+    "control_1x",
+    "dd_guard",
+    "tp075_1x",
+    "mae_stop_1x",
+    "dd_guard_tp075",
+    "full_dd_tp075_mae"
+  ],
+  "branch_spec": {
+    "control_1x": {"tp1_fraction": 0.5, "sizing": "1x", "stops": "original"},
+    "dd_guard": {"tp1_fraction": 0.5, "sizing": "dd_guard", "stops": "original", "guard_ref": "own-book control_1x equity"},
+    "tp075_1x": {"tp1_fraction": 0.75, "sizing": "1x", "stops": "original"},
+    "mae_stop_1x": {"tp1_fraction": 0.5, "sizing": "1x", "stops": "mae_tightened"},
+    "dd_guard_tp075": {"tp1_fraction": 0.75, "sizing": "dd_guard", "stops": "original", "guard_ref": "own-book tp075_1x equity"},
+    "full_dd_tp075_mae": {"tp1_fraction": 0.75, "sizing": "dd_guard", "stops": "mae_tightened", "guard_ref": "own-book aux _ref_mae_tp075_1x equity"}
+  },
+  "auxiliary": {
+    "_ref_mae_tp075_1x": "Diagnostic-only 1x run (tp1=0.75 + MAE stops) used SOLELY as own-book guard reference for full_dd_tp075_mae. Excluded from the 6-branch table."
+  },
+  "frozen_constants": {
+    "dd_trigger": 0.1,
+    "dd_guard_lev": 0.5,
+    "lev_min": 0.25,
+    "lev_max": 1.0,
+    "tp1_control": 0.5,
+    "tp1_tp075": 0.75,
+    "mae_cap_X": 0.027,
+    "mae_cap_X_note": "2.7% ~= v38-identity control-1x MAE-magnitude p50 (2.6846%; mean 2.66%, p75 3.53%, p90 5.61%, max 7.68% over 81 normal fills; probe 2026-09-08, entry_index..exit_index 5m extremes). TIGHTER than median signal-stop distance (3.58%) so it binds on most trades; min signal-stop distance 1.99% < X implies a few no-ops (counted, not hidden)."
+  },
+  "mae_stop_formula": {
+    "long": "applied_stop = max(original_stop, entry_limit*(1-X)); assert applied_stop < entry_limit",
+    "short": "applied_stop = min(original_stop, entry_limit*(1+X)); assert applied_stop > entry_limit",
+    "entry_proxy": "signal entry_limit (entry fill price unknown at signal time; causal, past-only). Keep TP1/TP2/holding unchanged.",
+    "noop_rule": "If original stop is already tighter than the X-stop, keep original and count as no-op."
+  },
+  "l2_X_rule": "On L2 rerun, set mae_cap_X = L2-control_1x MAE-magnitude p50 rounded to 3 decimals, frozen by config amendment BEFORE that run. In-sample threshold choice -> results stay exploratory.",
+  "dd_guard_formula": "lev 0.5 while own-book 1x reference equity is >10% under trailing peak (past-only, 1-microsecond cutoff, 100.0 seed), else 1.0. Own-book per branch (NOT shared control ref).",
+  "mae_definition": "Per filled trade, 5m-only proxy: LONG (min(low[entry..exit])-entry)/entry; SHORT (entry-max(high[entry..exit]))/entry; mae_frac=min(0,adverse). Magnitude=-mae_frac. Report mean/p50/p75/p90/max of magnitude. Diagnostic (uses post-entry extremes); the STOP itself is causal.",
+  "scenarios": ["normal", "fee_stress", "execution_stress"],
+  "fee_stress_rate": 0.00055,
+  "stress": {
+    "entry_penetration_bps": 5,
+    "target_penetration_bps": 5,
+    "market_exit_slippage_bps": 5,
+    "market_exit_fee_rate": 0.00055,
+    "allow_limit_price_improvement": false
+  },
+  "stress_path_note": "execution_stress.py honors ExecutionConfig.tp1_fraction (close_fraction(fill, execution.tp1_fraction, ...), line ~128) and signal.stop_loss (line ~112); asserted at runtime. MAE-stop (stop_loss rewrite) and tp075 therefore flow into ALL 3 scenarios.",
+  "control_check_smoke": {
+    "total_return": 0.571207818287566,
+    "max_drawdown": -0.2963885774340881,
+    "trades": 81,
+    "tolerance_return": 0.005,
+    "tolerance_dd": 0.005,
+    "note": "v38-identity control_1x tp1=0.5 normal. MUST reproduce or STOP. L2 rerun: replace with L2 reported numbers."
+  },
+  "gate": {
+    "monthly_geometric_net_min": 0.05,
+    "drawdown_max": 0.2,
+    "fills_min": 30
+  },
+  "causal_notes": [
+    "Signals frozen, never refit.",
+    "dd_guard uses past-only own-book equity.",
+    "MAE-stop uses signal-time fields only (entry_limit proxy).",
+    "X chosen from full-sample MAE -> in-sample, exploratory by construction.",
+    "No maker-fill/queue claims; stop/timeout exits market-like at scenario fee; DD trade-candle-close sampled."
+  ],
+  "risk_cost_accounting": "Per branch x scenario: fees, funding, monthly_geometric_net; vs control: monthly_cost_pp (control minus branch), dd_bought_pp (branch DD minus control DD, positive = shallower), mae_mean_reduction_pp, and cost ratios (monthly pp lost per DD pp bought / per MAE pp bought).",
+  "independent_test": false,
+  "exploratory": true,
+  "live_approved": false
+}

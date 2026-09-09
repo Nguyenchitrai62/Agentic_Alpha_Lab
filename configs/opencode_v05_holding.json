@@ -1,0 +1,42 @@
+{
+  "experiment": "opencode-v05-holding",
+  "hypothesis": "Holding horizon changes the risk/return profile of frozen v30 isotonic-4 signals; test holding_days in {3,5,7,10,14} crossed with {1x, dd_guard} sizing. No refitting; calibrated scores untouched. Exploratory only.",
+  "family": "R1-A holding horizon matrix on frozen calibrated predictions",
+  "predictions": "artifacts/research/opencode_v02_reproduce_v30/isotonic_4/predictions.npz",
+  "decisions": "data/processed/swing_regime_research_v4/decisions.parquet",
+  "candles": "data/processed/swing_regime_research_v4/candles.parquet",
+  "dataset_config": "data/processed/swing_regime_research_v4/config.json",
+  "parent_plan": "configs/swing_v15_continuous_folds.json",
+  "base_holding_days": [3, 7],
+  "holdings": [3, 5, 7, 10, 14],
+  "sizings": ["1x", "dd_guard"],
+  "methods": {
+    "reselection": {
+      "holdings": [3, 7],
+      "description": "Replicate swing_signals loop EXACTLY (same monthly cap + cooldown policy) but call choose() with modified cfg where ONLY holding_days=[h]. Frozen prediction columns sliced to the matching holding subset (base grid alternates 3d/7d per candidate index: even=3d, odd=7d). Entry offsets, brackets, and policy thresholds identical to base. Causal past-only."
+    },
+    "execution_override": {
+      "holdings": [5, 10, 14],
+      "description": "Frozen calibrated predictions cover ONLY 3d/7d candidates, so re-selection for novel horizons would require new inference (forbidden: never refit). Instead keep the frozen base-grid selection (control signals) and override holding_bars=h*288 at execution with a matching per-branch max_holding_bars cap. Selection is untouched; only the time-exit horizon varies. Causal past-only; truncated end-of-data windows are rejected by the engine and counted."
+    }
+  },
+  "control": "base holding grid [3,7] @1x; must match published isotonic_4 exposure1.0 normal (+122.80% total_return, -20.09% max_drawdown, 65 trades) or STOP",
+  "dd_trigger": 0.1,
+  "dd_guard_lev": 0.5,
+  "dd_guard_reference": "YOUR control-branch (control_1x) sampled equity (trade exit_time/equity_after), past-only 1-microsecond cutoff, 100.0 seed level; each branch applies the guard state at its OWN signal times",
+  "lev_min": 0.25,
+  "lev_max": 1.0,
+  "fee_stress_rate": 0.00055,
+  "stress": {
+    "entry_penetration_bps": 5,
+    "target_penetration_bps": 5,
+    "market_exit_slippage_bps": 5,
+    "market_exit_fee_rate": 0.00055,
+    "allow_limit_price_improvement": false
+  },
+  "gate": {
+    "monthly_min": 0.05,
+    "dd_max": 0.2,
+    "fills_min": 30
+  }
+}

@@ -1,0 +1,37 @@
+{
+  "experiment": "opencode-v31-1maudit",
+  "family": "R7-N1m neutral: audit stop-first + touch-khong-xuyen bang nen 1m (Nautilus idea)",
+  "hypothesis": "Gia dinh stop-first cua engine ohlc-v2 (va fill limit theo OHLC) chua tung duoc do. Neu 1m cho thay TP cham truoc stop nhieu, hoac entry chi touch-khong-xuyen nhieu, thi PnL 5m dang lac quan.",
+  "base": {
+    "signals": "artifacts/research/opencode_v15_mapensemble/majority_1x/signals.parquet",
+    "trades_normal": "artifacts/research/opencode_v15_mapensemble/majority_1x/normal_trades.csv",
+    "candles_5m": "data/processed/swing_regime_research_v4/candles.parquet",
+    "branch": "majority_1x",
+    "scenario": "normal",
+    "n_trades": 63
+  },
+  "klines_1m": {
+    "source": "Binance USD-M public klines (fapi, khong key)",
+    "symbol": "BTCUSDT",
+    "interval": "1m",
+    "day_coverage": "holding-covered: moi ngay UTC co it nhat 1 trade dang mo (entry_date..exit_date), tiet kiem hon full 2023-2026",
+    "outdir_pattern": "data/raw/opencode_1m_audit_YYYYMMDD"
+  },
+  "definitions": {
+    "a_touch_no_cross_entry_bar": "Tren 5 nenen 1m cua bar vao lenh 5m (entry_index): touch = min(low_1m) <= entry_limit (LONG) hoac max(high_1m) >= entry_limit (SHORT), tuc OHLC cho fill. cross = close_5m <= entry_limit (LONG) hoac close_5m >= entry_limit (SHORT), tuc gia dong xuyen qua limit. touch_no_cross = touch AND NOT cross. Ty le = so trade touch_no_cross / so trade co du 1m (dau vao cho prob-fill). Phu: so phut touch / 5.",
+    "b_both_touch_5m": "Bar 5m trong holding (range entry_index..exit_index-1, cung allow_targets nhu engine: suppress TP tren bar entry neu open khong nam trong limit) ma ca stop va TP1 deu fill theo _stop_fill/_take_profit_fill. Giai quyet bang 1m theo thu tu thoi gian: 1m dau tien cham stop vs 1m dau tien cham TP1 trong bar 5m do. stop_first_dung = stop cham truoc hoac cung 1m bar (bao toan, engine dung). tp_first_sai = TP1 cham truoc (engine sai, dang le TP). Ty le tren tong so bar both-touch va tren tong so trade.",
+    "c_pnl_1m_vs_5m": "Giu nguyen entry fill 5m; chi danh gia lai stop/TP1/TP2 trong holding tren nen 1m (stop-first trong cung 1m bar, suppress TP tren bar entry 5m giong engine). Timeout exit giu nguyen tai exit_index/open. Phi 0.0002/fill, funding long 0.0001/8h nhu normal. So sanh tong gross PnL 1m vs 5m (don vi diem equity, von goc 100)."
+  },
+  "costs": {
+    "fee_rate_per_fill": 0.0002,
+    "funding_long_rate": 0.0001,
+    "funding_short_rate": 0.0,
+    "funding_interval_hours": 8
+  },
+  "labels": {
+    "causal": "nen 1m public, chi do qua khu; khong dung tuong lai",
+    "exploratory": true,
+    "independent_test": false,
+    "live_approved": false
+  }
+}

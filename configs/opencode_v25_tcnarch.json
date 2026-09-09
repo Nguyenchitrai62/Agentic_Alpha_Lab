@@ -1,0 +1,29 @@
+{
+  "experiment": "opencode-r5a1-fresh-small-tcn-walkforward",
+  "model_family": "tcn_fusion",
+  "cloud_driver": "train_tcn_validated.py",
+  "parent_plan": "configs/swing_v15_continuous_folds.json",
+  "dataset": "data/processed/swing_regime_research_v4",
+  "cache": "artifacts/features/swing_sequences_v13_20260905",
+  "seeds": [1729, 1730, 1731],
+  "network": {"width": 96, "tcn_width": 32, "dropout": 0.1, "layers": 2, "heads": 4, "dilations": [1, 2, 4, 8]},
+  "training": {"epochs": 24, "batch_size": 32, "accumulation_steps": 2, "learning_rate": 0.0003, "weight_decay": 0.01, "gradient_clip": 1.0, "amp": true, "window_days": 730, "embargo_days": 8, "minimum_train_decisions": 200},
+  "epoch_selection": {"window_days": 730, "validation_days": 180, "embargo_days": 8, "minimum_train": 200, "minimum_validation": 100, "minimum_improvement": 0.0001, "patience": 4},
+  "loss": "macro_micro_value.objective (khong doi: payoff MSE + 0.1 fill BCE + 0.1 aux) de co lap hieu ung kien truc",
+  "ensemble_branches": [{"name": "mean", "penalty": 0.0}, {"name": "mean_minus_std", "penalty": 1.0}],
+  "exposures": [1.0, 0.5],
+  "hypothesis": "TCN v19 (24.1M params, 512-wide/6-layer) overfit tren ~2-3k train rows/fold. TCN-fresh NHO (451k params, 96-wide/2-layer, 5 encoder doc lap, receptive field 61 nen/frame, early stopping tren nested validation 180d past-only) giu lai diem manh cua ho TCN (train song song tren T4, gradient on dinh nho residual+LayerNorm, receptive field kiem soat duoc) trong khi giam ~53x capacity. Loss, folds, embargo, seeds giu nguyen de day la ablation kien truc thuan tuy.",
+  "rationale_vi": {
+    "chon_TCN_thay_vi_GRU_nho": "GRU-48 (40k params) tuy nhe nhung train tuan tu tren 128 buoc x 5 frames cham hon tren T4, tron frame som qua shared patch projection, va dong doi residual-GRU truoc day van overconfident (phai them isotonic map). TCN-fresh giu 5 encoder doc lap theo timeframe truoc khi fusion, phu hop gia thiet da che do theo khung thoi gian cua book nay; ban nho + early stopping truc tiep chua overfit thay vi doi ho model.",
+    "gi_quarterly_thay_vi_monthly": "Nhiem vu yeu cau monthly folds, nhung monthly ~33 folds x 3 seeds = 99 jobs gap 3 lan quarterly (11 folds x 3 seeds = 33 jobs), vo budget <8 GPU-gio va quota khan (~21h snapshot). Giu quarterly walk-forward cua B1 (cung trailing 730d, embargo 8d, seeds co dinh) de bao toan ky luat nhan qua trong khi van chay vua budget.",
+    "causal": "Train chi tren rows co label_end < fold_start - 8d; validation nested past-only; refit reset seed; khong chon seed/fold/threshold theo PnL; labels exploratory."
+  },
+  "measured_parameters": 451267,
+  "receptive_field_per_frame_candles": 61,
+  "selection": "Tat ca 3 seeds x 11 folds, toi da 24 epochs chon som (patience 4, cai thien toi thieu 1e-4). Khong chon seed/fold/threshold theo portfolio. So sanh constant-validation chi de chan doan. Tat ca ngay da mo la development, khong phai independent test.",
+  "target": "Calendar-geometric net >=5%/thang va global drawdown <=20% sau phi/funding; bao cao normal + fee_stress (0.00055) + execution_stress; bao cao gross, fees, funding, net, drawdown, trade count, coverage. Khong live approval.",
+  "compute": "Chi train nang tren Kaggle PRIVATE T4x2 (2 workers doc lap, khong DDP), toi da 8 GPU-gio; bootstrap guard 11400s wall (~6.3 GPU-gio) la tran cung. Local GTX1650 chi inference/replay/backtest. Khong fallback tra phi. Bat ky parity failure nao cung chan evaluation, khong chan preservation.",
+  "smoke": "Local CPU nhe: 1 fold (fold_0) x 1 seed (1729) x 2 epochs, batch 64, cung arch/embargo/window de chung minh pipeline (load, fold split, forward, 1 optimizer step, predict, choose+frequency loop, run_backtest/run_stress). Ket qua smoke KHONG phai ket qua nghien cuu.",
+  "owner_slug_suggestion": {"owner": "<kaggle-username-cua-worker>", "slug": "opencode-tracka1-tcn-v25"},
+  "live_approved": false
+}

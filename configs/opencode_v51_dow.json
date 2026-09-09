@@ -1,0 +1,52 @@
+{
+  "experiment": "opencode-v51-dow",
+  "family": "R15-B-dow breakthrough: UTC day-of-week filter on frozen v15 majority base (cheap, untried)",
+  "hypothesis": "Crypto trades 24/7 so weekend behavior may differ from weekdays. DOW (function of signal_time UTC only, known at decision time, causal) may separate return regimes without refit. Untried per ledger round15 B-dow. Round14 lesson honored: pre-checked counts BEFORE running (majority n=94: mon-fri 64, sat-sun 30) so weekend branch is NOT pre-starved at signal level; per mission all branches run and report even if fills < 30, no branch dropped.",
+  "base": "artifacts/research/opencode_v15_mapensemble/majority_1x/signals.parquet",
+  "base_provenance": "frozen v15 map-ensemble majority output: 2-of-3 vote with iso4 in majority, geometry is iso4 choose() output on agreement rows (see configs/opencode_v15_mapensemble.json). Never refit. Pre-loop verified: n=94 signals, columns include signal_time + direction; DOW derived from signal_time UTC only.",
+  "dow_distribution_precheck": {
+    "total": 94,
+    "mon_0": 12,
+    "tue_1": 15,
+    "wed_2": 13,
+    "thu_3": 9,
+    "fri_4": 15,
+    "sat_5": 18,
+    "sun_6": 12,
+    "mon_fri_only": 64,
+    "sat_sun_only": 30,
+    "note": "pandas signal_time.utc dayofweek Mon=0..Sun=6; mon_fri = dow<=4, sat_sun = dow>=5"
+  },
+  "candles": "data/processed/swing_regime_research_v4/candles.parquet",
+  "dataset_config": "data/processed/swing_regime_research_v4/config.json",
+  "parent_plan": "configs/swing_v15_continuous_folds.json",
+  "geometry": "control only (frozen entry/stop/TP/holding levels untouched)",
+  "scopes": {
+    "all": null,
+    "mon_fri": {"dayofweek_utc_inclusive": [0, 1, 2, 3, 4]},
+    "sat_sun": {"dayofweek_utc_inclusive": [5, 6]}
+  },
+  "scope_key": "Post-filter on frozen majority signals only (causal/past-only): all keeps everything; mon_fri keeps signal_time UTC dayofweek in {0,1,2,3,4} (Mon-Fri); sat_sun keeps dayofweek in {5,6} (Sat-Sun). DOW is a pure function of signal_time, known at candle-t close; no refit, no future data.",
+  "sizings": ["1x", "dd_guard"],
+  "branches": ["majority_all_1x", "majority_all_dd_guard", "majority_monfri_1x", "majority_monfri_dd_guard", "majority_satsun_1x", "majority_satsun_dd_guard"],
+  "control": "Reproduction gate or STOP: majority_all_1x normal must match B4 majority_1x (+165.18% total_return 1.6517829563633004, -20.09% max_drawdown -0.20086073993367803, 63 trades). Tolerance 1e-6 on return/drawdown, exact on trades.",
+  "control_reference": {"total_return": 1.6517829563633004, "max_drawdown": -0.20086073993367803, "trades": 63},
+  "dd_trigger": 0.1,
+  "dd_guard_lev": 0.5,
+  "dd_guard_reference": "YOUR control-branch run (majority_all_1x in THIS experiment) sampled equity from trade exit_time/equity_after, past-only 1-microsecond cutoff, 100.0 seed level; each dd_guard branch applies the guard state at its OWN scope-filtered signal times. Single shared control reference keeps scopes comparable (same convention as v11/v13/v18/v48). Disclosed per mission.",
+  "lev_min": 0.25,
+  "lev_max": 1.0,
+  "fee_stress_rate": 0.00055,
+  "stress": {
+    "entry_penetration_bps": 5,
+    "target_penetration_bps": 5,
+    "market_exit_slippage_bps": 5,
+    "market_exit_fee_rate": 0.00055,
+    "allow_limit_price_improvement": false
+  },
+  "gate": {
+    "monthly_min": 0.05,
+    "dd_max": 0.2,
+    "fills_min": 30
+  }
+}

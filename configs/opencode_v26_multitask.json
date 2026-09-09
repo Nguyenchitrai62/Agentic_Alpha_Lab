@@ -1,0 +1,168 @@
+{
+ "architecture": {
+  "dropout": 0.1,
+  "heads": {
+   "direction": {
+    "classes": [
+     "SHORT",
+     "WAIT",
+     "LONG"
+    ],
+    "horizon_bars": 48,
+    "in_features": 32,
+    "loss": "cross_entropy",
+    "out_features": 3,
+    "wait_band_bps": 8.0
+   },
+   "excursion": {
+    "horizon_bars": 48,
+    "in_features": 32,
+    "loss": "mse_log1p",
+    "targets": [
+     "up_excursion",
+     "down_excursion"
+    ]
+   },
+   "quantile": {
+    "horizon_bars": 48,
+    "in_features": 32,
+    "loss": "pinball",
+    "quantiles": [
+     0.1,
+     0.5,
+     0.9
+    ]
+   }
+  },
+  "hidden": [
+   64,
+   32
+  ],
+  "in_features": 44,
+  "kind": "MLP multitask nhỏ, CPU-trainable (~5.3k params)",
+  "loss_weights": {
+   "direction_ce": 1.0,
+   "excursion_mse": 0.5,
+   "quantile_pinball": 1.0
+  },
+  "total_loss": "CE + 1.0*mean(pinball P10/P50/P90) + 0.5*mean(MSE log1p up/down)"
+ },
+ "backtest": {
+  "costs": "dataset config (fee 0.0002/fill, long funding 0.0001/8h, short 0)",
+  "dd_guard": {
+   "lev": 0.5,
+   "reference": "own-branch 1x sampled equity, past-only 1-microsecond cutoff, seed 100.0",
+   "trigger": 0.1
+  },
+  "duration": "parent_plan swing_v15_continuous_folds (2023-06-01..2026-03-23)",
+  "engine": "run_backtest, initial equity 100",
+  "execution": "entry_expiry 12 bars, max_holding 2016 bars (7d); 1x lev 1.0/1.0; dd_guard lev 0.25/1.0 (ngưỡng B1)",
+  "frequency": "cooldown 5d, max 4/month (bản sao v20, đóng băng)",
+  "geometry": "mỗi side 1 candidate cố định: offset 0.5 ATR5, stop 2.0xunit, TP1 2.0xunit, TP2 4.0xunit, holding 7d (chân control [2,2,4])",
+  "scenarios": [
+   "normal",
+   "fee_stress fee_rate_per_fill=0.00055",
+   "execution_stress FillStress(5,5,5,0.00055,False)"
+  ]
+ },
+ "branches": [
+  "mt_p10gate_1x",
+  "mt_p10gate_dd_guard",
+  "mt_p50gate_1x",
+  "mt_p50gate_dd_guard"
+ ],
+ "candles": "data/processed/swing_regime_research_v4/candles.parquet",
+ "causality": "features: 40 frozen past-only + 4 calendar-only (không có market future). Labels dùng future (cho phép). Chuẩn hoá mean/std CHỈ fit trên train-window từng fold. Dự báo tháng M chỉ dùng fit_at đầu tháng M.",
+ "cloud": {
+  "dataset": "nguynchtrai/btc-swing-v26-multitask-20260907-data (PRIVATE)",
+  "job": "tối đa 1 kernel PRIVATE T4; CHỈ submit khi không có job RUNNING/QUEUED (tôn trọng A1)",
+  "kernel": "nguynchtrai/btc-swing-v26-multitask-20260907 (PRIVATE)"
+ },
+ "dataset_config": "data/processed/swing_regime_research_v4/config.json",
+ "decisions": "data/processed/swing_regime_research_v4/decisions.parquet",
+ "derived_features_causal_cheap": [
+  {
+   "formula": "số bar 5m tới funding timestamp kế tiếp (lịch UTC 00/08/16, deterministic như lịch — cùng lý luận v22, KHÔNG phải leakage)",
+   "name": "bars_to_funding"
+  },
+  {
+   "name": "sin_utc_hour",
+   "note": "calendar-only; session s0004 đã chứng minh mang book (R1-C)"
+  },
+  {
+   "name": "cos_utc_hour",
+   "note": "calendar-only"
+  },
+  {
+   "name": "is_weekend_utc",
+   "note": "calendar-only (thứ 7/CN UTC)"
+  }
+ ],
+ "examples": "data/processed/swing_regime_research_v4/examples.npz",
+ "experiment": "opencode-v26-multitask",
+ "family": "R5-A2: MLP nhỏ đa đầu ra FRESH trên 40 features (+ 4 đặc trưng lịch rẻ, causal), walk-forward + embargo 8d",
+ "folds": "walk-forward theo tháng: fit_at = mùng 1 mỗi tháng 2023-06..2026-03 (34 folds full); train mask = signal_time >= fit_at-730d AND label_end < fit_at-8d; predict mọi decision có signal_time trong tháng M; tối thiểu 200 mature decisions/fit",
+ "gate": {
+  "drawdown_max": 0.2,
+  "fills_min": 30,
+  "monthly_geometric_net_min": 0.05
+ },
+ "hypothesis": "Một MLP nhỏ học chung 3 nhiệm vụ bổ trợ (hướng + phân vị return + biên độ 2 phía) sẽ cho tín hiệu chọn lọc hơn HGB đơn-nhiệm vụ: head direction cho side, head quantile P10/P90 làm cổng tin cậy (biên xấu nhất vẫn vượt phí), head excursion giám sát TP/SL. Chưa từng thử per ledger (round5 A2).",
+ "labels_exploratory": {
+  "direction": "3-class tại H=48 bars (4h): LONG nếu ret>+8bps, SHORT nếu ret<-8bps, còn lại WAIT (band 8bps > phí round-trip 4bps + buffer, theo training.yaml)",
+  "excursion": "up = max(high[t+1:t+49])/close[t]-1 clip>=0; down = 1-min(low[t+1:t+49])/close[t] clip>=0 (unconditional, quy ước make_examples; Giant sát TP/SL)",
+  "quantile_targets": "return H=48 (giá trị thực, không phân lớp)",
+  "return": "ret = close[t+48]/close[t]-1 (dùng close đã đóng cửa; KHÔNG dùng giá oracle trong features)"
+ },
+ "model": {
+  "batch_size": 512,
+  "dropout": 0.1,
+  "epochs_full": 30,
+  "epochs_smoke": 5,
+  "hidden": [
+   64,
+   32
+  ],
+  "lr": 0.003,
+  "optimizer": "Adam",
+  "patience_full": 5,
+  "patience_smoke": 2,
+  "seeds": [
+   1729
+  ],
+  "threads": 2,
+  "val_fraction": 0.15,
+  "weight_decay": 0.001
+ },
+ "parent_plan": "configs/swing_v15_continuous_folds.json",
+ "policy_branches": {
+  "mt_p10gate": {
+   "note": "cổng chặt: phân vị xấu nhất vẫn vượt phí",
+   "rule": "LONG nếu class==LONG và q10>+8bps và conf>=0.45; SHORT nếu class==SHORT và q90<-8bps và conf>=0.45"
+  },
+  "mt_p50gate": {
+   "note": "cổng lỏng: trung vị vượt phí",
+   "rule": "LONG nếu class==LONG và q50>+8bps và conf>=0.45; SHORT nếu class==SHORT và q50<-8bps và conf>=0.45"
+  }
+ },
+ "rules": [
+  "no live orders",
+  "40 features đóng băng + 4 calendar-only (ghi rõ công thức)",
+  "chuẩn hoá chỉ trên train-window",
+  "ma trận nhánh đóng băng trước khi chạy, báo cáo ALL 4 nhánh x ALL 3 scenarios",
+  "exploratory labels, development interval only",
+  "output dir mới, không ghi đè",
+  "không commit/push, không secret trong bundle"
+ ],
+ "seeds": [
+  1729
+ ],
+ "smoke": {
+  "epochs": 5,
+  "folds": "3 tháng cuối (2025-12, 2026-01, 2026-02), CPU local"
+ },
+ "standing_best_anchor": {
+  "profit": "majority_1x 2.935%/mo (DD breach)",
+  "safe": "confirmed_dd_guard 2.79/2.67/2.06 DD-safe all scenarios"
+ }
+}

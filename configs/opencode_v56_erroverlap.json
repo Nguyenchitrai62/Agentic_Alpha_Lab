@@ -1,0 +1,46 @@
+{
+  "experiment": "opencode-v56-erroverlap",
+  "role": "R-DIAGNOSTIC (R-erroverlap, round18): negative-evidence diagnostic, ensemble hopeless or not",
+  "causality": "read-only analysis, no training/fitting. Labels exploratory. Split variables are past-only (knowable at candle-t close); split thresholds are fixed below or fit on pre-2025 decisions only (no label use). No future info used for pocket identity.",
+  "universe": {
+    "n_decisions": 4076,
+    "partition": "same continuous-fold partition as v34 (configs/swing_v15_continuous_folds.json + label_end < complete_evaluation_until)",
+    "truth": "data/processed/swing_regime_research_v4/examples.npz labels (N,16,3): ch0=realized net %, ch1=realized fill {0,1}, ch2=unused"
+  },
+  "correctness_definition": {
+    "name": "top1_sign",
+    "chosen_from": ["top1_sign", "topdecile_hit"],
+    "rule": "k*(m,i) = argmax_j pred_exp[m,i,j] (numpy argmax, first-max tie-break, applied identically to all families). correct[m,i] = 1 iff realized_net[i, k*(m,i)] > 0 (strict). error[m,i] = 1 - correct[m,i]. Tie at exactly 0 counts as wrong (conservative).",
+    "pred_exp": "ensemble families (v28/v29/v33, disagreement_penalty=0.0 mean combine): cond * sigmoid(fill_logit). v30_iso4: prediction[...,0] * sigmoid(prediction[...,4]).",
+    "filled": "filled[m,i] = 1 iff realized_fill[i, k*(m,i)] == 1 (that model's own top pick actually filled)",
+    "note_v30_fold0": "v30 has 368 all-zero-ch0 rows (fold_0, no calibrated output). Primary metrics apply the identical argmax rule with NO special-casing (argmax ties -> candidate 0). Sensitivity section repeats key metrics on the v30-valid subset (3708 rows)."
+  },
+  "families": {
+    "v28": "artifacts/kaggle/v28_bigmodel_download/bigmodel-training, mean combine (penalty 0.0)",
+    "v29": "artifacts/kaggle/v29_download/tcn-training, mean combine (penalty 0.0)",
+    "v33": "artifacts/kaggle/v33_actionmargin_download/tcn-training, mean combine (penalty 0.0)",
+    "v30": "artifacts/research/opencode_v02_reproduce_v30/isotonic_4/predictions.npz (calibrated)"
+  },
+  "metrics": {
+    "a_pairwise_overlap": "Jaccard(errorA,errorB)=|EA n EB|/|EA u EB| + agreement rate + full 2x2 counts + phi coefficient, full N=4076",
+    "b_conditional": "P(B right | A wrong) vs P(B right) marginal; SE=sqrt(p(1-p)/n_Awrong); z=(p_cond-p_marg)/SE. Reference A is v30 (primary question) + full directed matrix for all ordered pairs.",
+    "c_oracle": "oracle = |union_m correct_m| / N (coverage ceiling for ANY selection ensemble over these 4 families). Also report best-single accuracy and oracle_minus_best.",
+    "d_fills_gated": "pairs recomputed on S_AB={i: filledA & filledB}; oracle fills-gated on S_any={i: OR_m filled_m} as |{i in S_any: OR_m (correct_m & filled_m)}|/|S_any|; per-model P(correct|own filled)"
+  },
+  "pockets_past_only": {
+    "side_v30": "long (k*<8) vs short (k*>=8) from candidate grid col0; grid read from src, no threshold",
+    "session": "UTC hour of signal_time in {0,6,12,18}; 4 groups, no threshold",
+    "vol": "atr4/close ratio; HIGH vs LOW split at median over pre-2025 decisions only (signal_time < 2025-01-01, past-only fit, no labels)",
+    "era": "2023-2024 vs 2025-2026 by signal_time year; no threshold",
+    "agree_all": "all 4 families pick same candidate vs any disagreement (predictions known at t)",
+    "agree_v30_any": "v30 top pick equals at least one of v28/v29/v33 vs equals none",
+    "conf_v30": "v30 top pred_exp HIGH vs LOW split at median over pre-2025 v30-valid decisions only (past-only fit, no labels)"
+  },
+  "pocket_call_criteria": {
+    "note": "descriptive flags only, no fitting, thresholds fixed here before computing",
+    "flag_if": "lift = P(B right | v30 wrong, pocket) - P(B right overall marginal) >= 0.05 AND n(v30wrong AND pocket) >= 100 AND z >= 2.0 AND pocket n >= 200, for any B in {v29, v33, v28}",
+    "verdict_rule": "HOPELESS if no pocket flags AND oracle_minus_best is small (reported, judged against best-single); COMPLEMENTARY if >=1 flagged pocket names model+split+size"
+  },
+  "outputs": "artifacts/research/opencode_v56_erroverlap/: per_model_accuracy.csv, overlap_matrix.csv, conditional_accuracy.csv, oracle.csv, pockets.csv, rank_context.csv, summary.json (with sha256), BAO_CAO.md",
+  "forbidden": ["no training/fitting", "no registry writes", "no commit/push", "no overwrites (fail if out dir exists)", "exploratory labels only"]
+}

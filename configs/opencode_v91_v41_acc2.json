@@ -1,0 +1,348 @@
+{
+  "architecture": {
+    "cross_frame": {
+      "d_model": 192,
+      "d_state": 16,
+      "dropout": 0.1,
+      "kind": "1 x SelectiveSSM1D causal tren chuoi 5 frame vectors (GIU NGUYEN nhu v35/v38/v39/v40, khac TCN/Transformer/MLP/GRU)",
+      "layers": 1
+    },
+    "dropout": 0.1,
+    "excursion": {
+      "horizon_bars": 48,
+      "loss": "mse_log1p",
+      "targets": [
+        "up_MFE",
+        "down_MAE"
+      ]
+    },
+    "frame_encoder": {
+      "conv_k": 4,
+      "d_model": 64,
+      "d_state": 16,
+      "dropout": 0.1,
+      "kind": "shared SelectiveSSM1D x2 lop + depthwise causal conv + SiLU gate (weight-shared tren 5 frames), pool concat(last,mean) -> Linear 128->192 (GIU NGUYEN nhu v35/v38/v39/v40)",
+      "layers": 2
+    },
+    "fusion": "macro/micro/action/score/regime GIU NGUYEN hinh dang v28/v35/v38/v39/v40 (width 192); KHONG doi dims/wiring",
+    "heads_total": 5,
+    "kind": "Selective-SSM (Mamba-style, pure-PyTorch, causal, TAI DUNG VERBATIM tu v35/v38/v39/v40) + multitask heads direction/quantile/excursion + pairwise ranking tren value head TRADEABLE (de-chuan-hoa, KHONG CLIP)",
+    "loss_weights": {
+      "coverage_floor_hinge": 3.0,
+      "direction_ce": 1.0,
+      "excursion_mse_log1p": 0.5,
+      "quantile_pinball": 1.0,
+      "ranking_pairwise_expected": 0.5,
+      "ranking_temperature_percent": 1.0,
+      "ranking_tie_band_percent": 0.25,
+      "value_objective_standardized": 2.0
+    },
+    "params_target": {
+      "band": "0.4-2.0M",
+      "estimate": "~0.6M (DONG KICH THUOC v35/v38/v39/v40; chuan-hoa la phep affine ngoai params, 0 params moi)",
+      "measured_parameters": 600875
+    },
+    "quantile": {
+      "horizon_bars": 48,
+      "loss": "pinball",
+      "quantiles": [
+        0.1,
+        0.5,
+        0.9
+      ]
+    },
+    "ranking": {
+      "applies_to": "value head TRADEABLE: expected_trade = score_z[...,0]*sigma_train + mu_train (percent, cung don vi labels ch0) + WAIT=0 reference. Thu tu GIONG het tren z (affine don dieu) nen rank tren tradeable == rank tren z.",
+      "formula": "pairwise_expected_rank_loss(expected_trade, labels, temperature_percent=1.0, tie_band_percent=0.25) [src/agentic_alpha_lab/models/ranked_loss.py, VERBATIM nhu v29/v38/v40]",
+      "reference": "configs/swing_v29_residual_gru.json: ranking_weight 0.5, temperature 1.0%, tie-band 0.25%",
+      "weight": 0.5
+    },
+    "score_aux": {
+      "loss": "2.0*value_objective_chuan_hoa (payoff MSE tren z + 0.1 fill BCE + 0.1 aux tren z, CHI TIET o value_scale) + 0.5*pairwise ranking (TREN TRADEABLE, don vi percent)",
+      "mapping": "v41 export RAW (KHONG CLIP): ch0 = tradeable/fill (conditional tradeable percent), ch4 = logit(fill); unconditional(policy) = ch0*fill = tradeable (percent, khong bound). Sizing copy RIENG: capped_sizing = clip(tradeable, +-2.0) percent, file rieng, KHONG dung cho selection."
+    },
+    "tie_break": {
+      "eps": 1e-06,
+      "eps_why": "giu nguyen v40: tren noise float32 (~1e-7) nhung duoi tie-band ranking (0.25%) va BAND labels (8bps=0.08%): chi kich hoat khi that su gan-bang. Voi raw sane (khong rail) ties hiem; tie-break chi la safety, khong phai selector chinh (khac v40 95% rail -> tie-break dinh doat noise).",
+      "rule": "deterministic_best_index(expected, fill_logits, candidates): (1) m = max(expected); (2) T = {k: m - expected[k] < 1e-6}; (3) trong T chon fill_logits cao nhat; (4) neu van tie (fill gap < 1e-9) chon holding nho nhat (candidates[k,5] trong {3,7}); (5) neu van tie chon index nho nhat. Ap dung cho moi decision (n,16) doc lap, TREN RAW TRADEABLE (khong capped).",
+      "inputs_causal": "expected + fill logit tai decision T + bang candidates tinh (side/entry/brackets/holding, khong future, khong PnL). Khong fit, khong tune.",
+      "fill_field": "score[...,1] (fill logit, truoc sigmoid); holding_field = candidates[:,5] (3/7 ngay)",
+      "record": "quy tac ghi trong config nay + ham deterministic_best_index() trong scripts/opencode_r30m_v41_model.py (VERBATIM v40); smoke phai chung minh deterministic (2 lan goi giong nhau bit-identical) + dung thu tu (fill-desc, holding-asc)."
+    },
+    "value_scale": {
+      "method": "CHUAN-HOA MUC-TIEU THEO TRAIN-WINDOW (standardize realized-net targets with train-window stats). PICK-ONE justification o diff_vs_v40.change_a.",
+      "per_fold_stats": "mu_train = mean(labels[train][...,0]) flattened (all 16 candidates, unconditional net, percent units, zeros cua unfilled GIU NGUYEN); sigma_train = std(labels[train][...,0], ddof=0); sigma_eff = max(sigma_train, 1e-6). Chi tren train indices (trailing 730d, embargo 8d, past-only); KHONG dung val/test; ghi mu/sigma vao metadata moi fold/seed.",
+      "why_all_candidates_incl_zeros": "MSE hoi quy unconditional (unfilled payoff = 0). Neu chi thong ke tren filled thi mu lech duong lon, WAIT=0 bi day ve -mu/sigma ~ -1 (meo mien abstain). Bao gom zeros giu WAIT=0 gan 0 (mu ~ -0.05 percent toan bo) nen ranking reference khong meo.",
+      "standardize_formula_torch": "z_target = (target - mu)/sigma_eff; payoff = MSE(score_z[...,0], z_target); direction = target[:,:8].mean(-1)-target[:,8:].mean(-1) (percent); direction_z = direction/sigma_eff (khong tru mu, vi direction mean ~0); aux_loss = MSE(aux_z, direction_z); fill BCE giu nguyen (logits, khong scale).",
+      "destandardize_formula": "tradeable = score_z[...,0]*sigma_eff + mu (percent, affine don dieu -> giu nguyen thu tu; ranking tren tradeable == ranking tren z). Export/policy/coverage/ranking deu tren tradeable.",
+      "sigma_floor": 1e-06,
+      "sigma_floor_why": "chi chong chia-0 suy bien; thuc te sigma ~3.0 percent (do lech don vi + outliers) nen floor khong kich hoat; ghi sigma thuc vao metadata de audit.",
+      "expected_sigma": "~3.0 percent (toan bo labels ch0 std 3.04; train-window tuong tu) — bang chung don vi percent va outlier nang, ly do phai chuan-hoa tai goc."
+    }
+  },
+  "backtest_deferred": "Du bao RAW TRADEABLE export tren Kaggle (test + validation, KHONG CLIP); portfolio evaluation (run_backtest/run_stress, normal + fee_stress + execution_stress, gross/fees/funding/net/drawdown/trades/coverage) chay LOCAL sau khi tai checkpoint (audit-series nhu v28c/v35b/v38b/v60b/v77b). Sizing-capped copy chi cho thi nghiem sizing, KHONG cho selection.",
+  "branches_eval": [
+    "rank_en_1x",
+    "rank_en_dd_guard"
+  ],
+  "budget": {
+    "batch_size": 64,
+    "comparison": "v40: 33 jobs x FIXED 16ep x ~0.6M + val-pred export, guard 16200s (~9 GPU-h). v41: IDENTICAL + chuan-hoa affine (0 params, chi them 2 scalars mu/sigma moi fold, forward them 1 phep nhan-cong) + sizing-capped export phu (forward-only, khong dang ke), guard 16200s (~9 GPU-h). Tran 10 GPU-h.",
+    "epochs_fixed": 16,
+    "epochs_max": 16,
+    "guard_wall_seconds": 16200,
+    "gpu_hours_max": 9.5,
+    "seeds_fold_jobs": 33
+  },
+  "cache": "artifacts/features/swing_sequences_v13_20260905",
+  "calibration_pipeline_deferred_local_audit": {
+    "note": "THUC THI O PHASE AUDIT LOCAL SAU TRAIN (khong chay tren cloud, khong tune tren test). Cloud export CA test + validation predictions (RAW TRADEABLE, KHONG CLIP) de calibrate-first THAT SU kha thi + outlier-robust (bai hoc v39 val-outlier blowup + v40 rail). Voi raw sane (khong rail) isotonic bot mong manh; van bat buoc outlier-robust.",
+    "order": "CALIBRATE TRUOC choose: fit isotonic past-only TREN VALIDATION EXPORT voi outlier-robust (winsorize/trim phan vi truoc fit, chi fit tren val) -> ap dung len test -> chon nguong tu phan vi validation -> policy floor + tie-break.",
+    "outlier_robust_note": "v39 val-calibration xau di vi outliers; v40 rail 95% lam calibration vo nghia. Audit v41 PHAI bao cao phan vi val/test RAW tradeable (p50/p90/p95/p99/p999/max) + ty le vuot sizing-cap (|raw|>2.0) + so sanh fit isotonic thuong vs outlier-trim; KHONG sua scale theo test, chi ghi nhan analysis-only.",
+    "steps": [
+      "(1) Thu thap RAW tradeable en_best (max_k, kem tie-break deterministic) tren nested-validation 180d past-only cua moi fold/seed TU VAL-PREDICTIONS EXPORT (val_predictions.npy + indices.npz validation, rows co label_end < fold_start - 8d embargo, fit train/val past-only). KHONG dung test.",
+      "(2) Fit IsotonicRegression (out_of_bounds=clip) TREN VALIDATION ONLY voi outlier-trim (pre-spec o audit, moi seed/fold doc lap, causal, past-only).",
+      "(3) Ap dung isotonic-da-fit len test-fold (predictions.npy RAW) de duoc calibrated score.",
+      "(4) Chon nguong tu PHAN VI VALIDATION (vi du top-decile cut cua calibrated-val), khong dung so tuyet doi.",
+      "(5) Ap policy floor (gate calibrated > margin tu val + fallback top-8/fold-test, tie-break deterministic) truoc replay/portfolio."
+    ]
+  },
+  "causality": {
+    "deriv40": "GIU theo kich ban lag48 cua B1 (source_day+48h). Chua xac minh receipt-time lich su -> disclosure exploratory, khong claim live-fillable.",
+    "embargo_days": 8,
+    "flow40": "GIU. Chi nen dong truoc signal_time (merge_asof backward, stale -> raise).",
+    "funding": "GIU. As-of: chi ky co funding_time < signal_time; fund_7d/30d/slope/z chi tu qua khu, min 90 ky truoc.",
+    "macro": "GIU SPY/DXY (lag T-1 nghiem ngat: macro date < UTC date signal). LOAI GLD/GC-future khoi feature.",
+    "normalization": "mean/std features CHI fit tren train-window tung fold (val/test chi transform, past-only). THEM: mu/sigma cua value-targets CUNG chi fit tren train labels tung fold (past-only, embargo 8d); val/test KHONG tham gia.",
+    "price40": "GIU (frozen, past-only).",
+    "rule": "Train/val chi rows co label_end < fold_start - 8d; FIXED 16 epochs, khong chon epoch/fold/seed/threshold theo PnL; labels exploratory. Tie-break + mu/sigma + sizing-cap la hang so/thong ke train-only, khong fit theo test/PnL.",
+    "tie_break_causality": "Tie-break chi dung expected/fill/holding tai decision T (qua khu + bang tinh), khong future, khong PnL."
+  },
+  "cloud": {
+    "dataset_slug_suggestion": "opencode-trackm-valuescale-v41-data",
+    "jit_guard": "Bootstrap guard 16200s wall; peer-failure -> dung, giu checkpoint.",
+    "kernel_slug_suggestion": "opencode-trackm-valuescale-v41",
+    "mode": "PRIVATE T4x2, 2 workers doc lap (khong DDP)",
+    "note": "FAILOVER account-2 per ledger round34: account-1 quota 31.2/30h exhausted refresh 2026-09-12; FAILOVER AUTHORIZED. Staging artifacts/kaggle/opencode_trackM_v41_acc2 (acc1 intact). Max ONE dataset + ONE kernel on account-2. PRIVATE T4.",
+    "submit_rule": "CHI submit 1 dataset + 1 kernel khi (a) lane free (het RUNNING/QUEUED) VA (b) B-v55c terminal-or-running (COMPLETE/ERROR/CANCELLED). Neu 1 dieu kien thieu -> package-ready + blockers, KHONG submit. Dataset-ready gate: doi dataset READY + gap >=60s truoc kernels push (bai hoc v55 race 3-6s). Kernel re-push only neu ERROR empty-input.",
+    "dataset_ref": "trainguyenchi/opencode-trackm-valuescale-v41-data",
+    "kernel_ref": "trainguyenchi/opencode-trackm-valuescale-v41",
+    "account": "account-2 (failover)"
+  },
+  "cloud_driver": "scripts/opencode_r30m_v41_train.py",
+  "compute": "Chi train nang tren Kaggle PRIVATE T4x2. Local CPU chi smoke/replay/backtest/audit. Khong fallback tra phi. GPU-agnostic guard: GPU la (hoc tu A2 P100 sm_60) -> WARN va tiep tuc CPU, KHONG raise tu huy.",
+  "coverage_floor": {
+    "loss_mechanism": {
+      "formula": "trade = score_z[...,0]*sigma_eff + mu (percent); en_best_trade = max_k trade; mean_pos = mean(relu(en_best_trade)) tren train-batch (causal, train-only); coverage_loss = 3.0 * relu(1 - mean_pos/5e-4)^2 (GIU NGUYEN so v40, nay tren TRADEABLE de-chuan-hoa; hinge la safety net, inactive khi healthy).",
+      "params": {
+        "FLOOR_POS": 0.0005,
+        "LAMBDA_COV": 3.0
+      },
+      "domain": "TRADEABLE percent (de-chuan-hoa tu z; cung mien nhu v40 RAW nhung scale sane)"
+    },
+    "policy_mechanism": {
+      "N_MIN_PER_FOLD_TEST": 8,
+      "fallback": "neu gate cho < 8 tin hieu trong mot fold-test, lay bu top-N_MIN theo en_best_raw_tradeable (KHONG CLIP, tie-break deterministic; pre-spec, giong nhau moi fold/seed, khong tune theo PnL)",
+      "global_floor_math": "8 x 11 fold-tests ~= 88 tin hieu global toi thieu >> fills gate 30",
+      "primary_gate": "en_best_raw_tradeable > 0.0 (zero-margin TREN RAW TRADEABLE percent, KHONG CLIP; nguong calibrated tu phan vi validation o audit local sau); lua chon candidate theo deterministic tie-break tren raw tradeable",
+      "tie_break": "moi decision: best = deterministic_best_index(expected_raw_tradeable_row, fill_logits_row, candidates, eps=1e-6)",
+      "no_clip_note": "KHONG clip tren selection path (giu raw order end-to-end). Sizing cap chi tren file rieng (xem sizing_cap).",
+      "sizing_cap": {
+        "applies_to": "CHI file sizing copy rieng (predictions_sizing_capped.npy + val_predictions_sizing_capped.npy), KHONG dung cho selection/gate/ranking.",
+        "cap_percent": 2.0,
+        "cap_value": 2.0,
+        "formula_numpy": "capped_sizing = np.clip(tradeable, -2.0, +2.0)",
+        "formula_torch": "capped_sizing = torch.clamp(trade, -2.0, +2.0)",
+        "unit_fix_note": "2.0 percent (khong phai 0.02): sua loi don vi 100x cua v40 (labels percent 1.0=1% nhung cap 0.02=0.02%). Ghi nhan analysis-only, khong dung cho selection."
+      }
+    }
+  },
+  "data_frozen": {
+    "calendar_cal4": [
+      "bars_to_funding (lich UTC 00/08/16 deterministic)",
+      "sin_utc_hour",
+      "cos_utc_hour",
+      "is_weekend_utc"
+    ],
+    "deriv_deriv40": "artifacts/features/btc_derivatives_lag48_v1/features.npz:features (20 log-level/change + 20 missing masks, 5628x40, finite 100%)",
+    "flow_flow40": "tinh trong-script bang agentic_alpha_lab.data.flow_features tren candles tai signal_times (40 buy-imbalance/activity/volume x 5 khung, causal, finite 100%)",
+    "funding_fund5": [
+      "fund_rate (ky gan nhat TRUOC signal)",
+      "fund_7d (mean 21 ky truoc)",
+      "fund_30d (mean 90 ky truoc)",
+      "fund_slope_7d",
+      "fund_z30"
+    ],
+    "layout": "[:40] price, [40:80] deriv, [80:120] flow, [120:125] funding, [125:129] macro, [129:133] calendar (DONG BANG nhu v28/v35/v38/v39/v40)",
+    "macro_dropped": [
+      "GLD/GC-future: chi coverage, KHONG lam feature."
+    ],
+    "macro_macro4": [
+      "risk_on SPY>MA50 (T-1)",
+      "spy_gap_ma50",
+      "dxy_z60 (mean/std 60d ket thuc T-1)",
+      "spy_amp20"
+    ],
+    "price_price40": "data/processed/swing_regime_research_v4/examples.npz:features (40, frozen)",
+    "reuse": "Tai su dung VERBATIM builders cua v28 qua wrapper v35 (scripts/opencode_r9m_nextarch_features.py, da audit causal-join OK) qua wrapper scripts/opencode_r30m_v41_features.py + assert shape/layout/finite. Khong viet lai join.",
+    "total_flat": 133
+  },
+  "dataset": "data/processed/swing_regime_research_v4",
+  "decisions": "data/processed/swing_regime_research_v4/decisions.parquet",
+  "deliverables": [
+    "scripts/opencode_r30m_v41_model.py",
+    "scripts/opencode_r30m_v41_features.py",
+    "scripts/opencode_r30m_v41_train.py",
+    "scripts/opencode_r30m_v41_smoke.py",
+    "scripts/opencode_r30m_v41_package.py",
+    "configs/opencode_v91_v41.json (file nay, DONG BANG truoc dong goi)",
+    "artifacts/kaggle/opencode_trackM_v41/ (gitignored staging)",
+    "artifacts/research/opencode_v91_v41/... + summary.json (gitignored)"
+  ],
+  "diagnostic_proposals_applied": [
+    "(v34-1) ranking + fixed-epoch GIU NGUYEN v38/v40 (da sua underfit v28/v35): pairwise ranking loss tren value head TRADEABLE (w=0.5, temp=1.0% nhu v29) + value-objective chuan-hoa w=2.0 + FIXED 16 epochs, bo early-stop.",
+    "(v34-2) coverage floor + calibrate-first THAT: GIU coverage-hinge (3.0/5e-4, nay tren TRADEABLE) + policy floor (top-8 + zero-margin TREN RAW, khong clip) + VAL-PRED EXPORT RAW (ke thua v39/v40) + outlier-robust o audit (bai hoc v39 val-outlier + v40 rail).",
+    "(v40-fail fix) value-scale-at-origin + select-raw-cap-for-size (moi o v41, thay cap-at-policy cua v40): chuan-hoa muc-tieu ve z trong loss (gradient scale-invariant, sua overconfidence explosion train_mean_pos ~1.33 percent + saturation 95% tai rail) + de-chuan-hoa ve tradeable percent cho selection (giu raw order end-to-end, KHONG CLIP) + sizing-cap chi tren file rieng +-2.0 percent (sua loi don vi 100x, recorded, khong dung cho selection) + tie-break giu (safety khi raw sane)."
+  ],
+  "diff_vs_v40": {
+    "change_a_value_scale_at_origin": {
+      "change": "v40: payoff MSE tren RAW percent truc tiep (target std ~3.0 percent, outliers toi +-18 percent) -> raw bung no (train_mean_pos ~1.33, max|raw| ~0.88) + clip post-hoc +-0.02 (sai don vi 100x: 0.02=0.02% vs labels 1.0=1%) gay saturation 95% tai rail -> selection noise. v41: payoff MSE tren Z (z=(target-mu_train)/sigma_train, sigma~3.0, past-only moi fold) + de-chuan-hoa trade=z*sigma+mu cho selection/ranking/coverage/export (affine giu thu tu, KHONG CLIP).",
+      "justification": "(1) Chon CHUAN-HOA MUC-TIEU (khong phai scale-weight theo variance): chuan-hoa sua DONG THOI ca hai goc gay overconfidence — lech don vi 100x (fractional vs percent) va phuong sai outlier nang (std 3.04, p95 5.18, max 18.1 percent) — ngay trong loss (gradient scale-invariant, khong can clip). Scale-weight chi giam do lon gradient khi variance cao nhung de lai raw scale khong rang buoc trong fold (van can clip, khong sua don vi). (2) Z-scores vo don vi trong loss nen MSE khong bi outlier thong tri; de-chuan-hoa tra ve percent tradeable truc tiep (don chu so %, khop scale giao dich thuc) ma khong can clip. (3) Affine nen bao toan thu tu: ranking tren tradeable == ranking tren z, giu diagnostic temp/tie so sanh duoc voi v40. (4) Bao gom zeros (unfilled=0) trong mu/sigma giu WAIT=0 gan 0, khong meo abstain. (5) Mo ra kiem chung that bai ro rang o smoke: raw sane (max|raw| vai percent, khong rail) + ranking giam; neu flat -> STOP.",
+      "why_not_weight_scaling": "value_weight/sigma^2 tuong duong mot chieu (chi scale do lon) nhung pred van phai khop target tho percent (std 3.0) nen raw van lon tuy y trong fold; khong sua don vi, khong cho raw tradeable truc tiep, van phu thuoc clip. Chuan-hoa cho ca hai (don vi + variance) trong mot phep past-only duy nhat, don gian audit (2 scalars/fold trong metadata)."
+    },
+    "change_b_no_clip_selection_plus_sizing_copy": {
+      "change": "v40: capped = clip(raw, +-0.02) TREN selection path (gate + candidate + export) -> 95% tai rail (p50=p90=p95=p99=max=0.02), tie-break dinh doat noise. v41: selection path HOAN TOAN RAW (gate en_best_raw>0 + candidate tie-break tren raw + export predictions.npy RAW, khong clip). Sizing cap chi tren file rieng predictions_sizing_capped.npy = clip(tradeable, +-2.0 percent), recorded, KHONG dung cho selection/gate/ranking.",
+      "justification": "(1) Root-cause v40 (audit v77b): rank giu (+0.052, loss giam 33/33) nhung clip pha chon loc (monthly ~0.02%). Loai clip khoi selection khoi phuc rank->selection coupling. (2) Cap rieng cho sizing giu kha nang thi nghiem quan ly von co bound ( +-2.0 percent ~ scale giao dich thuc, gan policy v30 0.3% + coverage floor) ma khong nhiem vao duong chon loc. (3) Sua don vi: 2.0 percent (khong phai 0.02) vi labels percent; ghi nhan unit-fix, khong tune theo test."
+    },
+    "change_c_kept": {
+      "change": "GIU NGUYEN tu v40: SSM encoder ~0.6M (600875 params) + ranking 0.5 (temp 1.0%/tie 0.25%) + FIXED 16ep + coverage-hinge 3.0/5e-4 (nay tren TRADEABLE) + deterministic tie-break eps=1e-6 (nay tren raw) + VAL-PRED EXPORT (nay RAW) + GPU-agnostic guard + 133F + branches rank_en_1x/rank_en_dd_guard + seeds/folds/opt.",
+      "justification": "(1) Co lap bien duy nhat (value-scale): giu moi thu khac de so sanh cong bang v40 (rank-gradient da dung). (2) Coverage giu lam safety net (inactive khi healthy nhu v40, active khi collapse). (3) Fixed-epoch giu bai hoc early-stop underfit. (4) Val-export giu de audit lam outlier-robust calibrate-first that su."
+    },
+    "giu_nguyen": "SSM encoder ~0.6M (600875 params) + ranking 0.5 + FIXED 16ep + coverage-hinge 3.0/5e-4 + 133F builders + GPU-agnostic guard + branches rank_en_1x/rank_en_dd_guard + seeds/folds/opt + tie-break rule + val-export",
+    "unit_fix_note": "v40 cap 0.02 (fractional 2%) vs labels percent (1.0=1%): lech 100x la mot phan origin bug. v41 khong con cap tren selection (het lech); sizing-cap 2.0 percent sua dung don vi. Bao cao trung thuc de audit sau kiem tra."
+  },
+  "epoch_selection": {
+    "embargo_days": 8,
+    "minimum_train": 200,
+    "minimum_validation": 100,
+    "mode": "FIXED 16 epochs, KHONG early-stop (giu tu v38/v39/v40 theo de xuat diagnostic #1)",
+    "validation_days": 180,
+    "validation_role": "giam sat + EXPORT val-predictions RAW (val_predictions.npy TRADEABLE percent, KHONG CLIP) de fit isotonic outlier-robust calibrate-first o audit local sau (khong chon epoch, khong tune theo PnL)",
+    "window_days": 730
+  },
+  "experiment": "opencode-r30m-valuescale-selective-ssm-v41",
+  "export_spec": {
+    "indices": "seed{seed}/checkpoints/fold_{fold}/indices.npz: {train, validation, test} (past-only, embargo 8d, giong v38/v39/v40) + value_scale.json {mu_train, sigma_train, sigma_eff} (train-only, past-only)",
+    "parity": "save/reload parity tren test-sample (rtol 1e-4/atol 1e-4) + val finite check + tie-break deterministic check + destandardize roundtrip check (trade == z*sigma+mu); replay audit local verify ca hai",
+    "policy_no_clip": "predictions (test + val) la map-v8 RAW TRADEABLE percent: unconditional = tradeable (KHONG CLIP); ch0 = tradeable/fill, ch4 = logit(fill). Thu tu raw end-to-end cho selection.",
+    "prohibited": "KHONG export train predictions; KHONG chon epoch/fold/seed/threshold theo PnL; KHONG fit MU/SIGMA/CAP/eps theo test; KHONG dung sizing-capped cho selection",
+    "sizing_copy_separate": "seed{seed}/temporal_neural/fold_{fold}/predictions_sizing_capped.npy + val_predictions_sizing_capped.npy: clip(tradeable, +-2.0 percent), file RIENG cho thi nghiem sizing, KHONG dung cho gate/candidate/ranking; ghi sha256 + ghi nhan trong metadata",
+    "test_predictions": "seed{seed}/temporal_neural/fold_{fold}/predictions.npy: (n_test,16,6) map-v8 RAW TRADEABLE percent (ch0=trade/fill, ch4=logit fill), finite, sha256 trong metadata",
+    "tie_break_export": "best-candidate moi decision xac dinh bang deterministic_best_index tren RAW-tradeable-row (eps 1e-6, fill-desc, holding-asc); audit co the tai-lap tu predictions + candidates",
+    "val_predictions": "seed{seed}/temporal_neural/fold_{fold}/val_predictions.npy: (n_val,16,6) map-v8 RAW TRADEABLE percent, cung model FIXED-epoch, finite, sha256 trong metadata (ke thua v39/v40, bo clip)"
+  },
+  "family": "R30-M: Selective-SSM value-scale-at-origin (chuan-hoa train-window) + pairwise ranking TREN TRADEABLE + fixed-epoch + coverage-floor TREN TRADEABLE + SELECT-RAW (khong clip) + SIZING-CAP-RIENG +-2.0% + DETERMINISTIC TIE-BREAK + VAL-PRED EXPORT RAW, walk-forward quarterly, Kaggle conditional-submit (7th: sau B-v55c)",
+  "folds": {
+    "embargo_days": 8,
+    "folds_note": "11 quarterly folds (giong v28/v35/v38/v39/v40)",
+    "minimum_train_decisions": 200,
+    "parent": "configs/swing_v15_continuous_folds.json",
+    "trailing_window_days": 730
+  },
+  "funding_source": {
+    "dir": "data/raw/opencode_funding_20260907",
+    "file": "data/raw/opencode_funding_20260907/funding_BTCUSDT.parquet",
+    "note": "ETHUSDT chi du phong, KHONG dung."
+  },
+  "gate": {
+    "drawdown_max": 0.2,
+    "fills_min": 30,
+    "monthly_geometric_net_min": 0.05,
+    "scenarios": [
+      "normal",
+      "fee_stress",
+      "execution_stress"
+    ]
+  },
+  "hypothesis": "v40 giu duoc rank-gradient (loss giam 33/33, rank +0.052) NHUNG clip post-hoc +-0.02 (sai don vi 100x) gay saturation 95% tai rail -> selection noise (monthly ~0.02%), tie-break dinh doat noise, val-outlier pha calibration. v41 sua TAI GOC: chuan-hoa muc-tieu value ve z trong loss (gradient scale-invariant, het bung no) + de-chuan-hoa ve tradeable percent cho selection (raw sane vai percent, giu order end-to-end, KHONG CLIP) + sizing-cap chi tren file rieng +-2.0 percent (sua don vi, recorded). Ky vong: rank DICH (smoke phai chung minh giam, neu flat thi STOP); max|raw_tradeable| sane (vai percent, KHONG rail, KHONG collapse 0); fills qua gate 30; monthly so voi standing_best SAU audit local (khong claim truoc).",
+  "labels_exploratory": {
+    "direction": "3-class tai H=48 bars (4h): LONG neu ret>+8bps, SHORT neu ret<-8bps, con lai WAIT (fractional, cho CE head)",
+    "excursion": "up = max(high[t+1:t+49])/close[t]-1 clip>=0; down = 1-min(low[t+1:t+49])/close[t] clip>=0",
+    "quantile_targets": "return H=48 thuc (khong phan lop, fractional)",
+    "return": "ret = close[t+48]/close[t]-1 (close da dong cua, fractional)",
+    "value_labels": "examples.npz labels (n,16,3) giong A1/B1/v28/v35/v38/v39/v40 (ch0 unconditional net PERCENT 1.0=1%, ch1 fill, ch2 positive-net); v41 chuan-hoa ch0 ve z trong loss (mu/sigma train-only past-only), de-chuan-hoa ve percent cho policy",
+    "value_units": "PERCENT (net*100, 1.0 = 1%); minh chung: fast_outcome net*100 + policy minimum_expected_net_percent 0.3 (=0.3%) + labels p95 5.18/max 18.1 percent. V40 cap 0.02 la 0.02% (sai 100x) — v41 bo cap selection, sizing-cap 2.0 percent sua dung."
+  },
+  "live_approved": false,
+  "macro_source": {
+    "dir": "data/raw/opencode_macro_yahoo_20220101_20260907",
+    "note": "Yahoo Finance Chart API v8 (free, no key); Stooq bi chan tren host.",
+    "symbols_used": {
+      "dxy": "DX-Y.NYB (dxy_z60)",
+      "spy": "SPY (risk_on/gap/amp20)"
+    }
+  },
+  "model_family": "valuescale_selective_ssm_v41",
+  "params_target": {
+    "band": "0.4-2.0M",
+    "estimate": "~0.6M (DONG KICH THUOC v35/v38/v39/v40; chuan-hoa 0 params)",
+    "measured_parameters": 600875
+  },
+  "owner_slug_suggestion": {
+    "owner": "trainguyenchi",
+    "slug": "opencode-trackm-valuescale-v41"
+  },
+  "queue": {
+    "position": "7th (sau B-v55c 6th: A2-fix > v55 > v39 > v55b > M-v40 > B-v55c > M-v41)",
+    "max_submissions": 1
+  },
+  "seeds": [
+    1729,
+    1730,
+    1731
+  ],
+  "selection": "FIXED 16 epochs, tat ca 3 seeds x 11 folds. Khong chon seed/fold/epoch/threshold theo portfolio. Tat ca ngay da mo la development, khong phai independent test.",
+  "smoke": "Local CPU nhe: coverage audit 5 nguon + build flat (5628,133) + 1 fold (fold_0) x 1 seed (1729) x 3 epochs batch 32 (forward/backward ranking+coverage finite TREN Z/TRADEABLE, RANKING-DECREASING proof (rank_last < rank_first — neu flat thi STOP, khong package), RAW-SCALE-SANE proof (max|raw_tradeable| vai percent: 0.05 < max < 15.0 + range > 0.01 + std > 1e-3 + ty le |raw|>2.0 < 80% (khong rail) — neu rail/collapse thi STOP), DESTANDARDIZE roundtrip, TIE-BREAK deterministic proof, VAL-EXPORT RAW proof, save/reload parity, predict RAW tradeable + sizing-capped-rieng, policy-floor unit-test tren raw). Ket qua smoke KHONG phai ket qua nghien cuu.",
+  "standing_best_anchor": {
+    "confirmed_dd_guard": "2.79/2.67/2.06 DD-safe all scenarios (so sanh sau full train + audit local)",
+    "majority_1x": "2.935%/mo (DD breach)",
+    "v40_capatpolicy": "monthly ~0.02% (rank +0.052 nhung clip saturation 95% -> selection noise; DEAD standalone; bai hoc cap-at-policy REJECTED)"
+  },
+  "tie_break": {
+    "eps": 1e-06,
+    "rule": "gap<1e-6 -> fill-score-descending, roi holding-ascending (3 truoc 7), roi index nho nhat (TREN RAW TRADEABLE)"
+  },
+  "training": {
+    "accumulation_steps": 2,
+    "amp": true,
+    "batch_size": 64,
+    "coverage_floor_pos": 0.0005,
+    "coverage_lambda": 3.0,
+    "direction_weight": 1.0,
+    "epochs": 16,
+    "excursion_weight": 0.5,
+    "gradient_clip": 1.0,
+    "learning_rate": 0.0003,
+    "quantile_weight": 1.0,
+    "ranking_temperature_percent": 1.0,
+    "ranking_tie_band_percent": 0.25,
+    "ranking_weight": 0.5,
+    "sizing_cap_percent": 2.0,
+    "tie_break_eps": 1e-06,
+    "value_scale_method": "standardize_train_window",
+    "value_scale_sigma_floor": 1e-06,
+    "value_weight": 2.0,
+    "weight_decay": 0.01
+  },
+  "failover_record": {
+    "from": "account-1 (nguynchtrai) quota-exhausted 31.2/30h refresh 2026-09-12",
+    "to": "account-2 (trainguyenchi) via KAGGLE_API_TOKEN_2",
+    "reason": "ledger round34 M-v41submit kernel push REJECTED quota; FAILOVER AUTHORIZED by user rule",
+    "scope": "exactly this authorized v41 submit only; no other account-2 spend",
+    "staging_acc2": "artifacts/kaggle/opencode_trackM_v41_acc2",
+    "staging_acc1_kept_intact": "artifacts/kaggle/opencode_trackM_v41",
+    "re_slug": "not-reuse acc1 slugs; new refs trainguyenchi/opencode-trackm-valuescale-v41-data + trainguyenchi/opencode-trackm-valuescale-v41",
+    "privacy": "PRIVATE dataset + PRIVATE T4 kernel",
+    "config_hash_src": "4a617d2543a3051973221ed053f69ef63ae258e90fa6b91788d4db2369bb4dc9"
+  }
+}

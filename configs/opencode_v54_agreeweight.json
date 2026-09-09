@@ -1,0 +1,79 @@
+{
+  "experiment": "opencode-v54-agreeweight",
+  "family": "R17-E-agreeweight: agreement-weighted sizing on frozen U1 (votes set SIZE, nothing is dropped)",
+  "hypothesis": "Round16 UNION filtering is DEAD because it REMOVES trades (v52: monthly 2.935->2.724, extra trades net negative). Different hypothesis: keep every U1 signal, let votes set SIZE — 2 votes 1.0x, 1 vote 0.5x. Single-vote trades risk less capital instead of disappearing; agreement scales exposure without changing coverage/fills ex ante.",
+  "sources": {
+    "majority": "artifacts/research/opencode_v15_mapensemble/majority_1x/signals.parquet",
+    "confirmed": "artifacts/research/opencode_v15_mapensemble/confirmed_1x/signals.parquet"
+  },
+  "source_n_signals": {
+    "majority": 94,
+    "confirmed": 94
+  },
+  "union_rule": {
+    "key": ["bar_index", "direction"],
+    "dedup": "one row per (bar_index, direction); union U1 = majority UNION confirmed",
+    "conflict_priority": "majority > confirmed (keep majority row on conflict)",
+    "geometry": "each union member keeps its own frozen geometry; no refit, no recompute",
+    "hygiene": "drop redundant 'action'/'leverage' columns from sources if present; sort union by signal_time; reset index",
+    "note": "overlap recomputed by the driver itself (do not trust memory); ex ante U1_size = n_maj + n_con - intersection"
+  },
+  "vote_rule": {
+    "both": "key in BOTH sets -> leverage 1.0",
+    "single": "key in exactly one set -> leverage 0.5",
+    "frozen": true,
+    "causal": "set membership is known at signal time (both source frames are frozen pre-experiment); no future information"
+  },
+  "branches": [
+    "majority_control_1x",
+    "U1_1x",
+    "U1_agreeweight",
+    "U1_agreeweight_dd_guard"
+  ],
+  "sizings": ["1x", "agreeweight", "agreeweight_dd_guard"],
+  "sizing": {
+    "1x": "fixed 1.0 (ExecutionConfig 1.0/1.0, no per-signal leverage column)",
+    "agreeweight": "per-signal leverage from vote_rule (1.0 both / 0.5 single), ExecutionConfig floor 0.25 / max 1.0 so 0.5 passes through engine clamp min(max(requested, 0.25), 1.0)",
+    "agreeweight_dd_guard": "per-signal leverage = vote_weight * guard_level; guard_level = 0.5 when majority_control_1x equity of THIS experiment is >10% under trailing peak (past-only, 1-microsecond cutoff, 100.0 seed), else 1.0; applied at each signal's own signal_time. Realized levels: both+noguard 1.0, both+guard 0.5, single+noguard 0.5, single+guard 0.25. ExecutionConfig floor 0.25 / max 1.0 lets all four levels pass."
+  },
+  "dd_guard_reference": "Fresh majority_control_1x run of THIS experiment (exit_time/equity_after), past-only 1-microsecond cutoff, 100.0 seed level. Same formula as scripts/opencode_r1a_holding_probe.py. Guard NEVER removes trades, only scales the vote weight.",
+  "dd_trigger": 0.1,
+  "dd_guard_lev": 0.5,
+  "lev_min": 0.25,
+  "lev_max": 1.0,
+  "execution": {
+    "control_1x": "ExecutionConfig(leverage=1.0, max_leverage=1.0)",
+    "sized": "ExecutionConfig(leverage=0.25, max_leverage=1.0)"
+  },
+  "control_U1": "U1_1x normal must match published v52 U1_1x (total_return 1.4742586857377251, max_drawdown -0.21751346157692608, 66 trades; tol 1e-6) or STOP",
+  "control_U1_reference": {
+    "total_return": 1.4742586857377251,
+    "max_drawdown": -0.21751346157692608,
+    "trades": 66
+  },
+  "control_majority_check": "majority_control_1x normal CHECKED (non-fatal) vs published majority_1x (total_return 1.6517829563633004, max_drawdown -0.20086073993367803, 63 trades)",
+  "control_majority_reference": {
+    "total_return": 1.6517829563633004,
+    "max_drawdown": -0.20086073993367803,
+    "trades": 63
+  },
+  "candles": "data/processed/swing_regime_research_v4/candles.parquet",
+  "dataset_config": "data/processed/swing_regime_research_v4/config.json",
+  "parent_plan": "configs/swing_v15_continuous_folds.json",
+  "fee_stress_rate": 0.00055,
+  "stress": {
+    "entry_penetration_bps": 5,
+    "target_penetration_bps": 5,
+    "market_exit_slippage_bps": 5,
+    "market_exit_fee_rate": 0.00055,
+    "allow_limit_price_improvement": false
+  },
+  "matrix": "4 branches fixed BEFORE running: {majority_control_1x (1x control + guard reference), U1_1x (1x control), U1_agreeweight (vote sizing), U1_agreeweight_dd_guard (vote x guard)} x 3 scenarios {normal, fee_stress, execution_stress}",
+  "scenarios": ["normal", "fee_stress", "execution_stress"],
+  "gate": {
+    "monthly_min": 0.05,
+    "dd_max": 0.2,
+    "fills_min": 30
+  },
+  "exploratory_note": "Khoang 2023-2026 da mo (den complete_evaluation_until), KHONG phai kiem dinh doc lap. Chi backtest local, khong dat lenh live. Set ops + per-signal sizing tren tin hieu dong bang (past-only, khong refit). Drawdown lay mau theo gia dong nen trade. Exit stop/timeout dang market-like theo fee kich ban. Khong suy doan fill maker/hang doi tu OHLC."
+}

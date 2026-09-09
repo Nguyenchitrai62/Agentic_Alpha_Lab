@@ -1,0 +1,98 @@
+{
+  "tool": "opencode_promote",
+  "version": "1.0.0",
+  "purpose": "Thin one-command promotion runner for a frozen branch: gatecheck (gate + concentration + robustness) -> forward-protocol verdict (refuse if no new data) -> paper checklist status (reuse existing rehearsal summaries only if the same signals were rehearsed, else MISSING) -> single PROMOTE/HOLD/REJECT with reasons file. Analysis/code ONLY; no backtests, no training, no fitting, no live orders.",
+  "reuse": {
+    "method": "importlib import of scripts/opencode_gatecheck.py (as GC) and scripts/opencode_forward_test.py (as FT); all gate / concentration / robustness / forward / paper / decide logic is CALLED, never copied",
+    "gatecheck_module": "scripts/opencode_gatecheck.py",
+    "forward_module": "scripts/opencode_forward_test.py",
+    "no_copied_logic": true,
+    "wrapper_owns_only": "CLI + paper rehearsal auto-lookup by signal match + orchestration + reasons-file assembly"
+  },
+  "gatecheck_config": "configs/opencode_gatecheck.json",
+  "forward_protocol": "configs/opencode_forward_protocol.json",
+  "thresholds_mirror": {
+    "note": "MIRRORS ONLY. Authoritative values live in configs/opencode_gatecheck.json and configs/opencode_forward_protocol.json; this block is a pre-specified frozen copy so the promotion run is auditable without re-reading both files. If any value here disagrees with its source, the SOURCE wins and this config must be fixed.",
+    "gate": {
+      "monthly_min": 0.05,
+      "dd_max": 0.2,
+      "fills_min": 30,
+      "mirror_of": "opencode_gatecheck.json:gate + opencode_forward_protocol.json:research_gate"
+    },
+    "concentration": {
+      "top1_month_share_gt": 0.35,
+      "top3_months_share_gt": 0.6,
+      "top5_trades_warn_gt": 0.5,
+      "top5_trades_severe_gt": 0.7,
+      "mirror_of": "opencode_gatecheck.json:concentration_rule+trade_concentration_notes + opencode_forward_protocol.json:concentration"
+    },
+    "forward_window": {
+      "min_forward_months": 6,
+      "degradation_ratio_min": 0.5,
+      "mirror_of": "opencode_forward_protocol.json:forward_window+degradation_vs_backtest"
+    },
+    "robustness_margins": {
+      "max_exec_drop_pp": 0.01,
+      "max_fee_drag_pp": 0.005,
+      "min_dd_margin_pp": 0.0,
+      "mirror_of": "opencode_forward_protocol.json:robustness_margins (hard margins; gatecheck warns are advisory only)"
+    },
+    "paper_checks": [
+      "halt_demonstrated",
+      "trip_under_blocks",
+      "one_sided_verified",
+      "same_book_identity",
+      "kill_params_prespecified",
+      "resume_parity"
+    ],
+    "paper_mirror_of": "opencode_forward_protocol.json:paper_ops (all six must be PASS for green)"
+  },
+  "paper_matching": {
+    "method": "A rehearsal summary is reused for a candidate ONLY if one of its signal-identity fields suffix-matches the candidate --signals path (POSIX suffix, backslash-normalized). Checked fields in order: halt_trip_params.divergence_baseline_signals, config_snapshot.data.signals_replay_only, signal_set_identity.baseline_signals_path. Explicit --paper-summary files are always evaluated but their match/mismatch is recorded; auto-lookup (no --paper-summary) reuses ONLY matches, else paper_paths=[] and paper_source=MISSING.",
+    "fields": [
+      "halt_trip_params.divergence_baseline_signals",
+      "config_snapshot.data.signals_replay_only",
+      "signal_set_identity.baseline_signals_path"
+    ],
+    "rehearsal_index": {
+      "majority_1x": [
+        "artifacts/research/opencode_paper_v21/paper_v21_intents_x3_summary.json",
+        "artifacts/research/opencode_paper_v21/paper_v21_intents_drill_x3_summary.json"
+      ]
+    },
+    "known_missing": {
+      "dd_guard_tp075": "No rehearsal ever replayed the L3 s0004-pool signals; auto-lookup must yield MISSING (paper NOT_GREEN) until a dedicated rehearsal is run."
+    }
+  },
+  "decision_rule": {
+    "PROMOTE": "forward_status READY AND forward research-gate PASS on all forward scenarios AND concentration diffuse AND robustness margins PASS AND forward months >= 6 AND degradation ratio >= 0.50 AND paper_overall green (all six). Forward BLOCKED can NEVER promote (caps at HOLD).",
+    "REJECT": "forward READY with fills-fail in any scenario OR concentration FAIL OR total_net <= 0; or forward BLOCKED with in-sample REJECT-class (same REJECT conditions on the reference window).",
+    "HOLD": "Everything else (typically monthly-fail and/or dd-breach with fills intact and concentration diffuse, and/or FORWARD_BLOCKED, and/or paper-not-green).",
+    "mirror_of": "opencode_forward_protocol.json:promotion_rule (which itself mirrors opencode_gatecheck.json:decision_rule plus forward+paper proof)"
+  },
+  "exit_codes": {
+    "0": "Successful analysis; verdict (PROMOTE/HOLD/REJECT) lives in the payload and stdout, not in the exit code.",
+    "2": "Tool/input/refusal error (missing file, bad branch, forward on opened dates, overlapping forward trades, --out already exists so no overwrite). No verdict file is written on refusal."
+  },
+  "validation": {
+    "a_majority_1x": {
+      "branch": "majority_1x",
+      "expect": "HOLD with monthly-fail + dd-breach + FORWARD_BLOCKED reasons, never PROMOTE"
+    },
+    "b_dd_guard_tp075": {
+      "branch": "dd_guard_tp075",
+      "expect": "HOLD with monthly-fail + FORWARD_BLOCKED + paper MISSING reasons, never PROMOTE"
+    },
+    "c_synthetic_pass": {
+      "branch": "synthetic green branch per tests/test_forward_test.py run_case(fwd=True)",
+      "expect": "PROMOTE possible (forward READY + green paper); proves the machine CAN promote, it is the candidates that fail, not the wiring"
+    }
+  },
+  "warnings": [
+    "EXPLORATORY until a forward window exists; in-sample verdicts are reference only, never promotion claims.",
+    "Drawdown is trade-candle-close sampled, not true mark-price or full intrabar drawdown.",
+    "Stop/timeout exits are market-like at the scenario fee, NOT guaranteed maker/limit fills.",
+    "Do not claim maker fill probability or queue position from OHLC alone.",
+    "Capital is compounded from current equity, initial capital indexed to 100; fixed 1x is the baseline, confidence leverage capped at 2x until validated."
+  ]
+}

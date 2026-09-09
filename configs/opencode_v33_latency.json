@@ -1,0 +1,35 @@
+{
+  "experiment": "opencode-v33-latency",
+  "family": "R8-N neutral: entry-delay t+2 stress tren tin hieu frozen majority_1x (Nautilus latency-model idea)",
+  "hypothesis": "Neu edge cua majority_1x chi la microstructure noise o bar t+1 thi tre entry them 1 bar 5 phut (t+2) se lam loi nhuan boc hoi. Nguoc lai neu song sot tot thi edge khong phu thuoc toc do fill o mili-giay dau tien.",
+  "bases": {
+    "majority_1x": "artifacts/research/opencode_v15_mapensemble/majority_1x/signals.parquet",
+    "confirmed_1x": "artifacts/research/opencode_v15_mapensemble/confirmed_1x/signals.parquet"
+  },
+  "candles": "data/processed/swing_regime_research_v4/candles.parquet",
+  "dataset_config": "data/processed/swing_regime_research_v4/config.json",
+  "parent_plan": "configs/swing_v15_continuous_folds.json",
+  "entry_delay": [1, 2],
+  "branches": ["majority_d1", "majority_d2", "confirmed_d2"],
+  "branch_specs": {
+    "majority_d1": {"base": "majority_1x", "entry_delay": 1},
+    "majority_d2": {"base": "majority_1x", "entry_delay": 2},
+    "confirmed_d2": {"base": "confirmed_1x", "entry_delay": 2}
+  },
+  "scenarios": ["normal", "fee_stress", "execution_stress"],
+  "fee_stress_rate": 0.00055,
+  "stress": {
+    "entry_penetration_bps": 5,
+    "target_penetration_bps": 5,
+    "market_exit_slippage_bps": 5,
+    "market_exit_fee_rate": 0.00055,
+    "allow_limit_price_improvement": false
+  },
+  "control": "majority_d1 (entry_delay=1 tren majority_1x) normal phai khop published majority_1x (+165.17829563633% total_return 1.6517829563633004, -20.09% max_drawdown -0.20086073993367803, 63 trades) trong 1e-9 hoac STOP",
+  "control_reference": {"total_return": 1.6517829563633004, "max_drawdown": -0.20086073993367803, "trades": 63},
+  "entry_window": "Control (delay=1): first_entry_bar = signal_index + 1, last_entry_bar = min(signal_index + entry_expiry_bars, len-1) — verbatim engine ohlc-v2. Delay (delay=2): first_entry_bar = signal_index + 2, last_entry_bar = min(signal_index + entry_expiry_bars + 1, len-1) — giu nguyen do dai expiry (12 bars), holding_bars tinh tu entry thuc te nhu engine. Cach chon: sao chep vong entry cua engine voi first_entry_bar tham so hoa (KHONG tien xu ly bar_index+1 de giu Trade.signal_index trung voi frozen signals va de control delay=1 bit-identical voi engine). Stress runner ap dung dich chuyen tuong tu: range(index+delay, min(index+delay+expiry, len)).",
+  "monthly_formula": "ratio=final_equity/100; duration_years=(complete_evaluation_until - folds[0][0])/(365.2425*86400) theo parent_plan (giong v15/v30); monthly_geometric_net=ratio^(1/(12*duration_years))-1; annual=ratio^(1/duration_years)-1.",
+  "engine_note": "Toan bo backtest con lai (stop/timeout market-like o scenario fee, TP1 50% + TP2, funding long 0.0001/8h short 0, stop-first intrabar, TP suppression tren intrabar entry candle, drawdown trade-candle-close sampled, compounding tu equity hien tai, overlap next_available_index, holding validation) GIU NGUYEN nhu engine ohlc-v2 run_backtest / execution_stress run_stress. Chi cua so entry-search dich 1 bar.",
+  "gate": {"monthly_min": 0.05, "dd_max": 0.2, "fills_min": 30},
+  "verdict_note": "Day la thang latency-sensitivity (do do sut khi tre 1 bar), KHONG phai gate loi nhuan. Khong claim maker fill probability/queue tu OHLC; delay la gia dinh stress chu quan."
+}

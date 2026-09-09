@@ -1,0 +1,73 @@
+{
+  "mode": "SIMULATED/PAPER - no live orders. This config must never contain secrets.",
+  "exploratory": true,
+  "allow_live_orders": false,
+  "data": {
+    "candles": "data/processed/swing_regime_research_v4/candles.parquet",
+    "signals_replay_only": "artifacts/research/opencode_v02_reproduce_v30/isotonic_4/signals.parquet",
+    "note": "v2.1 CROSS-BOOK DRILL (exploratory, NOT an operating config): replays the real frozen v02/isotonic_4 book while the divergence baseline still tracks the real frozen majority_1x book - a simulated stale-baseline ops incident on 100% real artifacts. Expects: OVER-excursions logged info-only (never latch) + one genuine UNDER trip that blocks later real signals. Track C window bars 177690-443000."
+  },
+  "guard": {
+    "name": "dd_guard",
+    "dd_trigger": 0.1,
+    "guard_leverage": 0.5,
+    "full_leverage": 1.0,
+    "max_leverage": 1.0,
+    "reference": "scripts/opencode_risk_overlay_probe.py:47-61 (lev = 0.5 while past-only realized equity is >10% under its trailing peak, else 1.0). State updated on closed bars only, strictly before the signal bar's close."
+  },
+  "costs": {
+    "fee_rate_per_fill": 0.0002,
+    "funding_long_rate": 0.0001,
+    "funding_short_rate": 0.0,
+    "funding_interval_hours": 8
+  },
+  "policy_geometry": {
+    "entry_expiry_bars": 12,
+    "max_holding_bars": 2016,
+    "tp1_fraction_reference": 0.5,
+    "paper_exit_note": "Paper account takes the FULL position off at TP2 (no TP1 0.5 split) - a documented SIMPLIFICATION vs engine ohlc-v2. Do not compare paper equity 1:1 with backtest equity.",
+    "intrabar_policy": "stop_first",
+    "min_confidence": 0.25
+  },
+  "account": {
+    "initial_equity_indexed": 100.0
+  },
+  "kill_switch": {
+    "daily_loss_halt_pct": 0.03,
+    "max_positions": 1,
+    "note": "PRE-SPECIFIED kill-switch alternate X=3% (of {3%, 2%}) inside the drill."
+  },
+  "divergence": {
+    "baseline": "artifacts/research/opencode_v15_mapensemble/majority_1x/normal_trades.csv",
+    "baseline_signals": "artifacts/research/opencode_v15_mapensemble/majority_1x/signals.parquet",
+    "tolerance_pct": 0.05,
+    "definition": "PRE-SPECIFIED one-sided trip (v2.1 fix): Y=5% on UNDERperformance only vs the (here deliberately stale) majority_1x frozen path. Trip latches with direction=UNDER; OVER is info-only.",
+    "initial_equity": 100.0,
+    "latch": true,
+    "one_sided": "UNDER_ONLY",
+    "crossbook_drill": {
+      "declared": true,
+      "reason": "stale-baseline ops drill: replay real v02/isotonic_4 signals while the monitor baseline still tracks the real majority_1x book; proves the one-sided trip fires UNDER and blocks later real signals on non-synthetic replay data",
+      "expected_effect": "DIVERGENCE_OVER_INFO logged (never latched) + one DIVERGENCE_TRIP direction=UNDER blocking later real signals"
+    }
+  },
+  "state": {
+    "persist_path": "artifacts/research/opencode_paper_v21/guard_halt_state_drill_x3.json",
+    "alert_log": "artifacts/research/opencode_paper_v21/alerts_drill_x3.jsonl",
+    "persist_every_n_bars": 1,
+    "resume": false,
+    "note": "Drill state snapshot rewritten every bar."
+  },
+  "live_feed": {
+    "enabled": false,
+    "wiring": "FUTURE wiring point (no live path in this module). The interlock REFUSES enabled=true here.",
+    "refused_flags": ["--live", "--live-feed", "--enable-orders", "--resume-live", "--send-orders"]
+  },
+  "demo": {
+    "bars": 265311,
+    "start_bar": 177690,
+    "end_bar": 443000,
+    "window": "trackC_replay_illustration",
+    "note": "Stale-baseline drill over the Track C window (halt alternate X=3%)."
+  }
+}

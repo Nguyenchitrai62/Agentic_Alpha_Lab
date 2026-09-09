@@ -1,0 +1,121 @@
+{
+  "experiment": "opencode-v147-harness-regime-maelabels",
+  "family": "A2-ARCH audit harness prep: ONE harness for TWO round56 models (M-regime + B-maelabels), pre-spec BEFORE cloud outputs land; smoke-plumbing only",
+  "round": "round56",
+  "ledger_ref": "configs/opencode_hypothesis_ledger.json round56: M-regime-submit (regime-specialized quiet-market model) + B-mae-hold (MAE-aware labels + retrain package); both SSM ~0.6M walk-forward quarterly like v35/v41",
+  "harness_driver": "scripts/opencode_r56a_harness.py",
+  "mirror_pattern": "scripts/opencode_r48a_studentharness.py (R-harness pattern worked for student: detect_source full-vs-smoke + replay + policy parity + branches x scenarios + lens + gate + summary)",
+  "models": {
+    "regime": {
+      "owner": "M-regime-submit",
+      "expected_role": "regime-specialized quiet-market model (teacher loses in QUIET markets per v103; opt_B_UPWEIGHT guidance family)",
+      "expected_outputs": {
+        "note": "Train script STILL BUILDING at pre-spec time (2026-09-09); format pre-spec'd on v35/v41 output conventions. Auditor MUST read the model's actual train script export_spec at audit time and record which branch below was taken.",
+        "primary": "seed{1729,1730,1731}/temporal_neural/fold_{0..10}/predictions.npy: (n_test,16,6) map-v8 RAW TRADEABLE percent, finite (ch0=tradeable/fill conditional, ch4=logit fill; unconditional/policy = ch0*sigmoid(ch4))",
+        "val": "seed{seed}/temporal_neural/fold_{fold}/val_predictions.npy: (n_val,16,6) same FIXED-epoch model, finite",
+        "ranklist_note": "Regime model MAY additionally export a ranklist-ish file (e.g. ranklist.npy (n,16) per-decision candidate scores/orders, or regime_probs.npy (n,n_regimes) / regime_gate.json). If present it is RECORDED but selection stays on unconditional exp (regime is applied in-model); ranklist is a diagnostic lens input, NOT a second gate, unless the train script's export_spec says otherwise (then record deviation).",
+        "checkpoints": "seed{seed}/checkpoints/fold_{fold}/: model.safetensors + indices.npz{train,validation,test} + value_scale.json{mu_train,sigma_train} (if value-scale-at-origin kept) + metadata.json{state complete, gpu_reload_parity, prediction_sha256, val_prediction_sha256, weights_sha256, parameters ~0.6M in [400000,2000000], epoch_mode FIXED 16, model_family regime_*} + replay.npz",
+        "fold_geometry": "11 quarterly folds (configs/swing_v15_continuous_folds.json), trailing 730d train past-only (label_end < fold_start - 8d embargo), decision universe 4076 rows expected; VERIFY actual count at audit time (do NOT hard-fail on 4076 if train script re-partitions: record + adapt)"
+      }
+    },
+    "maelabels": {
+      "owner": "B-mae-hold",
+      "expected_role": "MAE-aware labels + retrain (MAE proven discriminative winners 1.64 vs losers 4.06 per v72; MAE-stop DEAD per v74 so labels-only, NOT stop)",
+      "expected_outputs": {
+        "note": "Train script STILL BUILDING at pre-spec time; same v35/v41 conventions. Auditor MUST read actual export_spec at audit time and record branch taken.",
+        "primary": "seed{1729,1730,1731}/temporal_neural/fold_{0..10}/predictions.npy: (n_test,16,6) map-v8 RAW TRADEABLE percent, finite (same channel semantics as regime/v41)",
+        "val": "seed{seed}/temporal_neural/fold_{fold}/val_predictions.npy: (n_val,16,6) same FIXED-epoch model, finite",
+        "checkpoints": "seed{seed}/checkpoints/fold_{fold}/: model.safetensors + indices.npz{train,validation,test} + value_scale.json (if kept) + metadata.json{state complete, parity, sha256s, params ~0.6M in band, FIXED 16, model_family maelabels_*} + replay.npz",
+        "fold_geometry": "same 11 quarterly folds; VERIFY count at audit time, record + adapt on deviation"
+      }
+    }
+  },
+  "export_fallback_reader": {
+    "note": "Harness reads each train script's ACTUAL export at audit time. Order of attempts (first hit wins, recorded in audit.json read_branch):",
+    "branches": [
+      "A-standard-v41: predictions.npy (n,16,6) + val_predictions.npy (n,16,6) -> exp=raw[...,0]*sigmoid(raw[...,4]), fill_logits=raw[...,4]",
+      "B-ranklist-alt: predictions_ranklist.npy (n,16) scores + predictions.npy (n,16,6) for gate/fill -> exp=ranklist (affine-invariant rank), fill from map-v8 ch4; RECORD deviation",
+      "C-logits-alt: predictions_logits.npy (n,16) student-style free units (no ch4) -> exp=logits, fill_logits=zeros (tie-break falls back holding-asc/index-min); RECORD deviation, bias lens units differ",
+      "D-regime-sidecar: regime_probs.npy (n,R)/regime_gate.json present -> diagnostic lens ONLY, never a second gate (unless export_spec mandates; then RECORD + require leader re-spec)"
+    ],
+    "rule": "NEVER silently coerce: every fallback taken is written to audit.json {file, shape, branch, assumption}. Unknown shapes RAISE with the file/shape listed (auditor extends reader, no guessing)."
+  },
+  "assumptions_recorded": [
+    "A1: both models keep v35/v41 frame (SSM ~0.6M, 133 flat features, (16,6) candidate grid side/entry/brackets/holding, FIXED 16 epochs, 3 seeds x 11 folds). Any deviation -> record, adapt counts, keep policy identical.",
+    "A2: selection is on UNCONDITIONAL exp (ch0*fill, percent) with zero-margin gate; sizing-cap files (if any) are NEVER used for selection/gate/ranking.",
+    "A3: smoke dry-run stand-in = artifacts/research/opencode_v91_v41/smoke/seed1729/fold_0/{predictions_sample,val_predictions_sample}.npy (64,16,6) = test[:64]/validation[:64] per scripts/opencode_r30m_v41_smoke.py:229,285. VERIFIED present 2026-09-09. Smoke rows stand in for BOTH models' plumbing (same reader, tagged per model).",
+    "A4: monthly formula + costs + engine identical to v91b/v41valfit (ohlc-v2, expiry 12, cap 2016, fee 0.0002, funding long 0.0001/8h).",
+    "A5: smoke-plumbing numbers are PLUMBING-ONLY: no research conclusions, no standing_best comparison, no per-model quality claims."
+  ],
+  "smoke_standin_verified": {
+    "dir": "artifacts/research/opencode_v91_v41/smoke/seed1729/fold_0/",
+    "files": ["model.safetensors", "indices.npz{train(1492,),validation(660,),test(368,)}", "predictions_sample.npy (64,16,6) float32 = test[:64]", "val_predictions_sample.npy (64,16,6) = validation[:64]", "predictions_sizing_capped_sample.npy (64,16,6)", "value_scale.json", "smoke_summary.json"],
+    "presence": "VERIFIED present (dir listing + probed shapes 2026-09-09)",
+    "role": "STAND-IN for BOTH regime and maelabels cloud outputs to prove ONE harness runs end-to-end per model. Smoke-harness numbers are PLUMBING-ONLY, NOT research; NO conclusions about either model; NO standing_best comparison on smoke"
+  },
+  "replay_method": {
+    "export_integrity": "sha256 + shape + finite checks per predictions/val file; record read_branch per fallback table",
+    "weight_reload": "Full audit: reload model.safetensors per fold, verify candidates grid + feature mean/scale == flat[train] stats (rtol 1e-5/atol 1e-6), params in [400000,2000000], predict vs exported np.allclose rtol=1e-4 atol=1e-4, record max_error; FAIL on mismatch. Smoke-plumbing: STUB (recorded; files are 64-row samples, weight reload deferred to COMPLETE). Import path resolved at audit time from the model's actual train script.",
+    "policy_parity": "Signals recomputed twice from verified arrays must be bit-identical (same ordered trading instructions); record pass/fail"
+  },
+  "policy_branches_per_model": {
+    "branch_names": ["{model}-1x", "{model}-dd_guard"],
+    "identity_policy": "VERBATIM v91b: exp_mat (n,16) unconditional percent; en_best=max_k; per fold-test gate en_best > 0.0; if gate hits < 8, top-up to min(8,len) by en_best desc stable-sort; candidate = deterministic_best_index(exp_row, fill_row, candidates, eps=1e-6) (fill-desc, holding-asc {3,7}, index-min); geometry = prices(close,atr5,atr4,grid[k],cfg); frequency = monthly cap + cooldown from dataset cfg policy; NO sizing-cap on selection path; NO calibration overlay in identity branches",
+    "dd_guard": "Conditional on {model}-1x signals>0: own-book 1x equity, trigger 10% (level/peak<0.9 -> 0.5 else 1.0), past-only 1-microsecond cutoff, seed equity 100.0; execution leverage=0.5/max=1.0; else SKIP + record reason",
+    "later_overlays_not_in_this_harness": ["calibrate-first isotonic on VAL export (outlier-robust, past-only)", "percentile gate from validation distribution", "coverage-floor variants"]
+  },
+  "combine": "Full audit: ensemble = mean across 3 seeds of stacked (3,n,16,6) via combine() (agentic_alpha_lab.models.ensemble_value) else np.mean fallback (recorded); require all 3 seeds present. Smoke-plumbing: single sample array, labelled as such (no mean).",
+  "scenarios": ["normal", "fee_stress", "execution_stress"],
+  "scenario_specs": {
+    "normal": "fee_rate_per_fill=0.0002 (dataset costs) + funding long 0.0001/8h short 0",
+    "fee_stress": "fee_rate_per_fill=0.00055",
+    "execution_stress": "FillStress(5,5,5,0.00055,False) + fee base 0.0002 (market_exit_fee 0.00055)"
+  },
+  "execution": {
+    "entry_expiry_bars": 12,
+    "holding_cap_bars": 2016,
+    "engine": "ohlc-v2: limit entry from next candle, expiry 12 bars, stop-first intrabar, TP suppression on intrabar entry candle, stop/timeout market-like at scenario fee, funding long 0.0001/8h short 0, compounding from current equity, capital indexed 100, drawdown trade-candle-close sampled (not true mark/intrabar)",
+    "monthly_formula": "ratio=final_equity/100; duration_years=(complete_evaluation_until - folds[0][0])/(365.2425*86400); monthly_geometric_net=ratio^(1/(12*duration_years))-1"
+  },
+  "diagnostic_lens_stubs": {
+    "score_distribution": "qstats(en_best): mean/std/min/p10/p50/p90/p95/p99/max + gate pass rate at 0.0",
+    "rank": "rank_corr_per_decision(exp_mat, hard labels ch0 percent) mean/std over valid decisions",
+    "coverage": "n_signals/n_decisions + by_month + active_months + gate_hits/fallback_adds per fold",
+    "topdecile": "TOPK=min(408,N): pred exp mean vs obs net mean (bias=pred-obs, same percent units for map-v8 models; RECORD only for logits-alt branch C)",
+    "selection": "directions/candidates/holdings counts; first/last signal",
+    "regime_sidecar": "IF regime_probs exported: distribution + gate-agreement diagnostics (stub; full spec at audit time)"
+  },
+  "gate": {"monthly_geometric_net_min": 0.05, "drawdown_max": 0.2, "fills_min": 30},
+  "standing_best_anchor": {
+    "majority_1x": "2.935%/mo (DD breach) — profit anchor",
+    "confirmed_dd_guard": "2.79/2.67/2.06 DD-safe all scenarios — safe anchor",
+    "rule": "Compare ONLY after full 33-fold audit per model (replay PASS + portfolio 2 branches x 3 scenarios + lens). NEVER on smoke-plumbing."
+  },
+  "audit_checklist_on_complete_per_model": [
+    "1. VERIFY presence: 33x model.safetensors + 33x predictions.npy + 33x val_predictions.npy + 33x indices.npz + value_scale/metadata; STOP + list missing if any (no re-download by auditor)",
+    "2. READ actual train script export_spec; record read_branch per fallback table (A/B/C/D); VERIFY identities: dataset/cache manifest sha256; plan family + FIXED 16 epochs; model params ~0.6M in band",
+    "3. REPLAY numeric per fold (rtol/atol 1e-4) reloaded-model vs exported predictions on ALL test rows + val finite check; record max_error; FAIL on mismatch",
+    "4. REPLAY policy parity: signals from reloaded predictions == signals from exported predictions (exact ordered instructions); plus determinism double-compute check",
+    "5. PORTFOLIO {model}-1x: 3 scenarios (normal/fee_stress/execution_stress), report gross/fees/funding/net/drawdown/trades/coverage + monthly geometric",
+    "6. PORTFOLIO {model}-dd_guard conditional (own-book trigger 10%, 0.5/1.0) x 3 scenarios",
+    "7. LENS: score distribution + rank vs hard ch0 + coverage + topdecile + selection mix (+ regime sidecar if exported)",
+    "8. GATE verdict per branch x scenario (monthly>=5%, DD<20%, fills>=30) + comparison vs standing_best anchors (majority_1x / confirmed_dd_guard)",
+    "9. Write NEW-ONLY audit dir artifacts/research/opencode_v147_harness/<run>/{model}/ + summary.json; no overwrites; no registry/CONTINUOUS_RESEARCH/NEXT_AGENT/rounds writes; exploratory labels; no live approval"
+  ],
+  "outputs": {
+    "dir": "artifacts/research/opencode_v147_harness/<run>/ (this pre-spec run: smoke_plumbing/)",
+    "files": ["config.json (copy of this pre-spec)", "{regime,maelabels}/audit.json", "{regime,maelabels}/{model}-1x/{signals.parquet,normal_metrics.json,fee_stress_metrics.json,execution_stress_metrics.json,diagnostics.json}", "{regime,maelabels}/{model}-dd_guard/{... or SKIPPED.json}", "summary.json (plumbing verdict + checklist status for BOTH models)"]
+  },
+  "rules": [
+    "harness + smoke-plumbing only (no conclusions about either model from smoke)",
+    "no live orders",
+    "NEVER touch research/parallel/registry.json, CONTINUOUS_RESEARCH.md, NEXT_AGENT.md, research/parallel/rounds/*, ../Kronos, C:/Users/trait/.codex/worktrees/*",
+    "no register/assign/rotate; no commit/push; no overwrites (output dir must not exist)",
+    "causal past-only; exploratory labels; opened development interval, NOT independent test",
+    "no heavy LOCAL training (inference plumbing only)",
+    "PowerShell `; if ($?) {}`"
+  ],
+  "independent_test": false,
+  "exploratory": true,
+  "live_approved": false
+}

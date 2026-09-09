@@ -1,0 +1,293 @@
+{
+ "architecture": {
+  "cross_frame": {
+   "d_model": 192,
+   "d_state": 16,
+   "dropout": 0.1,
+   "kind": "1 x SelectiveSSM1D causal tren chuoi 5 frame vectors (GIU NGUYEN dims/wiring nhu v35/v38)",
+   "layers": 1
+  },
+  "dropout": 0.1,
+  "encoder_reuse": "SelectiveSSM1D import VERBATIM tu scripts/opencode_r9m_nextarch_model.py; frame_in/frame_ssm/frame_pool/cross_ssm/frame_features/macro/micro/gate/action GIU NGUYEN hinh dang v35 (doi ten class RankOnlySSM, khong doi dims). So sanh cong bang: cung encoder/opt/data nhu v38, chi khac objective.",
+  "frame_encoder": {
+   "conv_k": 4,
+   "d_model": 64,
+   "d_state": 16,
+   "dropout": 0.1,
+   "kind": "shared SelectiveSSM1D x2 lop + depthwise causal conv + SiLU gate (weight-shared tren 5 frames), pool concat(last,mean) -> Linear 128->192 (GIU NGUYEN nhu v35)",
+   "layers": 2
+  },
+  "heads_removed": [
+   "value-objective (macro_micro_value.objective)",
+   "direction CE (3-class)",
+   "quantile pinball P10/P50/P90",
+   "excursion MSE-log1p MFE/MAE",
+   "regime",
+   "fill/BCE bat ky dang nao",
+   "coverage-hinge (BO: ranking-ALONE, coverage qua relative gate)"
+  ],
+  "heads_total": 1,
+  "kind": "Selective-SSM (Mamba-style, pure-PyTorch, causal) + MOT rank scorer per-candidate (n,16) logits. KHONG value/quantile/dir/excursion heads.",
+  "params_target": {
+   "band": "<=1M (small encoder)",
+   "estimate": "~0.6M",
+   "measured_parameters": 597409
+  },
+  "rank_head": {
+   "kind": "Linear(4*192->192) + GELU + Dropout(0.1) + Linear(192->1), ap dung per-candidate tren concat(ma,mi,ac,(ma+mi)*ac) (fusion GIU NGUYEN hinh dang v35)",
+   "output": "(n,16) rank logits, ordinal (KHONG don vi %, KHONG phai expected net)",
+   "scale_cap_note": "v55b: raw logits qua tanh CAP=3.0 truoc moi downstream; params khong doi (597409)"
+  },
+  "scale_cap": {
+   "mode": "tanh (elementwise, monotone)",
+   "cap_logit": 3.0,
+   "formula_torch": "capped = CAP * torch.tanh(raw / CAP)",
+   "formula_numpy": "capped = CAP * np.tanh(raw / CAP)",
+   "applies_to": "rank logits (n,16) TRUOC ListNet loss, TRUOC threshold-fit, TRUOC gate/policy, TRUOC export; loss/gate/export TAT CA tren capped",
+   "order_preservation": "tanh don dieu elementwise -> thu tu 16 candidates trong moi decision GIU NGUYEN chinh xac (argmax parity 100%); chi margin scale bi nen",
+   "margin_bound": "|margin_capped| <= 2*CAP = 6.0 voi moi raw huu han (bounded proof o smoke)",
+   "adds_params": 0,
+   "mode_rejected": "clip (vung bang mat gradient + pha ties) - chi tanh duoc phep (tien le v39)"
+  }
+ },
+ "backtest_deferred": "Du bao CAPPED rank logits export tren Kaggle (|logit|<=3.0); threshold gate (validation-percentile tren capped margins, da dong bang tren cloud) + portfolio evaluation (run_backtest/run_stress, normal + fee_stress + execution_stress, gross/fees/funding/net/drawdown/trades/coverage) chay LOCAL sau khi tai checkpoint (audit-series nhu v28c/v35/v38).",
+ "branches_eval": [
+  "rankonly_en_1x",
+  "rankonly_en_dd_guard"
+ ],
+ "budget": {
+  "batch_size": 64,
+  "comparison": "v55: 33 jobs x FIXED 16ep x 597409 params, guard 16200s (~9 GPU-h). v55b: IDENTICAL + cap tanh (0 params, forward-only, khong dang ke), guard 16200s (~9 GPU-h). v55bfix: IDENTICAL v55b (model UNCHANGED) + bundle them 1 file macro_micro_value.py (transitive import fix, 0 params, khong dang ke), guard 16200s. Tran 10 GPU-h.",
+  "epochs_fixed": 16,
+  "epochs_max": 16,
+  "guard_wall_seconds": 16200,
+  "gpu_hours_max": 9.5,
+  "seeds_fold_jobs": 33
+ },
+ "cache": "artifacts/features/swing_sequences_v13_20260905",
+ "calibration_note": "KHONG isotonic (khong absolute score). Nguong la validation-percentile tren CAPPED rank-margin (ordinal), KHONG nguong tuyet doi.",
+ "causality": {
+  "deriv40": "GIU theo kich ban lag48 cua B1 (source_day+48h). Chua xac minh receipt-time lich su -> disclosure exploratory, khong claim live-fillable.",
+  "embargo_days": 8,
+  "flow40": "GIU. Chi nen dong truoc signal_time (merge_asof backward, stale -> raise).",
+  "funding": "GIU. As-of: chi ky co funding_time < signal_time; fund_7d/30d/slope/z chi tu qua khu, min 90 ky truoc.",
+  "macro": "GIU SPY/DXY (lag T-1 nghiem ngat: macro date < UTC date signal). LOAI GLD/GC-future khoi feature.",
+  "normalization": "mean/std CHI fit tren train-window tung fold (val/test chi transform, past-only).",
+  "price40": "GIU (frozen, past-only).",
+  "rule": "Train/val chi rows co label_end < fold_start - 8d; FIXED 16 epochs, khong chon epoch/fold/seed/threshold theo PnL; labels exploratory (chi dung labels[...,0] lam ranking target).",
+  "threshold_causality": "Threshold moi fold/seed fit TREN nested-validation past-only TREN CAPPED margins (rows co label_end < fold_start - 8d), ap dung len test-fold sau. CAP=3.0 la hang so cau hinh, khong fit. Dong bang percentile-70 truoc train; khong sua theo test."
+ },
+ "cloud": {
+  "dataset_slug_suggestion": "opencode-trackb-rankonly-v55bfix-data",
+  "jit_guard": "Bootstrap guard 16200s wall; peer-failure -> dung, giu checkpoint.",
+  "kernel_slug_suggestion": "opencode-trackb-rankonly-v55bfix",
+  "mode": "PRIVATE T4x2, 2 workers doc lap (khong DDP)",
+  "note": "FAILOVER account-2 per ledger round34+round40: account-1 quota exhausted refresh 2026-09-12; FAILOVER AUTHORIZED. Staging artifacts/kaggle/opencode_trackB_v55bfix_acc2 (acc1 staging intact). Max ONE dataset + ONE kernel on account-2. PRIVATE T4.",
+  "submit_rule": "CHI submit 1 dataset + 1 kernel (PRIVATE) khi (a) NO RUNNING/QUEUED tren account-2 VA (b) v41 terminal (COMPLETE, da xac minh) VA (c) dataset READY + gap >=60s truoc kernels push, kem refs day du. Neu 1 dieu kien thieu -> package-ready + blockers, KHONG submit. Max MOT submission lan nay. KHONG submit gi tren account-1.",
+  "dataset_ref": "trainguyenchi/opencode-trackb-rankonly-v55bfix-data",
+  "kernel_ref": "trainguyenchi/opencode-trackb-rankonly-v55bfix",
+  "account": "account-2 (failover)"
+ },
+ "cloud_driver": "scripts/opencode_r21b_v55b_train.py",
+ "compute": "Chi train nang tren Kaggle PRIVATE T4x2. Local CPU chi smoke/replay/backtest/audit. Khong fallback tra phi. GPU-agnostic guard: GPU la (hoc tu A2 P100 sm_60) -> WARN va tiep tuc CPU, KHONG raise tu huy.",
+ "data_frozen": {
+  "calendar_cal4": [
+   "bars_to_funding (lich UTC 00/08/16 deterministic)",
+   "sin_utc_hour",
+   "cos_utc_hour",
+   "is_weekend_utc"
+  ],
+  "deriv_deriv40": "artifacts/features/btc_derivatives_lag48_v1/features.npz:features (20 log-level/change + 20 missing masks, 5628x40, finite 100%)",
+  "flow_flow40": "tinh trong-script bang agentic_alpha_lab.data.flow_features tren candles tai signal_times (40 buy-imbalance/activity/volume x 5 khung, causal, finite 100%)",
+  "funding_fund5": [
+   "fund_rate (ky gan nhat TRUOC signal)",
+   "fund_7d (mean 21 ky truoc)",
+   "fund_30d (mean 90 ky truoc)",
+   "fund_slope_7d",
+   "fund_z30"
+  ],
+  "layout": "[:40] price, [40:80] deriv, [80:120] flow, [120:125] funding, [125:129] macro, [129:133] calendar (DONG BANG nhu v28/v35/v38)",
+  "macro_dropped": [
+   "GLD/GC-future: chi coverage, KHONG lam feature."
+  ],
+  "macro_macro4": [
+   "risk_on SPY>MA50 (T-1)",
+   "spy_gap_ma50",
+   "dxy_z60 (mean/std 60d ket thuc T-1)",
+   "spy_amp20"
+  ],
+  "price_price40": "data/processed/swing_regime_research_v4/examples.npz:features (40, frozen)",
+  "reuse": "Tai su dung VERBATIM builders cua v28 qua wrapper v35 (scripts/opencode_r9m_nextarch_features.py, da audit causal-join OK) qua wrapper scripts/opencode_r17b_rankonly_features.py + assert shape/layout/finite. Khong viet lai join.",
+  "total_flat": 133
+ },
+ "dataset": "data/processed/swing_regime_research_v4",
+ "decisions": "data/processed/swing_regime_research_v4/decisions.parquet",
+ "deliverables": [
+  "scripts/opencode_r21b_v55b_model.py (tai dung VERBATIM, UNCHANGED)",
+  "scripts/opencode_r21b_v55b_features.py (tai dung VERBATIM, UNCHANGED)",
+  "scripts/opencode_r21b_v55b_train.py (tai dung VERBATIM, UNCHANGED)",
+  "scripts/opencode_r21b_v55b_smoke.py (tai dung VERBATIM, UNCHANGED)",
+  "scripts/opencode_r40b_v55bfix_package.py (moi: adapt tu opencode_r21b_v55b_package.py, +1 dong BUNDLE_MEMBERS)",
+  "configs/opencode_v111_v55bfix.json (file nay, DONG BANG truoc dong goi)",
+  "artifacts/kaggle/opencode_trackB_v55b_fix/ (gitignored staging moi, giu staging cu nguyen ven)",
+  "artifacts/research/opencode_v111_v55bfix/... + summary.json (gitignored)"
+ ],
+ "diff_vs_v35": {
+  "encoder": "GIU NGUYEN dims/wiring (~0.6M)",
+  "loss": "v35 value-objective + aux (khong ranking) -> v55 CHI ListNet ranking (bo value + aux)",
+  "policy": "v35 zero-margin + fallback top-8 -> v55 rank-margin gate + else WAIT (khong fallback)"
+ },
+ "diff_vs_v38": {
+  "encoder": "GIU NGUYEN (~0.6M)",
+  "ghi_chu": "Ablation sach: cung encoder/opt/data/folds/seeds/epochs nhu v38, chi doi objective. Neu v55 rank > v38 rank: multitask dilution duoc xac nhan. Neu v55 rank ~ 0: ranking can value-prior (huong v29 residual).",
+  "loss": "v38 2.0*value + 0.5*pairwise-ranking + aux + coverage-hinge -> v55 CHI ListNet softmax-CE (bo value, bo aux, bo coverage-hinge)",
+  "policy": "v38 zero-margin + top-8 + calibrate-first -> v55 rank-margin p70 + WAIT (khong fallback, khong isotonic)"
+ },
+ "epoch_selection": {
+  "embargo_days": 8,
+  "minimum_train": 200,
+  "minimum_validation": 100,
+  "mode": "FIXED 16 epochs, KHONG early-stop (bai hoc v34: v28 dung o epoch 1-3 o 29/33 folds)",
+  "validation_days": 180,
+  "validation_role": "chi (a) giam sat loss + (b) fit rank-margin threshold o percentile-70 TREN CAPPED margins (khong chon epoch, khong tune theo PnL)",
+  "window_days": 730
+ },
+ "experiment": "opencode-r40b-rankonly-scalecap-v55bfix",
+ "family": "R40-B: Selective-SSM rank-only (ListNet) + fixed-epoch + rank-margin gate + LOGIT SCALE-CAP tanh + ALLOWLIST FIX (v55b staging + 1 line: src/agentic_alpha_lab/models/macro_micro_value.py), walk-forward quarterly, Kaggle conditional-submit (round40-fix: sau v41 terminal, dual-account gate)",
+ "folds": {
+  "embargo_days": 8,
+  "folds_note": "11 quarterly folds (giong v28/v35/v38)",
+  "minimum_train_decisions": 200,
+  "parent": "configs/swing_v15_continuous_folds.json",
+  "trailing_window_days": 730
+ },
+ "funding_source": {
+  "dir": "data/raw/opencode_funding_20260907",
+  "file": "data/raw/opencode_funding_20260907/funding_BTCUSDT.parquet",
+  "note": "ETHUSDT chi du phong, KHONG dung."
+ },
+ "gate": {
+  "drawdown_max": 0.2,
+  "fills_min": 30,
+  "monthly_geometric_net_min": 0.05,
+  "scenarios": [
+   "normal",
+   "fee_stress",
+   "execution_stress"
+  ]
+ },
+ "hypothesis": "v38 chet vi overconfidence khong cap (bias +3.81, 95% gate pass, DD breach 6/6); v55 bo value-heads nen khong bias tuyet doi nhung margin-scale van co the peaked (ListNet tau-1% co dinh + fixed 16ep, softmax entropy thap -> margin phong -> test pass-rate lech xa 30% ky vong cua gate p70 duoi shift). v55b = v55 + tanh cap 3.0 tren logits: giu ranking (don dieu), chan bien do train+test theo cau truc, nguong tu capped-val past-only. Ky vong: rank tuong du v55 (ablation sach neu v55 co output), pick-rate test gan 30% hon, monthly so voi standing_best SAU audit local (khong claim truoc).",
+ "labels_exploratory": {
+  "ranking_target": "labels[...,0] (unconditional net, 0 neu khong fill) lam realized utility cho ListNet target softmax",
+  "unused": "direction/quantile/excursion labels KHONG dung (khong co heads). H=48/BAND-8bps KHONG dung o v55.",
+  "value_labels": "examples.npz labels (n,16,3) giong A1/B1/v28/v35/v38 (chi dung ch0)"
+ },
+ "live_approved": false,
+ "macro_source": {
+  "dir": "data/raw/opencode_macro_yahoo_20220101_20260907",
+  "note": "Yahoo Finance Chart API v8 (free, no key); Stooq bi chan tren host.",
+  "symbols_used": {
+   "dxy": "DX-Y.NYB (dxy_z60)",
+   "spy": "SPY (risk_on/gap/amp20)"
+  }
+ },
+ "mapping_rank_to_signal": {
+  "choose_compatibility": "predictions.npy = RAW rank logits (n,16), KHONG phai v8 block (khong co fill channel). Converter chuan: rank_logits_to_signals() trong scripts/opencode_r17b_rankonly_model.py. Audit replay dung converter nay (khong dung choose() tuyet doi).",
+  "fill_disclosure": "Rank-only KHONG du bao fill. Policy gate chi dung rank-margin. Fills do execution engine quyet dinh (limit-entry/fill gia dinh chuan). Khong claim fill probability.",
+  "margin": "margin = top1_logit - second_logit (second = max tren 15 candidate con lai). Don vi logit ordinal.",
+  "rule": "Moi decision: top1 = argmax logits (first-max deterministic). Phat top1 candidate NEU margin > threshold, nguoc lai WAIT.",
+  "threshold": "threshold = percentile-70 cua margins tren nested-validation past-only (moi fold/seed doc lap, luu metadata, ap dung len test). Percentile dong bang truoc train.",
+  "ties": "Tie tuyet doi -> margin 0 -> WAIT tru khi threshold < 0 (ghi nhan deterministic).",
+  "logits": "margins tinh TU CAPPED logits (bounded |margin|<=6.0); threshold = percentile-70 cua CAPPED margins tren nested-validation past-only",
+  "order_note": "cap don dieu nen top1 moi decision giong raw; chi tap hop qua-gate co the doi (capped nen cac margin phong) - do la muc dich fix"
+ },
+ "model_family": "rankonly_ssm_v55b",
+ "objective": {
+  "formula": "loss = mean_decisions[ -sum_{i=1..16} softmax(realized/tau)_i * log_softmax(pred/tau)_i ] (ListNet)",
+  "only_term": "ListNet softmax-CE tren capped logits. KHONG value, KHONG aux, KHONG coverage-hinge (giu nhu v55)",
+  "rationale": "v29 rank (0.074) di KEM ranking loss; moi model rank-less ~0/am. v38 test ranking-inside-multitask; v55 test ranking-ALONE.",
+  "temperature_percent": 1.0,
+  "temperature_units": "labels ch0 don vi % (giong v29/v38); pred logits chia cung tau (scale-invariant cua softmax roto lighter: tau chi anh huong do sac cua target).",
+  "tie_rule": "softmax deterministic; argmax first-max (index nho nhat); margin 0 khi tie -> WAIT (tru threshold < 0).",
+  "logits": "ListNet tren CAPPED logits (cap 3.0, tau co dinh 1.0%); target softmax tu realized/1.0% KHONG DOI"
+ },
+ "owner_slug_suggestion": {
+  "owner": "trainguyenchi",
+  "slug": "opencode-trackb-rankonly-v55bfix"
+ },
+ "seeds": [
+  1729,
+  1730,
+  1731
+ ],
+ "selection": "FIXED 16 epochs, tat ca 3 seeds x 11 folds. Khong chon seed/fold/epoch/threshold theo portfolio. Tat ca ngay da mo la development, khong phai independent test.",
+ "smoke": "Local CPU nhe: coverage audit 5 nguon + build flat (5628,133) + 1 fold (fold_0) x 1 seed (1729) x 2 epochs batch 32 (forward/backward ListNet finite TREN CAPPED, BOUNDED proof max|capped|<=3.0+1e-6, CAP-ACTIVE proof: order-parity raw-vs-capped + peaked-regime demo (raw x10 -> bounded + order giu) + bind-frac, save/reload parity tren capped, predict capped logits, gate unit-test tren capped margins). Ket qua smoke KHONG phai ket qua nghien cuu.",
+ "standing_best_anchor": {
+  "confirmed_dd_guard": "2.79/2.67/2.06 DD-safe all scenarios (so sanh sau full train + audit local)",
+  "majority_1x": "2.935%/mo (DD breach)"
+ },
+ "training": {
+  "epochs": 16,
+  "accumulation_steps": 2,
+  "amp": true,
+  "batch_size": 64,
+  "gate_percentile": 70,
+  "gradient_clip": 1.0,
+  "learning_rate": 0.0003,
+  "ranking_temperature_percent": 1.0,
+  "weight_decay": 0.01,
+  "scale_cap_logit": 3.0
+ },
+ "monitor_plan_audit_local": {
+  "note": "THUC THI O PHASE AUDIT LOCAL SAU TRAIN (khong chay cloud, khong tune, analysis-only). Cap la guardrail phong ngua; monitor xac minh co kich hoat/kha thi.",
+  "metrics": [
+   "(1) test pick-rate moi fold/seed vs 30% ky vong cua gate p70 (co mean +- std, global);",
+   "(2) entropy cua capped-softmax tren validation (phat hien peaked: entropy thap bat thuong);",
+   "(3) phan bo capped margins val-vs-test (shift);",
+   "(4) tan suat cap bind: frac(|raw|>CAP) tren val/test (cap dormant vs active)."
+  ],
+  "flag_bands": "CANH BAO (khong retrain, khong doi nguong): |pick_rate - 0.30| > 0.15 bat ky scenario nao, hoac entropy val < 50% entropy uniform (log16), hoac bind-frac test gap 5x bind-frac val.",
+  "action_on_flag": "GHI NHAN analysis-only trong audit report; KHONG sua threshold/CAP theo test; de xuat the he tiep theo (neu can) qua leader."
+ },
+ "cap_rule": {
+  "choice": "HARD CAP tren |logits|: capped = 3.0 * tanh(raw / 3.0), hang so cau hinh duy nhat, ap dung moi fold/seed giong nhau",
+  "justification": [
+   "(1) Init-scale: std init ~0.02 (do seed 1729, synthetic probe) -> CAP=3.0 ~140 sigma init: provably non-binding luc khoi dau/hoc som, giu nguyen dynamics v55 trong vung kha di; chi bind khi logits phong (peaked regime = failure mode).",
+   "(2) Don dieu elementwise -> ranking intra-decision bao toan chinh xac, ListNet tau=1.0% giu nguyen phia target (khong doi objective nhu adaptive-tau se lam).",
+   "(3) Bound test-time theo cau truc: |margin|<=6.0 du raw lon co nao -> threshold tu capped-val van co y nghia duoi shift (dung lo hong giet v38).",
+   "(4) Tien le v39 (tanh +-5% tren value head): cung ho cap, khac don vi (logit ordinal vs %); 0 params them, gradient-friendly (khong vung bang nhu clip).",
+   "(5) Hang so co dinh, khong fit per-fold -> khong them be mat leakage; nhuong xac minh cho monitor plan (pass-rate vs 30%)."
+  ],
+  "rejected_alternative": "Adaptive tau = max(1.0%, validation-margin-scale): LOAI vi (a) cung tau scale CA target lan pred trong ListNet v55 -> lam phang phan bo target, doi objective hoc (khong con la v55 + 1 change sach); (b) khong bound test-time margins (threshold van gap raw scale -> giu nguyen lo hong shift); (c) tham so fit per-fold them be mat leakage/phuc tap vs hang so co dinh.",
+  "disclosure": "CAP=3.0 la guardrail phong ngua pre-spec (chua co trained-logit quan sat: v55 ERROR truoc khi co output); neu audit cho thay cap dormant (|raw|<<3 moi noi) thi ghi nhan dormant + monitor plan la chinh, KHONG refit CAP theo test."
+ },
+ "diff_vs_v55": {
+  "cap": "v55 khong cap (raw logits thang vao loss/gate/export) -> v55b tanh CAP=3.0 truoc loss/gate/export (0 params)",
+  "giu_nguyen": "RankOnlySSM encoder + dims/wiring (~0.6M, 597409 params) + ListNet tau-1.0% + FIXED 16ep + 133F builders + p70 gate + else WAIT + GPU-agnostic guard + branches rankonly_en_1x/rankonly_en_dd_guard + seeds/folds/opt",
+  "loss": "v55 ListNet(raw) -> v55b ListNet(capped); target softmax KHONG DOI",
+  "policy": "v55 gate raw-margin p70 -> v55b gate capped-margin p70 (percentile dong bang, fit past-only nhu cu)"
+ },
+ "queue": {
+  "position": "round41-fix (failover acc2; v41 COMPLETE terminal; acc2 lane FREE; dataset-ready gate binding)",
+  "max_submissions": 1
+ },
+ "fix_vs_v55b_staging": {
+  "base": "artifacts/kaggle/opencode_trackB_v55b/ (giunguyen, khong ghi de)",
+  "change": "+1 bundle member: src/agentic_alpha_lab/models/macro_micro_value.py (transitive import cua scripts/opencode_r9m_nextarch_model.py L19 <- scripts/opencode_r17b_rankonly_model.py L29 <- scripts/opencode_r21b_v55b_model.py L24 <- cloud driver)",
+  "model": "UNCHANGED (encoder/dims/wiring/ListNet tau-1%/FIXED-16ep/p70-gate/tanh-cap-3.0/policy GIU NGUYEN v55b; params 597409)",
+  "config_plan": "configs/opencode_v111_v55bfix.json (metadata slugs/refs/queue/deliverables; model sections identical v66)",
+  "dataset_must_recreate": true,
+  "reason": "bundle zip nam TRONG dataset upload; zip bytes doi -> dataset phai tao moi (slug moi, PRIVATE)"
+ },
+ "failover_record": {
+  "from": "account-1 (nguynchtrai) quota-exhausted refresh 2026-09-12 (round40 kernel push REJECTED quota; round34 precedent)",
+  "to": "account-2 (trainguyenchi) via KAGGLE_API_TOKEN_2",
+  "reason": "ledger round34 M-v41submit + round40 B-v55brebuild: account-1 GPU quota exhausted; FAILOVER AUTHORIZED by user rule",
+  "scope": "exactly this authorized v55bfix submit only; no other account-2 spend; NOTHING on account-1",
+  "staging_acc2": "artifacts/kaggle/opencode_trackB_v55bfix_acc2",
+  "staging_acc1_kept_intact": "artifacts/kaggle/opencode_trackB_v55b_fix",
+  "re_slug": "not-reuse acc1 slugs as-is; new refs trainguyenchi/opencode-trackb-rankonly-v55bfix-data + trainguyenchi/opencode-trackb-rankonly-v55bfix",
+  "privacy": "PRIVATE dataset + PRIVATE T4 kernel",
+  "config_hash_src": "5005a2971d3a96bacc1f84f33a00955bf592955f83d990369037c6af5bf2bf80"
+ }
+}

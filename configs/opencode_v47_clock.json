@@ -1,0 +1,35 @@
+{
+  "experiment": "opencode-v47-clock",
+  "family": "R14-B live-clock fidelity audit: HTF forming-bar leak check on the standing-best feature chain",
+  "hypothesis": "WindowStore.at() + SwingStore.sample() can only ever return fully-closed HTF bars (frames drop incomplete buckets; ends searchsorted side=right on bucket close_time <= signal_time), so backtest features match the live closed-candle loop EXACTLY with no look-ahead. Expect per-timeframe verdict CLEAN x5 and NO code changes.",
+  "inputs": {
+    "candles": "data/processed/swing_regime_research_v4/candles.parquet",
+    "decisions": "data/processed/swing_regime_research_v4/decisions.parquet",
+    "dataset_config": "data/processed/swing_regime_research_v4/config.json",
+    "standing_signals": [
+      "artifacts/research/opencode_v15_mapensemble/majority_1x/signals.parquet",
+      "artifacts/research/opencode_v15_mapensemble/confirmed_1x/signals.parquet"
+    ],
+    "standing_trades": [
+      "artifacts/research/opencode_v15_mapensemble/majority_1x/normal_trades.csv",
+      "artifacts/research/opencode_v15_mapensemble/confirmed_1x/normal_trades.csv"
+    ]
+  },
+  "timeframes": ["5min", "15min", "1h", "4h", "1d"],
+  "checks": {
+    "A_alignment": "every decision signal_time equals candles.close_time[bar_index]; 5m grid contiguous",
+    "B_closed_only": "per TF, last used bar close_time <= signal_time AND staleness = T - close in [0, TF period) for ALL 5628 decisions (vectorized)",
+    "C_bucket_structure": "per TF frame: opens epoch-aligned, contiguous step == TF, close == open + TF - 1ms (all bars); constituent 5m-count == expected on samples",
+    "D_live_rebuild": "truncate base candles to close_time <= T, rebuild SwingStore, sample(T) bit-identical to full-history sample + stored close/atr5/atr4; subset rows [0, 1500, 3000, 4500, last]",
+    "E_boundary_math": "synthetic decisions at real 5m closes on 15m+1h / 4h / 1d boundaries + one non-boundary; print per-TF last-bar open/close/staleness",
+    "F_entry_alignment": "frozen majority_1x + confirmed_1x normal trades: entry_index >= bar_index + 1 for every trade (read-only)"
+  },
+  "pass_criteria": {
+    "CLEAN": "all checks pass for the timeframe; no future information; live rebuild bit-identical",
+    "LEAK": "any check fails; stop, report mechanism + file:line, implement strict fix + test + rerun (step 3 of brief)"
+  },
+  "output": "artifacts/research/opencode_v47_clock",
+  "exploratory": true,
+  "live_approved": false,
+  "notes": "Audit only. No execution-engine, cost, registry, or shared-file changes. New files only; never overwrite existing dirs."
+}

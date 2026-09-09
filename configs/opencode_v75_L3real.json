@@ -1,0 +1,92 @@
+{
+  "experiment": "opencode-v75-L3real",
+  "layer": "L3-BUILDER (RISK REDUCER) FOR REAL on L2 s0004_1x output",
+  "hypothesis": "Proven risk legs (dd_guard, tp075) buy DD-safety on the best-L2 branch s0004_1x (3.22%/mo normal, DD breach) at a measurable monthly cost. Exploratory only.",
+  "lineage": "L1 v72 pool (326 sigs, high-recall union v38+v33+majority) -> L2 v73 s0004_1x (210 signals, 101 normal fills, +190.84%/-22.86%/3.22%/mo normal, DD breach) -> L3 v75 risk stage (this config).",
+  "signals": "artifacts/research/opencode_v73_L2filter/s0004_1x/signals.parquet",
+  "signals_verified": {"n_signals": 210, "expected_about": 210, "status": "EXISTS, count verified 2026-09-08 before pre-spec"},
+  "l2_expected": "artifacts/research/opencode_v73_L2filter/<best-filter>/signals.parquet",
+  "l2_status_at_prespec": "PRESENT: s0004_1x selected as best L2 output (highest normal monthly_geometric_net 3.2178% among non-control 1x branches; DD breach -22.86%, fills 101 pass).",
+  "smoke_base": "artifacts/research/opencode_v59_v38cal/v38-identity/signals.parquet",
+  "candles": "data/processed/swing_regime_research_v4/candles.parquet",
+  "dataset_config": "data/processed/swing_regime_research_v4/config.json",
+  "parent_plan": "configs/swing_v15_continuous_folds.json",
+  "branches": [
+    "control_1x",
+    "dd_guard",
+    "tp075_1x",
+    "dd_guard_tp075"
+  ],
+  "branch_spec": {
+    "control_1x": {"tp1_fraction": 0.5, "sizing": "1x", "stops": "original", "note": "Rerun L2 s0004_1x 1x; must reproduce +190.84%/-22.86%/101 normal or STOP."},
+    "dd_guard": {"tp1_fraction": 0.5, "sizing": "dd_guard", "stops": "original", "guard_ref": "own-book control_1x equity", "formula": "lev 0.5 while own-book 1x reference equity >10% under trailing peak (past-only, 1-microsecond cutoff, 100.0 seed), else 1.0"},
+    "tp075_1x": {"tp1_fraction": 0.75, "sizing": "1x", "stops": "original", "note": "Driver asserts at runtime that execution_stress path honors ExecutionConfig.tp1_fraction AND signal.stop_loss."},
+    "dd_guard_tp075": {"tp1_fraction": 0.75, "sizing": "dd_guard", "stops": "original", "guard_ref": "own-book tp075_1x equity"}
+  },
+  "mae_stop_exclusion": {
+    "excluded": ["mae_stop_1x", "full_dd_tp075_mae"],
+    "reason": "Smoke v74 on v38-identity proved MAE-stop DEAD: control monthly 1.349% -> mae_stop 0.041% (~97% monthly kill); full combo 0.065%. MAE-mean improved only 2.66%->2.10% (p90 5.61->3.10) at that cost. dd_guard_tp075 was the cheapest DD buy among survivors. Per mission, L3-real verdict scope = 4 branches, no mae_stop.",
+    "smoke_evidence": "artifacts/research/opencode_v74_L3risk_smoke/summary.json",
+    "smoke_normal": {
+      "control_1x": {"ret_pct": 57.12, "dd_pct": -29.64, "mo_pct": 1.349, "n": 81},
+      "mae_stop_1x": {"ret_pct": 1.38, "dd_pct": -25.94, "mo_pct": 0.041, "n": 84},
+      "full_dd_tp075_mae": {"ret_pct": 2.22, "dd_pct": -20.61, "mo_pct": 0.065, "n": 84},
+      "dd_guard_tp075": {"ret_pct": 45.13, "dd_pct": -21.46, "mo_pct": 1.111, "n": 81}
+    },
+    "driver_note": "Driver scripts/opencode_r24L3_risk.py executes its frozen matrix verbatim (incl. mae diagnostic branches); verdict table uses ONLY the 4 pre-specified branches above. Mae branches, if executed by driver, are diagnostic-only and excluded from the verdict."
+  },
+  "frozen_constants": {
+    "dd_trigger": 0.1,
+    "dd_guard_lev": 0.5,
+    "lev_min": 0.25,
+    "lev_max": 1.0,
+    "tp1_control": 0.5,
+    "tp1_tp075": 0.75,
+    "mae_cap_X": 0.027,
+    "mae_cap_X_note": "Frozen from v74 smoke (v38-identity MAE p50 2.68%). L2 X-rule (X = L2-control MAE p50) NOT applied: mae_stop excluded from verdict scope, X unused by the 4 verdict branches. Kept only for driver provenance."
+  },
+  "mae_stop_formula": {
+    "long": "applied_stop = max(original_stop, entry_limit*(1-X)); assert applied_stop < entry_limit",
+    "short": "applied_stop = min(original_stop, entry_limit*(1+X)); assert applied_stop > entry_limit",
+    "note": "Recorded for provenance only; not in verdict scope."
+  },
+  "dd_guard_formula": "lev 0.5 while own-book 1x reference equity is >10% under trailing peak (past-only, 1-microsecond cutoff, 100.0 seed), else 1.0. Own-book per branch (control_1x ref for dd_guard; tp075_1x ref for dd_guard_tp075), NOT shared control ref.",
+  "mae_definition": "Per filled trade, 5m-only proxy via scripts/opencode_mae.py VERBATIM (mae_mfe_for_trades + mae_distribution): window candles.iloc[entry_index:exit_index+1]; LONG MAE=max(0,(entry-min_low)/entry); SHORT MAE=max(0,(max_high-entry)/entry); fractions; filled trades only. Report mean/p50/p90/max. Driver-internal mae_stats uses the identical formula; verbatim cross-check runs post-hoc on branch normal_trades.csv files.",
+  "scenarios": ["normal", "fee_stress", "execution_stress"],
+  "fee_stress_rate": 0.00055,
+  "stress": {
+    "entry_penetration_bps": 5,
+    "target_penetration_bps": 5,
+    "market_exit_slippage_bps": 5,
+    "market_exit_fee_rate": 0.00055,
+    "allow_limit_price_improvement": false
+  },
+  "stress_path_note": "execution_stress.py honors ExecutionConfig.tp1_fraction and signal.stop_loss; asserted at driver runtime. tp075 therefore flows into ALL 3 scenarios.",
+  "control_check_smoke": {
+    "total_return": 1.9084116914559015,
+    "max_drawdown": -0.2285874934965051,
+    "trades": 101,
+    "tolerance_return": 0.005,
+    "tolerance_dd": 0.005,
+    "note": "L2 s0004_1x tp1=0.5 normal (from artifacts/research/opencode_v73_L2filter/summary.json). MUST reproduce or STOP."
+  },
+  "gate": {
+    "monthly_geometric_net_min": 0.05,
+    "drawdown_max": 0.2,
+    "fills_min": 30
+  },
+  "monthly_formula": "ratio=final_equity/100; duration_years=(complete_evaluation_until - folds[0][0])/(365.2425*86400) per configs/swing_v15_continuous_folds.json; monthly_geometric_net=ratio^(1/(12*duration_years))-1",
+  "risk_cost_accounting": "Per branch x scenario: fees, funding, monthly_geometric_net; vs control: monthly_cost_pp (control minus branch), dd_bought_pp (branch DD minus control DD, positive = shallower), mae_mean_reduction_pp, cost ratios per DD/MAE pp.",
+  "driver": "scripts/opencode_r24L3_risk.py --config configs/opencode_v75_L3real.json --output artifacts/research/opencode_v75_L3real --signals artifacts/research/opencode_v73_L2filter/s0004_1x/signals.parquet",
+  "output": "artifacts/research/opencode_v75_L3real",
+  "causal_notes": [
+    "Signals frozen L2 output, never refit.",
+    "dd_guard uses past-only own-book equity.",
+    "tp075 flows via ExecutionConfig into all scenarios (runtime-asserted).",
+    "No maker-fill/queue claims; stop/timeout exits market-like at scenario fee; DD trade-candle-close sampled.",
+    "X (unused by verdict branches) would be in-sample; results stay exploratory."
+  ],
+  "independent_test": false,
+  "exploratory": true,
+  "live_approved": false
+}

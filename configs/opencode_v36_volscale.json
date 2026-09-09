@@ -1,0 +1,39 @@
+{
+  "experiment": "opencode-v36-volscale",
+  "family": "R9-N neutral: capital scale-up tren majority_1x frozen (tiep noi N-volcap v32; tra loi 'bot von lon co sao khong')",
+  "hypothesis": "o quy mo indexed-100, v32 chung minh mien nhiem (k=5% van 0 bar bi chan, qty nho hon cap 3-4 bac). Vi engine compounding theo von (notional=equity*1x, qty=notional/cand tang theo equity), khi von khoi diem tang len 10k/1M thi qty co the vuot cap=k*bar_volume va volcap bat dau can (delay trong expiry 12-bar hoac mat fill). Thi nghiem do nguong von noi volcap bat dau can, KHONG phai gate loi nhuan.",
+  "bases": {
+    "majority_1x": "artifacts/research/opencode_v15_mapensemble/majority_1x/signals.parquet"
+  },
+  "candles": "data/processed/swing_regime_research_v4/candles.parquet",
+  "dataset_config": "data/processed/swing_regime_research_v4/config.json",
+  "parent_plan": "configs/swing_v15_continuous_folds.json",
+  "volume_column": "volume",
+  "volume_unit": "base BTC per 5m bar (quote_volume chi de tham chieu; taker_buy_volume ton tai nhung khong dung)",
+  "capitals": [100, 10000, 1000000],
+  "k_levels": [1.0, 0.05, 0.01],
+  "branches": ["cap100_k100", "cap100_k05", "cap100_k01", "cap10k_k05", "cap10k_k01", "cap1M_k05", "cap1M_k01"],
+  "branch_specs": {
+    "cap100_k100": {"base": "majority_1x", "initial_equity": 100, "k": 1.0},
+    "cap100_k05": {"base": "majority_1x", "initial_equity": 100, "k": 0.05},
+    "cap100_k01": {"base": "majority_1x", "initial_equity": 100, "k": 0.01},
+    "cap10k_k05": {"base": "majority_1x", "initial_equity": 10000, "k": 0.05},
+    "cap10k_k01": {"base": "majority_1x", "initial_equity": 10000, "k": 0.01},
+    "cap1M_k05": {"base": "majority_1x", "initial_equity": 1000000, "k": 0.05},
+    "cap1M_k01": {"base": "majority_1x", "initial_equity": 1000000, "k": 0.01}
+  },
+  "branch_count_note": "7 branches (1 control + 3 von x 2 k, tru o control von-100 k=100%) x 2 scenarios (normal, fee_stress) = 14 o danh gia. Day la stress thanh khoan nen khong chay exec-stress.",
+  "control": "cap100_k100 (von 100, k=1.0 bypass volcap) normal phai khop published majority_1x (+165.17829563633% total_return 1.6517829563633004, -20.09% max_drawdown -0.20086073993367803, 63 trades) trong 1e-9 hoac STOP",
+  "control_reference": {"total_return": 1.6517829563633004, "max_drawdown": -0.20086073993367803, "trades": 63},
+  "fee_stress_rate": 0.00055,
+  "scenarios": ["normal", "fee_stress"],
+  "execution": {"leverage": 1.0, "max_leverage": 1.0, "tp1_fraction": 0.5, "intrabar_policy": "stop_first"},
+  "volcap_formula": "Voi tin hieu co limit L, direction d, duyet expiry bars idx=signal_index+1..signal_index+12 theo thu tu: cand=engine._entry_fill(bar,d,L); neu cand None -> bo (no-touch). Neu k>=1.0 -> fill ngay tai cand (control bypass, bit-identical engine). Neu k<1.0: notional=equity_hien_tai*leverage(1x); qty=notional/cand; cap=k*float(bar[volume_column]); neu qty<=cap -> fill tai cand; nguoc lai coi nhu unfilled o bar do (volcap_skip+1) va thu bar ke tiep trong expiry. Khong khop mot phan, khong doi gia entry. Quyet dinh chi dung bar hien tai + equity qua khu (causal), tru luu y: full-bar volume ve ly thuyet chi biet sau khi bar dong (intrabar look-ahead nhe, ap dung dong nhat). Day la logic verbatim tu scripts/opencode_r8n_volcap.py (import truc tiep, khong copy sua).",
+  "reuse_note": "scripts/opencode_r9n_volscale.py TAI DUNG truc tiep ham run_volcap_backtest + TRADE_COLUMNS tu scripts/opencode_r8n_volcap.py (import, khong duplicate logic). Chi driver khac: vong lap theo von khoi diem (initial_equity theo branch) + cong thuc monthly dung ratio=final/initial (thay vi /100 co dinh) + assert ma tran 7-branch vonxk.",
+  "seed_base": 1729,
+  "rng_scheme": "Deterministic, khong co draw ngau nhien. seed_base=1729 chi ghi de dam bao sap xep/tai lap co dinh danh (signals sort by bar_index, candles sort by open_time). Moi branch chay lai tu dau voi cung thu tu (cong bang so sanh).",
+  "monthly_formula": "ratio=final_equity/initial_equity_cua_branch; duration_years=(complete_evaluation_until - folds[0][0])/(365.2425*86400) theo parent_plan (giong v15/v30/v32); monthly_geometric_net=ratio^(1/(12*duration_years))-1; annual=ratio^(1/duration_years)-1. Khac v32 o cho mau so la initial cua branch (100/10k/1M), khong phai 100 co dinh.",
+  "engine_note": "Phan con lai cua backtest (stop/timeout market-like o scenario fee, TP1 50% + TP2, funding long 0.0001/8h short 0, stop-first intrabar, TP suppression tren intrabar entry candle, drawdown trade-candle-close sampled, compounding tu equity hien tai, overlap next_available_index, holding validation, truncated-window reject) GIU NGUYEN nhu engine ohlc-v2 run_backtest via ham tai dung tu v32. Chi khoi entry-search co dieu kien volcap. k=1.0 bypass de lam control gate bit-identical.",
+  "gate": {"monthly_min": 0.05, "dd_max": 0.2, "fills_min": 30},
+  "verdict_note": "Day la thang robustness theo von (do survival khi von tang + k giam), KHONG phai gate loi nhuan. k la gia dinh stress chu quan, khong suy ra tu microstructure/queue that. Khong claim maker fill probability tu OHLC. Von compounding theo equity: day chinh la thu can do. Drawdown trade-candle-close sampled. Stop/timeout market-like o scenario fee. Khong promote branch hay claim validation/live."
+}

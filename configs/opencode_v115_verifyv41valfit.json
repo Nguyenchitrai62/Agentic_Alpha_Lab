@@ -1,0 +1,87 @@
+{
+  "experiment": "opencode-v115-verifyv41valfit",
+  "role": "A2-ARCH VERIFICATION (6th): independent rebuild of R-v41valfit (v112), do not copy R driver",
+  "lineage": "v41 valuescale SSM (configs/opencode_v91_v41_acc2.json, 3 seeds x 11 folds, FIXED 16ep) -> R-audit v91b (rank_en_1x +39.0%/-33.4%/75 normal) -> R-v41valfit v112 TRUE val-fit (configs/opencode_v112_v41valfit.json, driver scripts/opencode_r40a_v41valfit.py, published artifacts/research/opencode_v112_v41valfit/summary.json) -> THIS v115 independent verify (own driver scripts/opencode_r41a_verifyv41valfit.py, never imports R driver)",
+  "mission_claim": {
+    "identity_normal": {"total_return": 0.39, "max_drawdown": -0.334, "trades": 75},
+    "note": "Leader mission text ALSO quotes 'v41-winsor-calibrated normal -13.88%/-33.91%/75'. VERIFIER PRE-FINDING (from reading R artifacts BEFORE running): R v112 uses NO winsor (config + driver contain zero winsor references) and R v112 published calibrated-normal is +36.75%/-35.77%/88, NOT -13.88%. The -13.88%/-33.91%/75 numbers trace EXACTLY to v90 v40-winsor-calibrated_1x normal (artifacts/research/opencode_v90_v40wincal/summary.json: total_return -0.13879223151570785, max_drawdown -0.3390752446016986, trades 75). Leader text conflates v90 (v40+winsor) with v112 (v41 val-fit, no winsor). This verify therefore rebuilds R ACTUAL v112 method (per-fold val-only isotonic, NO winsor, same gate) and compares against R ACTUAL v112 published numbers frozen below. The v90 worsening (+0.66% -> -13.88%) is real but belongs to v40, reported separately, NOT re-run here."
+  },
+  "branches": [
+    "verify_v41_identity_1x_normal",
+    "verify_v41_identity_1x_fee055",
+    "verify_v41_valfit_calibrated_1x_normal",
+    "verify_v41_valfit_calibrated_1x_fee055"
+  ],
+  "branch_spec": {
+    "verify_v41_identity_1x_normal": {"calibration": "none", "fee_rate_per_fill": 0.0002, "r_branch": "v41-identity_1x", "r_scenario": "normal"},
+    "verify_v41_identity_1x_fee055": {"calibration": "none", "fee_rate_per_fill": 0.00055, "r_branch": "v41-identity_1x", "r_scenario": "fee_stress"},
+    "verify_v41_valfit_calibrated_1x_normal": {"calibration": "true-valfit-per-fold-isotonic-NO-winsor", "fee_rate_per_fill": 0.0002, "r_branch": "v41-valfit-calibrated_1x", "r_scenario": "normal"},
+    "verify_v41_valfit_calibrated_1x_fee055": {"calibration": "true-valfit-per-fold-isotonic-NO-winsor", "fee_rate_per_fill": 0.00055, "r_branch": "v41-valfit-calibrated_1x", "r_scenario": "fee_stress"}
+  },
+  "r_published_exact": {
+    "verify_v41_identity_1x_normal": {"total_return": 0.3899179293659072, "max_drawdown": -0.33417184374176423, "monthly_geometric_net": 0.009815086891059588, "final_equity": 138.9917929365907, "trades": 75, "long_trades": 50, "short_trades": 25, "n_signals": 135},
+    "verify_v41_identity_1x_fee055": {"total_return": 0.31892076936271274, "max_drawdown": -0.34302549798691484, "monthly_geometric_net": 0.008245648940232941, "final_equity": 131.89207693627128, "trades": 75, "long_trades": 50, "short_trades": 25, "n_signals": 135},
+    "verify_v41_valfit_calibrated_1x_normal": {"total_return": 0.3675060552366549, "max_drawdown": -0.35765504002923465, "monthly_geometric_net": 0.009328226967856512, "final_equity": 136.75060552366548, "trades": 88, "long_trades": 51, "short_trades": 37, "n_signals": 135},
+    "verify_v41_valfit_calibrated_1x_fee055": {"total_return": 0.2856966692473466, "max_drawdown": -0.3689233635456445, "monthly_geometric_net": 0.007482836878070165, "final_equity": 128.56966692473466, "trades": 88, "long_trades": 51, "short_trades": 37, "n_signals": 135}
+  },
+  "pass_criterion": {
+    "tolerance_abs": 1e-06,
+    "float_keys": ["total_return", "max_drawdown", "monthly_geometric_net", "final_equity"],
+    "exact_keys": ["trades", "long_trades", "short_trades", "n_signals"],
+    "rule": "PASS iff ALL 4 branches match on ALL float keys within 1e-6 AND ALL exact keys equal; else FAIL + name cause, no number adjustment"
+  },
+  "frozen_inputs": {
+    "predictions_dir": "artifacts/kaggle/v41_acc2_download/valuescale-training",
+    "predictions_n_test_expected": 33,
+    "predictions_n_val_expected": 33,
+    "predictions_pattern": "seed{seed}/temporal_neural/fold_{fold}/predictions.npy",
+    "val_predictions_pattern": "seed{seed}/temporal_neural/fold_{fold}/val_predictions.npy",
+    "indices_pattern": "seed{seed}/checkpoints/fold_{fold}/indices.npz",
+    "decisions": "data/processed/swing_regime_research_v4/decisions.parquet",
+    "labels": "data/processed/swing_regime_research_v4/examples.npz",
+    "candles": "data/processed/swing_regime_research_v4/candles.parquet",
+    "dataset_config": "data/processed/swing_regime_research_v4/config.json",
+    "parent_plan": "configs/swing_v15_continuous_folds.json",
+    "model_plan": "configs/opencode_v91_v41_acc2.json",
+    "r_config_read_only": "configs/opencode_v112_v41valfit.json",
+    "r_summary_read_only": "artifacts/research/opencode_v112_v41valfit/summary.json",
+    "v90_summary_read_only": "artifacts/research/opencode_v90_v40wincal/summary.json"
+  },
+  "frozen_constants": {
+    "seeds": [1729, 1730, 1731],
+    "n_folds": 11,
+    "n_decisions_expected": 4076,
+    "maximum_signals_per_month": 4,
+    "cooldown_days": 5,
+    "tp1_fraction": 0.5,
+    "entry_expiry_bars_expected": 12,
+    "holding_cap_bars_expected": 2016,
+    "dataset_base_fee": 0.0002,
+    "min_eligible_decisions": 50,
+    "tie_break_eps": 1e-06,
+    "gate_floor": 0.0,
+    "fallback_topk_per_fold": 8,
+    "model_family_expected": "valuescale_selective_ssm_v41"
+  },
+  "own_method": {
+    "combine": "own mean_3seeds: per-seed expected=ch0*sigmoid(ch4) float64, arithmetic mean; own fill_logit=logit(mean sigmoid ch4) for tie-break only; never imports ensemble_value.combine nor R driver",
+    "candidate": "own tie-break: max(exp); tie set within eps=1e-6; fill-logit desc; holding asc; index min; never imports opencode_r30m_v41_model",
+    "geometry": "own grid/prices formulas from dataset config (side/entry/brackets/holding order, min-risk unit, ordered-bracket checks)",
+    "calibration": "own per-fold TRUE val-fit: sklearn IsotonicRegression(out_of_bounds=clip) on VAL ensemble-expected flat vs VAL labels ch0 flat; NO winsor (faithful to R v112); map test; warmup WAIT (<50/nonfinite/unique<2) -> RAW; past-only assert val_max < test_min per fold; sampled order-preservation assert viol==0",
+    "gate": "own v41 policy floor UNCHANGED: en_best > 0.0 + fallback top-8/fold-test on same scale (raw or calibrated); own chronological monthly-cap-4 + cooldown-5d frequency loop in partition order",
+    "monthly": "ratio=final/100; years from parent plan complete_evaluation_until minus folds[0][0] over 365.2425d; monthly=ratio^(1/(12*years))-1",
+    "engine": "shared ohlc-v2 run_backtest infra only (CostModel fee per branch, ExecutionConfig expiry12/cap2016/lev1x); signals carry no leverage col"
+  },
+  "output": "artifacts/research/opencode_v115_verifyv41valfit",
+  "driver": "scripts/opencode_r41a_verifyv41valfit.py",
+  "rules": [
+    "verification backtests only; no live orders",
+    "NEVER touch research/parallel/registry.json, CONTINUOUS_RESEARCH.md, NEXT_AGENT.md, research/parallel/rounds/*, ../Kronos, C:/Users/trait/.codex/worktrees/*",
+    "no register/assign/rotate; no commit/push; no overwrites (output dir must not exist)",
+    "causal past-only; exploratory labels; opened 2023-2026 interval, NOT independent test",
+    "pre-specified here BEFORE running (driver asserts branches + tolerance + constants)"
+  ],
+  "independent_test": false,
+  "exploratory": true,
+  "live_approved": false
+}

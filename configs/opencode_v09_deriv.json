@@ -1,0 +1,48 @@
+{
+  "experiment": "opencode-v09-deriv-breakthrough",
+  "hypothesis": "Price-based 5m approaches saturate ~2.4%/mo, so new information must come from elsewhere. Test whether NON-PRICE signal sources carry incremental value: daily derivatives positioning/OI context (lag48 archive scenario) and causal kline flow/activity features, alone and combined, with zero raw-price features. Control is the same HGB walk-forward on candle40 only, so any gap is attributable to the feature source, not the model or policy.",
+  "family": "derivatives/flow-feature CPU model, purged monthly walk-forward, new signal source",
+  "dataset": "data/processed/swing_regime_research_v4",
+  "decisions": "data/processed/swing_regime_research_v4/decisions.parquet",
+  "candles": "data/processed/swing_regime_research_v4/candles.parquet",
+  "dataset_config": "data/processed/swing_regime_research_v4/config.json",
+  "parent_plan": "configs/swing_v15_continuous_folds.json",
+  "feature_sources": {
+    "candle40": "data/processed/swing_regime_research_v4/examples.npz:features (40, frozen, control)",
+    "deriv40_lag48": "artifacts/features/btc_derivatives_lag48_v1/features.npz:features (20 daily OI/positioning log-level/change + 20 missing masks, source_day+48h archive-lag scenario, row-aligned 5628)",
+    "flow40": "computed in-script via agentic_alpha_lab.data.flow_features.flow_features on dataset candles at v4 signal_times (40 causal closed-candle buy-imbalance/activity/volume features x 5 timeframes, verified finite 5628x40 in Phase 1)"
+  },
+  "feature_branches": {
+    "candle40": ["candle40"],
+    "deriv40": ["deriv40_lag48"],
+    "flow40": ["flow40"],
+    "flowderiv80": ["flow40", "deriv40_lag48"]
+  },
+  "label": "examples.npz labels (n,16,3): channel0 unconditional net percent (0 if unfilled), channel1 OHLC fill indicator, channel2 positive-net given fill. Shared action-value regressors: net on ch0, fill on ch1; prediction ch0 = net/fill (conditional), ch4 = logit(fill). Exactly the v8/train_adaptive_action_model mapping. Exploratory labels on opened development data.",
+  "folds": "purged monthly walk-forward: for each calendar month M in 2023-06..2026-03, fit_at = first-of-month 00:00Z; train mask = label_end < fit_at - 8d AND signal_time >= fit_at - 730d; predict all decisions with signal_time in M. Embargo 8d >= 7d max holding horizon. Minimum 200 mature train decisions per fit (else STOP with error). 34 fits per feature branch. No threshold/sizing/direction tuning on fold outcomes.",
+  "model": {
+    "kind": "HistGradientBoostingRegressor shared net/fill, squared loss",
+    "max_iter": 120,
+    "max_leaf_nodes": 15,
+    "min_samples_leaf": 128,
+    "learning_rate": 0.05,
+    "l2_regularization": 10.0,
+    "max_bins": 127,
+    "early_stopping": false,
+    "random_state": 1729,
+    "threads": 2,
+    "note": "Exactly v8 hyperparams; no scaling/PCA (trees); single seed (CPU budget, HGB near-deterministic)"
+  },
+  "policy": "Standard choose() with UNCHANGED v5 thresholds (minimum_expected_net_percent 0.3, minimum_fill_score 0.25) + identical frequency loop (cooldown 5d, max 4/month) as the r1a gen_signals replica. Entry/brackets/holding grid [3,7] unchanged. Branches x sizing {1x, dd_guard}; dd_guard = 0.5x while own-branch 1x sampled equity (trade exit_time/equity_after, past-only 1-microsecond cutoff, 100.0 seed) is >10% under its trailing peak, else 1.0.",
+  "backtest": {
+    "engine": "run_backtest, initial equity 100",
+    "costs": "dataset config (fee 0.0002/fill, long funding 0.0001/8h, short 0)",
+    "execution": "entry_expiry 12 bars, max_holding 2016 bars (7d); 1x lev 1.0/1.0; dd_guard lev 0.25/1.0",
+    "scenarios": ["normal", "fee_stress fee_rate_per_fill=0.00055", "execution_stress FillStress(5,5,5,0.00055,False)"],
+    "duration": "monthly_geometric_net = ratio^(1/(12*duration_years))-1 with duration from parent_plan (2023-06-01 to 2026-03-23)"
+  },
+  "branches": ["candle40_1x", "candle40_dd_guard", "deriv40_1x", "deriv40_dd_guard", "flow40_1x", "flow40_dd_guard", "flowderiv80_1x", "flowderiv80_dd_guard"],
+  "gate": {"monthly_min": 0.05, "dd_max": 0.2, "fills_min": 30},
+  "causality_disclosure": "Derivatives availability is proxied by source_day+48h, NOT observed historical receipt time (upstream manifest point_in_time_availability_verified=false). Results are a disclosed exploratory lag sensitivity, not live-fillable evidence. Flow features use only closed candles strictly before each signal_time. All fits use only mature labels (8d embargo). No live approval.",
+  "rules": ["no live orders", "CPU-only (HGB)", "fit on train-window mature labels only", "pre-specified matrix, no changes after backtests", "report ALL 8 branches x ALL 3 scenarios", "exploratory labels, development interval only"]
+}

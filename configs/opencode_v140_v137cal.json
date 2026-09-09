@@ -1,0 +1,118 @@
+{
+  "experiment": "opencode-v140-v137calibrate-first",
+  "family": "R-DIAGNOSTIC calibrate-first tren predictions student-v137 dong bang (local only, cheap, pre-spec; 5th rescue test sau v33, v38-partial, v55c, v55b-fix)",
+  "hypothesis": "Student-distill SSM (~0.6M) co rank +0.0568 THAP HON teacher v38 (+0.066), monthly AM ca 3 scenarios (normal -0.29%/mo), top-picks AM (topdecile obs -0.44%), pass-rate 70.4% cao (overconfidence nhe), coverage 3.31% (135 signals) — dung profile rescue-candidate v33-like (rank yeu + picks dau thua + monthly am nhung coverage du). Causal isotonic past-only map student-logit free-units ordinal -> net% + nguong phan vi validation + coverage floor top-8/fold co the cuu vot lan thu 5. Nguoc lai neu that bai thi CONFIRM chet tren distill base (calibrate khong cuu noi, dong distill-rescue).",
+  "lineage": "student-distill v106/v137 (configs/opencode_v137_v106rebuild.json, 3 seeds x 11 folds, SSM ~0.6M, KL + ranking-opt_B + coverage-hinge, FIXED 16ep, en_best_logit>0.0 + top-8 fallback, deterministic tie-break eps 1e-6 holding-asc, no fill-desc) -> R-audit v137b replay+portfolio (artifacts/research/opencode_v137b_replay/audit.json + portfolio.json + summary.json, student-1x normal -9.37%/-35.42%/79/N135) -> v140 calibrate-first nay (local, khong train/cloud/live)",
+  "base": {
+    "ensemble": "mean_3seeds student logits free units (so hoc, giong audit parity; khong penalty/median/weighting)",
+    "source": "artifacts/kaggle/v137_student_download/student-training",
+    "source_note": "33 models = 11 folds x 3 seeds (1729/1730/1731), VERIFY presence truoc khi chay; neu thieu STOP (khong tu re-download)",
+    "dataset": "data/processed/swing_regime_research_v4",
+    "decisions": "data/processed/swing_regime_research_v4/decisions.parquet",
+    "labels": "data/processed/swing_regime_research_v4/examples.npz",
+    "candles": "data/processed/swing_regime_research_v4/candles.parquet",
+    "dataset_config": "data/processed/swing_regime_research_v4/config.json",
+    "parent_plan": "configs/swing_v15_continuous_folds.json",
+    "plan": "configs/opencode_v137_v106rebuild.json",
+    "r_audit_read_only": "artifacts/research/opencode_v137b_replay/summary.json",
+    "r_audit_portfolio_read_only": "artifacts/research/opencode_v137b_replay/portfolio.json",
+    "r_audit_audit_read_only": "artifacts/research/opencode_v137b_replay/audit.json",
+    "seeds": [1729, 1730, 1731],
+    "predictions_pattern": "seed{seed}/temporal_neural/fold_{fold}/predictions_logits.npy",
+    "predictions_shape": "(n_fold_test, 16) student logits free units float32 (T=1, khong percent, khong clip; KHONG phai v8 blocks)"
+  },
+  "calibration": {
+    "method": "causal-isotonic past-only (src/agentic_alpha_lab/models/causal_calibration.py, pattern scripts/opencode_r35b_v55ccal.py = v55ccal + scripts/opencode_r11b_v33cal.py + scripts/opencode_r19a_v38cal.py)",
+    "score": "ensemble mean student logit per candidate (N,16) ordinal — isotonic map sang net% (don vi sau map la percent, truoc map la logit free units: khong so sanh trung binh truc tiep, chi rank_corr la hop le nhu v137b bias_note)",
+    "target": "labels[...,0] realized net percent per candidate (unconditional, 0 neu unfilled)",
+    "mapping": "IsotonicRegression(out_of_bounds=clip) tren (score,target) pairs past-only; mapped (N,16) la calibrated expected net% per candidate; candidate = deterministic_best_index tren mapped row (eps 1e-6 holding-asc index-min, BO fill-desc — bao toan tie-break student VERBATIM; bang argmax raw up-to-ties do don dieu trong-fold)",
+    "eligibility_rule": "giu candidate student (k=deterministic_best_index(mapped_row)); giu decision iff mapped[k] > T (T=0.0 cho isoall; T=t_f validation-percentile cho topdec-gate); fallback top-8/fold bypass T nhung van chiu monthly cap + cooldown",
+    "no_fill_head": "student KHONG co value/fill head nen KHONG co fill>=0.25 gate (giong v55c/v55b, khac v33/v38); eligibility chi theo mapped threshold",
+    "window": "all-quarter (first=0; left=folds[0][0] cho moi fold)",
+    "asof": "parent folds[fold][0] (fold start)",
+    "embargo_days": 8,
+    "min_eligible_decisions": 50,
+    "warmup": "WAIT (mapped=zeros, thresh=inf -> khong signal trong fold do; fallback cung WAIT o warmup fold)",
+    "thresholds_from": "VALIDATION history only (eligible history past-only, embargoed): t_f = 90th percentile cua history best-calibrated (max_k mapped tren eligible history); never test (khong dung current fold distribution cho threshold, tru fallback top-8 ranking trong fold khong dung label)"
+  },
+  "branches": ["student-identity", "student-isoall", "student-iso-topdec-gate"],
+  "branch_specs": {
+    "student-identity": {
+      "calibration": "none (control)",
+      "gate": "en_best_logit > 0.0 per fold-test + top-up to min(8,len) by en_best desc stable-sort neu gate hits < 8 (N_MIN_PER_FOLD_TEST=8, VERBATIM opencode_r48a_studentharness.py student_policy_signals); candidate deterministic_best_index (eps 1e-6 holding-asc index-min, no fill-desc)",
+      "fallback": "top-8/fold top-up (ne la mot phan cua policy identity, khac voi coverage-fallback cua nhanh rescue)",
+      "sizing": "1x",
+      "note": "Phai khop R-audit student-1x normal trong 1e-9 (total_return/max_drawdown) + exact trades/long/short/signals hoac STOP"
+    },
+    "student-isoall": {
+      "calibration": "causal-isotonic all-quarter (score=student-logit free units, target=net%)",
+      "gate": "absolute 0.0% tren calibrated (mapped[k] > 0.0 voi k=deterministic_best_index(mapped)): giu nguong tuyet doi de do bias-correction don thuan (analog v33 0.3 / v38 0.0 / v55c 0.0 / v55bfix 0.0 tren thang calibrated)",
+      "fallback": "none (pure bias-correction test)",
+      "sizing": "1x"
+    },
+    "student-iso-topdec-gate": {
+      "calibration": "causal-isotonic all-quarter (giong isoall)",
+      "gate": "REPLACE absolute 0.0 bang validation-percentile: per-fold t_f = 90th percentile cua history best-calibrated (max_k mapped tren eligible history past-only); giu iff mapped[k] > t_f; warmup WAIT",
+      "fallback": "coverage-fallback top-8/fold: per fold (tru warmup), union top-8 decisions theo best mapped forced eligible (bypass t_f), van chiu monthly cap 4 + cooldown 5d; ranking trong fold khong dung label (causal) — v33 rescue pattern",
+      "sizing": "1x",
+      "note": "Day la nhanh rescue chinh (v33 pattern: percentile-gate + coverage floor; v55c/v55bfix cho thay isoall co the thang gate tren weak-rank base)"
+    }
+  },
+  "sizings": ["1x"],
+  "dd_guard_conditional": {
+    "run": "chi tren best calibrated branch theo normal monthly_geometric_net (trong 2 calibrated), NEU re (signals>0, backtest local vai phut) thi chay; else SKIP va ghi ly do",
+    "formula": "own-book 1x equity, trigger 10%, lev 0.5/1.0 past-only (1-microsecond cutoff, seed 100.0), giong v03/v28c/v33d/v38b/v55d/v137b; execution leverage=0.5/max=1.0",
+    "note": "Khong phai branch pre-spec chinh; ket qua luu rieng duoi cung output neu chay"
+  },
+  "scenarios": ["normal", "fee_stress", "execution_stress"],
+  "scenario_specs": {
+    "normal": "fee_rate_per_fill=0.0002 (dataset costs)",
+    "fee_stress": "fee_rate_per_fill=0.00055",
+    "execution_stress": "FillStress(5,5,5,0.00055,False) + fee 0.0002 base (market_exit_fee 0.00055)"
+  },
+  "stress": {
+    "entry_penetration_bps": 5,
+    "target_penetration_bps": 5,
+    "market_exit_slippage_bps": 5,
+    "market_exit_fee_rate": 0.00055,
+    "allow_limit_price_improvement": false
+  },
+  "execution": {
+    "entry_expiry_bars": 12,
+    "holding_cap_bars": 2016,
+    "leverage_1x": 1.0
+  },
+  "monthly_formula": "ratio=final_equity/100; duration_years=(complete_evaluation_until - folds[0][0])/(365.2425*86400) theo configs/swing_v15_continuous_folds.json (giong v33d/v38b/v55d/v111b/v137b); monthly_geometric_net=ratio^(1/(12*duration_years))-1; annual=ratio^(1/duration_years)-1",
+  "engine_note": "ohlc-v2: limit entry tu nen ke tiep, expiry 12 bars, stop-first intrabar, TP suppression tren intrabar entry candle, stop/timeout market-like o scenario fee, funding long 0.0001/8h short 0, compounding tu equity hien tai, overlap next_available_index, drawdown trade-candle-close sampled (khong phai mark/intrabar day du). Khong claim maker fill/queue tu OHLC.",
+  "gate": {"monthly_min": 0.05, "dd_max": 0.2, "fills_min": 30},
+  "control_reference": {
+    "branch": "student-1x normal (R-audit v137b summary.json + portfolio.json)",
+    "total_return": -0.09374179546455541,
+    "max_drawdown": -0.35421006579208447,
+    "monthly_geometric_net": -0.002915753229174145,
+    "trades": 79,
+    "long_trades": 40,
+    "short_trades": 39,
+    "n_signals": 135,
+    "n_selected_pre_frequency": 2869,
+    "tolerance": "1e-9 cho total_return/max_drawdown + exact trades/long/short/signals hoac STOP"
+  },
+  "diagnostic_lens_v34": {
+    "bias": "top-decile (n=408) pred vs obs: identity la logit free units (chi ghi bias_note, khong bias so cross-unit); calibrated branches mapped la % nen bias_pred_minus_obs co nghia; delta = after - before tren thang % (before lay obs ref)",
+    "rank": "rank_corr_per_decision tren 16 candidates mean/std truoc/sau (isotonic fit per-fold asof nen rank global co the drift ACROSS folds; trong-fold bao toan up-to-ties)",
+    "coverage": "n_signals/4076 + by_month + active_months + picks_by_fold + gate_hits/fallback_adds"
+  },
+  "output": "artifacts/research/opencode_v140_v137cal",
+  "driver": "scripts/opencode_r54a_v137cal.py",
+  "rules": [
+    "no live orders; local only",
+    "NEVER touch research/parallel/registry.json, CONTINUOUS_RESEARCH.md, NEXT_AGENT.md, research/parallel/rounds/*, ../Kronos, C:/Users/trait/.codex/worktrees/*",
+    "no register/assign/rotate; no commit/push; no overwrites (output dir phai chua ton tai)",
+    "causal past-only (maps fit tren earlier folds only, 8-day embargo; thresholds tu validation history only)",
+    "exploratory labels; opened 2023-2026 development interval, NOT independent test",
+    "pre-specify matrix trong config nay TRUOC khi chay (script assert branches)"
+  ],
+  "independent_test": false,
+  "exploratory": true,
+  "live_approved": false
+}

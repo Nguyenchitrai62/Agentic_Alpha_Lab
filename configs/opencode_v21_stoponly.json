@@ -1,0 +1,41 @@
+{
+  "experiment": "opencode-v21-stoponly",
+  "family": "R4-N3 neutral: stop-loss-only distance matrix on frozen v30 isotonic-4 x {1x, dd_guard}",
+  "hypothesis": "Varying ONLY stop distance (frozen per-branch constant multiplier, causal past-only) may shift the monthly-geometric/DD frontier. R1-B scaled stop+TP together and is done; this probe isolates STOP ONLY: new_stop = entry - side*mult*(entry - orig_stop) for mult in {0.5, 0.75, 1.0, 1.5}. TPs (take_profit_1/2), holding_bars, entry_limit, and the 94 frozen signals are identical in every branch. Exploratory only.",
+  "signals": "artifacts/research/opencode_v02_reproduce_v30/isotonic_4/signals.parquet",
+  "candles": "data/processed/swing_regime_research_v4/candles.parquet",
+  "dataset_config": "data/processed/swing_regime_research_v4/config.json",
+  "parent_plan": "configs/swing_v15_continuous_folds.json",
+  "stop_mults": {
+    "stop050": 0.5,
+    "stop075": 0.75,
+    "stop100": 1.0,
+    "stop150": 1.5
+  },
+  "stop_formula": "new_stop = entry_limit - direction*mult*(entry_limit - stop_loss); side=+1 long tightens toward entry for mult<1; side=-1 short mirrors symmetrically. Frozen constant per branch, applied to the per-signal stop_loss column before the run; TPs/holding/entry untouched.",
+  "stop_note": "Stop multiple is a frozen constant per branch (causal past-only, no fitting, no per-signal tuning). Same 94 frozen signals in every branch; only the stop_loss column values differ by the branch constant.",
+  "sizings": ["1x", "dd_guard"],
+  "branches": ["stop050_1x", "stop050_dd_guard", "stop075_1x", "stop075_dd_guard", "stop100_1x", "stop100_dd_guard", "stop150_1x", "stop150_dd_guard"],
+  "control": "stop100_1x (mult=1.0/1x) must match published isotonic_4 exposure1.0 normal (+122.80% total_return, -20.09% max_drawdown, 65 trades) or STOP",
+  "dd_trigger": 0.1,
+  "dd_guard_lev": 0.5,
+  "dd_guard_reference": "stop100_1x (mult=1.0) control sampled equity (trade exit_time/equity_after), past-only 1-microsecond cutoff, 100.0 seed level; each dd_guard branch applies the guard state at its OWN signal times. Shared single reference keeps stop mults comparable. Deviation from v03 (own-book per branch) disclosed.",
+  "lev_min": 0.25,
+  "lev_max": 1.0,
+  "tp1_fraction": 0.5,
+  "tp_note": "ExecutionConfig.tp1_fraction fixed at 0.5 in all branches (engine default); frozen signals carry tp1_fraction=0.5 untouched. Only stop distance varies.",
+  "fee_stress_rate": 0.00055,
+  "stress": {
+    "entry_penetration_bps": 5,
+    "target_penetration_bps": 5,
+    "market_exit_slippage_bps": 5,
+    "market_exit_fee_rate": 0.00055,
+    "allow_limit_price_improvement": false
+  },
+  "stop_path_note": "Pre-run code inspection: src/agentic_alpha_lab/backtest/engine.py run_backtest line 248 stop_fill=_stop_fill(bar,direction,float(signal.stop_loss)) reads per-signal stop_loss with stop_first intrabar policy; src/agentic_alpha_lab/backtest/execution_stress.py run_stress line 112 stop=_stop_fill(bar,side,float(signal.stop_loss)) reads per-signal stop_loss. Runtime re-asserted in driver.",
+  "gate": {
+    "monthly_min": 0.05,
+    "dd_max": 0.2,
+    "fills_min": 30
+  }
+}

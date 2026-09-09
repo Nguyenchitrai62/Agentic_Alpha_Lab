@@ -1,0 +1,65 @@
+{
+  "experiment": "opencode-v19-disagreeveto (R4-B3 breakthrough, inverse of dead v14 agreement-veto)",
+  "hypothesis": "Since v14 showed model agreement selects AGAINST the best trades (agreement veto collapses fills and kills edge), try the INVERSE: keep v30 signals where the non-price models DISAGREE or are silent. If non-price agreement is anti-informative, disagreement/silence should preserve or concentrate the v30 edge.",
+  "family": "disagreement filter on frozen signals (no refit)",
+  "inputs": {
+    "v30_signals": "artifacts/research/opencode_v02_reproduce_v30/isotonic_4/signals.parquet",
+    "veto_flow_signals": "artifacts/research/opencode_v09_deriv/flow40_1x/signals.parquet",
+    "veto_deriv_signals": "artifacts/research/opencode_v09_deriv/deriv40_1x/signals.parquet",
+    "candles": "data/processed/swing_regime_research_v4/candles.parquet",
+    "dataset_config": "data/processed/swing_regime_research_v4/config.json",
+    "parent_plan": "configs/swing_v15_continuous_folds.json"
+  },
+  "key_compatibility_rule": "BEFORE any backtest: verify v30 vs B1 frames share decision-key space: columns bar_index/signal_time/direction present in all; bar_index integer ranges overlap; signal_time same UTC clock with >0 overlapping timestamps; direction encoding identical {1,-1}. Decision key is bar_index; direction key is (bar_index, direction). If zero bar overlap AND zero time overlap, STOP and write a negative audit instead of forcing a match. Same method as scripts/opencode_r3b3_derivveto_probe.py.",
+  "disagreement_rule": "keep a v30 row (bar_index=b, direction=d) iff: flowsilent: b NOT in set(flow bar_index) [flow has NO signal at same decision index, either direction]; derivsilent: b NOT in set(deriv bar_index) [deriv has NO signal same index]; flowoppose: (b,-d) in flow (bar_index,direction) key set [flow has OPPOSITE direction same index; bar_index unique per frame so same-agree and oppose are mutually exclusive]; nonagree: (b,d) NOT in (flow_keys UNION deriv_keys) [complement of the v14 either-agreement set; kept iff NOT same-direction agreement with either model]. Filter is a causal post-filter on frozen signals (function of same-decision model outputs only); no thresholds refit, no future data.",
+  "disagreement_sources": ["flowsilent", "derivsilent", "flowoppose", "nonagree"],
+  "sizings": ["1x", "dd_guard"],
+  "dd_trigger": 0.1,
+  "dd_guard_lev": 0.5,
+  "dd_guard_reference": "unvetoed control run control_1x (v30 frozen signals, 1x) sampled equity from trade exit_time/equity_after, past-only 1-microsecond cutoff, 100.0 seed level; EVERY disagreement dd_guard branch reuses that control guard state at its own kept signal times (disclosed; trade-candle-close sampled DD, not mark/intrabar)",
+  "lev_min": 0.25,
+  "lev_max": 1.0,
+  "fee_stress_rate": 0.00055,
+  "stress": {
+    "entry_penetration_bps": 5,
+    "target_penetration_bps": 5,
+    "market_exit_slippage_bps": 5,
+    "market_exit_fee_rate": 0.00055,
+    "allow_limit_price_improvement": false
+  },
+  "gate": {
+    "monthly_min": 0.05,
+    "dd_max": 0.2,
+    "fills_min": 30
+  },
+  "control_check": {
+    "branch": "control_1x",
+    "scenario": "normal",
+    "total_return": 1.2279837998661565,
+    "max_drawdown": -0.20086073993367803,
+    "trades": 65,
+    "tolerance": 1e-6,
+    "action": "STOP and report if mismatch; no further branches"
+  },
+  "branches": [
+    {"name": "control_1x", "disagree": null, "sizing": "1x"},
+    {"name": "disagree_flowsilent_1x", "disagree": "flowsilent", "sizing": "1x"},
+    {"name": "disagree_flowsilent_dd_guard", "disagree": "flowsilent", "sizing": "dd_guard"},
+    {"name": "disagree_derivsilent_1x", "disagree": "derivsilent", "sizing": "1x"},
+    {"name": "disagree_derivsilent_dd_guard", "disagree": "derivsilent", "sizing": "dd_guard"},
+    {"name": "disagree_flowoppose_1x", "disagree": "flowoppose", "sizing": "1x"},
+    {"name": "disagree_flowoppose_dd_guard", "disagree": "flowoppose", "sizing": "dd_guard"},
+    {"name": "disagree_nonagree_1x", "disagree": "nonagree", "sizing": "1x"},
+    {"name": "disagree_nonagree_dd_guard", "disagree": "nonagree", "sizing": "dd_guard"}
+  ],
+  "scenarios": ["normal", "fee_stress", "execution_stress"],
+  "empty_set_policy": "If any disagreement set keeps 0 v30 signals, report it as a branch with 0 fills in all scenarios (empty signals.parquet + empty trades CSVs + zero metrics); do NOT drop the branch.",
+  "rules": [
+    "no live orders; local backtests only",
+    "signals/scores never refit",
+    "causal past-only (filter uses same-decision model outputs only, no future)",
+    "pre-specified matrix in this config before running; no changes after backtests",
+    "report ALL 9 branches x ALL 3 scenarios, even degenerate/low-fill branches",
+    "exploratory labels; opened development interval only, not an independent test"
+  ]
+}

@@ -1,0 +1,57 @@
+{
+  "experiment": "opencode-v53-1mtrend",
+  "family": "R16-B breakthrough: 1m micro-trend agreement filter on frozen majority_1x (new information, not new prices)",
+  "hypothesis": "The 5m-close decision may catch counter-micro-trend entries. Keeping only signals whose direction agrees with the 1m micro-trend strictly before signal_time (past-only information the 5m book does not encode as a filter) improves monthly net without collapsing fills. 1m-entry refinement is DEAD (v44); 1m INFORMATION as a filter is untested.",
+  "base": {
+    "signals": "artifacts/research/opencode_v15_mapensemble/majority_1x/signals.parquet",
+    "candles_5m": "data/processed/swing_regime_research_v4/candles.parquet",
+    "dataset_config": "data/processed/swing_regime_research_v4/config.json",
+    "parent_plan": "configs/swing_v15_continuous_folds.json",
+    "m1dir": "data/raw/opencode_1m_audit_20260907",
+    "n_signals_frozen": 94
+  },
+  "trend_formula": {
+    "note": "Micro-trend uses ONLY 1m bars with close_time <= signal_time (strictly causal, asserted at runtime). Window of L minutes before signal_time S: the L 1m bars with opens S.floor('min')-(L-1) .. S.floor('min') (close_times in (S - L min, S]).",
+    "trend": "trend_L = last-1m-close (bar closing at S) - first-1m-open (earliest bar of window)",
+    "sign": "trend_sign = +1 if trend_L > 0, -1 if trend_L < 0, 0 if exactly flat",
+    "agreement_rule": "KEEP a frozen signal iff trend_sign == direction (+1 LONG / -1 SHORT). Flat (0) counts as DISAGREE (dropped). Geometry of kept signals is byte-identical to frozen (pure row filter; entry/stop/TP/holding untouched).",
+    "lookbacks": [60, 240],
+    "report_both": "Both L variants are pre-specified here and both are reported; no cherry-picking the better L."
+  },
+  "coverage_policy": {
+    "keep_rule": "A signal is trend-computable for lookback L iff ALL L expected 1m bars are present AND each has close_time <= signal_time (causal); else the signal is DROPPED for that L branch, count reported, NEVER extrapolated.",
+    "control_full": "control branches run on all 94 frozen signals (reproduction gate; untouched).",
+    "trend_branches": "trend60-agree runs on signals computable at L=60 AND agreeing; trend240-agree likewise at L=240. Different N per L is the disclosed filter effect, not a bug.",
+    "precrawl_check": "Verified BEFORE running (read-only probe, no tuning): L=5 79/94 full (matches B-1mentry); L=60 full=40/94 (part=40 with only the 5 own sub-bars, zero=14); L=240 full=40/94 (part=40, zero=14). Expect trend universes of 40 coverable signals each; agreement split unknown until run."
+  },
+  "branches": ["control_1x", "control_dd_guard", "trend60_agree_1x", "trend60_agree_dd_guard", "trend240_agree_1x", "trend240_agree_dd_guard"],
+  "sizings": ["1x", "dd_guard"],
+  "control": "control_1x (94 signals, frozen geometry) must match B4 majority_1x published normal (+165.17829563633006% total_return 1.6517829563633004, -20.086073993367803% max_drawdown -0.20086073993367803, 63 trades) within 1e-6 / exact trades or STOP the run.",
+  "control_reference": {"total_return": 1.6517829563633004, "max_drawdown": -0.20086073993367803, "trades": 63},
+  "dd_guard_policy": {
+    "rule": "All 3 filter variants x both sizings = 6 pre-specified branches. dd_guard reference is THIS run's control_1x sampled equity (trade exit_time/equity_after), past-only 1-microsecond cutoff, 100.0 seed; trigger 10%, lev 0.5; applied at each branch's OWN signal times via leverage column only (geometry untouched).",
+    "reference": "control_1x this-run equity (not v03 own-book; disclosed deviation, same convention as v41/v44 shared-control reference).",
+    "guard_frac_reported": true
+  },
+  "scenarios": ["normal", "fee_stress", "execution_stress"],
+  "fee_stress_rate": 0.00055,
+  "stress": {
+    "entry_penetration_bps": 5,
+    "target_penetration_bps": 5,
+    "market_exit_slippage_bps": 5,
+    "market_exit_fee_rate": 0.00055,
+    "allow_limit_price_improvement": false
+  },
+  "monthly_note": "monthly/annual geometric from parent_plan duration (complete_evaluation_until minus folds[0][0], 365.2425d year), same formula as v41/v44.",
+  "gate": {
+    "monthly_min": 0.05,
+    "dd_max": 0.2,
+    "fills_min": 30
+  },
+  "labels": {
+    "causal": "1m bars strictly before/at signal_time only (close_time <= signal_time asserted); entry seeking still starts at t+1; no future information.",
+    "exploratory": true,
+    "independent_test": false,
+    "live_approved": false
+  }
+}

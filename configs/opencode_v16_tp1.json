@@ -1,0 +1,37 @@
+{
+  "experiment": "opencode-v16-tp1",
+  "family": "R3-N3 neutral: TP1 take-fraction exit matrix on frozen v30 isotonic-4 x {1x, dd_guard}",
+  "hypothesis": "Varying the frozen TP1 take fraction (share of notional closed at TP1, remainder to TP2/timeout; known at signal time as a frozen per-branch constant, causal past-only) may shift the monthly-geometric/DD frontier. Engine default 0.5 everywhere and untried; this narrow exit-micro-structure matrix is the honest novelty. Exploratory only.",
+  "signals": "artifacts/research/opencode_v02_reproduce_v30/isotonic_4/signals.parquet",
+  "candles": "data/processed/swing_regime_research_v4/candles.parquet",
+  "dataset_config": "data/processed/swing_regime_research_v4/config.json",
+  "parent_plan": "configs/swing_v15_continuous_folds.json",
+  "tp1_fractions": {
+    "tp025": 0.25,
+    "tp050": 0.5,
+    "tp075": 0.75
+  },
+  "tp1_note": "tp1_fraction is a frozen ExecutionConfig constant per branch (0<f<1, asserted). Frozen signals carry a tp1_fraction=0.5 column that the engine ignores (engine reads ExecutionConfig only); the probe overwrites that column per branch for artifact provenance with no engine effect. No per-signal fitting; same 94 frozen signals in every branch.",
+  "sizings": ["1x", "dd_guard"],
+  "branches": ["tp025_1x", "tp025_dd_guard", "tp050_1x", "tp050_dd_guard", "tp075_1x", "tp075_dd_guard"],
+  "control": "tp050_1x (tp1=0.5/1x) must match published isotonic_4 exposure1.0 normal (+122.80% total_return, -20.09% max_drawdown, 65 trades) or STOP",
+  "dd_trigger": 0.1,
+  "dd_guard_lev": 0.5,
+  "dd_guard_reference": "tp050_1x (tp1=0.5) control sampled equity (trade exit_time/equity_after), past-only 1-microsecond cutoff, 100.0 seed level; each dd_guard branch applies the guard state at its OWN signal times. Shared single reference keeps tp fractions comparable. Disclosed deviation from v03 (own-book per branch).",
+  "lev_min": 0.25,
+  "lev_max": 1.0,
+  "fee_stress_rate": 0.00055,
+  "stress": {
+    "entry_penetration_bps": 5,
+    "target_penetration_bps": 5,
+    "market_exit_slippage_bps": 5,
+    "market_exit_fee_rate": 0.00055,
+    "allow_limit_price_improvement": false
+  },
+  "stress_path_note": "Pre-run code inspection: src/agentic_alpha_lab/backtest/execution_stress.py run_stress line 128 close_fraction(fill, execution.tp1_fraction, ...) honors ExecutionConfig.tp1_fraction; line 53-54 validates 0<tp1_fraction<1. Runtime re-asserted in driver.",
+  "gate": {
+    "monthly_min": 0.05,
+    "dd_max": 0.2,
+    "fills_min": 30
+  }
+}

@@ -1,0 +1,8 @@
+{
+  "experiment": "opencode-v03-risk-overlay",
+  "hypothesis": "Frozen v30 isotonic-4 signals carry the only demonstrated positive expectancy; a causal realized-vol target plus an equity-curve drawdown guard (both past-only, signals untouched) may improve the risk-adjusted frontier without refitting anything.",
+  "signals": "artifacts/research/opencode_v02_reproduce_v30/isotonic_4/signals.parquet",
+  "candles": "data/processed/swing_regime_research_v4/candles.parquet",
+  "dataset_config": "data/processed/swing_regime_research_v4/config.json",
+  "parent_plan": "configs/swing_v15_continuous_folds.json"
+}

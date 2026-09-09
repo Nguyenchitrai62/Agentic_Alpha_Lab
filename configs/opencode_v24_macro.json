@@ -1,0 +1,72 @@
+{
+  "experiment": "opencode-v24-macro",
+  "family": "R5-D2 data: macro-daily regime-conditional policy on frozen majority_1x (local only)",
+  "hypothesis": "BTC swing PnL của tín hiệu majority_1x phụ thuộc regime vĩ mô: risk-on (SPY>MA50) mang phần lớn lợi nhuận; risk-off và các lúc USD tăng nóng (DXY z>1.5) kéo DD. Chưa ai thử dữ liệu macro mới này (ledger round5 D2).",
+  "signals": "artifacts/research/opencode_v15_mapensemble/majority_1x/signals.parquet",
+  "candles": "data/processed/swing_regime_research_v4/candles.parquet",
+  "dataset_config": "data/processed/swing_regime_research_v4/config.json",
+  "parent_plan": "configs/swing_v15_continuous_folds.json",
+  "macro_dir": "data/raw/opencode_macro_yahoo_20220101_20260907",
+  "macro_source": "Yahoo Finance Chart API v8 (free, no key). Stooq free CSV bi chan tren host nay (HTTP 404 / JS-challenge) nen dung Yahoo, ghi ro nguon.",
+  "macro_symbols": {
+    "spy": "SPY (proxy ^SPX)",
+    "dxy": "DX-Y.NYB (DXY index; chinh)",
+    "uup": "UUP (fallback dollar, coverage)",
+    "gld": "GLD (vang ETF, coverage + mo ta)",
+    "gcf": "GC=F (vang future, coverage)",
+    "spx": "^GSPC (SPX index, tham khao)"
+  },
+  "regime": {
+    "causality": "Decision ngay T chi dung macro dong cua ngay T-1 tro ve truoc (strictly: macro date < UTC date cua signal_time). Regime features past-only, khong refit.",
+    "risk_on": "SPY close(T-1) > MA50 cua SPY (mean 50 daily close ket thuc T-1). risk_off = nguoc lai.",
+    "dxy_z60": "(DXY close(T-1) - mean60) / std60 (ddof=1), mean/std tren 60 daily close ket thuc T-1. strong_dxy = z > 1.5.",
+    "vix_proxy_amp20": "(max high 20d - min low 20d) / close(T-1) cua SPY, 20 daily bar ket thuc T-1. CHI MO TA, khong lam filter trong matrix nay.",
+    "nan_policy": "Neu thieu macro (NaN): risk_on/risk_off = drop khoi ca 2 nhanh; strong_dxy = giu lai (khong cam). Thuc te 0 NaN tren 94 tin hieu (macro tu 2022-01).",
+    "gld_note": "GLD/GC crawl de coverage + thong ke mo ta; matrix nay chi filter theo SPY/DXY theo nhiem vu."
+  },
+  "filters": {
+    "control": "giu tat ca 94 tin hieu frozen",
+    "risk_on_only": "chi giu tin hieu co risk_on == True",
+    "risk_off_only": "chi giu tin hieu co risk_on == False",
+    "no_strong_dxy": "cam tin hieu co dxy_z60 > 1.5"
+  },
+  "branches": ["control_1x", "control_dd_guard", "risk_on_only_1x", "risk_on_only_dd_guard", "risk_off_only_1x", "risk_off_only_dd_guard", "no_strong_dxy_1x", "no_strong_dxy_dd_guard"],
+  "branch_map": {
+    "control_1x": {"filter": "control", "sizing": "1x"},
+    "control_dd_guard": {"filter": "control", "sizing": "dd_guard"},
+    "risk_on_only_1x": {"filter": "risk_on_only", "sizing": "1x"},
+    "risk_on_only_dd_guard": {"filter": "risk_on_only", "sizing": "dd_guard"},
+    "risk_off_only_1x": {"filter": "risk_off_only", "sizing": "1x"},
+    "risk_off_only_dd_guard": {"filter": "risk_off_only", "sizing": "dd_guard"},
+    "no_strong_dxy_1x": {"filter": "no_strong_dxy", "sizing": "1x"},
+    "no_strong_dxy_dd_guard": {"filter": "no_strong_dxy", "sizing": "dd_guard"}
+  },
+  "sizings": ["1x", "dd_guard"],
+  "method": "Subset truc tiep 94 tin hieu majority_1x frozen (da qua frequency loop monthly-cap-4 + cooldown-5d o v15); KHONG chay lai frequency loop. Control rerun phai khop artifact goc. dd_guard ap dung tren subset cua tung nhanh.",
+  "control": "control_1x normal phai khop majority_1x goc (+165.17829563633% total_return 1.6517829563633004, -20.086073993367803% max_drawdown, 63 trades) hoac STOP",
+  "dd_trigger": 0.1,
+  "dd_guard_lev": 0.5,
+  "dd_guard_reference": "control_1x (majority_1x rerun) sampled equity (trade exit_time/equity_after, trade-candle-close sampled), past-only 1-microsecond cutoff, 100.0 seed; moi nhanh ap dung guard tai signal_time cua subset RIENG minh. Cong bo cong thuc, giong v15/v22.",
+  "lev_min": 0.25,
+  "lev_max": 1.0,
+  "execution_frozen": "entry_expiry_bars=12 (dataset config), max_holding_bars=2016 (7d*288), tp1_fraction=0.5 (default), intrabar_policy=stop_first; giong he v15 de control khop. Chi subset tin hieu thay doi theo nhanh.",
+  "fee_stress_rate": 0.00055,
+  "stress": {
+    "entry_penetration_bps": 5,
+    "target_penetration_bps": 5,
+    "market_exit_slippage_bps": 5,
+    "market_exit_fee_rate": 0.00055,
+    "allow_limit_price_improvement": false
+  },
+  "gate": {
+    "monthly_min": 0.05,
+    "dd_max": 0.2,
+    "fills_min": 30
+  },
+  "expected_n_signals_causal": {
+    "control": 94,
+    "risk_on_only": 71,
+    "risk_off_only": 23,
+    "no_strong_dxy": 82
+  }
+}

@@ -1,0 +1,170 @@
+{
+  "tool": "opencode_forward_test",
+  "version": "1.0.0",
+  "purpose": "Promotion machine for the NEXT candidate that passes the research gate. Pre-specified forward-validation protocol: IN-SAMPLE (opened interval) is reference only; promotion requires a FORWARD window on data strictly after the frozen cutoff, plus green paper rehearsal. Analysis/config only; no backtests, no training, no live orders.",
+  "data_freeze": {
+    "frozen_data_end_exclusive": "2026-03-23",
+    "last_candle_close": "2026-03-22T23:59:59.999+00:00",
+    "candles": "data/processed/swing_regime_research_v4/candles.parquet",
+    "in_sample_interval_note": "Development interval opened 2023-2026 (frozen majority_1x signals 2023-09-10/2026-03-11, backtest exits 2023-09-11/2026-03-08). Per research rule 5, once inspected this interval is research data: it can NEVER serve as forward validation.",
+    "forward_start_rule": "Forward window start must be strictly after 2026-03-23T00:00:00+00:00. A --forward-start on/before the cutoff is REFUSED; a forward-trades file whose earliest exit_time is on/before the cutoff is REFUSED as overlap. No output file is written on refusal.",
+    "rationale": "Current data ends 2026-03-23, so no forward window exists yet: the runner must output FORWARD_BLOCKED (never PROMOTE) until genuinely new candles arrive. Refusing opened dates prevents relabeling in-sample as validation, the exact overfit path that produced 150+ dead branches across rounds 1-26."
+  },
+  "in_sample": {
+    "role": "reference only",
+    "method": "opencode_gatecheck on the frozen branch summary.json + normal_trades.csv (same thresholds as the research gate).",
+    "rationale": "In-sample gate/concentration/robustness describe the candidate on already-opened data. They anchor the degradation comparison (forward vs backtest monthly) but can never promote by themselves, because every standing-best book was selected on this same interval."
+  },
+  "forward_window": {
+    "min_forward_months": {
+      "value": 6,
+      "rationale": "Backtest books span ~30 trade months (2023-09/2026-03); 6 months (~20% holdout) gives the monthly-geometric statistic at least 6 points, covers 2+ max-holding windows (14d) and full fee/funding cycles, and at the 5-fills/month pace yields >=30 fills matching the fills gate. Shorter windows let 1-2 lucky months dominate (the v61 concentration lesson: top-3 months carried 35-71% of net)."
+    },
+    "month_method": "Calendar-month zero-filled exit_time series (v61 method inherited from opencode_gatecheck): months spanned = full period_range(min_exit_month, max_exit_month).",
+    "embargo": {
+      "value": "forward signals must come from a model frozen before the cutoff; no refit of normalization, labels, calibration, thresholds, or plan on forward data",
+      "rationale": "Research rules 1-4: fit on train/validation only, chronological splits with embargo >= horizon. A forward window touched by fitting is just in-sample with extra steps."
+    }
+  },
+  "research_gate": {
+    "note": "Applied to the FORWARD window (ALL present scenarios must pass). Numbers identical to the ledger research gate so forward can never lower the bar.",
+    "monthly_min": {
+      "value": 0.05,
+      "rationale": "Unchanged from the ledger gate: the 5%/mo bar rejected 150+ branches including the 2.935%/mo ceiling (majority_1x). Forward must clear the same bar, not a discounted one."
+    },
+    "dd_max": {
+      "value": 0.2,
+      "rationale": "Unchanged 20% drawdown cap (trade-candle-close sampled). A forward book that breaches it fails exactly as confirmed_dd_guard's rivals did in-sample."
+    },
+    "fills_min": {
+      "value": 30,
+      "rationale": "Unchanged 30-fill minimum in EVERY present scenario (incl. execution_stress). Kills low-coverage luck such as v28 (19 fills) and risk_off (18 fills) regardless of monthly."
+    },
+    "scenarios_expected": {
+      "value": ["normal", "fee_stress", "execution_stress"],
+      "rationale": "Normal-first reporting per user correction (limit/BTC-liquid ~ normal); fee/execution stresses stay mandatory because geometry e2.0_b1.5 collapsed 2.41%/mo -> 0.95%/mo under execution stress."
+    }
+  },
+  "concentration": {
+    "note": "Applied to FORWARD trades (exit_time + net_pnl), v61 method.",
+    "top1_month_share_gt": {
+      "value": 0.35,
+      "rationale": "Same as gatecheck: a single forward month carrying >35% of net is luck, not edge (v38-isoall top-5 carried 71.3% and was rejected as a candidate despite DD-safe monthly)."
+    },
+    "top3_months_share_gt": {
+      "value": 0.6,
+      "rationale": "Same as gatecheck: top-3 months >60% of net fails diffuse. Majority_1x itself sits at 34.7% (pass) yet its trade-level top-5 36.3% is kept as an advisory caveat."
+    },
+    "top5_trades_warn_gt": {
+      "value": 0.5,
+      "rationale": "Advisory only (never flips the verdict alone): flags single-trade dependence in the forward window, the E-monthattr lesson (top-5 carried 36-39% on standing-best books)."
+    },
+    "top5_trades_severe_gt": {
+      "value": 0.7,
+      "rationale": "Severe-trade-concentration caveat line; v38-isoall printed 71.3% here and that evidence weakened its candidacy."
+    }
+  },
+  "robustness_margins": {
+    "note": "Hard margins on the FORWARD window (fail -> HOLD at best, never PROMOTE). Stricter than the gatecheck advisory warns.",
+    "max_exec_drop_pp": {
+      "value": 0.01,
+      "rationale": "2x the gatecheck warn threshold (0.5pp). Majority_1x already drops 0.54pp normal->exec in-sample; a forward collapse beyond 1pp repeats the e2.0_b1.5 execution-fragility pattern (lost ~60% of monthly under stress)."
+    },
+    "max_fee_drag_pp": {
+      "value": 0.005,
+      "rationale": "5x the in-sample fee drag of durable books (~0.1pp). Fee break-even ladders (majority ~79bps, PF7 band2 ~140bps) prove fee cannot kill a real edge; a larger forward drag means cost-structure shift, not edge."
+    },
+    "min_dd_margin_pp": {
+      "value": 0.0,
+      "rationale": "Forward worst-scenario DD must stay inside the 20% cap with non-negative margin (margin = 0.20 - |worst DD|). Majority_1x margin is already -0.47pp in-sample, which is why it can never promote without a genuinely better forward book."
+    }
+  },
+  "degradation_vs_backtest": {
+    "forward_monthly_ge_backtest_ratio_min": {
+      "value": 0.5,
+      "rationale": "Forward normal monthly must retain >=50% of in-sample (backtest) normal monthly. Documented in-sample stresses already cost ~20% (0.54pp exec-drop + 0.13pp fee-drag on a 2.9% book), so 50% retention demands the edge survive regime shift with margin while tolerating honest decay. Necessary-not-sufficient: the absolute 5%/mo gate still binds, so a 2.9% backtest can never promote via this ratio alone."
+    }
+  },
+  "paper_ops": {
+    "note": "All six must be PASS from frozen paper-rehearsal summaries for paper_overall=green. Ops stack (halt/trip/resume/paper) is proven by tests/test_paper_trader_v21.py; each future candidate re-proves it with its own rehearsal files.",
+    "halt_demonstrated": {
+      "pass_rule": ">=1 DAILY_LOSS_HALT event across rehearsal summaries",
+      "evidence": "paper summary stats.daily_halt_events / halt_days (x3 operating run showed 9 halt days on real data)",
+      "rationale": "The halt path must be exercised on real data, not just code-reviewed; a rehearsal with zero halts proves nothing about the kill-switch wiring."
+    },
+    "trip_under_blocks": {
+      "pass_rule": ">=1 declared drill summary with divergence_tripped=true, trip direction UNDER, skipped_divergence>=1",
+      "evidence": "drill summary stats.divergence_trip + divergence_blocks (drill x3: UNDER trip 2025-08-15, 23 later real signals blocked)",
+      "rationale": "Proves the UNDER trip latches and blocks later REAL signals (v2 caught overperformance instead; the drill is the only honest trip-block proof because operating runs rarely trip)."
+    },
+    "one_sided_verified": {
+      "pass_rule": "v21_one_sided_checks == pass on every rehearsal summary",
+      "evidence": "paper summary stats.v21_one_sided_checks (v2 latched on +7.5% overperformance and blocked 75 good signals; one-sided UNDER-only is the fix)",
+      "rationale": "Over-excursions must be info-only (DIVERGENCE_OVER_INFO) and never latch; two-sided trips punish winning."
+    },
+    "same_book_identity": {
+      "pass_rule": ">=1 operating (non-drill) summary with v21_identity=true and is_drill=false",
+      "evidence": "paper summary signal_set_identity / stats.v21_identity (fail-closed fingerprint assert fixed the v2 silent book mismatch)",
+      "rationale": "Divergence is only meaningful same-book; a cross-book baseline trips on book difference, not on live divergence."
+    },
+    "kill_params_prespecified": {
+      "pass_rule": "daily_loss_halt_X_pct in {0.02, 0.03}, divergence_tolerance_Y_pct == 0.05, max_positions == 1, mode startswith SIMULATED/PAPER, live_orders == false",
+      "evidence": "paper summary halt_trip_params + mode + live_orders",
+      "rationale": "X/Y/positions are pre-specified alternates (3%/2%, 5%, 1); any other value is an undeclared experiment, and any live path is refused fail-closed."
+    },
+    "resume_parity": {
+      "pass_rule": "resume_proof block present with intents_identical=true and equity_match=true",
+      "evidence": "resume_proof artifact attached to the rehearsal (kill+resume bit-identical over the 265311-bar Track-C window, cf. tests/test_paper_trader_v21.py::test_resume_long_trackc_replay_identical)",
+      "rationale": "State persistence must survive a mid-run kill with identical continuation (intents frame + equity + counters + halt/trip state); otherwise a restart silently becomes a different bot."
+    }
+  },
+  "promotion_rule": {
+    "PROMOTE": "forward_status READY AND research-gate PASS on all forward scenarios AND concentration diffuse AND robustness margins PASS AND forward months >= 6 AND degradation ratio >= 0.50 AND paper_overall green (all six). Every condition is necessary.",
+    "REJECT": "forward READY with fills-fail in any scenario OR concentration FAIL OR total_net <= 0; or forward BLOCKED with in-sample REJECT-class (same REJECT conditions on the reference window).",
+    "HOLD": "Everything else (typically monthly-fail and/or dd-breach with fills intact and concentration diffuse): banked-leg territory, needs a monthly breakthrough, not dead. Forward BLOCKED always caps at HOLD, never PROMOTE.",
+    "rationale": "Mirrors the gatecheck decision_rule so the promotion machine cannot be more lenient than the research gate; the only path to PROMOTE adds forward proof (unseen data) + ops proof (paper rehearsal) on top of the same bar."
+  },
+  "forward_only": {
+    "when": "No same-policy frozen in-sample leg exists for the policy (first-forward policy, e.g. Kronos-mini zero-shot shakedown): READY is impossible without a second metrics pass, which is forbidden. The runner then emits forward_status FORWARD_ONLY with in_sample_baseline NO-IN-SAMPLE-BASELINE.",
+    "method": "Gate the forward window alone with the SAME research gate + concentration + robustness margins + min forward months as READY; degradation_vs_backtest is skipped and reported as NO-IN-SAMPLE-BASELINE (no ratio, no pass). Crash-safe scoring (no unconditional float formatting) so losing books report REJECT/monthly-fail instead of crashing.",
+    "max_decision": {
+      "value": "HOLD",
+      "rationale": "FORWARD_ONLY caps at HOLD max and can never PROMOTE without an in-sample baseline: prevents laundering weak history through forward-only by promoting a forward window that has no same-policy reference leg to measure degradation against. A forward-only HOLD/REJECT is process evidence only; PROMOTE requires a later READY verdict once a same-policy frozen leg exists."
+    }
+  },
+  "handoff_checklist": {
+    "note": "What a cloud model must deliver BEFORE any paper rehearsal on its weights. Each item names the required evidence artifact; paper rehearsal is REFUSED until all four are present.",
+    "replay_parity": {
+      "required": "max abs difference between cloud predictions.npy and local replay <= 1e-4, reported per fold",
+      "evidence": "replay audit report (cf. v29a/v28c/v35b replays)",
+      "rationale": "Proves paper trades what the cloud scored. Observed passes printed 1.9e-6/4.8e-6/6.7e-6, so 1e-4 is ~15x above the worst honest replay yet far below PnL materiality; anything larger is a pipeline mismatch, not noise."
+    },
+    "plan_sha_match": {
+      "required": "sha256 of the backtest/plan config pinned in the verdict; control-branch reproduction bit-identical to the published anchor",
+      "evidence": "plan config + control reproduction (cf. v15 control assert: +122.80% total, -20.09% DD, 65 trades)",
+      "rationale": "Prevents config drift between cloud training and local replay: same signals, same geometry, same costs, or the comparison is void."
+    },
+    "bounded_output_proof": {
+      "required": "documented output bounds (e.g. tanh cap range) plus smoke max|score| <= cap, order-preserving",
+      "evidence": "scale-cap smoke report (cf. v60 tanh-cap 0.038 proof; v55b 140-sigma-init proof)",
+      "rationale": "Unbounded outputs caused the v38 overconfidence explosion (bias +3.81, 95% pass gate -> pure selection noise). No bounded-output proof, no policy."
+    },
+    "val_export": {
+      "required": "validation-fold predictions exported (predictions_val.*) with fold ids and embargo >= forecast horizon, before any test inspection",
+      "evidence": "val-pred bundle (the v39/v40 prescription: calibrate-first needs validation predictions; test stays locked)",
+      "rationale": "Enables honest calibrate-first (v38-isoall rescue +57%/+83% came from calibration, not from touching test) while keeping the locked test locked per research rule 5."
+    },
+    "secret_hygiene": {
+      "required": "bundle secret-scan clean; datasets/kernels PRIVATE; submit-gate includes datasets-status=ready + minute gap",
+      "evidence": "secret-scan log + submit-gate record (cf. v28/v55 empty-input races fixed by the dataset-ready gate)",
+      "rationale": "Credentials never leave the vault and cloud lanes never race: process failures (empty /kaggle/input, 0-byte logs) cost weeks, and a leaked key costs more."
+    }
+  },
+  "warnings": [
+    "EXPLORATORY until a forward window exists; in-sample verdicts are reference only, never promotion claims.",
+    "Drawdown is trade-candle-close sampled, not true mark-price or full intrabar drawdown.",
+    "Stop/timeout exits are market-like at the scenario fee, NOT guaranteed maker/limit fills.",
+    "Do not claim maker fill probability or queue position from OHLC alone.",
+    "Capital is compounded from current equity, initial capital indexed to 100; fixed 1x is the baseline, confidence leverage capped at 2x until validated."
+  ]
+}

@@ -1,0 +1,182 @@
+{
+  "experiment": "opencode-v06-geometry",
+  "hypothesis": "Frozen v30 isotonic-4 candidate scores carry the only demonstrated expectancy; scaling limit-entry distance (entry_atr_5m) and stop/TP width (brackets_atr_4h) multiplicatively may shift fill-rate vs excursion capture. No refit; predictions untouched; candidate-index rank preserved, only absolute price levels move.",
+  "family": "entry-offset x bracket geometry matrix on frozen calibrated predictions",
+  "predictions": "artifacts/research/opencode_v02_reproduce_v30/isotonic_4/predictions.npz",
+  "decisions": "data/processed/swing_regime_research_v4/decisions.parquet",
+  "candles": "data/processed/swing_regime_research_v4/candles.parquet",
+  "dataset_config": "data/processed/swing_regime_research_v4/config.json",
+  "parent_plan": "configs/swing_v15_continuous_folds.json",
+  "base_grid": {
+    "entry_atr_5m": [0.5, 1.5],
+    "brackets_atr_4h": [[2.0, 2.0, 4.0], [3.0, 3.0, 6.0]],
+    "holding_days": [3, 7]
+  },
+  "entry_scales": [0.5, 1.0, 2.0],
+  "bracket_scales": [0.75, 1.0, 1.5],
+  "sizings": ["1x", "dd_guard"],
+  "dd_trigger": 0.1,
+  "dd_guard_lev": 0.5,
+  "lev_min": 0.25,
+  "lev_max": 1.0,
+  "fee_stress_rate": 0.00055,
+  "stress": {
+    "entry_penetration_bps": 5,
+    "target_penetration_bps": 5,
+    "market_exit_slippage_bps": 5,
+    "market_exit_fee_rate": 0.00055,
+    "allow_limit_price_improvement": false
+  },
+  "gate": {
+    "monthly_min": 0.05,
+    "dd_max": 0.2,
+    "fills_min": 30
+  },
+  "branches": [
+    {
+      "name": "e0.5_b0.75_1x",
+      "entry_scale": 0.5,
+      "bracket_scale": 0.75,
+      "sizing": "1x",
+      "entry_atr_5m": [0.25, 0.75],
+      "brackets_atr_4h": [[1.5, 1.5, 3.0], [2.25, 2.25, 4.5]]
+    },
+    {
+      "name": "e0.5_b0.75_dd_guard",
+      "entry_scale": 0.5,
+      "bracket_scale": 0.75,
+      "sizing": "dd_guard",
+      "entry_atr_5m": [0.25, 0.75],
+      "brackets_atr_4h": [[1.5, 1.5, 3.0], [2.25, 2.25, 4.5]]
+    },
+    {
+      "name": "e0.5_b1.0_1x",
+      "entry_scale": 0.5,
+      "bracket_scale": 1.0,
+      "sizing": "1x",
+      "entry_atr_5m": [0.25, 0.75],
+      "brackets_atr_4h": [[2.0, 2.0, 4.0], [3.0, 3.0, 6.0]]
+    },
+    {
+      "name": "e0.5_b1.0_dd_guard",
+      "entry_scale": 0.5,
+      "bracket_scale": 1.0,
+      "sizing": "dd_guard",
+      "entry_atr_5m": [0.25, 0.75],
+      "brackets_atr_4h": [[2.0, 2.0, 4.0], [3.0, 3.0, 6.0]]
+    },
+    {
+      "name": "e0.5_b1.5_1x",
+      "entry_scale": 0.5,
+      "bracket_scale": 1.5,
+      "sizing": "1x",
+      "entry_atr_5m": [0.25, 0.75],
+      "brackets_atr_4h": [[3.0, 3.0, 6.0], [4.5, 4.5, 9.0]]
+    },
+    {
+      "name": "e0.5_b1.5_dd_guard",
+      "entry_scale": 0.5,
+      "bracket_scale": 1.5,
+      "sizing": "dd_guard",
+      "entry_atr_5m": [0.25, 0.75],
+      "brackets_atr_4h": [[3.0, 3.0, 6.0], [4.5, 4.5, 9.0]]
+    },
+    {
+      "name": "e1.0_b0.75_1x",
+      "entry_scale": 1.0,
+      "bracket_scale": 0.75,
+      "sizing": "1x",
+      "entry_atr_5m": [0.5, 1.5],
+      "brackets_atr_4h": [[1.5, 1.5, 3.0], [2.25, 2.25, 4.5]]
+    },
+    {
+      "name": "e1.0_b0.75_dd_guard",
+      "entry_scale": 1.0,
+      "bracket_scale": 0.75,
+      "sizing": "dd_guard",
+      "entry_atr_5m": [0.5, 1.5],
+      "brackets_atr_4h": [[1.5, 1.5, 3.0], [2.25, 2.25, 4.5]]
+    },
+    {
+      "name": "e1.0_b1.0_1x",
+      "entry_scale": 1.0,
+      "bracket_scale": 1.0,
+      "sizing": "1x",
+      "entry_atr_5m": [0.5, 1.5],
+      "brackets_atr_4h": [[2.0, 2.0, 4.0], [3.0, 3.0, 6.0]]
+    },
+    {
+      "name": "e1.0_b1.0_dd_guard",
+      "entry_scale": 1.0,
+      "bracket_scale": 1.0,
+      "sizing": "dd_guard",
+      "entry_atr_5m": [0.5, 1.5],
+      "brackets_atr_4h": [[2.0, 2.0, 4.0], [3.0, 3.0, 6.0]]
+    },
+    {
+      "name": "e1.0_b1.5_1x",
+      "entry_scale": 1.0,
+      "bracket_scale": 1.5,
+      "sizing": "1x",
+      "entry_atr_5m": [0.5, 1.5],
+      "brackets_atr_4h": [[3.0, 3.0, 6.0], [4.5, 4.5, 9.0]]
+    },
+    {
+      "name": "e1.0_b1.5_dd_guard",
+      "entry_scale": 1.0,
+      "bracket_scale": 1.5,
+      "sizing": "dd_guard",
+      "entry_atr_5m": [0.5, 1.5],
+      "brackets_atr_4h": [[3.0, 3.0, 6.0], [4.5, 4.5, 9.0]]
+    },
+    {
+      "name": "e2.0_b0.75_1x",
+      "entry_scale": 2.0,
+      "bracket_scale": 0.75,
+      "sizing": "1x",
+      "entry_atr_5m": [1.0, 3.0],
+      "brackets_atr_4h": [[1.5, 1.5, 3.0], [2.25, 2.25, 4.5]]
+    },
+    {
+      "name": "e2.0_b0.75_dd_guard",
+      "entry_scale": 2.0,
+      "bracket_scale": 0.75,
+      "sizing": "dd_guard",
+      "entry_atr_5m": [1.0, 3.0],
+      "brackets_atr_4h": [[1.5, 1.5, 3.0], [2.25, 2.25, 4.5]]
+    },
+    {
+      "name": "e2.0_b1.0_1x",
+      "entry_scale": 2.0,
+      "bracket_scale": 1.0,
+      "sizing": "1x",
+      "entry_atr_5m": [1.0, 3.0],
+      "brackets_atr_4h": [[2.0, 2.0, 4.0], [3.0, 3.0, 6.0]]
+    },
+    {
+      "name": "e2.0_b1.0_dd_guard",
+      "entry_scale": 2.0,
+      "bracket_scale": 1.0,
+      "sizing": "dd_guard",
+      "entry_atr_5m": [1.0, 3.0],
+      "brackets_atr_4h": [[2.0, 2.0, 4.0], [3.0, 3.0, 6.0]]
+    },
+    {
+      "name": "e2.0_b1.5_1x",
+      "entry_scale": 2.0,
+      "bracket_scale": 1.5,
+      "sizing": "1x",
+      "entry_atr_5m": [1.0, 3.0],
+      "brackets_atr_4h": [[3.0, 3.0, 6.0], [4.5, 4.5, 9.0]]
+    },
+    {
+      "name": "e2.0_b1.5_dd_guard",
+      "entry_scale": 2.0,
+      "bracket_scale": 1.5,
+      "sizing": "dd_guard",
+      "entry_atr_5m": [1.0, 3.0],
+      "brackets_atr_4h": [[3.0, 3.0, 6.0], [4.5, 4.5, 9.0]]
+    }
+  ],
+  "notes": "PHASE-1 pre-specified FULL matrix (9 geometries x 2 sizings = 18 branches). Scales multiply base grid values. Control is e1.0_b1.0_1x. Holding grid, policy thresholds, frequency policy, costs frozen. Candidate-index ordering preserved; only absolute entry/stop/TP levels move. No matrix changes permitted after backtests."
+}

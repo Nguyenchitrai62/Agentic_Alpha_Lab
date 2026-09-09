@@ -1,0 +1,79 @@
+{
+  "experiment": "opencode-v58-1mvol",
+  "family": "R18-B breakthrough: 1m-range realized-volatility regime filter on frozen majority_1x (new information channel, never tested)",
+  "hypothesis": "Trailing 1m realized volatility (past-only information the 5m book does not encode as a filter) separates signal quality: keeping majority_1x signals only when 24h 1m vol is in-band improves monthly net without collapsing fills. Different from round16 1m micro-trend DIRECTION (dead both ways) and from v12 5m-vol regime (dead standalone): this is 1m RANGE/volatility magnitude, not direction.",
+  "base": {
+    "signals": "artifacts/research/opencode_v15_mapensemble/majority_1x/signals.parquet",
+    "candles_5m": "data/processed/swing_regime_research_v4/candles.parquet",
+    "dataset_config": "data/processed/swing_regime_research_v4/config.json",
+    "parent_plan": "configs/swing_v15_continuous_folds.json",
+    "m1dir": "data/raw/opencode_1m_audit_20260907",
+    "n_signals_frozen": 94
+  },
+  "vol_formula": {
+    "note": "Trailing 24h = 1440 1m bars with close_time in (S-24h, S], i.e. 1m opens S.floor('min')-1439min .. S.floor('min'), where S = signal_time = 5m candle close_time. Strictly causal: every 1m bar must satisfy close_time <= S (asserted at runtime).",
+    "returns": "r_i = ln(close_i / close_{i-1}) for i=1..1439 over the 1440 closes (1439 log-returns).",
+    "std": "sample std with ddof=1 over the 1439 log-returns.",
+    "annualized": "vol_ann = std * sqrt(365.2425*24*60); sqrt factor = 725.2235517411166. Scaling is monotonic so tercile assignment is invariant to the year convention; convention disclosed here.",
+    "annualization_factor": 725.2235517411166,
+    "n_bars": 1440,
+    "n_returns": 1439
+  },
+  "coverage_policy": {
+    "keep_rule": "A signal is vol-computable iff ALL 1440 expected 1m bars are present AND each has close_time <= signal_time (causal); else DROPPED, count reported, NEVER extrapolated.",
+    "control_full": "control branches run on all 94 frozen signals (reproduction gate; untouched).",
+    "vol_branches": "low/mid/high run on vol-computable signals in their band only. Different N per band is the disclosed filter effect, not a bug.",
+    "precrawl_probe": "Read-only probe BEFORE backtests (no tuning): L=5 full=79/94 (matches B-1mentry); L=1440 full=19/94, dropped=75/94. Pooled distribution over the 19 computable vols only."
+  },
+  "bands": {
+    "note": "Terciles of the pooled 19-vol distribution, computed BEFORE backtests (read-only probe above). Thresholds frozen here; driver asserts recomputed pooled distribution matches within 1e-9 and applies the rule below.",
+    "pooled_n": 19,
+    "dropped_no_history": 75,
+    "p33": 0.3794771419667856,
+    "p66": 0.5254974684715426,
+    "quantile_method": "numpy.quantile linear, q=[1/3, 2/3] over sorted pooled vols",
+    "low": "vol <= p33 (expected 7: positions [9, 35, 58, 67, 69, 71, 84])",
+    "mid": "p33 < vol <= p66 (expected 6: positions [18, 41, 46, 51, 77, 83])",
+    "high": "vol > p66 (expected 6: positions [22, 59, 74, 81, 89, 92])",
+    "expected_counts": {"low": 7, "mid": 6, "high": 6},
+    "expected_positions": {
+      "low": [9, 35, 58, 67, 69, 71, 84],
+      "mid": [18, 41, 46, 51, 77, 83],
+      "high": [22, 59, 74, 81, 89, 92]
+    }
+  },
+  "branches": ["control_1x", "control_dd_guard", "lowvol_1x", "lowvol_dd_guard", "midvol_1x", "midvol_dd_guard", "highvol_1x", "highvol_dd_guard"],
+  "sizings": ["1x", "dd_guard"],
+  "control": "control_1x (94 signals, frozen geometry) must match B4 majority_1x published normal (+165.17829563633006% total_return 1.6517829563633004, -20.086073993367803% max_drawdown -0.20086073993367803, 63 trades) within 1e-6 / exact trades or STOP the run.",
+  "control_reference": {"total_return": 1.6517829563633004, "max_drawdown": -0.20086073993367803, "trades": 63},
+  "dd_guard_policy": {
+    "rule": "All 4 filter variants x both sizings = 8 pre-specified branches. dd_guard reference is THIS run's control_1x sampled equity (trade exit_time/equity_after), past-only 1-microsecond cutoff, 100.0 seed; trigger 10%, lev 0.5; applied at each branch's OWN signal times via leverage column only (geometry untouched).",
+    "reference": "control_1x this-run equity (not v03 own-book; disclosed deviation, same convention as v41/v44/v53 shared-control reference).",
+    "trigger": 0.1,
+    "lev": 0.5,
+    "lev_min": 0.25,
+    "lev_max": 1.0,
+    "guard_frac_reported": true
+  },
+  "scenarios": ["normal", "fee_stress", "execution_stress"],
+  "fee_stress_rate": 0.00055,
+  "stress": {
+    "entry_penetration_bps": 5,
+    "target_penetration_bps": 5,
+    "market_exit_slippage_bps": 5,
+    "market_exit_fee_rate": 0.00055,
+    "allow_limit_price_improvement": false
+  },
+  "monthly_note": "monthly/annual geometric from parent_plan duration (complete_evaluation_until minus folds[0][0], 365.2425d year), same formula as v41/v44/v53.",
+  "gate": {
+    "monthly_min": 0.05,
+    "dd_max": 0.2,
+    "fills_min": 30
+  },
+  "labels": {
+    "causal": "1m bars strictly before/at signal_time only (close_time <= signal_time asserted); entry seeking still starts at t+1; no future information.",
+    "exploratory": true,
+    "independent_test": false,
+    "live_approved": false
+  }
+}

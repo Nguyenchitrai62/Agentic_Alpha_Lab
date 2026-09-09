@@ -1,0 +1,39 @@
+{
+  "experiment": "opencode-v11-threshold",
+  "family": "R2-N1 neutral: score-threshold tiers on frozen v30 isotonic-4 x {1x, dd_guard}",
+  "hypothesis": "Filtering the frozen v30 isotonic-4 signal set to higher expected_net_percent scores (known at signal time, causal past-only) may improve the monthly-geometric/DD frontier. Tiers were tried on v42 outputs by Codex but never on v30-iso4 + dd_guard; that narrow combination is the honest novelty. Exploratory only.",
+  "signals": "artifacts/research/opencode_v02_reproduce_v30/isotonic_4/signals.parquet",
+  "candles": "data/processed/swing_regime_research_v4/candles.parquet",
+  "dataset_config": "data/processed/swing_regime_research_v4/config.json",
+  "parent_plan": "configs/swing_v15_continuous_folds.json",
+  "score_column": "expected_net_percent",
+  "base_policy_minimum_expected_net_percent": 0.3,
+  "tiers": {
+    "control": null,
+    "t030": 0.3,
+    "t040": 0.4,
+    "t050": 0.5
+  },
+  "tier_note": "t030 equals the base policy minimum (0.3); frozen minimum signal is ~0.311 so t030 is a near-passthrough that verifies base-policy == control. t040 = base+0.1pp, t050 = base+0.2pp. Filter rule: keep signals with score >= tier (score known at signal time, causal). ohlc_fill_score NOT used for filtering (base policy minimum_fill_score 0.25 already satisfied by all frozen signals, min ~0.364).",
+  "sizings": ["1x", "dd_guard"],
+  "branches": ["control_1x", "control_dd_guard", "t030_1x", "t030_dd_guard", "t040_1x", "t040_dd_guard", "t050_1x", "t050_dd_guard"],
+  "control": "unfiltered control_1x must match published isotonic_4 exposure1.0 normal (+122.80% total_return, -20.09% max_drawdown, 65 trades) or STOP",
+  "dd_trigger": 0.1,
+  "dd_guard_lev": 0.5,
+  "dd_guard_reference": "UNFILTERED-control (control_1x) sampled equity (trade exit_time/equity_after), past-only 1-microsecond cutoff, 100.0 seed level; each branch applies the guard state at its OWN signal times. Disclosed deviation from v03 (which used own-book equity per branch): single shared reference keeps tiers comparable.",
+  "lev_min": 0.25,
+  "lev_max": 1.0,
+  "fee_stress_rate": 0.00055,
+  "stress": {
+    "entry_penetration_bps": 5,
+    "target_penetration_bps": 5,
+    "market_exit_slippage_bps": 5,
+    "market_exit_fee_rate": 0.00055,
+    "allow_limit_price_improvement": false
+  },
+  "gate": {
+    "monthly_min": 0.05,
+    "dd_max": 0.2,
+    "fills_min": 30
+  }
+}

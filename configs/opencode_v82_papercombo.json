@@ -1,0 +1,69 @@
+{
+  "mode": "SIMULATED/PAPER - no live orders. This config must never contain secrets.",
+  "exploratory": true,
+  "allow_live_orders": false,
+  "label": "OPENED-INTERVAL REHEARSAL (not forward validation - data already opened; ops behavior only: halts/trips/state)",
+  "data": {
+    "candles": "data/processed/swing_regime_research_v4/candles.parquet",
+    "signals_replay_only": "artifacts/research/opencode_v75_L3real/dd_guard_tp075/signals.parquet",
+    "note": "v2.1 OPERATING run (same-book): frozen L3-combo dd_guard_tp075 signals (210 rows on 202 bars incl. 8 same-bar opposite pairs, 101 backtest fills) replayed against the frozen dd_guard_tp075 normal backtest baseline via thin adapter scripts/opencode_r27L3_papercombo.py (ComboReplayPredictor: sequence-keyed replay so all 210 rows survive the v2.1 identity fingerprint; deterministic top-ohlc_fill_score pick on collided bars; v2.1/v2/v1 UNMODIFIED). The frozen leverage column is intentionally IGNORED (paper guard recomputes live from paper equity)."
+  },
+  "guard": {
+    "name": "dd_guard",
+    "dd_trigger": 0.1,
+    "guard_leverage": 0.5,
+    "full_leverage": 1.0,
+    "max_leverage": 1.0,
+    "reference": "scripts/opencode_risk_overlay_probe.py:47-61 (lev = 0.5 while past-only realized equity is >10% under its trailing peak, else 1.0). State updated on closed bars only, strictly before the signal bar's close."
+  },
+  "costs": {
+    "fee_rate_per_fill": 0.0002,
+    "funding_long_rate": 0.0001,
+    "funding_short_rate": 0.0,
+    "funding_interval_hours": 8
+  },
+  "policy_geometry": {
+    "entry_expiry_bars": 12,
+    "max_holding_bars": 2016,
+    "tp1_fraction_reference": 0.75,
+    "paper_exit_note": "Paper account takes the FULL position off at TP2 (no TP1 0.75 split + time_after_tp1 handling) - a documented SIMPLIFICATION vs engine ohlc-v2. Do not compare paper equity 1:1 with backtest equity; the one-sided divergence trip (Y=5% UNDER-only) watches for excess drift.",
+    "intrabar_policy": "stop_first",
+    "min_confidence": 0.25
+  },
+  "account": {
+    "initial_equity_indexed": 100.0
+  },
+  "kill_switch": {
+    "daily_loss_halt_pct": 0.03,
+    "max_positions": 1,
+    "note": "PRE-SPECIFIED kill-switch X=3%: UTC-day loss halts NEW intents for the rest of the day (positions still managed to exit); max_positions=1 asserted fail-closed."
+  },
+  "divergence": {
+    "baseline": "artifacts/research/opencode_v75_L3real/dd_guard_tp075/normal_trades.csv",
+    "baseline_signals": "artifacts/research/opencode_v75_L3real/dd_guard_tp075/signals.parquet",
+    "tolerance_pct": 0.05,
+    "definition": "PRE-SPECIFIED one-sided trip: Y=5% on UNDERperformance only, (paper-expected)/expected < -5% per closed bar vs the FROZEN SAME-BOOK dd_guard_tp075 normal path (exit_index -> equity_after, forward-filled). Overperformance is logged once as DIVERGENCE_OVER_INFO and never latches. Trip latches: all further new intents blocked + alert record (direction=UNDER) logged. Identity between replay signals and baseline_signals is asserted at load (fail-closed).",
+    "initial_equity": 100.0,
+    "latch": true,
+    "one_sided": "UNDER_ONLY"
+  },
+  "state": {
+    "persist_path": "artifacts/research/opencode_paper_combo/guard_halt_state.json",
+    "alert_log": "artifacts/research/opencode_paper_combo/alerts.jsonl",
+    "persist_every_n_bars": 1,
+    "resume": false,
+    "note": "Guard/halt/trip snapshot rewritten every bar; --resume reloads it and continues the walk."
+  },
+  "live_feed": {
+    "enabled": false,
+    "wiring": "FUTURE wiring point (no live path in this module): on each CLOSED 5m bar, append the row (same columns, index continuing the global bar_index sequence) and call strategy.on_bar(closed_frame) + strategy.save_state(state_path). The interlock REFUSES enabled=true here.",
+    "refused_flags": ["--live", "--live-feed", "--enable-orders", "--resume-live", "--send-orders"]
+  },
+  "demo": {
+    "bars": 294401,
+    "start_bar": 148600,
+    "end_bar": 443000,
+    "window": "combo_rehearsal_fullbook",
+    "note": "Full-book rehearsal window: starts 8 bars before the first combo signal (148608) for clean day-open seeding, ends after the last combo exit (442956) so every paper position settles. Kill-switch X=3%, trip Y=5% UNDER-only."
+  }
+}

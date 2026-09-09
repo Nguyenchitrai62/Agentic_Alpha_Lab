@@ -1,0 +1,890 @@
+{
+  "artifact_policy": "copy exact floats from summary.json/portfolio.json; never invent numbers; skip missing files with note; special (non-portfolio) rows carry finding strings with null numerics",
+  "branch_select_rule": "max normal monthly_geometric_net among listed candidates",
+  "cloud_track": [
+    {
+      "audit": "COMPLETE, replay DEAD: best branch exec monthly -0.076%; fresh 451k-param TCN has no edge",
+      "lesson": "Small fresh TCN dead; smoke 0-signals pre-train is expected, not a bug",
+      "model": "A1-TCN v25",
+      "status": "COMPLETE"
+    },
+    {
+      "audit": "COMPLETE, replay DEAD: monthly 0.33%, fills 19 (fail gate), coverage 0.28% (34/12228)",
+      "lesson": "Underfit (early-stop epoch 1-3) + missing ranking loss (rank 0.018) + no calibrate-first; all overconfident",
+      "model": "BigModel v28 (2.8M multitask)",
+      "status": "COMPLETE"
+    },
+    {
+      "audit": "COMPLETE, replay DEAD standalone: mms exec +0.29% is a filter artifact; rank AM -0.028",
+      "lesson": "Percentile-gate PARTIAL RESCUE banked as leg (+87%/1.88%/mo DD-safe); rescue-tool for weak models only",
+      "model": "v33-retry (action-margin GRU)",
+      "status": "COMPLETE"
+    },
+    {
+      "audit": "COMPLETE, replay DEAD: monthly ~0.3%, DD breach 5/6, rank AM -0.0105, early-stop recurred 18/33",
+      "lesson": "Coverage-floor bought garbage coverage; confirms v38 prescription",
+      "model": "v35 (SSM coverage-floor)",
+      "status": "COMPLETE"
+    },
+    {
+      "audit": "ERROR-infra (Kaggle P100 sm_60 vs torch, guard self-abort) -> CPU-fallback retry COMPLETE, replay DEAD: p50gate_dd +0.43%/mo, DD -25.8%",
+      "lesson": "GPU-agnostic guards mandatory in every package",
+      "model": "A2-multitask v26b",
+      "status": "COMPLETE-after-retry"
+    },
+    {
+      "audit": "COMPLETE, audit DEAD standalone: rank FIXED +0.066, 33/33 full 16ep; overconfidence explosion bias +3.81, monthly 1.1-1.5%, DD breach 6/6",
+      "lesson": "Isoall rescue -> v38-isoall leg (1.82% DD-safe); percentile-gate HURTS ranked models",
+      "model": "v38 (rankloss SSM)",
+      "status": "COMPLETE"
+    },
+    {
+      "audit": "UNTESTED: v2 ERROR empty-input race (kernel pushed 3-6s after dataset) -> v2-retry ERROR missing module macro_micro_value",
+      "lesson": "Submit-gate MUST include datasets-status=ready + minute gap; bundle-only import test mandatory",
+      "model": "v55 (rankonly SSM)",
+      "status": "ERROR-infra-dead"
+    },
+    {
+      "audit": "UNTESTED: v1 ERROR ~40s 0-byte log (same transitive-import family); r39 B-v55bsubmit DID NOT submit: staging lacks the allowlist fix (import-proven FAIL, bundle 31 entries, 0 macro-module macro_micro_value.py; re-push would replay ModuleNotFoundError); lane acc1 FREE but B2 gate unconfirmed (no TOKEN_2 in worker) + acc1 quota-exhausted note",
+      "lesson": "Process catch: rebuild staging WITH fix + bundle-only import proof before any retry (Round 40 B-v55brebuild, B owns, 0 acc2 writes); v55b keeps first turn (staged earlier than v96)",
+      "model": "v55b (rankonly scale-cap)",
+      "status": "ERROR-infra-dead (staging-blocked)"
+    },
+    {
+      "audit": "COMPLETE, audit FAIL: monthly 2.2-2.3%, DD -31~-65%; scale-cap fixed bias (+3.81->-0.23) but killed rank-gradient (loss flat) + noise coverage (60.8%)",
+      "lesson": "v40 prescription: rank-on-raw + cap-at-policy +-2% + deterministic tie-break + outlier-robust calibrate",
+      "model": "v39 (scale-cap + val-export)",
+      "status": "COMPLETE"
+    },
+    {
+      "audit": "COMPLETE, audit DEAD (v77b): rank kept (loss down 33/33, rank +0.052) but post-hoc clip +-0.02 saturated 95% at cap -> selection noise, monthly ~0.02%; tie-break determinized noise; winsor-calibrate (v90) also dead (monthly negative)",
+      "lesson": "Cap-at-policy hypothesis REJECTED. v41 direction: scale-at-origin or select-raw-cap-for-size; outlier-robust calibrate validated mechanically only",
+      "model": "v40 (rank-on-raw + cap-at-policy)",
+      "status": "COMPLETE-DEAD"
+    },
+    {
+      "audit": "COMPLETE poll-1 (r33 v55d): replay PASS 2.86e-6; rank +0.022 (< v38 +0.066 multitask); monthly negative all 3 (normal -0.75%/mo); DD breach all 3 (normal -35.59%); pass-rate 32.5% healthy; bench GTX1650 321.50ms/window, 19.75MB VRAM; verify v98 4/4 PASS bit-identical",
+      "lesson": "Ranking-ALONE DEAD; multitask-dilution theory REJECTED (inverted: ranking needs value-prior); weights stored artifacts/models/v55c/; calibrate-first rescue -> v55c-isoall leg (r35 v97)",
+      "model": "v55c (allowlist fix)",
+      "status": "COMPLETE-DEAD"
+    },
+    {
+      "audit": "COMPLETE poll 17 acc2 (r38 v91b): replay parity; rank +0.0727 BEST fresh (33/33 full 16ep, raw sane no rail, coverage 135); bias +4.54% (worse than v38 +3.81) -> selection noise; monthly ~1% (normal 0.98%/75 fills, DD -33.4%); DD breach 6/6; forward-ready RAW only (needs val-isotonic + sequence builder)",
+      "lesson": "Scale fixes rank, not bias; v41 DEAD standalone (rank-best but bias-killer). Remaining cure: calibrate-first on val-export (R40 R-v41valfit) or t050-gate probe (R40 A2); cap-at-policy AND scale-at-origin both rejected as bias cures",
+      "model": "v41 (valuescale selective SSM)",
+      "status": "COMPLETE-DEAD"
+    },
+    {
+      "model": "v96 Transformer (8.77M)",
+      "status": "STAGED-QUEUED",
+      "audit": "PENDING: 8,768,459 params, ListNet-primary + scale-at-origin + XLA-tolerable; smoke ranking-decreases + raw-sane; package staged secret-clean; submits iff lane free AND v41 terminal",
+      "lesson": "Biggest capacity build; T4 default, TPU future option"
+    },
+    {
+      "model": "v106 student-from-distill (0.6M SSM)",
+      "status": "STAGED-QUEUED",
+      "audit": "PENDING: KL + opt_B-upweighted ranking-on-hard, fixed 16ep, smoke KL-decreasing + upweight proof, 85MB secret-clean, 597409 params; NOT submitted at build time (v41 RUNNING blocked + acc1 quota exhausted per r37 queue)",
+      "lesson": "Submits iff lanes free AND v55b AND v96 terminal (queued 8th, third in v6 queue)"
+    }
+  ],
+  "cloud_accounts": {
+    "account1": {
+      "key": "KAGGLE_API_TOKEN",
+      "username": "nguynchtrai",
+      "quota": "31.2/30h EXHAUSTED, refresh 2026-09-12T00:00 (ledger round34 hard evidence: kernel push REJECTED)",
+      "spend": "v41 dataset PRIVATE ok (ready); kernel push REJECTED quota -> no acc1 submits after; no spend on acc1 this mission beyond existing",
+      "refs": "dataset nguynchtrai/opencode-trackm-valuescale-v41-data (ready, kept intact, untouched after failover)"
+    },
+    "account2": {
+      "key": "KAGGLE_API_TOKEN_2",
+      "username": "trainguyenchi",
+      "quota": "GPU used 0.00h / remaining 30.00h / total 30.00h refreshAt 2026-09-12T00:00:00; TPU used 0.51h / remaining 19.49h / total 20.00h (pre-existing TPU use, not ours); quota messages on acc2: NONE",
+      "spend": "FAILOVER ACTIVE: exactly ONE dataset + ONE kernel created on account-2 this mission (max-one-plus-one); lane was free (0 datasets mine before, 1 pre-existing unrelated notebook)",
+      "refs": "dataset trainguyenchi/opencode-trackm-valuescale-v41-data (ready, 101s dataset-ready gap) + kernel trainguyenchi/opencode-trackm-valuescale-v41 (RUNNING v1, T4, PRIVATE, pushed 2026-09-08T13:31:56Z)"
+    }
+  },
+  "concentration": {
+    "agreeweight_dd": "v61:U1_agreeweight_dd_guard",
+    "band2confirmed": "v61:confirmed_band2_1x (measured on 1x variant)",
+    "confirmed_dd_guard": "v61:confirmed_dd_guard",
+    "default": "unknown",
+    "majority_1x": "v61:majority_1x",
+    "v38_isoall": "v62:v38-isoall_1x"
+  },
+  "concentration_sources": [
+    "artifacts/research/opencode_v61_monthattr/summary.json",
+    "artifacts/research/opencode_v62_v38conc/summary.json",
+    "artifacts/research/opencode_v75_L3real/gatecheck_official.json (L1/L2/L3-combo verdicts)"
+  ],
+  "covers_minimum": [
+    "v30-iso4",
+    "majority_1x",
+    "confirmed_dd_guard",
+    "band2confirmed",
+    "s0004_t050",
+    "t050",
+    "agreeweight_dd",
+    "v38-isoall",
+    "v33-topdec",
+    "A1-mean",
+    "v28-mean",
+    "v33-mms",
+    "A2-p50gate",
+    "long_only",
+    "mid-band",
+    "risk_off",
+    "h14",
+    "tp075-confirmed",
+    "fee-ladder finding",
+    "decay horizon",
+    "volcap/capacity thresholds",
+    "probfill survival",
+    "L1-pool (r24)",
+    "L2-s0004 (r24-25)",
+    "L3-combo dd_guard_tp075 (r25)",
+    "v39 all 3 branches (r24)",
+    "v55 infra-dead, no numbers (r25)",
+    "fee-BE s0004 544bps (r25)",
+    "fee-BE PF7 140bps (r23)",
+    "fee-BE combo 510bps (r27)",
+    "paper rehearsal (r27)",
+    "volscale PF7 thresholds (r22)",
+    "pool sessions s0004-special (r27)",
+    "clock-clean (r14)",
+    "1m-audit (r7)",
+    "v40-identity dead clip-saturates (r29)",
+    "v40-winsorcal dead monthly-negative (r30)",
+    "fee-BE confirmed 808bps, ladder set complete (r29)",
+    "verify feecombo 2/2 (r29)",
+    "paper 38iso first real UNDER trip (r28)",
+    "volscale combo thresholds (r28)",
+    "resume-from-state proven (r29)",
+    "verify v40 3/3 (r30)",
+    "forward/promote machine validated (r30)",
+    "gatecheck CLI validated 3/3 (r23/r30)",
+    "monthattr concentration evidence (r19)",
+    "v41 staged, smoke-proven (r30)",
+    "quota-failover infra event acc1->acc2 (r34-35)",
+    "v41 RUNNING on account-2 pending audit (r35)",
+    "v55ccal rescue +64.9%/1.50% DD-safe 3rd confirmation (r35 v97)",
+    "distill soft-targets data asset + teacher diagnostic (r35 v101)",
+    "scorediag value-prior mechanism (r34 v100)",
+    "fwfeatures 679 decisions seal intact (r35 v102)",
+    "verify v55c 4/4 (r34 v98)",
+    "v41 COMPLETE-DEAD rank-best-bias-killer (r38 v91b)",
+    "forward shakedown weak Kronos-mini + 2 machine gaps (r38 v109)",
+    "seal 4/4 PASS + bit-identical repro (r39 v110 final)",
+    "forward-only verdict path + Kronos FORWARD_ONLY+REJECT (r39)",
+    "gatecheck None-safe 4/4 incl losing book (r39)",
+    "v55b staging-lacks-fix process catch, correct hold (r39)",
+    "scopes dead on rescued v33-topdec too (r37 v107)",
+    "concentration veto on rescued legs top5 74%/89.2% (r37 v108)",
+    "teacher-losing quiet-market guidance opt_B (r36 v103)",
+    "student-from-distill staged queued 8th (r37 v106)",
+    "verify v55c-rescue 5/5 (r36 v104)"
+  ],
+  "csv_columns": [
+    "family",
+    "best_branch",
+    "normal_Ret",
+    "normal_DD",
+    "normal_Mo",
+    "normal_fills",
+    "normal_PF",
+    "normal_WR",
+    "fee_Mo",
+    "exec_Mo",
+    "exec_fills",
+    "dd_gate_all3",
+    "fills_gate_all3",
+    "monthly_best",
+    "concentration_flag",
+    "verdict",
+    "artifact_path"
+  ],
+  "experiment": "opencode-r40e-dossier6",
+  "exploratory": true,
+  "gate": {
+    "dd_max": 0.2,
+    "fills_min": 30,
+    "fills_rule": "trades>=30 in ALL of normal/fee_stress/execution_stress",
+    "monthly_min": 0.05
+  },
+  "family": "R40 E-dossierv6: pre-registered extension of v105 with rounds 36-39 families (analysis only, no backtests)",
+  "hypothesis": "No branch passes the 5%/mo gate; the v6 dossier re-ranks family-bests (59 carried + 11 new) by Normal monthly and risk-adjusted PF/DD only to name comparison anchors. Expected: top-5 monthly UNCHANGED (s0004_1x ~3.22%/mo DD-breach still top; v41-dead ~1% + scopes33-rescued 1.88% enter mid-table only); risk top-3 raw UNCHANGED (PF7-book duplicates; new portfolio rows PF<=1.56); recommendation stays NONE (v41 DEAD audited, rescued legs concentration-vetoed, v96/student untested); queue v55b-fix -> v96 -> student.",
+  "live_approved": false,
+  "monthly_best_rule": "numeric max(normal_Mo,fee_Mo,exec_Mo) EXCEPT finding-families (fee_ladder, decay_horizon, volcap_capacity, feeBE_*, volscale_PF7, volscale_combo, poolsess_s0004) where monthly_best carries the headline finding string verbatim from the artifact/synthesis; special rows carry finding strings with null numerics",
+  "paper_candidate_rule": "MUST satisfy normal_Mo>=0.05 AND dd_gate_all3=y AND fills_gate_all3=y AND all 3 scenarios present; else verdict NONE with explicit why + missing pieces (forward test, live weights)",
+  "pipeline_verdicts": {
+    "L1_pool_1x": "REJECT (monthly-fail all 3 + dd-breach all 3 + concentrated top3-months 61.2%)",
+    "L2_s0004_1x": "HOLD (monthly-fail all 3 + dd-breach all 3; fills PASS; diffuse PASS top5=47.1%)",
+    "L3_dd_guard_tp075_combo": "HOLD (monthly-fail all 3 ONLY; DD/fills/concentration PASS; diffuse PASS top5=45.6%)",
+    "source": "artifacts/research/opencode_v75_L3real/gatecheck_official.json"
+  },
+  "queue_exact_order": [
+    "v55b-fix FIRST (round40 B-v55brebuild): rebuild staging WITH the allowlist fix (bundle macro_micro_value.py) + bundle-only import proof, then submit iff no RUNNING/QUEUED on EITHER account AND v41 terminal (v41 COMPLETE-DEAD now; acc1 quota refresh 2026-09-12; B owns, 0 acc2 writes)",
+    "v96 SECOND (M-queue96): Transformer 8.77M (ListNet-primary + scale-at-origin, smoke-proven) submits iff lane free AND v55b terminal-or-running",
+    "v106-student THIRD (M-student-pkg queued 8th): KL + opt_B-upweighted ranking student submits iff lanes free AND v55b AND v96 terminal (acc1 default, failover acc2 only on quota-exhaustion)"
+  ],
+  "queue_note": "v41 terminal COMPLETE-DEAD (r38 v91b) -> lane free pending quota (acc1 31.2/30h exhausted refresh 2026-09-12 per ledger round34 evidence, not re-polled here). v55b keeps first turn (staged earlier, blocked only on rebuild+B2 gate); v96 second; student third. v55c dead-audited, never re-queued. Leader self-monitors both accounts.",
+  "ranking_rules": {
+    "top3_risk_adjusted": "sort by normal profit_factor desc, tie-break max_drawdown asc (closest to zero); specials (null PF) excluded",
+    "top5_monthly": "sort by normal monthly_geometric_net desc, report DD/fills caveats inline; specials (null Mo) excluded"
+  },
+  "rows": [
+    {
+      "artifact": "artifacts/research/opencode_v02_reproduce_v30/summary.json",
+      "candidates": [
+        "isotonic_4_1.0"
+      ],
+      "family": "v30_iso4_base",
+      "finding": null,
+      "verdict": "leg"
+    },
+    {
+      "artifact": "artifacts/research/opencode_v15_mapensemble/summary.json",
+      "candidates": [
+        "majority_1x"
+      ],
+      "family": "majority_1x",
+      "finding": null,
+      "verdict": "standing-best"
+    },
+    {
+      "artifact": "artifacts/research/opencode_v15_mapensemble/summary.json",
+      "candidates": [
+        "confirmed_dd_guard"
+      ],
+      "family": "confirmed_dd_guard",
+      "finding": null,
+      "verdict": "standing-best"
+    },
+    {
+      "artifact": "artifacts/research/opencode_v49_band2conf/summary.json",
+      "candidates": [
+        "confirmed_band2_1x",
+        "confirmed_band2_dd_guard"
+      ],
+      "family": "band2confirmed",
+      "finding": null,
+      "verdict": "leg"
+    },
+    {
+      "artifact": "artifacts/research/opencode_v13_megacombo/summary.json",
+      "candidates": [
+        "s0004_t050_1x",
+        "s0004_t050_dd_guard"
+      ],
+      "family": "s0004_t050",
+      "finding": null,
+      "verdict": "leg"
+    },
+    {
+      "artifact": "artifacts/research/opencode_v11_threshold/summary.json",
+      "candidates": [
+        "t050_1x"
+      ],
+      "family": "t050",
+      "finding": null,
+      "verdict": "leg"
+    },
+    {
+      "artifact": "artifacts/research/opencode_v54_agreeweight/summary.json",
+      "candidates": [
+        "U1_agreeweight",
+        "U1_agreeweight_dd_guard"
+      ],
+      "family": "agreeweight_dd",
+      "finding": null,
+      "verdict": "leg"
+    },
+    {
+      "artifact": "artifacts/research/opencode_v59_v38cal/summary.json",
+      "candidates": [
+        "v38-isoall_1x",
+        "v38-isoall_1x_dd_guard"
+      ],
+      "family": "v38_isoall",
+      "finding": null,
+      "verdict": "leg"
+    },
+    {
+      "artifact": "artifacts/research/opencode_v42_v33cal/summary.json",
+      "candidates": [
+        "v33-iso-topdec_1x",
+        "v33-iso-topdec-cov8_1x",
+        "v33-iso-topdec_1x_dd_guard"
+      ],
+      "family": "v33_topdec",
+      "finding": null,
+      "verdict": "leg"
+    },
+    {
+      "artifact": "artifacts/research/opencode_v29a_a1_replay/portfolio.json",
+      "candidates": [
+        "mean_1x",
+        "mean_dd_guard"
+      ],
+      "family": "A1_mean",
+      "finding": null,
+      "verdict": "dead"
+    },
+    {
+      "artifact": "artifacts/research/opencode_v28c_replay/portfolio.json",
+      "candidates": [
+        "mean_1x",
+        "mean_dd_guard"
+      ],
+      "family": "v28_mean",
+      "finding": null,
+      "verdict": "dead"
+    },
+    {
+      "artifact": "artifacts/research/opencode_v33d_replay/portfolio.json",
+      "candidates": [
+        "mean_minus_std_1x",
+        "mean_minus_std_0.5x",
+        "mean_minus_std_dd_guard"
+      ],
+      "family": "v33_mms",
+      "finding": null,
+      "verdict": "dead"
+    },
+    {
+      "artifact": "artifacts/research/opencode_v26c_replay/portfolio.json",
+      "candidates": [
+        "mt_p50gate_1x",
+        "mt_p50gate_dd_guard"
+      ],
+      "family": "A2_p50gate",
+      "finding": null,
+      "verdict": "dead"
+    },
+    {
+      "artifact": "artifacts/research/opencode_v04_side_ddguard/summary.json",
+      "candidates": [
+        "long_only_1x",
+        "long_only_dd_guard"
+      ],
+      "family": "long_only",
+      "finding": null,
+      "verdict": "leg"
+    },
+    {
+      "artifact": "artifacts/research/opencode_v12_volregime/summary.json",
+      "candidates": [
+        "mid_1x",
+        "mid_dd_guard"
+      ],
+      "family": "mid_band",
+      "finding": null,
+      "verdict": "dead"
+    },
+    {
+      "artifact": "artifacts/research/opencode_v24_macro/summary.json",
+      "candidates": [
+        "risk_off_only_1x",
+        "risk_off_only_dd_guard"
+      ],
+      "family": "risk_off",
+      "finding": null,
+      "verdict": "dead"
+    },
+    {
+      "artifact": "artifacts/research/opencode_v05_holding/summary.json",
+      "candidates": [
+        "h14_1x",
+        "h14_dd_guard"
+      ],
+      "family": "h14",
+      "finding": null,
+      "verdict": "dead"
+    },
+    {
+      "artifact": "artifacts/research/opencode_v41_tp075maj/summary.json",
+      "candidates": [
+        "confirmed_tp075_1x",
+        "confirmed_tp075_dd_guard"
+      ],
+      "family": "tp075_confirmed",
+      "finding": null,
+      "verdict": "dead"
+    },
+    {
+      "artifact": "artifacts/research/opencode_v39_feeladder/summary.json",
+      "candidates": [
+        "fee0002_1x"
+      ],
+      "family": "fee_ladder",
+      "finding": "break-even ~79bps/fill; bot survives every realistic fee tier; dd_guard does not extend break-even",
+      "verdict": "leg"
+    },
+    {
+      "artifact": "artifacts/research/opencode_v40_decayext/opencode-profit-round1/summary.json",
+      "candidates": [
+        "majority_d12",
+        "majority_d24",
+        "majority_d48"
+      ],
+      "family": "decay_horizon",
+      "finding": "alpha-decay horizon (2h,4h]: alive at d24 (+89% total), dead at d48 (fee-negative)",
+      "verdict": "leg"
+    },
+    {
+      "artifact": "artifacts/research/opencode_v36_volscale/summary.json",
+      "candidates": [
+        "cap100_k05"
+      ],
+      "family": "volcap_capacity",
+      "finding": "capacity thresholds ~130k capital @k=5%, ~27k @k=1%; v32: 0 bars capped even k=5% at indexed-100 (immune at small size)",
+      "verdict": "leg"
+    },
+    {
+      "artifact": "artifacts/research/opencode_v30_probfill/summary.json",
+      "candidates": [
+        "majority_pf020_ps00",
+        "majority_pf020_ps50",
+        "confirmed_pf020_ps50"
+      ],
+      "family": "probfill_survival",
+      "finding": null,
+      "verdict": "leg"
+    },
+    {
+      "artifact": "artifacts/research/opencode_v72_L1pool/summary.json",
+      "candidates": [
+        "pool_1x"
+      ],
+      "conc_flag": "concentrated (FAIL) top5=54.4% top3mo=61.2% (gatecheck v79)",
+      "family": "L1_pool",
+      "finding": null,
+      "verdict": "leg"
+    },
+    {
+      "artifact": "artifacts/research/opencode_v73_L2filter/summary.json",
+      "candidates": [
+        "s0004_1x"
+      ],
+      "conc_flag": "diffuse (PASS) top5=47.1% (gatecheck v79)",
+      "family": "L2_s0004",
+      "finding": null,
+      "verdict": "leg"
+    },
+    {
+      "artifact": "artifacts/research/opencode_v75_L3real/summary.json",
+      "candidates": [
+        "dd_guard_tp075"
+      ],
+      "conc_flag": "diffuse (PASS) top5=45.6% (gatecheck v79)",
+      "family": "L3_combo",
+      "finding": null,
+      "verdict": "hold"
+    },
+    {
+      "artifact": "artifacts/research/opencode_v60b_replay/portfolio.json",
+      "candidates": [
+        "rank_en_1x",
+        "rank_en_dd_guard",
+        "rank_en_calibrated_valfit_1x"
+      ],
+      "family": "v39_rank",
+      "finding": null,
+      "verdict": "dead"
+    },
+    {
+      "artifact": "artifacts/research/opencode_v76_L2fee/summary.json",
+      "candidates": [
+        "fee0002_1x"
+      ],
+      "family": "feeBE_s0004",
+      "finding": "break-even ~544bps OLS-extrapolated (0.0054); survives all measured tiers to 100bps; fee cannot kill this branch",
+      "verdict": "leg"
+    },
+    {
+      "artifact": "artifacts/research/opencode_v71_feeband2/summary.json",
+      "candidates": [
+        "fee0002_1x"
+      ],
+      "family": "feeBE_PF7",
+      "finding": "break-even ~140bps OLS-extrapolated (0.0140); DD-safe all tiers; PF7 most fee-resilient book",
+      "verdict": "leg"
+    },
+    {
+      "artifact": "artifacts/research/opencode_v81_feecombo/summary.json",
+      "candidates": [
+        "fee0002_combo"
+      ],
+      "family": "feeBE_combo",
+      "finding": "break-even ~510bps OLS-extrapolated (0.0051); DD-safe all tiers; fee program closed on all books",
+      "verdict": "leg"
+    },
+    {
+      "artifact": "artifacts/research/opencode_v68_volscaleband2/summary.json",
+      "candidates": [
+        "cap100_k05",
+        "cap100_k01",
+        "cap100_k100",
+        "cap10k_k05",
+        "cap10k_k01",
+        "cap1M_k05",
+        "cap1M_k01"
+      ],
+      "family": "volscale_PF7",
+      "finding": "capacity: PF7 scales clean to 10k capital, breaks at 1M (thin 30-fill base, not weaker microstructure)",
+      "verdict": "leg"
+    },
+    {
+      "artifact": "artifacts/research/opencode_v83_poolsessions/summary.json",
+      "candidates": [
+        "s0004_1x"
+      ],
+      "conc_flag": "diffuse (PASS) top5=47.1% (gatecheck v79, same s0004 book)",
+      "family": "poolsess_s0004",
+      "finding": "s0004 SPECIAL: only profitable pool session (+190.8%); pool = s0004 diluted by losers; others negative/empty",
+      "verdict": "leg"
+    },
+    {
+      "artifact": "artifacts/research/opencode_v55b_diag/summary.json",
+      "family": "v55_infradead",
+      "special": "infra-dead",
+      "special_finding": "v55 ranking-alone STILL untested at v2 time (3 infra deaths): v2 ERROR empty-input race; v2-retry ERROR missing module macro_micro_value; v55b ERROR ~40s 0-byte log (same import family). No numbers. Retest = v55c (allowlist, import-proven), RUNNING in v3 cloud-track.",
+      "verdict": "infra-dead"
+    },
+    {
+      "artifact": "artifacts/research/opencode_paper_combo/summary.json",
+      "family": "paper_rehearsal",
+      "special": "finding",
+      "special_finding": "rehearsal clean (OPENED-interval ops only, not forward validation): 138 intents, 24 halt-days latched+cleared no leak, 0 trips, paper +5.04% structural (TP2-full vs TP1-split); adapter needed for 8 same-bar opposite-signal pairs; gaps: halt-block unobserved, resume untested on this book, live policy for opposite pairs undeclared, no live feed/weights",
+      "verdict": "hold"
+    },
+    {
+      "artifact": "artifacts/research/opencode_v47_clock/summary.json",
+      "family": "clock_clean",
+      "special": "finding",
+      "special_finding": "ALL 5 TFs CLEAN (5628/5628 close_last<=T); live loop parity confirmed; no code change, no rerun needed; clock audit CLOSED",
+      "verdict": "leg"
+    },
+    {
+      "artifact": "artifacts/research/opencode_v31_1maudit/v31_1maudit_20260907_final/summary.json",
+      "family": "audit_1m",
+      "special": "finding",
+      "special_finding": "stop-first neutral here (0 both-touch 5m bars, 1m-vs-5m gross diff ~0, 0 exit-reason flips); entry touch-no-cross 42.9% (27/63); exit engine trusted, entry is the leaky point",
+      "verdict": "leg"
+    },
+    {
+      "artifact": "artifacts/research/opencode_v77b_replay/portfolio.json",
+      "candidates": [
+        "rank_en_1x",
+        "rank_en_dd_guard"
+      ],
+      "family": "v40_identity",
+      "finding": null,
+      "verdict": "dead"
+    },
+    {
+      "artifact": "artifacts/research/opencode_v90_v40wincal/summary.json",
+      "candidates": [
+        "v40-winsor-calibrated_1x",
+        "v40-winsor-calibrated_1x_dd_guard"
+      ],
+      "family": "v40_winsorcal",
+      "finding": null,
+      "verdict": "dead"
+    },
+    {
+      "artifact": "artifacts/research/opencode_v87_feeconfirmed/summary.json",
+      "candidates": [
+        "fee0002_1x"
+      ],
+      "family": "feeBE_confirmed",
+      "finding": "break-even ~808bps OLS-extrapolated (0.0081); survives all measured tiers to 100bps; DD-safe all tiers; fee ladder set COMPLETE: majority 79 < PF7 140 < combo 510 < s0004 544 < confirmed 808",
+      "verdict": "leg"
+    },
+    {
+      "artifact": "artifacts/research/opencode_v86_volscalecombo/summary.json",
+      "candidates": [
+        "cap100_k05",
+        "cap100_k01",
+        "cap100_k100",
+        "cap10k_k05",
+        "cap10k_k01",
+        "cap1M_k05",
+        "cap1M_k01"
+      ],
+      "family": "volscale_combo",
+      "finding": "capacity: final L3 combo immune to 10k capital, breaks at 1M (same band as majority/PF7 books); capacity program closed on 3/4 books (38iso volscale pending r31, joins v4)",
+      "verdict": "leg"
+    },
+    {
+      "artifact": "artifacts/research/opencode_paper_38iso/summary.json",
+      "family": "paper_38iso_trip",
+      "special": "finding",
+      "special_finding": "FIRST real UNDER divergence trip on operating run (OPENED-interval rehearsal, not forward validation): latch bar 242796 (-6.31%), 37 intents emitted + 85 later real signals divergence-blocked; 3 halt-days latched+cleared, halt-block-real-signal still 0; guard/baseline sizing mismatch drives post-latch drift (lesson: pair guard/baseline sizing)",
+      "verdict": "leg"
+    },
+    {
+      "artifact": "artifacts/research/opencode_paper_resume/summary.json",
+      "family": "resume_proven",
+      "special": "finding",
+      "special_finding": "restart-safe PROVEN on L3-combo book: kill+resume bit-identical 138/138 intents, equity 279.3005, 101/101 exits; all 15 assertions PASS (intents/equity/exits/counters/halts/alerts/guard); ops readiness complete (kill+trip+resume all proven on opened interval)",
+      "verdict": "leg"
+    },
+    {
+      "artifact": "artifacts/research/opencode_v92_verifyv40/summary.json",
+      "family": "verify_3of3",
+      "special": "finding",
+      "special_finding": "independent-verification program 3/3 PASS bit-identical (delta 0.0): v79 L3-combo control+combo, v88 feecombo fee0002/fee0010, v92 v40-identity normal+fee055; published numbers trustworthy; apply to future claims",
+      "verdict": "leg"
+    },
+    {
+      "artifact": "artifacts/research/opencode_forward_demo/summary.json",
+      "family": "fwd_machine",
+      "special": "finding",
+      "special_finding": "promotion machine validated: majority_1x correctly HOLD (monthly-fail + dd-breach + FORWARD_BLOCKED, data ends 2026-03-23); runner REFUSES forward on opened dates (rule-5); synthetic PROMOTE path green (9/9 tests); blocked only on post-2026-03 data + passing candidate",
+      "verdict": "leg"
+    },
+    {
+      "artifact": "artifacts/research/opencode_gatecheck_demo/summary.json",
+      "family": "gatecheck_validated",
+      "special": "finding",
+      "special_finding": "gatecheck CLI validated 3/3 vs ledger (majority HOLD monthly-fail, band2 REJECT monthly+fills-exec-fail, v38-isoall HOLD monthly-fail; concentration crosscheck reproduces dossier 36.3%/71.3%); PROMOTE/HOLD/REJECT automation ready",
+      "verdict": "leg"
+    },
+    {
+      "artifact": "artifacts/research/opencode_v61_monthattr/summary.json",
+      "family": "monthattr",
+      "special": "finding",
+      "special_finding": "standing-best months diffuse PASS (top3mo 31-42%, top1mo 11-17%) but trade-level carries 36-39% top5 net (majority 36.3%, confirmed_dd 38.0%, band2 38.8%, agreeweight 36.9%); v38-isoall SEVERE trade caveat (top5 71.3%); honest negative evidence kept",
+      "verdict": "leg"
+    },
+    {
+      "artifact": "artifacts/research/opencode_v91_v41/summary.json",
+      "family": "v41_staged",
+      "special": "finding",
+      "special_finding": "v41 STAGED (value-scale-at-origin + no-clip-selection + tie-break, 600875 params, 85MB secret-clean, smoke ranking-decreases + raw-sane no-rail, pytest 187); submits iff lane free AND v55c terminal (queued 7th); monthly compared only AFTER full train + local audit",
+      "verdict": "staged"
+    },
+    {
+      "family": "volscale_38iso",
+      "artifact": "artifacts/research/opencode_v93_volscale38iso/summary.json",
+      "candidates": [
+        "cap100_k100",
+        "cap100_k05",
+        "cap100_k01",
+        "cap10k_k05",
+        "cap10k_k01",
+        "cap1M_k05",
+        "cap1M_k01"
+      ],
+      "verdict": "leg",
+      "finding": "capacity 4th/4th book CLOSED (r31 v93): v38-isoall immune to 10k, breaks at 1M (same band as majority/PF7/combo); normal+fee_stress only, volcap IS the stress so no exec-stress"
+    },
+    {
+      "family": "v55c_rankonly",
+      "artifact": "artifacts/research/opencode_v55d_replay/portfolio.json",
+      "candidates": [
+        "rankonly_en_1x",
+        "rankonly_en_dd_guard"
+      ],
+      "verdict": "dead",
+      "finding": "ranking-ALONE DEAD (r33 v55d audit): rank +0.022 < v38 +0.066 multitask; monthly negative all 3 scenarios; DD breach all 3; pass-rate 32.5% healthy; multitask-dilution theory REJECTED (inverted: ranking needs value-prior)"
+    },
+    {
+      "family": "v55c_bench",
+      "artifact": "artifacts/research/opencode_bench/v55c_report.json",
+      "special": "finding",
+      "special_finding": "GTX1650 infer bench of v55c rankonly SSM (597409 params float32): median 321.50ms/window batch1 (p95 345.03ms), peak VRAM 19.75MB; reload parity PASS diff 0.0; harness ready for next completed model",
+      "verdict": "leg"
+    },
+    {
+      "family": "forward_sealed",
+      "artifact": "data/processed/opencode_forward_20260323/manifest.json",
+      "special": "asset",
+      "special_finding": "SEALED pristine forward window 2026-03-23 -> 2026-09-08 (r32 D-forward): 48,819 klines + 509 funding + 233 macro, 0 gaps, structural-checks only; frozen-candidate evaluation only, never tuning/thresholds/labels",
+      "verdict": "asset"
+    },
+    {
+      "family": "v96_staged",
+      "artifact": "artifacts/research/opencode_v96_transformer/summary.json",
+      "special": "finding",
+      "special_finding": "Transformer v96 STAGED (r32 M): 8,768,459 params d320/8head/5+2 layers, ListNet-primary + scale-at-origin + XLA-tolerable; smoke ranking-decreases + raw-sane, package staged secret-clean; NO submit yet (v55c RUNNING blocked); no numbers yet",
+      "verdict": "staged"
+    },
+    {
+      "family": "promorunner_validated",
+      "artifact": "artifacts/research/opencode_promote_demo/summary.json",
+      "special": "finding",
+      "special_finding": "integrated promote CLI validated 3/3 (r31 L3-promorunner): majority HOLD, L3-combo HOLD, synthetic PROMOTE possible; 11/11 unit tests; machine CAN promote, real candidates fail on monthly/forward/paper not wiring",
+      "verdict": "leg"
+    },
+    {
+      "family": "quota_failover",
+      "artifact": "configs/opencode_v91_v41_acc2.json",
+      "special": "infra-event",
+      "special_finding": "INFRA EVENT, no numbers (r34 M-v41submit): account-1 kernel push REJECTED with hard evidence (weekly GPU quota 31.2/30h exhausted, refresh 2026-09-12); FAILOVER AUTHORIZED per user rule (round27 correction 2); acc1 dataset kept intact/untouched; v41 resubmitted on account-2 with dataset-ready 101s gap",
+      "verdict": "infra-dead"
+    },
+    {
+      "family": "v41_acc2_running",
+      "artifact": "artifacts/research/opencode_v91_v41_acc2/summary.json",
+      "special": "pending",
+      "special_finding": "v41 RUNNING on account-2 (r35): trainguyenchi/opencode-trackm-valuescale-v41, T4 PRIVATE v1, pushed 2026-09-08T13:31:56Z, KernelWorkerStatus.RUNNING; origin-fix build (value-scale-at-origin + no-clip-selection, 600875 params); acc2 quota fresh (GPU 0.00/30h used); monthly compared only AFTER full train + local audit; no numbers yet",
+      "verdict": "staged"
+    },
+    {
+      "family": "v55ccal_rescue",
+      "artifact": "artifacts/research/opencode_v97_v55ccal/summary.json",
+      "candidates": [
+        "v55c-isoall_1x",
+        "v55c-isoall_1x_dd_guard",
+        "v55c-iso-topdec-gate_1x",
+        "v55c-identity_1x"
+      ],
+      "verdict": "leg",
+      "finding": "3rd calibrate-first rescue confirmation (r35 v97): v55c identity -22.5% -> isoall +64.9%/1.50%/mo DD-safe all 3 (PF1.40 WR49.4%); percentile-gate loses to isoall again; pattern 3/3 (v33/v38/v55c) with monthly ceiling ~1.9%"
+    },
+    {
+      "family": "distill_targets",
+      "artifact": "artifacts/research/opencode_v101_distill/summary.json",
+      "special": "asset",
+      "special_finding": "DATA ASSET, no portfolio numbers (r35 v101): distill soft-targets (4076,16) from v38 ensemble (taus mostly 8.0, teacher overconfident); teacher diagnostic +0.237% over uniform (wins 3/5/7, loses 1/9/10); student spec ready (KL-primary + lambda_rank 0.1-0.25, T=1); NO student training in v101",
+      "verdict": "asset"
+    },
+    {
+      "family": "scorediag_v38v55c",
+      "artifact": "artifacts/research/opencode_v100_scorediag/summary.json",
+      "special": "finding",
+      "special_finding": "MECHANISM diagnostic, no portfolio numbers (r34 v100): value-prior anchors magnitude + regularizes order (standardized mean|d| 0.410 vs 0.677, wins 11/11 folds); rank-only margins are ordinal jitter; v38-only top-decile +0.196% vs v55c-only -0.727%; implication: keep down-weighted value head OR distill on E38 soft-targets",
+      "verdict": "leg"
+    },
+    {
+      "family": "fwfeatures_sealed",
+      "artifact": "data/processed/opencode_forward_20260323/features/builder_manifest.json",
+      "special": "asset",
+      "special_finding": "FORWARD INFERENCE FEATURES, no labels/metrics (r35 v102): (679,133) built verbatim via research builders (40/40/40/5/4/4), seal intact (8-point checklist), deriv mostly masked by design (archive ends 2026-03-22); inference-ready, labels still forbidden",
+      "verdict": "asset"
+    },
+    {
+      "family": "verify_4of4",
+      "artifact": "artifacts/research/opencode_v98_verifyv55c/summary.json",
+      "special": "finding",
+      "special_finding": "independent-verification program 4/4 PASS bit-identical (delta 0.0): v79 L3-combo control+combo, v88 feecombo fee0002/fee0010, v92 v40-identity normal+fee055, v98 v55c-identity normal+fee055 (127 signals identity match); published numbers trustworthy; apply to future claims",
+      "verdict": "leg"
+    },
+    {
+      "family": "v41_dead",
+      "artifact": "artifacts/research/opencode_v91b_replay/portfolio.json",
+      "candidates": [
+        "rank_en_1x",
+        "rank_en_dd_guard"
+      ],
+      "verdict": "dead",
+      "finding": "v41 DEAD standalone (r38 v91b audit): rank +0.0727 BEST fresh (33/33 full 16ep, raw sane no rail, coverage 135) BUT bias +4.54% (worse than v38 +3.81) -> selection noise; monthly ~1% DD breach 6/6; forward-ready RAW only (needs val-isotonic + sequence builder); remaining cure calibrate-first on val-export (R40)"
+    },
+    {
+      "family": "fwdshakedown_weak",
+      "artifact": "artifacts/research/opencode_v109_fwdshakedown/summary.json",
+      "special": "finding",
+      "special_finding": "FORWARD shakedown WEAK as expected (r38 E, Kronos-mini zero-shot frozen 12bps, 679 decisions/192 actionable, forward 2026-03-23->2026-09-08): normal -10.69%/-2.01%/mo DD -12.0% fills 189; fee -21.76%/-4.31%/mo DD-breach; exec -19.12%/-3.74%/mo fills 109; gate REJECT all 3; machinery validated end-to-end; 2 machine gaps found (gatecheck None-crash fixed R39; frozen-leg problem fixed E-fwdonly); seal intact; FORWARD-window only, excluded from opened-interval monthly ranking",
+      "verdict": "dead"
+    },
+    {
+      "family": "seal_verified_4of4",
+      "artifact": "artifacts/research/opencode_v110_sealverify/seal_audit_final.json",
+      "special": "finding",
+      "special_finding": "Seal 4/4 PASS (r39 A2-sealverify2 rerun vs completed E artifacts): S1 frozen-policy PASS + S2 metrics-once PASS + S3 no-threshold-label PASS + S4 no-plots PASS, overall PASS; bit-identical repro PASS (normal/fee deltas 0.0); forward tree delta 0 files; shakedown trustworthy, window pristine",
+      "verdict": "leg"
+    },
+    {
+      "family": "fwdonly_path",
+      "artifact": "artifacts/research/opencode_forward_only/summary.json",
+      "special": "finding",
+      "special_finding": "Forward-only verdict path built (r39 E, FORWARD_ONLY mode, HOLD cap, anti-laundering rationale): Kronos re-verdict FORWARD_ONLY+REJECT (forward -2.01%/mo, NO-IN-SAMPLE-BASELINE, 7 months >= 6 need); 11/11 tests (9 existing + hold-on-weak + never-promote-on-strong); F1/F2 fail-closed rechecks unchanged; forward machine complete",
+      "verdict": "leg"
+    },
+    {
+      "family": "gatecheck_none_safe",
+      "artifact": "artifacts/research/opencode_gatecheck_fix/summary.json",
+      "special": "finding",
+      "special_finding": "Gatecheck None-crash fixed (r39 R, code+tests only): None-safe helpers _pct_or_na/_num_or_na/_signed_pct_or_na (byte-identical on winning books); losing-book shares/gini None with n/a placeholders; 4/4 validation (majority HOLD + L3-combo HOLD byte-identical + v109-losing REJECT + CLI no-crash); 11 tests pass (8 existing + 3 new); thresholds/decision logic unchanged",
+      "verdict": "leg"
+    },
+    {
+      "family": "v55b_staging_fix_missing",
+      "artifact": "artifacts/research/opencode_v66_v55b/summary.json",
+      "special": "finding",
+      "special_finding": "PROCESS CATCH (r39 B-v55bsubmit): DID NOT submit \u2014 staging lacks the allowlist fix (import-proven FAIL: bundle 31 entries, 0 macro-module macro_micro_value.py; re-push would replay ModuleNotFoundError ~40s like v55-v2/v55b-v1); correct hold; lane acc1 FREE but B2 gate unconfirmed (no TOKEN_2 in worker) + acc1 quota-exhausted note; rebuild staging with fix + bundle-only import proof, then submit (Round 40 B-v55brebuild keeps first turn)",
+      "verdict": "staged"
+    },
+    {
+      "family": "scopes33_rescued_dead",
+      "artifact": "artifacts/research/opencode_v107_scopes33/summary.json",
+      "candidates": [
+        "v33topdec_all_1x",
+        "v33topdec_all_dd_guard",
+        "v33topdec_long_only_1x",
+        "v33topdec_long_only_dd_guard",
+        "v33topdec_s0004_1x",
+        "v33topdec_s0004_dd_guard",
+        "v33topdec_t050_1x",
+        "v33topdec_t050_dd_guard"
+      ],
+      "verdict": "dead",
+      "finding": null
+    },
+    {
+      "family": "conc_rescued_veto",
+      "artifact": "artifacts/research/opencode_v108_concrescued/summary.json",
+      "special": "finding",
+      "special_finding": "Concentration VETO on rescued legs (r37 E, v61 method verbatim, normal): v33-topdec diffuse PASS monthly but top5 trades 74.0% (trade-level veto); v55c-isoall concentrated FAIL (top3mo 65.6% > 60%, top5 trades 89.2%, 11 negative months); rescued legs cannot promote despite DD-safe monthly",
+      "verdict": "leg"
+    },
+    {
+      "family": "teacherlose_guidance",
+      "artifact": "artifacts/research/opencode_v103_teacherlose/summary.json",
+      "special": "finding",
+      "special_finding": "Teacher-losing diagnostic (r36 M, frozen v38+v29 predictions, past-only descriptors): teacher loses in QUIET markets (low vol + low funding), overconfident exactly there; v29 loses same places (Jaccard 0.805); 8 descriptors flagged; oracle gap 3.59pp in L; guidance opt_B_UPWEIGHT quiet samples in ranking-on-hard (student design input v106)",
+      "verdict": "leg"
+    },
+    {
+      "family": "student_staged",
+      "artifact": "artifacts/research/opencode_v106_student/summary.json",
+      "special": "finding",
+      "special_finding": "Student-from-distill STAGED (r37 M, 597409-param SSM, KL + opt_B-upweighted ranking-on-hard, fixed 16ep, smoke KL-decreasing + upweight proof, 85MB secret-clean); NOT submitted (v41 RUNNING blocked + acc1 quota exhausted at build time); queued 8th, third in v6 queue; submits iff lanes free AND v55b AND v96 terminal",
+      "verdict": "staged"
+    },
+    {
+      "family": "verify_5of5",
+      "artifact": "artifacts/research/opencode_v104_verifyv55ccal/summary.json",
+      "special": "finding",
+      "special_finding": "Independent-verification program 5/5 PASS bit-identical (delta 0.0): v79 L3-combo control+combo, v88 feecombo fee0002/fee0010, v92 v40-identity normal+fee055, v98 v55c-identity normal+fee055 (127 signals identity match), v104 v55c-rescue identity+isoall normal+fee055 (4 metrics); published numbers trustworthy",
+      "verdict": "leg"
+    }
+  ],
+  "scenario_keys": [
+    "normal",
+    "fee_stress",
+    "execution_stress"
+  ],
+  "schema_variants": [
+    "branches->{branch}->{scenarios|direct}",
+    "results->{branch}->scenarios",
+    "portfolio.json branches->{branch}->scenarios",
+    "fee-ladder flat per-fee-tier branch nodes (mapped to single normal scenario, fee/exec=null+note)",
+    "special non-portfolio rows (finding string, null numerics, gates n/a)"
+  ],
+  "verdict_rule": "standing-best = ledger comparison anchors only; leg = ledger-banked combo/robustness/finding leg; hold = gate-hold (monthly-only fail, DD/fills PASS); dead = rejected standalone; infra-dead = cloud infra deaths/events, no numbers; staged = cloud package ready/dispatched/running, queued, untested (pre-assigned per row above, script copies verbatim)",
+  "rounds_covered": "1-39 (v5 covered 1-35; v6 adds rounds 36-39)",
+  "delta_plan": "+11 rows vs v5 (59 -> 70): v41_dead, fwdshakedown_weak, seal_verified_4of4, fwdonly_path, gatecheck_none_safe, v55b_staging_fix_missing, scopes33_rescued_dead, conc_rescued_veto, teacherlose_guidance, student_staged, verify_5of5",
+  "forward_readiness": {
+    "needs": [
+      "frozen candidate passing gate",
+      "sealed forward window",
+      "validated forward protocol"
+    ],
+    "candidate": "MISSING: promotion recommendation NONE (ceiling 3.22%/mo < 5% gate; every DD-safe book <=2.94%/mo; v41 DEAD audited ~1%/mo DD-breach 6/6 bias +4.54%; v55c-isoall rescue 1.50% below gate + conc FAIL veto (top5 89.2%); scopes33-rescued 1.88% below gate; v96/student untested); no frozen weights qualify",
+    "window": "READY: data/processed/opencode_forward_20260323 SEALED pristine 2026-03-23 -> 2026-09-08 (48,819 klines + 509 funding + 233 macro, 0 gaps) + inference features (679,133) verbatim seal-intact + seal 4/4 PASS with bit-identical repro (r39 A2-sealverify2) + shakedown trustworthy (r38 E, Kronos-mini weak REJECT, seal intact)",
+    "protocol": "READY: promote CLI + forward-protocol + handoff checklist validated (majority HOLD, L3 HOLD, synthetic PROMOTE possible; 11/11 tests) + forward-only path complete (HOLD cap, anti-laundering rationale, 11/11 tests, Kronos FORWARD_ONLY+REJECT re-verdict)",
+    "overall": "BLOCKED on candidate only: first forward validation runs when a gate-passing frozen candidate exists (v96/student audited, R40 v41-valfit/t050 probes, or new idea)"
+  }
+}

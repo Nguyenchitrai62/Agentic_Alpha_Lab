@@ -1,0 +1,44 @@
+{
+  "experiment": "opencode-v12-volregime",
+  "hypothesis": "Frozen v30 isotonic-4 signals may concentrate expectancy in a realized-vol regime: an on/off regime GATE (keep signal only if its causal trailing-30d realized vol falls in the branch band) crossed with {1x, dd_guard} sizing. This is NOT v03 vol_target sizing (continuous leverage scaling, DEAD per ledger); it is a binary regime filter never tried on this book. Signals/scores untouched; vol uses only candles strictly before signal_time. Exploratory only.",
+  "signals": "artifacts/research/opencode_v02_reproduce_v30/isotonic_4/signals.parquet",
+  "candles": "data/processed/swing_regime_research_v4/candles.parquet",
+  "dataset_config": "data/processed/swing_regime_research_v4/config.json",
+  "parent_plan": "configs/swing_v15_continuous_folds.json",
+  "vol_lookback_days": 30,
+  "vol_definition": "trailing-30-calendar-day std of 5m close log-returns strictly before signal_time (1-microsecond cutoff), annualized x sqrt(365.2425*288); computed with a .loc mask (replaces deprecated .last(), behavior identical); min 100 bars else NaN (excluded from gated bands, kept in control)",
+  "bands": {
+    "control": null,
+    "low": {"vol_ann_lt": 0.3},
+    "mid": {"vol_ann_ge": 0.3, "vol_ann_le": 0.6},
+    "high": {"vol_ann_gt": 0.6}
+  },
+  "band_key": "control keeps all signals; low keeps vol_ann < 0.30; mid keeps 0.30 <= vol_ann <= 0.60; high keeps vol_ann > 0.60; vol_ann is causal past-only",
+  "sizings": ["1x", "dd_guard"],
+  "dd_trigger": 0.1,
+  "dd_guard_lev": 0.5,
+  "dd_guard_reference": "ungated-control (control_1x) base-1x sampled equity (trade exit_time/equity_after), past-only 1-microsecond cutoff, 100.0 seed level; regime-gated signals reuse the control-run guard state at their own signal times (same disclosed method as risk_overlay/side_ddguard/session probes)",
+  "lev_min": 0.25,
+  "lev_max": 1.0,
+  "fee_stress_rate": 0.00055,
+  "stress": {
+    "entry_penetration_bps": 5,
+    "target_penetration_bps": 5,
+    "market_exit_slippage_bps": 5,
+    "market_exit_fee_rate": 0.00055,
+    "allow_limit_price_improvement": false
+  },
+  "control_reproduction": {
+    "normal_total_return": 1.2279837998661565,
+    "normal_max_drawdown": -0.20086073993367803,
+    "normal_trades": 65,
+    "tolerance_return": 1e-9,
+    "tolerance_dd": 1e-9,
+    "action_on_mismatch": "STOP, do not proceed to gated branches"
+  },
+  "gate": {
+    "monthly_min": 0.05,
+    "dd_max": 0.2,
+    "fills_min": 30
+  }
+}

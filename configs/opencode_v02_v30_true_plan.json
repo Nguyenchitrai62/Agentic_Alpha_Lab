@@ -1,0 +1,28 @@
+{
+  "experiment": "v30-v29-causal-calibration",
+  "source": "artifacts/kaggle/v29_download/tcn-training",
+  "replay_audit": "artifacts/research/v29_local_audit/audit.json",
+  "dataset": "data/processed/swing_regime_research_v4",
+  "parent_plan": "configs/swing_v15_continuous_folds.json",
+  "seeds": [
+    1729,
+    1730,
+    1731
+  ],
+  "penalty": 0.0,
+  "windows_previous_quarters": [
+    1,
+    2,
+    4,
+    0
+  ],
+  "exposures": [
+    1.0,
+    0.5
+  ],
+  "embargo_days": 8,
+  "warmup": "WAIT until at least50 eligible out-of-sample decision rows exist",
+  "hypothesis": "V29 residual-GRU preserves a useful action rank but remains overconfident in absolute utility. Fit fixed monotone score maps only from earlier mature-label fold histories with the same 8-day embargo, preserving v29 ranking and the unchanged portfolio policy. Compare identity with fixed 1/2/4/all-quarter windows; do not tune thresholds, seeds or windows retrospectively.",
+  "target": "Calendar-geometric5%monthly net and global drawdown <=20% after normal fee, fee-stress and execution-stress scenarios; no live approval.",
+  "registration": "All mappings and windows are fixed before this read-only probe; all opened historical dates remain development data. Preserve every result and do not promote a favorable window retrospectively."
+}

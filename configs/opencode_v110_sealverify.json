@@ -1,0 +1,110 @@
+{
+  "experiment": "opencode-v110-sealverify",
+  "role": "A2-ARCH VERIFICATION duty (5/5 bit-identical; guarding pristine window). Independent seal-compliance audit + numbers reproduction of E forward shakedown.",
+  "lineage": "ledger forward_window PRISTINE (cutoff 2026-03-23) -> D-forward freeze v95 (data/processed/opencode_forward_20260323 SEALED) -> E-fwfeatures v102 (features/ inference-only, 679 decisions) -> R38-E-fwdshakedown (frozen Kronos-mini zero-shot, no tuning, metrics once, Depends-on-E) -> v110 independent audit (this config, pre-specified BEFORE verifying)",
+  "branch": "opencode/profit-round1",
+  "seal": {
+    "cutoff_exclusive": "2026-03-23T00:00:00+00:00",
+    "rule": "PRISTINE per configs/opencode_hypothesis_ledger.json forward_window + data/processed/opencode_forward_20260323/SEAL.json: crawl-only, structural checks only (counts/gaps/bounds). NO label/outcome inspection, NO tuning, NO threshold selection on forward window. Evaluate frozen candidates only via forward-protocol machine.",
+    "forbidden": ["tuning", "threshold selection", "labels inspection", "training", "returns computation beyond verification rebuild", "PnL/distribution inspection beyond verification rebuild", "price plotting", "live orders"],
+    "allowed": ["frozen-candidate evaluation via forward-protocol", "independent verification rebuild from frozen E signals + forward candles/costs (normal + fee 0.00055)"]
+  },
+  "depends_on_E": {
+    "note": "E runs in parallel. Audit AFTER it finishes. If summary absent: do prep (this config + verifier) and POLL at most 4 times ~20min apart, else return PREP-READY. Do NOT block forever.",
+    "e_config_candidates": ["configs/opencode_v109_fwdshakedown.json", "configs/opencode_v109_forward.json", "configs/opencode_v109_fwdshake.json"],
+    "e_artifact_dir_candidates": ["artifacts/research/opencode_v109_fwdshakedown", "artifacts/research/opencode_v109_forward", "artifacts/research/opencode_v109_fwdshake", "artifacts/research/opencode_fwdshakedown"],
+    "e_summary_filename": "summary.json",
+    "e_signals_candidates": ["signals.parquet", "forward_signals.parquet", "frozen_signals.parquet"],
+    "poll_plan": "poll_1 at prep start; poll_2 after prep writes; poll_3/4 spaced ~20min (bounded, max 4). If still absent -> PREP-READY.",
+    "poll_1_result": "ABSENT at prep start 2026-09-09 (no v109 dir, no v109 config, no E summary)"
+  },
+  "baseline_policy_frozen": {
+    "note": "Historical baseline policy E must reuse verbatim except frozen signal source (Kronos-mini zero-shot). Any execution/cost/threshold change = FAIL.",
+    "source_refs": ["configs/opencode_v02_v30_true_plan.json", "data/processed/swing_regime_research_v4/config.json", "configs/opencode_forward_protocol.json", "AGENTS.md execution assumptions"],
+    "execution": {
+      "engine": "ohlc-v2",
+      "entry_expiry_bars": 12,
+      "max_holding_bars_allowed": [864, 2016],
+      "max_holding_bars_expected_shakedown": 2016,
+      "tp1_fraction": 0.5,
+      "leverage": 1.0,
+      "max_leverage": 1.0,
+      "intrabar_policy": "stop_first",
+      "signal_fill_rule": "signal at t fills no earlier than t+1",
+      "capital_index": 100.0
+    },
+    "costs": {
+      "fee_normal_per_fill": 0.0002,
+      "fee_stress_per_fill": 0.00055,
+      "funding_long_8h": 0.0001,
+      "funding_short_8h": 0.0,
+      "funding_interval_hours": 8,
+      "stop_timeout_exits": "market-like at scenario fee, NOT guaranteed maker/limit"
+    },
+    "signal_source": {
+      "expected": "frozen Kronos-mini zero-shot on v102 forward features (679 decisions, 6h lattice), no refit, no normalization fitting, no calibration fitting, no threshold tuning on forward",
+      "forbidden_signal_columns_fit": ["threshold fitted on forward", "isotonic fitted on forward", "normalization fitted on forward"]
+    }
+  },
+  "checks": {
+    "S1_frozen_policy_only": {
+      "description": "E used ONLY prespecified frozen policy: diff its config vs historical baseline policy",
+      "method": "load E config JSON; compare execution (entry_expiry, holding cap, tp1_fraction, leverage/max, stop-first), costs (fee/funding/interval), capital, engine; allow ONLY signal-source = frozen Kronos-mini zero-shot; flag any threshold/label/calibration/normalization fitting on forward",
+      "PASS_rule": "all execution+costs+engine+capital equal baseline AND signal source declares frozen zero-shot AND no forward-fit keys present",
+      "FAIL_examples": ["entry_expiry != 12", "tp1_fraction != 0.5", "leverage != 1x", "fee != 0.0002 base", "threshold selected on forward", "isotonic/normalization fitted on forward"]
+    },
+    "S2_metrics_once": {
+      "description": "Metrics computed once: check for rerun traces / multiple summaries",
+      "method": "count summary*.json in E dir; list rerun traces (summary_*.json, summary_v2.json, rerun*.log, metrics_*.json duplicates, multiple created_at timestamps); report count",
+      "PASS_rule": "exactly 1 summary.json AND 0 rerun-trace files",
+      "report": "counts + file list as evidence even on PASS"
+    },
+    "S3_no_threshold_label_files": {
+      "description": "No threshold/label files created on forward data: list forward dir tree before/after via manifest",
+      "method": "snapshot data/processed/opencode_forward_20260323 tree (relative paths + sizes + sha where feasible) BEFORE (prep) and AFTER (audit); list E dir files matching *threshold* *label* *tune* *calibrat* *normalize*; fail if any such file references forward window or if sealed files modified (SHA mismatch vs manifest/SEAL)",
+      "PASS_rule": "sealed SHA unchanged AND forward tree delta = 0 new files outside features/ AND E dir has 0 threshold/label/tune files derived from forward",
+      "evidence": "before/after tree JSON + SHA checks"
+    },
+    "S4_no_price_returns_plots": {
+      "description": "No price/returns plots",
+      "method": "scan E dir for *.png *.jpg *.html *plot* *returns*price*; grep E driver source for matplotlib/plotly/plot(/price/returns computation on forward (excluding verification backtest engine internals)",
+      "PASS_rule": "0 plot files AND 0 price/returns-plot code paths operating on forward candles",
+      "evidence": "file-type census + grep hits (empty = PASS)"
+    }
+  },
+  "numbers_reproduction": {
+    "description": "Rebuild E forward backtest independently (own driver, frozen E signals + forward candles/costs) for normal + fee 0.00055",
+    "method": "own driver scripts/opencode_r38a_sealverify.py imports agentic_alpha_lab.backtest.engine.run_backtest directly (never imports E driver); aligns bar_index via forward candles open_time if needed; runs normal (fee 0.0002 from baseline costs) + fee_stress (0.00055 override, all else identical); monthly formula indexed-100 with forward duration from forward candles bounds",
+    "frozen_inputs": {
+      "forward_candles": "data/processed/opencode_forward_20260323/candles.parquet",
+      "forward_manifest": "data/processed/opencode_forward_20260323/manifest.json",
+      "forward_seal": "data/processed/opencode_forward_20260323/SEAL.json",
+      "e_signals": "<E dir>/signals.parquet (resolved at audit time, SHA recorded)",
+      "e_config": "<E config> (resolved at audit time, SHA recorded)"
+    },
+    "scenarios": ["normal", "fee_00055"],
+    "metrics": ["total_return", "max_drawdown", "monthly_geometric_net", "final_equity", "trades", "long_trades", "short_trades"],
+    "monthly_formula": "ratio=final_equity/100; duration_years=(forward_last_close - forward_first_open)/(365.2425*86400); monthly=ratio^(1/(12*duration_years))-1",
+    "pass_criterion": {
+      "tolerance_abs": 1e-06,
+      "verdict_pass": "all |repro - E_published| <= 1e-6 on total_return/max_drawdown/monthly_geometric_net/final_equity AND trades/long/short exact, for BOTH normal and fee_00055",
+      "on_mismatch": "investigate + name cause (signal order/sort? bar_index alignment? entry_expiry/holding cap drift? tp1_fraction path? leverage column handling? fee application path? funding interval? monthly duration bounds? engine version drift? forward candle SHA drift? truncated holding window handling?); do NOT silently adjust numbers"
+    }
+  },
+  "outputs_new_only": {
+    "dir": "artifacts/research/opencode_v110_sealverify",
+    "files": ["config.json (copy of this pre-spec)", "driver_source.py (copy of verifier)", "forward_tree_before.json", "forward_tree_after.json", "seal_audit.json", "reproduction.json (when E present) OR prep_ready.json (when E absent)", "summary.json"]
+  },
+  "absolute_rules": [
+    "verification only; no live orders",
+    "NEVER touch research/parallel/registry.json, CONTINUOUS_RESEARCH.md, NEXT_AGENT.md, research/parallel/rounds/*, ../Kronos, C:/Users/trait/.codex/worktrees/*",
+    "no register/assign/rotate; no commit/push",
+    "no overwrites (new dir artifacts/research/opencode_v110_sealverify/)",
+    "no outcome-looking beyond verification rebuild; exploratory labels",
+    "PowerShell ; if ($?) {} chaining"
+  ],
+  "driver": "scripts/opencode_r38a_sealverify.py --config configs/opencode_v110_sealverify.json --output artifacts/research/opencode_v110_sealverify",
+  "independent_test": false,
+  "exploratory": true,
+  "live_approved": false
+}

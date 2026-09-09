@@ -1,0 +1,195 @@
+{
+ "architecture": {
+  "dropout": 0.1,
+  "excursion": {
+   "horizon_bars": 48,
+   "loss": "mse_log1p",
+   "targets": [
+    "up_MFE",
+    "down_MAE"
+   ]
+  },
+  "heads_total": 5,
+  "kind": "TCN-deep-multitask (5 encoder TCN doc lap + Transformer-encoder 4 lop + heads direction/quantile/excursion)",
+  "layers": 4,
+  "loss_weights": {
+   "direction_ce": 1.0,
+   "excursion_mse_log1p": 0.5,
+   "quantile_pinball": 1.0,
+   "value_objective_macro_micro": 1.0
+  },
+  "network": {
+   "dilations": [
+    1,
+    2,
+    4,
+    8,
+    16
+   ],
+   "dropout": 0.1,
+   "heads": 8,
+   "layers": 4,
+   "tcn_width": 64,
+   "width": 192
+  },
+  "quantile": {
+   "horizon_bars": 48,
+   "loss": "pinball",
+   "quantiles": [
+    0.1,
+    0.5,
+    0.9
+   ]
+  },
+  "score_aux": {
+   "loss": "macro_micro_value.objective (giong A1: payoff MSE + 0.1 fill BCE + 0.1 aux)",
+   "mapping": "v8: ch0 = net/fill (conditional), ch4 = logit(fill)"
+  }
+ },
+ "backtest_deferred": "Du bao export tren Kaggle; portfolio evaluation (run_backtest/run_stress, normal + fee_stress + execution_stress, gross/fees/funding/net/drawdown/trades/coverage) chay LOCAL sau khi tai checkpoint, giong A1.",
+ "branches_eval": [
+  "mt_p10gate_1x",
+  "mt_p10gate_dd_guard",
+  "mt_p50gate_1x",
+  "mt_p50gate_dd_guard"
+ ],
+ "budget": {
+  "batch_size": 64,
+  "comparison": "A1: 33 fold-seed x <=24ep x 451k params, guard 11400s wall (~6.3 GPU-gio). M: 33 fold-seed x <=16ep x ~2.8M params, guard 17100s wall (~9.5 GPU-gio). Tran cung 10 GPU-gio.",
+  "epochs_max": 16,
+  "guard_wall_seconds": 17100,
+  "gpu_hours_max": 10.0,
+  "seeds_fold_jobs": 33
+ },
+ "cache": "artifacts/features/swing_sequences_v13_20260905",
+ "causality": {
+  "deriv40": "GIU theo kich ban lag48 cua B1 (source_day+48h). Chua xac minh receipt-time lich su -> disclosure exploratory, khong claim live-fillable.",
+  "embargo_days": 8,
+  "flow40": "GIU. Chi nen dong truoc signal_time (merge_asof backward, stale -> raise).",
+  "funding": "GIU. As-of: chi ky co funding_time < signal_time; fund_7d/30d/slope/z chi tu qua khu, min 90 ky truoc (kiem tra: min prior periods 384/5628).",
+  "macro": "GIU SPY/DXY (lag T-1 nghiem ngat: macro date < UTC date signal). LOAI GLD/GC-future khoi feature (chi coverage/mo ta).",
+  "normalization": "mean/std CHI fit tren train-window tung fold (ca val nested past-only).",
+  "price40": "GIU (frozen, past-only).",
+  "rule": "Train/val chi rows co label_end < fold_start - 8d; refit reset seed; khong chon seed/fold/threshold theo PnL; labels exploratory."
+ },
+ "cloud": {
+  "dataset_slug_suggestion": "opencode-trackm-bigmodel-v28-data",
+  "jit_guard": "Bootstrap guard 17100s wall; peer-failure -> dung, giu checkpoint.",
+  "kernel_slug_suggestion": "opencode-trackm-bigmodel-v28",
+  "mode": "PRIVATE T4x2, 2 workers doc lap (khong DDP)",
+  "note": "A1 (opencode-tracka1-tcn-v25) dang RUNNING -> KHONG submit; package san.",
+  "submit_rule": "CHI submit 1 dataset + 1 kernel khi `kaggle kernels list --mine` het job RUNNING/QUEUED."
+ },
+ "cloud_driver": "scripts/opencode_r6m_bigmodel_train.py",
+ "compute": "Chi train nang tren Kaggle PRIVATE T4x2. Local GTX1650/CPU chi audit/smoke/replay/backtest. Khong fallback tra phi.",
+ "data_frozen": {
+  "calendar_cal4": [
+   "bars_to_funding (lich UTC 00/08/16 deterministic)",
+   "sin_utc_hour",
+   "cos_utc_hour",
+   "is_weekend_utc"
+  ],
+  "deriv_deriv40": "artifacts/features/btc_derivatives_lag48_v1/features.npz:features (20 log-level/change + 20 missing masks, 5628x40, finite 100%)",
+  "flow_flow40": "tinh trong-script bang agentic_alpha_lab.data.flow_features tren candles tai signal_times (40 buy-imbalance/activity/volume x 5 khung, causal, finite 100%)",
+  "funding_fund5": [
+   "fund_rate (ky gan nhat TRUOC signal)",
+   "fund_7d (mean 21 ky truoc)",
+   "fund_30d (mean 90 ky truoc)",
+   "fund_slope_7d",
+   "fund_z30"
+  ],
+  "macro_macro4": [
+   "risk_on SPY>MA50 (T-1)",
+   "spy_gap_ma50",
+   "dxy_z60 (mean/std 60d ket thuc T-1)",
+   "spy_amp20"
+  ],
+  "macro_dropped": [
+   "GLD/GC-future: chi coverage, KHONG lam feature (ghi ro de tranh dao sau)."
+  ],
+  "price_price40": "data/processed/swing_regime_research_v4/examples.npz:features (40, frozen)",
+  "total_flat": 133
+ },
+ "dataset": "data/processed/swing_regime_research_v4",
+ "decisions": "data/processed/swing_regime_research_v4/decisions.parquet",
+ "epoch_selection": {
+  "embargo_days": 8,
+  "minimum_improvement": 0.0001,
+  "minimum_train": 200,
+  "minimum_validation": 100,
+  "patience": 3,
+  "validation_days": 180,
+  "window_days": 730
+ },
+ "experiment": "opencode-r6m-bigmodel-tcn-deep-multitask",
+ "family": "R6-M: kien truc lon + data tong hop (price+deriv+flow+funding+macro), walk-forward quarterly, Kaggle conditional-submit",
+ "folds": {
+  "embargo_days": 8,
+  "minimum_train_decisions": 200,
+  "parent": "configs/swing_v15_continuous_folds.json",
+  "folds_note": "11 quarterly folds",
+  "trailing_window_days": 730
+ },
+ "funding_source": {
+  "dir": "data/raw/opencode_funding_20260907",
+  "file": "data/raw/opencode_funding_20260907/funding_BTCUSDT.parquet",
+  "note": "ETHUSDT chi du phong, KHONG dung."
+ },
+ "gate": {
+  "drawdown_max": 0.2,
+  "fills_min": 30,
+  "monthly_geometric_net_min": 0.05,
+  "scenarios": [
+   "normal",
+   "fee_stress",
+   "execution_stress"
+  ]
+ },
+ "hypothesis": "Mo hinh nho (A1 451k, A2 ~5k) va HGB don-nhiem-vu dung tran ~2.4-2.9%/thang. Mo rong dung tich ~6x (2-8M) + data tong hop (deriv/flow/funding/macro, tat ca causal) + multitask (direction + quantile P10/P50/P90 + MFE/MAE) cho phep head tin cay (P10 gate) chon loc tin hieu tot hon ma khong doi policy/folds/embargo/seeds. Day la buoc thoat model nho theo roadmap round6-M.",
+ "labels_exploratory": {
+  "direction": "3-class tai H=48 bars (4h): LONG neu ret>+8bps, SHORT neu ret<-8bps, con lai WAIT",
+  "excursion": "up = max(high[t+1:t+49])/close[t]-1 clip>=0; down = 1-min(low[t+1:t+49])/close[t] clip>=0",
+  "quantile_targets": "return H=48 thuc (khong phan lop)",
+  "return": "ret = close[t+48]/close[t]-1 (close da dong cua)",
+  "value_labels": "examples.npz labels (n,16,3) giong A1/B1 (ch0 unconditional net, ch1 fill, ch2 positive-net)"
+ },
+ "live_approved": false,
+ "macro_source": {
+  "dir": "data/raw/opencode_macro_yahoo_20220101_20260907",
+  "note": "Yahoo Finance Chart API v8 (free, no key); Stooq bi chan tren host (disclosed nhu D2).",
+  "symbols_used": {
+   "dxy": "DX-Y.NYB (dxy_z60)",
+   "spy": "SPY (risk_on/gap/amp20)"
+  }
+ },
+ "model_family": "bigmodel_tcn_multitask",
+ "owner_slug_suggestion": {
+  "owner": "<kaggle-username-cua-worker>",
+  "slug": "opencode-trackm-bigmodel-v28"
+ },
+ "params_target": {
+  "band": "2-8M (vua T4 free)",
+  "estimate": "~2.8M (5 encoders ~620k + transformer 4L ~1.77M + fusion/score ~400k + multitask heads ~3k)",
+  "measured_parameters": 2798731
+ },
+ "seeds": [
+  1729,
+  1730,
+  1731
+ ],
+ "selection": "Tat ca 3 seeds x 11 folds, toi da 16 epochs chon som (patience 3, cai thien toi thieu 1e-4). Khong chon seed/fold/threshold theo portfolio. Tat ca ngay da mo la development, khong phai independent test.",
+ "smoke": "Local CPU nhe: coverage audit 5 nguon + build flat (5628,133) + 1 fold (fold_0) x 1 seed (1729) x 2 epochs batch 32 (forward/backward, save/reload parity, predict). Ket qua smoke KHONG phai ket qua nghien cuu.",
+ "standing_best_anchor": {
+  "confirmed_dd_guard": "2.79/2.67/2.06 DD-safe all scenarios (so sanh sau full train)",
+  "majority_1x": "2.935%/mo (DD breach)"
+ },
+ "training": {
+  "accumulation_steps": 2,
+  "amp": true,
+  "batch_size": 64,
+  "epochs": 16,
+  "gradient_clip": 1.0,
+  "learning_rate": 0.0003,
+  "weight_decay": 0.01
+ }
+}

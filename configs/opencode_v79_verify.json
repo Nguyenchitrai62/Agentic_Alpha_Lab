@@ -1,0 +1,138 @@
+{
+  "experiment": "opencode-v79-verify",
+  "role": "L2-BUILDER worker: independent verification of L3 v75 headline numbers (rebuild, don't copy)",
+  "lineage": "L1 v72 pool -> L2 v73 s0004_1x (210 signals) -> L3 v75 risk stage -> v79 independent rebuild",
+  "frozen_inputs": {
+    "signals": "artifacts/research/opencode_v73_L2filter/s0004_1x/signals.parquet",
+    "signals_n_expected": 210,
+    "candles": "data/processed/swing_regime_research_v4/candles.parquet",
+    "dataset_config": "data/processed/swing_regime_research_v4/config.json",
+    "parent_plan": "configs/swing_v15_continuous_folds.json",
+    "l3_config_read_only": "artifacts/research/opencode_v75_L3real/config.json",
+    "l3_summary_read_only": "artifacts/research/opencode_v75_L3real/summary.json"
+  },
+  "branches": [
+    "control_1x",
+    "tp075_1x",
+    "dd_guard_tp075"
+  ],
+  "branch_spec": {
+    "control_1x": {
+      "tp1_fraction": 0.5,
+      "sizing": "1x",
+      "purpose": "Second independent check of the shared chain: must reproduce L2 s0004_1x / L3 control_1x normal."
+    },
+    "tp075_1x": {
+      "tp1_fraction": 0.75,
+      "sizing": "1x",
+      "purpose": "Intermediate own-book guard reference for the combo (diagnostic + ref build)."
+    },
+    "dd_guard_tp075": {
+      "tp1_fraction": 0.75,
+      "sizing": "dd_guard",
+      "guard_ref": "own-book tp075_1x normal equity (this run, past-only, 1-microsecond cutoff, 100.0 seed)",
+      "guard_formula": "lev 0.5 while own-book tp075_1x reference equity is >10% under trailing peak, else 1.0"
+    }
+  },
+  "frozen_constants": {
+    "dd_trigger": 0.1,
+    "dd_guard_lev": 0.5,
+    "lev_min": 0.25,
+    "lev_max": 1.0,
+    "tp1_control": 0.5,
+    "tp1_tp075": 0.75,
+    "initial_equity": 100.0,
+    "fee_normal": 0.0002,
+    "fee_stress_rate": 0.00055
+  },
+  "scenarios": [
+    "normal",
+    "fee_stress"
+  ],
+  "monthly_formula": "ratio=final_equity/100; duration_years=(complete_evaluation_until - folds[0][0])/(365.2425*86400) per configs/swing_v15_continuous_folds.json; monthly_geometric_net=ratio^(1/(12*duration_years))-1",
+  "l3_published_exact": {
+    "control_1x": {
+      "normal": {
+        "total_return": 1.9084116914559015,
+        "max_drawdown": -0.2285874934965051,
+        "trades": 101,
+        "monthly_geometric_net": 0.0321780425066327,
+        "final_equity": 290.84116914559013
+      },
+      "fee_stress": {
+        "total_return": 1.7111360239494462,
+        "max_drawdown": -0.23928533147550723,
+        "trades": 101,
+        "monthly_geometric_net": 0.03002954140171843,
+        "final_equity": 271.1136023949446
+      }
+    },
+    "dd_guard_tp075": {
+      "normal": {
+        "total_return": 1.6590074162267956,
+        "max_drawdown": -0.16573345360670333,
+        "trades": 101,
+        "monthly_geometric_net": 0.029436464245190752,
+        "final_equity": 265.90074162267956
+      },
+      "fee_stress": {
+        "total_return": 1.4819383605145493,
+        "max_drawdown": -0.1767606732608331,
+        "trades": 101,
+        "monthly_geometric_net": 0.027334090774281172,
+        "final_equity": 248.19383605145492
+      },
+      "meta": {
+        "guard_ref": "own-book tp075_1x",
+        "guard_low_frac": 0.03333333333333333
+      }
+    },
+    "tp075_1x": {
+      "normal": {
+        "total_return": 1.7542551298409808,
+        "max_drawdown": -0.2125419347183768,
+        "trades": 101,
+        "monthly_geometric_net": 0.030511812832279217,
+        "final_equity": 275.4255129840981
+      },
+      "fee_stress": {
+        "total_return": 1.567301365950578,
+        "max_drawdown": -0.22338842674149073,
+        "trades": 101,
+        "monthly_geometric_net": 0.028365182576313597,
+        "final_equity": 256.7301365950578
+      }
+    }
+  },
+  "pass_criterion": {
+    "tolerance_abs": 1e-06,
+    "metrics": [
+      "total_return",
+      "max_drawdown",
+      "monthly_geometric_net",
+      "final_equity"
+    ],
+    "trades": "exact integer match",
+    "verdict_pass": "all |repro - published| <= 1e-6 AND trades exact, both branches x both scenarios",
+    "on_mismatch": "investigate and name the cause (guard-ref difference? tp1 handling? floating order?); do NOT silently adjust to match"
+  },
+  "driver": "scripts/opencode_r26L2_verify.py --config configs/opencode_v79_verify.json --output artifacts/research/opencode_v79_verify",
+  "output": "artifacts/research/opencode_v79_verify",
+  "causal_notes": [
+    "Frozen L2 signals only, never refit.",
+    "Guard uses strictly-past own-book reference exits (signal ts minus 1 microsecond), 100.0 seed.",
+    "tp075 flows via ExecutionConfig.tp1_fraction (signal tp1_fraction column is provenance only).",
+    "Per-signal holding_bars preserved verbatim; leverage column dropped for 1x, set to guard vector for combo.",
+    "No maker-fill/queue claims; stop/timeout exits market-like at scenario fee; DD trade-candle-close sampled."
+  ],
+  "rules": [
+    "verification backtests only (no new hypotheses)",
+    "no live orders",
+    "NEVER touch research/parallel/registry.json, CONTINUOUS_RESEARCH.md, NEXT_AGENT.md, research/parallel/rounds/*, ../Kronos, C:/Users/trait/.codex/worktrees/*",
+    "no register/assign/rotate; no commit/push; no overwrites (output dir must not exist)",
+    "causal past-only; exploratory labels; opened development interval only, NOT independent test"
+  ],
+  "independent_test": false,
+  "exploratory": true,
+  "live_approved": false
+}

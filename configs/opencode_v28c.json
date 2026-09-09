@@ -1,0 +1,59 @@
+{
+  "experiment": "opencode-v28c-bigmodel-replay",
+  "family": "R8 R-AUDIT: replay audit + continuous portfolio cho v28 BigModel (local only)",
+  "hypothesis": "Kernel Kaggle nguynchtrai/opencode-trackm-bigmodel-v28 (TCN-deep 2.8M params + Transformer 4 lop x 8 heads + multitask direction/quantile/excursion, data tong hop 133 features causal, walk-forward quarterly 11 folds x seeds 1729/1730/1731 = 33 models, nested validation past-only chon epoch) da COMPLETE, worker_exit_codes [0,0]. Training loss KHONG phai thanh cong. Bat buoc: (1) replay audit local nap lai 33 checkpoints + so parity voi cloud predictions (rtol/atol 1e-3) + parity chinh sach combine+swing_signals; (2) continuous portfolio local tren toan bo development interval. Labels exploratory, causal past-only.",
+  "training_source": "artifacts/kaggle/v28_bigmodel_download/bigmodel-training",
+  "model_plan": "configs/opencode_v28_bigmodel.json",
+  "parent_plan": "configs/swing_v15_continuous_folds.json",
+  "dataset": "data/processed/swing_regime_research_v4",
+  "audit": {
+    "driver": "scripts/opencode_r8a_v28replay.py",
+    "rtol": 0.001,
+    "atol": 0.001,
+    "device": "cuda",
+    "batch_size": 32,
+    "output": "artifacts/research/opencode_v28c_replay",
+    "require": "state=complete, worker_exit_codes=[0,0], missing_or_failed rong; du 33 predictions (len(selected),16,6) finite; plan sha trung configs/opencode_v28_bigmodel.json"
+  },
+  "portfolio": {
+    "driver": "scripts/opencode_r8a_v28replay.py --portfolio",
+    "ensemble_bases": ["mean", "mean_minus_std"],
+    "sizings": ["1x", "dd_guard"],
+    "branches": ["mean_1x", "mean_dd_guard", "mean_minus_std_1x", "mean_minus_std_dd_guard"],
+    "scenarios": ["normal", "fee_stress", "execution_stress"],
+    "fee_stress_rate": 0.00055,
+    "stress": {
+      "entry_penetration_bps": 5,
+      "target_penetration_bps": 5,
+      "market_exit_slippage_bps": 5,
+      "market_exit_fee_rate": 0.00055,
+      "allow_limit_price_improvement": false
+    },
+    "dd_trigger": 0.1,
+    "dd_guard_lev": 0.5,
+    "dd_guard_reference": "own-book: moi nhanh dd_guard dung sampled equity (trade exit_time/equity_after) cua chinh nhanh 1x cung ensemble base, past-only 1-microsecond cutoff, seed 100.0 (theo tien le v03 opencode_risk_overlay_probe.py, khac v27 shared-reference; cong bo tai day)",
+    "lev_min": 0.5,
+    "lev_max": 1.0,
+    "monthly_geometric": "ratio^(1/(12*duration_years))-1, duration tu folds[0][0] den complete_evaluation_until trong swing_v15_continuous_folds.json",
+    "output": "artifacts/research/opencode_v28c_replay/portfolio.json"
+  },
+  "standing_best": {
+    "majority_1x": "2.935%/mo (DD breach)",
+    "confirmed_dd_guard": "2.79/2.67/2.06 DD-safe all scenarios"
+  },
+  "gate": {
+    "monthly_min": 0.05,
+    "dd_max": 0.2,
+    "fills_min": 30,
+    "scenarios": ["normal", "fee_stress", "execution_stress"]
+  },
+  "rules": [
+    "khong dat lenh live; local inference/replay/backtest only",
+    "khong dung research/parallel/registry.json, CONTINUOUS_RESEARCH.md, NEXT_AGENT.md, research/parallel/rounds/*, ../Kronos",
+    "khong register/assign/rotate; khong commit/push; khong ghi de artifacts cu",
+    "causal past-only; exploratory labels; khong dung output nua voi lam bang chung",
+    "bao cao TAT CA branches x TAT CA scenarios; trung thuc: FAIL la FAIL"
+  ],
+  "independent_test": false,
+  "live_approved": false
+}

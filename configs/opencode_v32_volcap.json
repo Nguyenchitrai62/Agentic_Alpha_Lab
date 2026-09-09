@@ -1,0 +1,34 @@
+{
+  "experiment": "opencode-v32-volcap",
+  "family": "R8-N neutral: volume-cap fills (k x bar volume) tren majority_1x frozen (Nautilus idea thu hai)",
+  "hypothesis": "Engine ohlc-v2 gia dinh thanh khoan vo han: gia CHAM entry_limit la khop full size o gia limit. Stress thuc te hon (y tuong NautilusTrader): moi bar chi khop toi da k x volume cua bar vao lenh (mo phong thanh khoan huu han + queue). Neu qty lenh > k x volume cua bar cham gia thi bo bar do (unfilled) va thu bar ke tiep trong expiry 12-bar (second-chance giong probfill). Muc tieu la do survival/robustness cua majority_1x, KHONG phai tang loi nhuan.",
+  "bases": {
+    "majority_1x": "artifacts/research/opencode_v15_mapensemble/majority_1x/signals.parquet"
+  },
+  "candles": "data/processed/swing_regime_research_v4/candles.parquet",
+  "dataset_config": "data/processed/swing_regime_research_v4/config.json",
+  "parent_plan": "configs/swing_v15_continuous_folds.json",
+  "volume_column": "volume",
+  "volume_unit": "base BTC per 5m bar (quote_volume chi de tham chieu; taker_buy_volume ton tai nhung khong dung)",
+  "k_levels": [1.0, 0.25, 0.1, 0.05],
+  "branches": ["majority_k100", "majority_k25", "majority_k10", "majority_k05"],
+  "branch_specs": {
+    "majority_k100": {"base": "majority_1x", "k": 1.0},
+    "majority_k25": {"base": "majority_1x", "k": 0.25},
+    "majority_k10": {"base": "majority_1x", "k": 0.1},
+    "majority_k05": {"base": "majority_1x", "k": 0.05}
+  },
+  "branch_count_note": "4 branches (k) x 2 scenarios (normal, fee_stress) = 8 o danh gia. Day DA la stress nen khong chay exec-stress.",
+  "control": "majority_k100 (k=1.0 bypass volcap) normal phai khop published majority_1x (+165.17829563633% total_return 1.6517829563633004, -20.09% max_drawdown -0.20086073993367803, 63 trades) hoac STOP",
+  "control_reference": {"total_return": 1.6517829563633004, "max_drawdown": -0.20086073993367803, "trades": 63},
+  "fee_stress_rate": 0.00055,
+  "scenarios": ["normal", "fee_stress"],
+  "execution": {"leverage": 1.0, "max_leverage": 1.0, "tp1_fraction": 0.5, "intrabar_policy": "stop_first"},
+  "volcap_formula": "Voi tin hieu co limit L, direction d, duyet expiry bars idx=signal_index+1..signal_index+12 theo thu tu: cand=engine._entry_fill(bar,d,L); neu cand None -> bo (no-touch). Neu k>=1.0 -> fill ngay tai cand (control bypass, bit-identical engine). Neu k<1.0: notional=equity_hien_tai*leverage(1x); qty=notional/cand; cap=k*float(bar[volume_column]); neu qty<=cap -> fill tai cand; nguoc lai coi nhu unfilled o bar do (volcap_skip+1) va thu bar ke tiep trong expiry. Khong khop mot phan, khong doi gia entry. Quyet dinh chi dung bar hien tai + equity qua khu (causal), tru luu y: full-bar volume ve ly thuyet chi biet sau khi bar dong (intrabar look-ahead nhe, ap dung dong nhat).",
+  "seed_base": 1729,
+  "rng_scheme": "Deterministic, khong co draw ngau nhien. seed_base=1729 chi ghi de dam bao sap xep/tai lap co dinh danh (signals sort by bar_index, candles sort by open_time). Moi branch chay lai tu dau voi cung thu tu (cong bang so sanh).",
+  "monthly_formula": "ratio=final_equity/100; duration_years=(complete_evaluation_until - folds[0][0])/(365.2425*86400) theo parent_plan (giong v15/v30); monthly_geometric_net=ratio^(1/(12*duration_years))-1; annual=ratio^(1/duration_years)-1.",
+  "engine_note": "Phan con lai cua backtest (stop/timeout market-like o scenario fee, TP1 50% + TP2, funding long 0.0001/8h short 0, stop-first intrabar, TP suppression tren intrabar entry candle, drawdown trade-candle-close sampled, compounding tu equity hien tai, overlap next_available_index, holding validation, truncated-window reject) GIU NGUYEN nhu engine ohlc-v2 run_backtest. Chi khoi entry-search duoc chen them dieu kien volcap. k=1.0 bypass de lam control gate bit-identical.",
+  "gate": {"monthly_min": 0.05, "dd_max": 0.2, "fills_min": 30},
+  "verdict_note": "Day la thang robustness (do survival khi k giam), KHONG phai gate loi nhuan. k la gia dinh stress chu quan, khong suy ra tu microstructure/queue that. Khong claim maker fill probability tu OHLC. Capital indexed 100, 1x co dinh: ket luan chi co hieu luc o quy mo nay, khong suy rong cho capital lon hon nhieu."
+}

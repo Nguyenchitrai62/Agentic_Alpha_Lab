@@ -1,0 +1,64 @@
+{
+  "experiment": "opencode-v14-derivveto (R3-B3 breakthrough)",
+  "hypothesis": "Standalone non-price models are DEAD per B1 verdict, but non-price model AGREEMENT may carry incremental value as a VETO filter on frozen v30 price signals: keep a v30 signal iff a B1-model signal exists at the same decision index (bar_index) with the SAME direction. Veto uses only model outputs available at the same decision time (both models purged past-only walk-forward / frozen), hence causal past-only, no future.",
+  "family": "agreement-veto filter on frozen signals (no refit)",
+  "inputs": {
+    "v30_signals": "artifacts/research/opencode_v02_reproduce_v30/isotonic_4/signals.parquet",
+    "veto_flow_signals": "artifacts/research/opencode_v09_deriv/flow40_1x/signals.parquet",
+    "veto_deriv_signals": "artifacts/research/opencode_v09_deriv/deriv40_1x/signals.parquet",
+    "candles": "data/processed/swing_regime_research_v4/candles.parquet",
+    "dataset_config": "data/processed/swing_regime_research_v4/config.json",
+    "parent_plan": "configs/swing_v15_continuous_folds.json"
+  },
+  "key_compatibility_rule": "BEFORE any backtest: verify v30 vs B1 frames share decision-key space: columns bar_index/signal_time/direction present in all; bar_index integer ranges overlap; signal_time same UTC clock with >0 overlapping timestamps; direction encoding identical {1,-1}. Veto key is (bar_index, direction). If zero bar overlap AND zero time overlap, STOP and write a negative audit instead of forcing a match.",
+  "veto_rule": "keep a v30 row iff (bar_index, direction) is in the veto-source key set. Sources: flow = flow40_1x keys; deriv = deriv40_1x keys; either = flow|deriv; both = flow&deriv. Veto is a causal post-filter on frozen signals (function of same-decision model outputs only); no thresholds refit, no future data.",
+  "veto_sources": ["flow", "deriv", "either", "both"],
+  "sizings": ["1x", "dd_guard"],
+  "dd_trigger": 0.1,
+  "dd_guard_lev": 0.5,
+  "dd_guard_reference": "unvetoed control run control_1x (v30 frozen signals, 1x) sampled equity from trade exit_time/equity_after, past-only 1-microsecond cutoff, 100.0 seed level; EVERY veto dd_guard branch reuses that control guard state at its own veto-kept signal times (disclosed; trade-candle-close sampled DD, not mark/intrabar)",
+  "lev_min": 0.25,
+  "lev_max": 1.0,
+  "fee_stress_rate": 0.00055,
+  "stress": {
+    "entry_penetration_bps": 5,
+    "target_penetration_bps": 5,
+    "market_exit_slippage_bps": 5,
+    "market_exit_fee_rate": 0.00055,
+    "allow_limit_price_improvement": false
+  },
+  "gate": {
+    "monthly_min": 0.05,
+    "dd_max": 0.2,
+    "fills_min": 30
+  },
+  "control_check": {
+    "branch": "control_1x",
+    "scenario": "normal",
+    "total_return": 1.2279837998661565,
+    "max_drawdown": -0.20086073993367803,
+    "trades": 65,
+    "tolerance": 1e-6,
+    "action": "STOP and report if mismatch; no further branches"
+  },
+  "branches": [
+    {"name": "control_1x", "veto": null, "sizing": "1x"},
+    {"name": "veto_flow_1x", "veto": "flow", "sizing": "1x"},
+    {"name": "veto_flow_dd_guard", "veto": "flow", "sizing": "dd_guard"},
+    {"name": "veto_deriv_1x", "veto": "deriv", "sizing": "1x"},
+    {"name": "veto_deriv_dd_guard", "veto": "deriv", "sizing": "dd_guard"},
+    {"name": "veto_either_1x", "veto": "either", "sizing": "1x"},
+    {"name": "veto_either_dd_guard", "veto": "either", "sizing": "dd_guard"},
+    {"name": "veto_both_1x", "veto": "both", "sizing": "1x"},
+    {"name": "veto_both_dd_guard", "veto": "both", "sizing": "dd_guard"}
+  ],
+  "scenarios": ["normal", "fee_stress", "execution_stress"],
+  "rules": [
+    "no live orders; local backtests only",
+    "signals/scores never refit",
+    "causal past-only (veto uses same-decision model outputs only, no future)",
+    "pre-specified matrix in this config before running; no changes after backtests",
+    "report ALL 9 branches x ALL 3 scenarios, even degenerate/low-fill branches",
+    "exploratory labels; opened development interval only, not an independent test"
+  ]
+}
