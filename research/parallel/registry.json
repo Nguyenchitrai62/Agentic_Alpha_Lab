@@ -2,7 +2,7 @@
   "schema_version": 1,
   "project": "Agentic Alpha Lab BTC swing research",
   "created_at": "2026-09-06T00:00:00Z",
-  "next_version": 200,
+  "next_version": 201,
   "control": {
     "coordinator_model": "gpt-5.6-sol",
     "coordinator_reasoning": "high",
@@ -54,7 +54,7 @@
     "expected_workers": 3,
     "version_range": [
       45,
-      199
+      200
     ],
     "parent_commit": "1ecf947baddd5ef78444670330e9db62128dad50",
     "cloud_snapshot": {
@@ -7888,7 +7888,7 @@
       "version": "v197",
       "track": "A",
       "direction_key": "v197-sleeve-rung-size",
-      "status": "running",
+      "status": "rejected",
       "parent_versions": [
         "v195"
       ],
@@ -7901,9 +7901,36 @@
       "write_scope": "research/parallel/rounds/parallel-20260906-r2/v197",
       "worker_agent_id": "01a07792-4a6b-7fc3-a08a-af2923b1778a",
       "worker_host_id": "local",
-      "result_manifest": null,
+      "result_manifest": "research\\parallel\\rounds\\parallel-20260906-r2\\v197\\result_manifest.json",
       "registered_at": "2026-09-26T18:27:24.519886Z",
-      "assigned_at": "2026-09-26T18:27:24.519886Z"
+      "assigned_at": "2026-09-26T18:27:24.519886Z",
+      "result_manifest_sha256": "c47b9cf3ce8a88e9fab15aca9367abab2a46a5199a3a894bf4317f345e9cf3fa",
+      "result_summary": {
+        "scenarios": {
+          "normal": {
+            "monthly_geometric_net_percent": 4.996,
+            "max_drawdown_percent": 19.32,
+            "fills": 40078,
+            "months": 60
+          },
+          "fee_stress": {
+            "monthly_geometric_net_percent": 4.996,
+            "max_drawdown_percent": 19.32,
+            "fills": 40078,
+            "months": 60
+          },
+          "execution_stress": {
+            "monthly_geometric_net_percent": 4.996,
+            "max_drawdown_percent": 19.32,
+            "fills": 40078,
+            "months": 60
+          }
+        },
+        "independent_test": false,
+        "live_approved": false,
+        "audit_notes": "Bit-exact on all rows; mult 1 equals v193 X=0.08; look-ahead PASS; tail: worst 1m dip -8.6% (book-led), 7 small sleeve stop gaps, liquidation margin +0.89, 0 liquidations. Gate fails: 5y 4.996, last year 2.761. (Pre-fix DD 19.32; re-scored 19.72 in v199 with intrabar peaks.)"
+      },
+      "audited_at": "2026-09-26T19:05:25.454595Z"
     },
     {
       "version": "v198",
@@ -7946,7 +7973,28 @@
       "result_manifest": null,
       "registered_at": "2026-09-26T18:37:57.935326Z",
       "assigned_at": "2026-09-26T18:37:57.935326Z"
+    },
+    {
+      "version": "v200",
+      "track": "A",
+      "direction_key": "v200-user-tp-sl-range",
+      "status": "running",
+      "parent_versions": [
+        "v197"
+      ],
+      "model_family": "hist-gradient-boosting",
+      "objective": "Book SL/TP inside the user's 3-10% range: (SL2,TP4), (SL2.5,TP2.5), (SL3,TP2) daily sigma on the v197 pipeline",
+      "data_contract": "cached members, 1m majors, engine_user (post-audit fix)",
+      "policy_contract": "v197 otherwise; select among the three on the first four years; report % distances and gross exposure",
+      "hypothesis": "Closer stops/targets preferred by the user keep most of the edge",
+      "parent_commit": "1ecf947baddd5ef78444670330e9db62128dad50",
+      "write_scope": "research/parallel/rounds/parallel-20260906-r2/v200",
+      "worker_agent_id": "01a07792-4a6b-7fc3-a08a-af2923b1778a",
+      "worker_host_id": "local",
+      "result_manifest": null,
+      "registered_at": "2026-09-26T19:05:25.451571Z",
+      "assigned_at": "2026-09-26T19:05:25.451571Z"
     }
   ],
-  "updated_at": "2026-09-26T18:37:57.937365Z"
+  "updated_at": "2026-09-26T19:05:25.454595Z"
 }

@@ -68,7 +68,7 @@ def prepare(books, opens):
                 settle=settle_at_end)
 
 
-def simulate(books, opens, prep, m_sl=3.0, m_sleeve_sl=2.0, sleeve=True, target=0.25, cap=2.0, d_limit=D_LIMIT, win_end=60, sleeve_risk_budget=None, gap=0.02, m_sleeve_tp=1.0, rung_scale_fixed=None, size_mult=1.0, rungs=RUNGS):
+def simulate(books, opens, prep, m_sl=3.0, m_sleeve_sl=2.0, sleeve=True, target=0.25, cap=2.0, d_limit=D_LIMIT, win_end=60, sleeve_risk_budget=None, gap=0.02, m_sleeve_tp=1.0, rung_scale_fixed=None, size_mult=1.0, rungs=RUNGS, m_tp=None):
     idx, cols = prep["idx"], prep["cols"]
     O, H, L, C = prep["O"], prep["H"], prep["L"], prep["C"]
     sig4, o1, o2, settle = prep["sig4"], prep["o1"], prep["o2"], prep["settle"]
@@ -83,7 +83,7 @@ def simulate(books, opens, prep, m_sl=3.0, m_sleeve_sl=2.0, sleeve=True, target=
     net, g, eq, eq_min, eq_max = np.zeros(n), np.ones(n), np.ones(n), np.ones(n), np.ones(n)
     w = np.zeros(na)            # position weights at bar start (fraction of equity, drifted)
     entry = np.full(na, np.nan)  # average entry price per asset
-    stats = dict(fills=0, unfilled=0, stops=0, tps=0, rungs=0, rung_stops=0, rung_tps=0, liq=0, fees=0.0, funding=0.0)
+    stats = dict(fills=0, unfilled=0, stops=0, tps=0, rungs=0, rung_stops=0, rung_tps=0, liq=0, fees=0.0, funding=0.0, gross_sum=0.0, gross_max=0.0, bars=0)
     minute = np.arange(240)
     for i in range(n):
         if i >= 2:
@@ -126,9 +126,10 @@ def simulate(books, opens, prep, m_sl=3.0, m_sleeve_sl=2.0, sleeve=True, target=
             def levels(qq, ee):
                 if qq == 0 or not np.isfinite(ee) or not np.isfinite(sd[a]):
                     return None, None
+                mt = 2 * m_sl if m_tp is None else m_tp
                 if qq > 0:
-                    return ee * (1 - m_sl * sd[a]), ee * (1 + 2 * m_sl * sd[a])
-                return ee * (1 + m_sl * sd[a]), ee * (1 - 2 * m_sl * sd[a])
+                    return ee * (1 - m_sl * sd[a]), ee * (1 + mt * sd[a])
+                return ee * (1 + m_sl * sd[a]), ee * (1 - mt * sd[a])
 
             def first_exit(qq, lo_m, hi_m):
                 sl, tp = levels(qq, cur_e)
@@ -241,6 +242,10 @@ def simulate(books, opens, prep, m_sl=3.0, m_sleeve_sl=2.0, sleeve=True, target=
         gross = float(np.abs(q * o2[i]).sum()) + (N_MAX if sleeve else 0.0)
         if 1 + float(path.min()) < MMR * max(gross, 1e-9):
             stats["liq"] += 1
+        gb = float(np.abs(tgt).sum())
+        stats["gross_sum"] += gb
+        stats["gross_max"] = max(stats["gross_max"], gb)
+        stats["bars"] += 1
         # drift weights to next bar start
         end_eq_rel = 1 + pnl
         w = np.where(np.isfinite(o2[i]), q * o2[i] / end_eq_rel, 0.0)

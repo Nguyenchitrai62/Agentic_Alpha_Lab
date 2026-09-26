@@ -100,6 +100,7 @@ def main():
             else:
                 entry = m["bar_open"] * (1 + D_LIMIT)
                 sl, tp = entry * (1 + M_SL_BOOK * m["sig_d"]), entry * (1 - M_TP_BOOK * m["sig_d"])
+            row.update(sl_pct=round(100 * abs(sl / entry - 1), 1), tp_pct=round(100 * abs(tp / entry - 1), 1))
             row.update(limit_entry=round(entry, 6), stop_loss_market=round(sl, 6), take_profit_limit=round(tp, 6),
                        last_price=m["last"], valid_until=str(m["bar_open_time"] + pd.Timedelta(hours=4)))
         books.append(row)
@@ -123,10 +124,13 @@ def main():
     for r in books:
         if "limit_entry" in r:
             print(f"  {r['symbol']:8s} {r['side']:5s} {r['weight']*100:6.2f}% von (~{r['notional_usdt']} USDT)  "
-                  f"entry {r['limit_entry']}  SL {r['stop_loss_market']}  TP {r['take_profit_limit']}  "
+                  f"entry {r['limit_entry']}  SL {r['stop_loss_market']} (-{r['sl_pct']}%)  TP {r['take_profit_limit']} (+{r['tp_pct']}%)  "
                   f"tin cay: {r['confidence']} (2 mo hinh {'cung' if r['members_agree'] else 'khac'} huong, do manh {r['strength']})")
         else:
             print(f"  {r['symbol']:8s} {r['side']}  (trong so {r['weight']*100:.2f}%)")
+    gross = sum(abs(r["weight"]) for r in books)
+    print(f"  => Tong vi the sach: {gross * 100:.1f}% von (don bay {gross:.2f} lan). Lich su: trung binh ~48% von, cao nhat ~230% von.")
+    print("  => SL/TP xa la luoi an toan: mo hinh thuong tu dong/giam vi the sau ~2 ngay (trung vi), khong can cho cham TP/SL.")
     print(f"\n2) MUA DAY TRONG NEN (dat san tu phut 16 den phut 238 cua nen 4h hien tai; tong rui ro lenh dang mo <= {RISK_BUDGET*100:.0f}% von):")
     for r in sleeve:
         print(f"  {r['symbol']:8s} {r['rung_sigma']}sigma: BUY LIMIT {r['buy_limit']}  TP {r['take_profit_limit']}  SL {r['stop_loss_market']}  "
