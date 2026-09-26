@@ -2,7 +2,7 @@
   "schema_version": 1,
   "project": "Agentic Alpha Lab BTC swing research",
   "created_at": "2026-09-06T00:00:00Z",
-  "next_version": 201,
+  "next_version": 204,
   "control": {
     "coordinator_model": "gpt-5.6-sol",
     "coordinator_reasoning": "high",
@@ -54,7 +54,7 @@
     "expected_workers": 3,
     "version_range": [
       45,
-      200
+      203
     ],
     "parent_commit": "1ecf947baddd5ef78444670330e9db62128dad50",
     "cloud_snapshot": {
@@ -7936,7 +7936,7 @@
       "version": "v198",
       "track": "B",
       "direction_key": "v198-tsmom-member",
-      "status": "running",
+      "status": "rejected",
       "parent_versions": [
         "v196"
       ],
@@ -7949,15 +7949,42 @@
       "write_scope": "research/parallel/rounds/parallel-20260906-r2/v198",
       "worker_agent_id": "01a07791-eecb-7053-8866-dcdbe31e84d7",
       "worker_host_id": "local",
-      "result_manifest": null,
+      "result_manifest": "research\\parallel\\rounds\\parallel-20260906-r2\\v198\\result_manifest.json",
       "registered_at": "2026-09-26T18:30:55.361898Z",
-      "assigned_at": "2026-09-26T18:30:55.361898Z"
+      "assigned_at": "2026-09-26T18:30:55.361898Z",
+      "result_manifest_sha256": "83af0d16baded3e5b5477f6d3455fdff17a878b99ad1b57c9aa7699289d134b1",
+      "result_summary": {
+        "scenarios": {
+          "normal": {
+            "monthly_geometric_net_percent": 4.996,
+            "max_drawdown_percent": 19.32,
+            "fills": 40078,
+            "months": 60
+          },
+          "fee_stress": {
+            "monthly_geometric_net_percent": 4.996,
+            "max_drawdown_percent": 19.32,
+            "fills": 40078,
+            "months": 60
+          },
+          "execution_stress": {
+            "monthly_geometric_net_percent": 4.996,
+            "max_drawdown_percent": 19.32,
+            "fills": 40078,
+            "months": 60
+          }
+        },
+        "independent_test": false,
+        "live_approved": false,
+        "audit_notes": "Bit-exact on all rows; TSMOM causal; v151 reference equals the v197 selection; rejected."
+      },
+      "audited_at": "2026-09-26T19:16:19.669314Z"
     },
     {
       "version": "v199",
       "track": "C",
       "direction_key": "v199-ladder-depth",
-      "status": "running",
+      "status": "rejected",
       "parent_versions": [
         "v188"
       ],
@@ -7970,15 +7997,42 @@
       "write_scope": "research/parallel/rounds/parallel-20260906-r2/v199",
       "worker_agent_id": "01a07748-5adc-7061-8052-0ed36705a8a8",
       "worker_host_id": "local",
-      "result_manifest": null,
+      "result_manifest": "research\\parallel\\rounds\\parallel-20260906-r2\\v199\\result_manifest.json",
       "registered_at": "2026-09-26T18:37:57.935326Z",
-      "assigned_at": "2026-09-26T18:37:57.935326Z"
+      "assigned_at": "2026-09-26T18:37:57.935326Z",
+      "result_manifest_sha256": "605420e9a6911bac7aeb2c7de18d94e18542b4148e822cab02a477d90478d1b0",
+      "result_summary": {
+        "scenarios": {
+          "normal": {
+            "monthly_geometric_net_percent": 4.996,
+            "max_drawdown_percent": 19.72,
+            "fills": 40078,
+            "months": 60
+          },
+          "fee_stress": {
+            "monthly_geometric_net_percent": 4.996,
+            "max_drawdown_percent": 19.72,
+            "fills": 40078,
+            "months": 60
+          },
+          "execution_stress": {
+            "monthly_geometric_net_percent": 4.996,
+            "max_drawdown_percent": 19.72,
+            "fills": 40078,
+            "months": 60
+          }
+        },
+        "independent_test": false,
+        "live_approved": false,
+        "audit_notes": "Bit-exact on all rows under the corrected conventions; v197 anchor confirmed (DD 19.32 -> 19.72 from minute-path peaks); look-ahead PASS."
+      },
+      "audited_at": "2026-09-26T19:19:50.161320Z"
     },
     {
       "version": "v200",
       "track": "A",
       "direction_key": "v200-user-tp-sl-range",
-      "status": "running",
+      "status": "rejected",
       "parent_versions": [
         "v197"
       ],
@@ -7991,10 +8045,100 @@
       "write_scope": "research/parallel/rounds/parallel-20260906-r2/v200",
       "worker_agent_id": "01a07792-4a6b-7fc3-a08a-af2923b1778a",
       "worker_host_id": "local",
-      "result_manifest": null,
+      "result_manifest": "research\\parallel\\rounds\\parallel-20260906-r2\\v200\\result_manifest.json",
       "registered_at": "2026-09-26T19:05:25.451571Z",
-      "assigned_at": "2026-09-26T19:05:25.451571Z"
+      "assigned_at": "2026-09-26T19:05:25.451571Z",
+      "result_manifest_sha256": "0e6ee2d604ce278e9948ac2fa27e20ed22f000248ad62adbf5939b45a4b5177b",
+      "result_summary": {
+        "scenarios": {
+          "normal": {
+            "monthly_geometric_net_percent": 4.425,
+            "max_drawdown_percent": 21.28,
+            "fills": 39739,
+            "months": 60
+          },
+          "fee_stress": {
+            "monthly_geometric_net_percent": 4.425,
+            "max_drawdown_percent": 21.28,
+            "fills": 39739,
+            "months": 60
+          },
+          "execution_stress": {
+            "monthly_geometric_net_percent": 4.425,
+            "max_drawdown_percent": 21.28,
+            "fills": 39739,
+            "months": 60
+          }
+        },
+        "independent_test": false,
+        "live_approved": false,
+        "audit_notes": "Bit-exact on all rows incl. gross exposure; v197 anchor confirmed twice under the corrected engine; look-ahead PASS; rejected."
+      },
+      "audited_at": "2026-09-26T19:32:08.787583Z"
+    },
+    {
+      "version": "v201",
+      "track": "B",
+      "direction_key": "v201-hourly-ladder-risk-budget",
+      "status": "running",
+      "parent_versions": [
+        "v198"
+      ],
+      "model_family": "rule-sleeve-no-selection",
+      "objective": "Add an hourly-anchored dip ladder (sigma_1h rungs, TP 1 sigma, SL 5 sigma, next-hour exit) to v197 under the shared stop-risk budget (0.12 / 0.18)",
+      "data_contract": "cached members, 1m majors, engine_user",
+      "policy_contract": "v197 otherwise; reference must reproduce v197; select on first four years",
+      "hypothesis": "The 4h sleeve is capacity-limited; hourly overshoots add independent rebounds priced by smaller stops",
+      "parent_commit": "1ecf947baddd5ef78444670330e9db62128dad50",
+      "write_scope": "research/parallel/rounds/parallel-20260906-r2/v201",
+      "worker_agent_id": "01a07791-eecb-7053-8866-dcdbe31e84d7",
+      "worker_host_id": "local",
+      "result_manifest": null,
+      "registered_at": "2026-09-26T19:16:19.667284Z",
+      "assigned_at": "2026-09-26T19:16:19.667284Z"
+    },
+    {
+      "version": "v202",
+      "track": "C",
+      "direction_key": "v202-quarterly-retrain",
+      "status": "running",
+      "parent_versions": [
+        "v199"
+      ],
+      "model_family": "hist-gradient-boosting",
+      "objective": "Quarterly walk-forward retraining of the book models (20 quarterly anchors, each model predicts only its quarter) vs annual, under v197 rules",
+      "data_contract": "same panels and features as v144/v151 members; per-anchor cutoffs/embargoes unchanged; engine_user",
+      "policy_contract": "v151 books annual vs quarterly, v197 sleeve and rules; select on first four years",
+      "hypothesis": "More frequent retraining adapts to regime changes and improves robustness across years",
+      "parent_commit": "1ecf947baddd5ef78444670330e9db62128dad50",
+      "write_scope": "research/parallel/rounds/parallel-20260906-r2/v202",
+      "worker_agent_id": "01a07748-5adc-7061-8052-0ed36705a8a8",
+      "worker_host_id": "local",
+      "result_manifest": null,
+      "registered_at": "2026-09-26T19:19:50.159320Z",
+      "assigned_at": "2026-09-26T19:19:50.159320Z"
+    },
+    {
+      "version": "v203",
+      "track": "A",
+      "direction_key": "v203-annual-quarterly-retrain-ensemble",
+      "status": "running",
+      "parent_versions": [
+        "v200"
+      ],
+      "model_family": "hist-gradient-boosting",
+      "objective": "Average annual and quarterly retrained v151 books (0.5/0.5) under v197 rules",
+      "data_contract": "members_v154 (annual) and members_quarterly (v202) caches, engine_user",
+      "policy_contract": "v197 otherwise; select on first four years",
+      "hypothesis": "Ensembling two retraining schedules reduces model variance and improves robustness across years",
+      "parent_commit": "1ecf947baddd5ef78444670330e9db62128dad50",
+      "write_scope": "research/parallel/rounds/parallel-20260906-r2/v203",
+      "worker_agent_id": "01a07792-4a6b-7fc3-a08a-af2923b1778a",
+      "worker_host_id": "local",
+      "result_manifest": null,
+      "registered_at": "2026-09-26T19:32:08.785582Z",
+      "assigned_at": "2026-09-26T19:32:08.785582Z"
     }
   ],
-  "updated_at": "2026-09-26T19:05:25.454595Z"
+  "updated_at": "2026-09-26T19:32:08.787583Z"
 }

@@ -64,11 +64,16 @@ def prepare(books, opens):
     o1, o2 = o.shift(-1).to_numpy(), o.shift(-2).to_numpy()
     exit_hour = (idx + pd.Timedelta(hours=8)).hour
     settle_at_end = np.isin(exit_hour, (0, 8, 16))  # T + 4h is a funding settlement
+    n, na = A["open"].shape[0], len(cols)
+    h_open = A["open"][:, [0, 60, 120, 180], :].astype(float).reshape(n * 4, na)
+    sig_h = pd.DataFrame(h_open).pct_change().rolling(1440, min_periods=480).std().to_numpy().reshape(n, 4, na)
+    sig1h = np.full((n, na), np.nan)
+    sig1h[1:] = sig_h[:-1, 3, :]  # hourly sigma known before the holding bar starts
     return dict(idx=idx, cols=cols, O=A["open"], H=A["high"], L=A["low"], C=A["close"], sig4=sig4, o1=o1, o2=o2,
-                settle=settle_at_end)
+                settle=settle_at_end, sig1h=sig1h)
 
 
-def simulate(books, opens, prep, m_sl=3.0, m_sleeve_sl=2.0, sleeve=True, target=0.25, cap=2.0, d_limit=D_LIMIT, win_end=60, sleeve_risk_budget=None, gap=0.02, m_sleeve_tp=1.0, rung_scale_fixed=None, size_mult=1.0, rungs=RUNGS, m_tp=None):
+def simulate(books, opens, prep, m_sl=3.0, m_sleeve_sl=2.0, sleeve=True, target=0.25, cap=2.0, d_limit=D_LIMIT, win_end=60, sleeve_risk_budget=None, gap=0.02, m_sleeve_tp=1.0, rung_scale_fixed=None, size_mult=1.0, rungs=RUNGS, m_tp=None, hourly=False):
     idx, cols = prep["idx"], prep["cols"]
     O, H, L, C = prep["O"], prep["H"], prep["L"], prep["C"]
     sig4, o1, o2, settle = prep["sig4"], prep["o1"], prep["o2"], prep["settle"]
@@ -187,7 +192,7 @@ def simulate(books, opens, prep, m_sl=3.0, m_sleeve_sl=2.0, sleeve=True, target=
         sleeve_pnl = 0.0
         if sleeve:
             rn = (s[i] if rung_scale_fixed is None else rung_scale_fixed) * g[i] * size_mult * SIZE / 4 / S_REF  # per-rung size fixed
-            fills = []
+            fills = []  # (fill minute, ladder 0=4h / 1=hourly, rung, asset, limit, sigma, end minute)
             for r, k in enumerate(rungs):
                 for a in range(na):
                     if not np.isfinite(sig4[i][a]):
@@ -195,25 +200,37 @@ def simulate(books, opens, prep, m_sl=3.0, m_sleeve_sl=2.0, sleeve=True, target=
                     lv = o1[i][a] * (1 - k * sig4[i][a])
                     hit = L[i, 16:239, a].astype(float) < lv
                     if hit.any():
-                        fills.append((16 + int(np.argmax(hit)), r, a, lv))
-            fills.sort()
+                        fills.append((16 + int(np.argmax(hit)), 0, r, a, lv, sig4[i][a], 240))
+            if hourly and "sig1h" in prep:
+                s1 = prep["sig1h"][i]
+                for h in range(4):
+                    a0, a1 = (16 if h == 0 else 60 * h + 4), 60 * h + 57
+                    for r, k in enumerate(rungs):
+                        for a in range(na):
+                            if not np.isfinite(s1[a]) or not np.isfinite(O[i, 60 * h, a]):
+                                continue
+                            lv = float(O[i, 60 * h, a]) * (1 - k * s1[a])
+                            hit = L[i, a0:a1 + 1, a].astype(float) < lv
+                            if hit.any():
+                                fills.append((a0 + int(np.argmax(hit)), 1, r, a, lv, s1[a], 60 * (h + 1)))
+            fills.sort(key=lambda t: t[:4])
             taken = []
-            for f, r, a, lv in fills:
+            for f, lad, r, a, lv, sg, end_m in fills:
                 if sleeve_risk_budget is None:
                     open_now = sum(1 for t in taken if t[4] > f)
                     if (open_now + 1) * rn > N_MAX + 1e-12:
                         continue
                 else:  # risk budget: loss if every open rung and the new one stop out (stop distance + gap allowance)
-                    risk_open = sum(rn * (m_sleeve_sl * sig4[i][t[2]] + gap) for t in taken if t[4] > f)
-                    if risk_open + rn * (m_sleeve_sl * sig4[i][a] + gap) > sleeve_risk_budget + 1e-12:
+                    risk_open = sum(rn * (m_sleeve_sl * t[6] + gap) for t in taken if t[4] > f)
+                    if risk_open + rn * (m_sleeve_sl * sg + gap) > sleeve_risk_budget + 1e-12:
                         continue
                 Ha, La, Ca, Oa = (X[i, :, a].astype(float) for X in (H, L, C, O))
-                tp = lv * (1 + m_sleeve_tp * sig4[i][a])
-                sl = lv * (1 - m_sleeve_sl * sig4[i][a])
-                x, ret = 240, None
-                if f + 1 < 240:
-                    hs = La[f + 1:240] <= sl
-                    ht = Ha[f + 1:240] > tp
+                tp = lv * (1 + m_sleeve_tp * sg)
+                sl = lv * (1 - m_sleeve_sl * sg)
+                x, ret = end_m, None
+                if f + 1 < end_m:
+                    hs = La[f + 1:end_m] <= sl
+                    ht = Ha[f + 1:end_m] > tp
                     hit = hs | ht
                     if hit.any():
                         k = int(np.argmax(hit))
@@ -225,8 +242,11 @@ def simulate(books, opens, prep, m_sl=3.0, m_sleeve_sl=2.0, sleeve=True, target=
                             ret = tp / lv - 1 - 2 * MAKER
                             stats["rung_tps"] += 1
                 if ret is None:
-                    ret = o2[i][a] / lv - 1 - MAKER - TAKER - (FUND_LONG if settle[i] else 0.0)
-                taken.append((f, r, a, lv, x, ret))
+                    if end_m >= 240:
+                        ret = o2[i][a] / lv - 1 - MAKER - TAKER - (FUND_LONG if settle[i] else 0.0)
+                    else:
+                        ret = Oa[end_m] / lv - 1 - MAKER - TAKER
+                taken.append((f, r, a, lv, x, ret, sg))
                 sleeve_pnl += rn * ret
                 seg = np.zeros(240)
                 end = min(x, 240)
