@@ -6,7 +6,8 @@ Last update: 2026-09-26 (after v165/v168, engine_real).
 
 | candidate | normal / fee / execution %/month | full-path DD | hidden year (strict 1m exec) |
 |---|---|---|---|
-| **v154 on engine_real (actual signed funding, real carry fees, capital budget, min notional; audit pending)** | 0.25: 3.71 | 18.9% close / 21.4% intrabar bound | +63.0% |
+| **v154 + v170 execution (60-min rest) on engine_real, audited** | 0.25: 3.80 | 18.9% close | +64.7% |
+| **v154 on engine_real (actual signed funding, real carry fees, capital budget, min notional; audited PASS)** | 0.25: 3.71 | 18.9% close / 19.0% true 1m-marked (v169) | +63.0% |
 | **v154 = (v144 + options + Coinbase-premium books)/3, realistic engine, 20% governor** | 0.25: 3.52; 0.28: 3.67 (v155, ex post) | 19.2% / 20.0% | +56.3% (0.25) |
 | v151 = 0.5 v144 + 0.5 v150 (options-flow) books, realistic engine, governor, target 0.25 (ex post)** | 3.53 (realistic 1m path) | 19.4% | +36.5% |
 | v152 frontier with a 30% governor (user decision) | 0.30: 3.76; 0.35: 3.93; 0.40: 4.09 | 25.0-25.3% | cap 2x binds |
@@ -49,7 +50,7 @@ current signal (IC ~0.1 at 7d, ~0.05 at 1d; Sharpe ~1.5-1.9).
 `engine_real/engine_real.py` (`evaluate(books, opens)`, cached v154 books in artifacts/research/engine_real/): v144 loop +
 actual signed Binance funding at the t+2 settlement, carry with spot 0.1% + perp taker 0.05% and t+2 funding, capital
 budget (spot cash + perp gross/5 <= 95%), min notional at 10k USDT, intrabar DD bound. Ablation on v154: funding +0.20pp,
-carry +0.02, budget -0.04, min notional 0. Report both engines for new versions until the audit passes.
+carry +0.02, budget -0.04, min notional 0. engine_real audit PASSED (bit-exact, funding timing verified). Report both engines for new versions.
 
 ## Tried and rejected (do not repeat without a new hypothesis)
 
@@ -61,15 +62,17 @@ intrabar 1h features (v107); rebalance every 4h/12h (v108) or slower (v117); tra
 Coinbase premium (v111, unstable); sign classifiers (v112); nested-CV hyperparameters (v119); 28-day book (v122);
 no-trade band (v118 gain vanishes under strict execution, v124); tranching as a return booster (v125 = luck-free
 level); halving-cycle features (v128, memorises 2-3 cycles); spot-vs-perp flow/basis (v130); signal-strength
-leverage (v131, just more exposure); nested permutation feature selection (v136: 1.97%/month, worse); HGB+ridge blend (v138: 2.08, ridge IC unstable); Binance positioning metrics OI/long-short (v139: IC up 2022-24 but hidden year down, 2.42 vs 2.44); forward-Sharpe targets (v140: 1.37); cross-asset attention NN (v143: IC negative 2021-22, blend 2.36); xs features for ALL features (v145: 2.20, dilutes); relative positioning (v146: 2.52, DD 25%); 12h horizon in v103 (v147: neutral 3.33); xs vol forecast (v149: neutral); ensemble members that DILUTE: positioning (v153), DVOL (v156: 2.98), macro (v157: 2.94), ETH options added to the options member (v158: 3.44), Fear & Greed (v159: 3.34), CFTC COT (v160: 2.68); options flow alone (v150: 3.47/19.2 but hidden year +27% vs +41%); bear-only shorts (v134: lower DD 12.8% but 2.30%/month, hidden year +21% - diagnostic-motivated, keep only as a prospective hypothesis); trading DOGE/TRX/ADA as extra assets (v132: 2.13%/month, DD 24%, new assets IC ~0-0.04); cross-venue funding arbitrage (Binance vs Bybit, 0.1-0.3 bps/8h now); deep tabular MLP-PLR + FT-Transformer member on Kaggle (v165: IC ~0.03, val loss best at epoch 0, (A+B+D+E)/4 3.41 vs 3.52); agreement confidence (v166: neutral 3.55); quantile-HGB uncertainty sizing of v103 (v168: 2.67, median model loses signal).
+leverage (v131, just more exposure); nested permutation feature selection (v136: 1.97%/month, worse); HGB+ridge blend (v138: 2.08, ridge IC unstable); Binance positioning metrics OI/long-short (v139: IC up 2022-24 but hidden year down, 2.42 vs 2.44); forward-Sharpe targets (v140: 1.37); cross-asset attention NN (v143: IC negative 2021-22, blend 2.36); xs features for ALL features (v145: 2.20, dilutes); relative positioning (v146: 2.52, DD 25%); 12h horizon in v103 (v147: neutral 3.33); xs vol forecast (v149: neutral); ensemble members that DILUTE: positioning (v153), DVOL (v156: 2.98), macro (v157: 2.94), ETH options added to the options member (v158: 3.44), Fear & Greed (v159: 3.34), CFTC COT (v160: 2.68); options flow alone (v150: 3.47/19.2 but hidden year +27% vs +41%); bear-only shorts (v134: lower DD 12.8% but 2.30%/month, hidden year +21% - diagnostic-motivated, keep only as a prospective hypothesis); trading DOGE/TRX/ADA as extra assets (v132: 2.13%/month, DD 24%, new assets IC ~0-0.04); cross-venue funding arbitrage (Binance vs Bybit, 0.1-0.3 bps/8h now); deep tabular MLP-PLR + FT-Transformer member on Kaggle (v165: IC ~0.03, val loss best at epoch 0, (A+B+D+E)/4 3.41 vs 3.52); agreement confidence (v166: neutral 3.55); quantile-HGB uncertainty sizing of v103 (v168: 2.67, median model loses signal; audit: median-only 2.66); 1m intrabar portfolio stop at k*sigma (v169 on engine_real: k=3 2.71, k=4 3.05, k=2 2.02 vs 3.71, DD not lower - intrabar dips mean-revert); GRU over 42 4h bars on Kaggle (v167: IC ~0/negative 2021-24, blend 3.15; 4th DL failure).
 
 ## What worked (keep)
 
 Pooled majors HGB (v92), 2017 spot prefix, causal vol targets, long/short horizon ensemble (v94), blending books
 (v96), funding carry sleeve (v99), 1d/3d order-flow model (v103, +0.5pp at short horizons), longer history
-(v113/v114), vol-forecast sizing (v129, small), 10 bps limit execution (v135), selected cross-sectional features (v142, +0.11pp), realistic governor at higher risk (v141/v144).
+(v113/v114), vol-forecast sizing (v129, small), 10 bps limit execution (v135), selected cross-sectional features (v142, +0.11pp), realistic governor at higher risk (v141/v144), actual funding in the engine (engine_real, +0.19pp), 60-minute limit rest window (v170 audited: 3.80 vs 3.71, maker share 0.64 -> 0.81, all years better).
 
 ## Idea queue (next)
+
+- NEW LEAD (v171, audit pending): intrabar dip-reversal sleeve on 1m data (buy after close <= -k sigma of the 4h open in minutes 16..238, exit next 4h open, taker both sides, k walk-forward): sleeve alone +8..+65%/yr, DD 7-9%, corr 0.04 with v154; v154+sleeve 5.96%/month but DD 21.85%. Robust to 10 bps slippage and 1-5 min delay (ex post diagnostic); top events are real crashes. v172 = crash-aware slippage + v170 execution. Next: v173 event model (which drops rebound) and a prospective paper log of the frozen rule.
 
 - Information-diverse ensembles work only with members that are good alone (options, Coinbase premium). Next: ETH options (download running to data/raw/deribit_opt_20260926/ETH_options_4h.parquet) as part of the options member (v158).
 - v151 frozen: scripts/v151_advisor.py (+ scripts/deribit_options_update.py appends live 4h options aggregates each run; backup BTC_options_4h.backup_20260926.parquet), logged as v151_deploy_v4.

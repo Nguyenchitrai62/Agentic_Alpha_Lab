@@ -25,7 +25,7 @@ m = {"schema_version": 1, "experiment_id": v, "track": track, "status": "candida
      "hashes": {"result_sha256": hashlib.sha256(raw).hexdigest()},
      "scenarios": {k: dict(sc) for k in ("normal", "fee_stress", "execution_stress")},
      "result": {k: {"monthly": r["monthly_pct"], "full_path_dd": r["full_path_dd"], "yearly": [y["net_pct"] for y in r["yearly"]]}
-                for k, r in rows.items() if isinstance(r, dict) and "monthly_pct" in r},
+                for k, r in rows.items() if isinstance(r, dict) and "yearly" in r},
      "note": note, "independent_test": False, "live_approved": False,
      "cloud": {"submission_count": 0, "upload_attempted": False},
      "audit": {"passed": False, "replay_complete": False, "notes": "awaiting OpenCode blind audit"}}
