@@ -1,0 +1,3 @@
+{"id": "nguynchtrai/v165-deep-tabular-majors", "title": "v165-deep-tabular-majors", "code_file": "train_v165.py", "language": "python",
+ "kernel_type": "script", "is_private": true, "enable_gpu": true, "enable_internet": false,
+ "dataset_sources": ["nguynchtrai/v165-majors-full-panel"], "competition_sources": [], "kernel_sources": []}

@@ -2,7 +2,7 @@
   "schema_version": 1,
   "project": "Agentic Alpha Lab BTC swing research",
   "created_at": "2026-09-06T00:00:00Z",
-  "next_version": 164,
+  "next_version": 168,
   "control": {
     "coordinator_model": "gpt-5.6-sol",
     "coordinator_reasoning": "high",
@@ -54,7 +54,7 @@
     "expected_workers": 3,
     "version_range": [
       45,
-      163
+      167
     ],
     "parent_commit": "1ecf947baddd5ef78444670330e9db62128dad50",
     "cloud_snapshot": {
@@ -6208,7 +6208,7 @@
       "version": "v161",
       "track": "A",
       "direction_key": "v161-ensemble-korean-premium",
-      "status": "running",
+      "status": "rejected",
       "parent_versions": [
         "v158"
       ],
@@ -6221,15 +6221,42 @@
       "write_scope": "research/parallel/rounds/parallel-20260906-r2/v161",
       "worker_agent_id": "01a07792-4a6b-7fc3-a08a-af2923b1778a",
       "worker_host_id": "local",
-      "result_manifest": null,
+      "result_manifest": "research\\parallel\\rounds\\parallel-20260906-r2\\v161\\result_manifest.json",
       "registered_at": "2026-09-26T10:42:59.761179Z",
-      "assigned_at": "2026-09-26T10:42:59.761179Z"
+      "assigned_at": "2026-09-26T10:42:59.761179Z",
+      "result_manifest_sha256": "3ac639086ab856f298fd4933a231338583b4a78fc81b9c3a2dbaf9dcc74bbc5b",
+      "result_summary": {
+        "scenarios": {
+          "normal": {
+            "monthly_geometric_net_percent": 3.434,
+            "max_drawdown_percent": 19.28,
+            "fills": 10896,
+            "months": 60
+          },
+          "fee_stress": {
+            "monthly_geometric_net_percent": 3.434,
+            "max_drawdown_percent": 19.28,
+            "fills": 10896,
+            "months": 60
+          },
+          "execution_stress": {
+            "monthly_geometric_net_percent": 3.434,
+            "max_drawdown_percent": 19.28,
+            "fills": 10896,
+            "months": 60
+          }
+        },
+        "independent_test": false,
+        "live_approved": false,
+        "audit_notes": "Blind replication bit-exact; no look-ahead. Rejected: Korean premium member dilutes."
+      },
+      "audited_at": "2026-09-26T11:33:44.679268Z"
     },
     {
       "version": "v162",
       "track": "B",
       "direction_key": "v162-monotone-trend-constraints",
-      "status": "running",
+      "status": "rejected",
       "parent_versions": [
         "v159"
       ],
@@ -6242,15 +6269,42 @@
       "write_scope": "research/parallel/rounds/parallel-20260906-r2/v162",
       "worker_agent_id": "01a07791-eecb-7053-8866-dcdbe31e84d7",
       "worker_host_id": "local",
-      "result_manifest": null,
+      "result_manifest": "research\\parallel\\rounds\\parallel-20260906-r2\\v162\\result_manifest.json",
       "registered_at": "2026-09-26T10:49:30.418978Z",
-      "assigned_at": "2026-09-26T10:49:30.418978Z"
+      "assigned_at": "2026-09-26T10:49:30.418978Z",
+      "result_manifest_sha256": "c7237464dc5ee1a5b5babcfa8e81488ce81a6e94ac24ea146f93f80fe3e9e1c0",
+      "result_summary": {
+        "scenarios": {
+          "normal": {
+            "monthly_geometric_net_percent": 2.802,
+            "max_drawdown_percent": 19.02,
+            "fills": 10876,
+            "months": 60
+          },
+          "fee_stress": {
+            "monthly_geometric_net_percent": 2.802,
+            "max_drawdown_percent": 19.02,
+            "fills": 10876,
+            "months": 60
+          },
+          "execution_stress": {
+            "monthly_geometric_net_percent": 2.802,
+            "max_drawdown_percent": 19.02,
+            "fills": 10876,
+            "months": 60
+          }
+        },
+        "independent_test": false,
+        "live_approved": false,
+        "audit_notes": "Blind replication bit-exact; no look-ahead. Rejected: monotone constraints hurt."
+      },
+      "audited_at": "2026-09-26T11:34:39.860540Z"
     },
     {
       "version": "v163",
       "track": "C",
       "direction_key": "v163-prediction-ema-smoothing",
-      "status": "running",
+      "status": "rejected",
       "parent_versions": [
         "v160"
       ],
@@ -6263,10 +6317,100 @@
       "write_scope": "research/parallel/rounds/parallel-20260906-r2/v163",
       "worker_agent_id": "01a07748-5adc-7061-8052-0ed36705a8a8",
       "worker_host_id": "local",
-      "result_manifest": null,
+      "result_manifest": "research\\parallel\\rounds\\parallel-20260906-r2\\v163\\result_manifest.json",
       "registered_at": "2026-09-26T10:54:26.771572Z",
-      "assigned_at": "2026-09-26T10:54:26.771572Z"
+      "assigned_at": "2026-09-26T10:54:26.771572Z",
+      "result_manifest_sha256": "5edde93e4b256301d6e0edd218a1b320e6e1ffd7ec8a8645ccbed7b6ed2270ae",
+      "result_summary": {
+        "scenarios": {
+          "normal": {
+            "monthly_geometric_net_percent": 3.374,
+            "max_drawdown_percent": 19.02,
+            "fills": 10769,
+            "months": 60
+          },
+          "fee_stress": {
+            "monthly_geometric_net_percent": 3.374,
+            "max_drawdown_percent": 19.02,
+            "fills": 10769,
+            "months": 60
+          },
+          "execution_stress": {
+            "monthly_geometric_net_percent": 3.374,
+            "max_drawdown_percent": 19.02,
+            "fills": 10769,
+            "months": 60
+          }
+        },
+        "independent_test": false,
+        "live_approved": false,
+        "audit_notes": "Blind replication bit-exact; no look-ahead in the causal EMA. Rejected."
+      },
+      "audited_at": "2026-09-26T11:27:42.975034Z"
+    },
+    {
+      "version": "v165",
+      "track": "C",
+      "direction_key": "v165-kaggle-deep-tabular-member",
+      "status": "running",
+      "parent_versions": [
+        "v163"
+      ],
+      "model_family": "mlp-plr-and-ft-transformer",
+      "objective": "Kaggle GPU deep tabular multi-task ensemble (MLP-PLR + FT-Transformer, 6 seeds each) on the full-information panel, evaluated as a fourth member of the v154 ensemble",
+      "data_contract": "Exported v103 panel + v142 xs + v150 options + v111 Coinbase features (70 features), targets y6/y18/y42/y84/fv; private Kaggle dataset nguynchtrai/v165-majors-full-panel",
+      "policy_contract": "Walk-forward anchors, per-target embargoes, early stopping on the last training year; member E books as v144; (A+B+D+E)/4 primary, E alone secondary; fixed",
+      "hypothesis": "A modern tabular deep model trained multi-task on all good information sets errs differently from HGB and strengthens the ensemble",
+      "parent_commit": "1ecf947baddd5ef78444670330e9db62128dad50",
+      "write_scope": "research/parallel/rounds/parallel-20260906-r2/v165",
+      "worker_agent_id": "01a07748-5adc-7061-8052-0ed36705a8a8",
+      "worker_host_id": "local",
+      "result_manifest": null,
+      "registered_at": "2026-09-26T11:27:42.972497Z",
+      "assigned_at": "2026-09-26T11:27:42.972497Z"
+    },
+    {
+      "version": "v166",
+      "track": "A",
+      "direction_key": "v166-member-agreement-confidence",
+      "status": "running",
+      "parent_versions": [
+        "v161"
+      ],
+      "model_family": "hist-gradient-boosting",
+      "objective": "Confidence sizing from agreement between the three v154 members: x1.3 when all non-zero member signs agree, x0.6 when they conflict",
+      "data_contract": "v154 member books",
+      "policy_contract": "Per asset/bar multiplier from same-bar member weights; v144 engine rows; reference v154; fixed",
+      "hypothesis": "Agreement between models built on different information sets is a usable confidence signal for position size",
+      "parent_commit": "1ecf947baddd5ef78444670330e9db62128dad50",
+      "write_scope": "research/parallel/rounds/parallel-20260906-r2/v166",
+      "worker_agent_id": "01a07792-4a6b-7fc3-a08a-af2923b1778a",
+      "worker_host_id": "local",
+      "result_manifest": null,
+      "registered_at": "2026-09-26T11:33:44.676749Z",
+      "assigned_at": "2026-09-26T11:33:44.676749Z"
+    },
+    {
+      "version": "v167",
+      "track": "B",
+      "direction_key": "v167-kaggle-temporal-gru-member",
+      "status": "running",
+      "parent_versions": [
+        "v162"
+      ],
+      "model_family": "gru",
+      "objective": "Kaggle GPU temporal GRU over the last 42 bars of the 70 engineered features (multi-task, 6 seeds), evaluated as a fourth member of the v154 ensemble",
+      "data_contract": "Kaggle dataset nguynchtrai/v165-majors-full-panel (same as v165)",
+      "policy_contract": "Walk-forward anchors, per-target embargoes, early stopping on the last training year; member books as v144; (A+B+D+E)/4 primary; fixed",
+      "hypothesis": "Temporal dynamics of the engineered features carry information that per-bar models miss",
+      "parent_commit": "1ecf947baddd5ef78444670330e9db62128dad50",
+      "write_scope": "research/parallel/rounds/parallel-20260906-r2/v167",
+      "worker_agent_id": "01a07791-eecb-7053-8866-dcdbe31e84d7",
+      "worker_host_id": "local",
+      "result_manifest": null,
+      "registered_at": "2026-09-26T11:34:39.858540Z",
+      "assigned_at": "2026-09-26T11:34:39.858540Z"
     }
   ],
-  "updated_at": "2026-09-26T10:54:26.773979Z"
+  "updated_at": "2026-09-26T11:34:39.860540Z"
 }

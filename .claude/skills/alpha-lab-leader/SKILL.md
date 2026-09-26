@@ -64,13 +64,32 @@ The user writes Vietnamese: reply in Vietnamese, say "năm giấu" (never "ảo"
    only under `<round>/vNNN_audit/` + `tests/test_vNNN_audit.py`, save part A (`replication.json`) BEFORE opening
    `vNNN/`, compare (IC > 0.01, return > 1pp, DD > 0.5pp), check look-ahead, write `COMPARISON.md`. Dispatch:
    ```bash
-   COMMON=OPENCODE_VF_COMMON.md nohup bash artifacts/research/opencode_background/dispatch.sh vNNN_audit OPENCODE_VNNN_AUDIT.md > /dev/null 2>&1 &
+   COMMON=OPENCODE_VF_COMMON.md nohup bash scripts/opencode_dispatch.sh vNNN_audit OPENCODE_VNNN_AUDIT.md > /dev/null 2>&1 &
    ```
    Watch with a Monitor (until-loop on `exit=`). Bundle 2-3 versions per audit.
 5. **Close**: read `COMPARISON.md` verdict; set `audit = {passed, replay_complete, auditor, notes}` in the
    manifest (note any post-fix / non-blind matches honestly), then rotate into the next hypothesis.
 6. Update `CONTINUOUS_RESEARCH.md` (new dated paragraph at the top), `NEXT_AGENT.md` (active round line),
    research-map.md (tried/failed/queue), and memory when something durable is learned.
+
+## Coordinating OpenCode workers (opencode-go / muse-spark-1.3-contributor)
+
+The user explicitly allows dispatching as many OpenCode workers as useful. The leader still decides what to model, what
+to register and what to deploy; workers never edit the registry, ledger, `CONTINUOUS_RESEARCH.md`, `NEXT_AGENT.md`,
+`../Kronos`, other workers' folders or leader scripts.
+
+- Dispatcher (tracked): `scripts/opencode_dispatch.sh <tag> <ASSIGNMENT.md> [extra]` with `COMMON=OPENCODE_VF_COMMON.md`;
+  every call starts a NEW session (old sessions 400). Run with `nohup ... &`, then a Monitor until-loop on
+  `artifacts/research/opencode_background/<tag>.current` -> `<run>.stderr.log` containing `exit=`.
+- Good worker tasks (bounded, verifiable): blind audits (default); public-data fetchers with manifests and hashes;
+  implementing a PRE-SPECIFIED variant script that the leader has already written as a docstring/spec (the worker fills
+  in code under its own folder, the leader reviews and registers before running); replicating or stress-testing a result
+  (e.g. alternative cost models); smoke-testing Kaggle bundles; writing tests.
+- Assignment file (`OPENCODE_<TAG>.md` at repo root): exact write scope (one folder + one test file), inputs, the precise
+  computation (ambiguous wording has caused false mismatches), what to save first (blind part A), acceptance thresholds,
+  and "do not edit leader files".
+- Run several workers in parallel on disjoint scopes; bundle related versions into one audit to save turns.
+- Never let a worker upload to Kaggle, touch credentials, or place orders; cloud submissions are leader-only.
 
 ## Evaluation standard (current)
 

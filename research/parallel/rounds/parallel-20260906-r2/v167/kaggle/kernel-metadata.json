@@ -1,0 +1,3 @@
+{"id": "nguynchtrai/v167-temporal-gru-majors", "title": "v167-temporal-gru-majors", "code_file": "train_v167.py", "language": "python",
+ "kernel_type": "script", "is_private": true, "enable_gpu": true, "enable_internet": false,
+ "dataset_sources": ["nguynchtrai/v165-majors-full-panel"], "competition_sources": [], "kernel_sources": []}
