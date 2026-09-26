@@ -4,7 +4,7 @@ Last update: 2026-09-26 (after v179).
 
 ## Honest status
 
-USER-RULE ENGINE (engine_user, 2026-09-27; limit entry + SL market + TP limit per position, maker 0.02% / taker 0.055%, adverse funding, no carry; selection on first four years): v188 v154+sleeve SL m=4: 5y 3.53, last year 3.55, DD 19.0; v189 comparison selects v151+sleeve (dev4 3.90) -> 5y 3.58, last year 2.34, DD 19.4. Gate needs 5y >= 5, last year >= 5, no losing year, DD <= 20.
+USER-RULE ENGINE (engine_user, 2026-09-27; limit entry + SL market + TP limit per position, maker 0.02% / taker 0.055%, adverse funding, no carry; selection on first four years): v188 v154+sleeve SL m=4: 5y 3.53, last year 3.55, DD 19.0; v189 comparison selects v151+sleeve (dev4 3.90) -> 5y 3.58, last year 2.34, DD 19.4. Gate needs 5y >= 5, last year >= 5, no losing year, DD <= 20. Then: v190 bracket (triple-barrier) targets rejected (2022 IC ~0); v191 sleeve rung stop 5 sigma best (dev4 4.05); v192 book limits resting the whole bar (4.07); v193 STOP-RISK sleeve budget X=0.08: dev4 5.046 (first >= 5), DD 19.3, 5y 4.60, last year 2.85 (+40%) -> fails on last year; v194 sleeve TP 1 sigma stays best; v195/v196 books-vs-sleeve allocation: keep books at 0.25 (sleeve is capacity-limited by rung size); v197 rung size x1.5 with budget 0.12: dev4 5.562, DD 19.32, 5y 4.996, last year 2.761 (+38.7%) -> BEST under user rules; fails only on the most recent year.
 
 | candidate | normal / fee / execution %/month | full-path DD | hidden year (strict 1m exec) |
 |---|---|---|---|

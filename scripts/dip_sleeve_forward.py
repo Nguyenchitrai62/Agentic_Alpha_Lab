@@ -31,6 +31,9 @@ from agentic_alpha_lab.data.binance_usdm import fetch_klines
 FREEZE = pd.Timestamp("2026-09-26T16:00:00Z")
 FREEZE_LADDER = pd.Timestamp("2026-09-26T20:00:00Z")  # v183 ladder + TP rule frozen from this bar
 RUNGS = (2.5, 3.0, 3.5, 4.0)
+FREEZE_V197 = pd.Timestamp("2026-09-27T00:00:00Z")  # v197 ladder: TP 1 sigma (maker), SL 5 sigma (market), frozen from this bar
+M_SL_V197 = 5.0
+TAKER_USER = 0.00055  # Bybit VIP0 (AGENTS.md gate cost model)
 SYMS = ("BTCUSDT", "ETHUSDT", "SOLUSDT", "BNBUSDT", "XRPUSDT")
 K, K_LIMIT, SIZE, TAKER, MAKER = 4.0, 3.5, 0.25, 0.0005, 0.0002
 OUT = Path("artifacts/research/advisor_shadow/dip_sleeve_forward.json")
@@ -102,6 +105,24 @@ def events_for(sym: str, sess) -> list[dict]:
                     xmin = 240
                 out.append(dict(rule="ladder_tp", symbol=sym, bar_open=T.isoformat(), rung_k=k, fill_minute=fmin,
                                 exit_minute=xmin, sigma=round(sig, 6), entry=lv, net_return=round(r, 6)))
+                if T >= FREEZE_V197:
+                    sl = lv * (1 - M_SL_V197 * sig)
+                    after = bar[bar["off"] > fmin]
+                    hs = after["low"].astype(float) <= sl
+                    ht = after["high"].astype(float) > tp
+                    hit = hs | ht
+                    if hit.any():
+                        row = after[hit].iloc[0]
+                        xm = int(row["off"])
+                        if float(row["low"]) <= sl:
+                            r2 = min(sl, float(row["open"])) / lv - 1 - MAKER - TAKER_USER
+                        else:
+                            r2 = tp / lv - 1 - 2 * MAKER
+                    else:
+                        xm = 240
+                        r2 = float(o[nxt]) / lv - 1 - MAKER - TAKER_USER - (0.0001 if nxt.hour in (0, 8, 16) else 0.0)
+                    out.append(dict(rule="ladder_v197", symbol=sym, bar_open=T.isoformat(), rung_k=k, fill_minute=fmin,
+                                    exit_minute=xm, sigma=round(sig, 6), entry=lv, net_return=round(r2, 6)))
         thr = o[T] * (1 - K * sig)
         hit = live[live["close"].astype(float) <= thr]
         if hit.empty:
@@ -125,8 +146,8 @@ def main():
             ev.extend(events_for(s, sess))
     ev.sort(key=lambda e: e["bar_open"])
     summary = {}
-    for rule in ("limit", "taker", "ladder_tp"):
-        size = SIZE / len(RUNGS) if rule == "ladder_tp" else SIZE
+    for rule in ("limit", "taker", "ladder_tp", "ladder_v197"):
+        size = SIZE / len(RUNGS) if rule in ("ladder_tp", "ladder_v197") else SIZE
         eq = 1.0
         by_bar: dict[str, float] = {}
         for e in ev:
@@ -137,7 +158,9 @@ def main():
         summary[rule] = {"n_events": sum(e["rule"] == rule for e in ev), "sleeve_cum_return_pct": round(100 * (eq - 1), 3)}
     out = {"rules": {"limit": "v175/v176 resting bid k=3.5, maker on trade-through", "taker": "v172 k=4 crash-aware taker",
                      "ladder_tp": "v183 ladder 2.5/3/3.5/4 sigma, TP at L(1+sigma) maker, else next 4h open taker (per-rung log; the "
-                                  "open-notional budget is applied when scoring with equity), frozen from FREEZE_LADDER"},
+                                  "open-notional budget is applied when scoring with equity), frozen from FREEZE_LADDER",
+                     "ladder_v197": "v197 rungs under the user's rules: TP 1 sigma (maker), SL 5 sigma (market, taker 0.055%), else next 4h open "
+                                    "(taker, adverse long funding); per-rung log, stop-risk budget applied when scoring; frozen from FREEZE_V197"},
            "freeze_ladder": FREEZE_LADDER.isoformat(),
            "size": SIZE, "freeze": FREEZE.isoformat(), "scored_until": datetime.now(timezone.utc).isoformat(),
            "summary": summary, "events": ev}

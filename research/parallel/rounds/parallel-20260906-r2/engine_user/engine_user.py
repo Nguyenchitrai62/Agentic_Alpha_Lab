@@ -68,7 +68,7 @@ def prepare(books, opens):
                 settle=settle_at_end)
 
 
-def simulate(books, opens, prep, m_sl=3.0, m_sleeve_sl=2.0, sleeve=True, target=0.25, cap=2.0, d_limit=D_LIMIT, win_end=60, sleeve_risk_budget=None, gap=0.02):
+def simulate(books, opens, prep, m_sl=3.0, m_sleeve_sl=2.0, sleeve=True, target=0.25, cap=2.0, d_limit=D_LIMIT, win_end=60, sleeve_risk_budget=None, gap=0.02, m_sleeve_tp=1.0, rung_scale_fixed=None, size_mult=1.0):
     idx, cols = prep["idx"], prep["cols"]
     O, H, L, C = prep["O"], prep["H"], prep["L"], prep["C"]
     sig4, o1, o2, settle = prep["sig4"], prep["o1"], prep["o2"], prep["settle"]
@@ -184,7 +184,7 @@ def simulate(books, opens, prep, m_sl=3.0, m_sleeve_sl=2.0, sleeve=True, target=
         # dip sleeve
         sleeve_pnl = 0.0
         if sleeve:
-            rn = s[i] * g[i] * SIZE / len(RUNGS) / S_REF
+            rn = (s[i] if rung_scale_fixed is None else rung_scale_fixed) * g[i] * size_mult * SIZE / len(RUNGS) / S_REF
             fills = []
             for r, k in enumerate(RUNGS):
                 for a in range(na):
@@ -206,7 +206,7 @@ def simulate(books, opens, prep, m_sl=3.0, m_sleeve_sl=2.0, sleeve=True, target=
                     if risk_open + rn * (m_sleeve_sl * sig4[i][a] + gap) > sleeve_risk_budget + 1e-12:
                         continue
                 Ha, La, Ca, Oa = (X[i, :, a].astype(float) for X in (H, L, C, O))
-                tp = lv * (1 + sig4[i][a])
+                tp = lv * (1 + m_sleeve_tp * sig4[i][a])
                 sl = lv * (1 - m_sleeve_sl * sig4[i][a])
                 x, ret = 240, None
                 if f + 1 < 240:
