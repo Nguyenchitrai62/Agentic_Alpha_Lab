@@ -2,7 +2,7 @@
   "schema_version": 1,
   "project": "Agentic Alpha Lab BTC swing research",
   "created_at": "2026-09-06T00:00:00Z",
-  "next_version": 184,
+  "next_version": 187,
   "control": {
     "coordinator_model": "gpt-5.6-sol",
     "coordinator_reasoning": "high",
@@ -54,7 +54,7 @@
     "expected_workers": 3,
     "version_range": [
       45,
-      183
+      186
     ],
     "parent_commit": "1ecf947baddd5ef78444670330e9db62128dad50",
     "cloud_snapshot": {
@@ -7120,7 +7120,7 @@
       "version": "v181",
       "track": "B",
       "direction_key": "v181-dip-ladder-out-of-universe",
-      "status": "running",
+      "status": "rejected",
       "parent_versions": [
         "v180"
       ],
@@ -7133,15 +7133,42 @@
       "write_scope": "research/parallel/rounds/parallel-20260906-r2/v181",
       "worker_agent_id": "01a07791-eecb-7053-8866-dcdbe31e84d7",
       "worker_host_id": "local",
-      "result_manifest": null,
+      "result_manifest": "research\\parallel\\rounds\\parallel-20260906-r2\\v181\\result_manifest.json",
       "registered_at": "2026-09-26T14:24:29.149128Z",
-      "assigned_at": "2026-09-26T14:24:29.149128Z"
+      "assigned_at": "2026-09-26T14:24:29.149128Z",
+      "result_manifest_sha256": "d1af18d859674289f97bbfe376e88e5127edbefe5827a0873c9b2a614ef3d8f1",
+      "result_summary": {
+        "scenarios": {
+          "normal": {
+            "monthly_geometric_net_percent": 0.0,
+            "max_drawdown_percent": 0.0,
+            "fills": 5727,
+            "months": 60
+          },
+          "fee_stress": {
+            "monthly_geometric_net_percent": 0.0,
+            "max_drawdown_percent": 0.0,
+            "fills": 5727,
+            "months": 60
+          },
+          "execution_stress": {
+            "monthly_geometric_net_percent": 0.0,
+            "max_drawdown_percent": 0.0,
+            "fills": 5727,
+            "months": 60
+          }
+        },
+        "independent_test": true,
+        "live_approved": false,
+        "audit_notes": "REPLICATED exactly (fills, per-asset means to 0.1 bps, criterion passes); no bad ticks, 1m/4h aligned; top events are real stress dislocations; no tuning on these assets. Caveats: out-of-universe but not out-of-time, DOGE-heavy, TRX negative 3/5 years."
+      },
+      "audited_at": "2026-09-26T16:26:18.735398Z"
     },
     {
       "version": "v182",
       "track": "C",
       "direction_key": "v182-pooled-11-asset-rebound-gate",
-      "status": "running",
+      "status": "rejected",
       "parent_versions": [
         "v178"
       ],
@@ -7154,15 +7181,42 @@
       "write_scope": "research/parallel/rounds/parallel-20260906-r2/v182",
       "worker_agent_id": "01a07748-5adc-7061-8052-0ed36705a8a8",
       "worker_host_id": "local",
-      "result_manifest": null,
+      "result_manifest": "research\\parallel\\rounds\\parallel-20260906-r2\\v182\\result_manifest.json",
       "registered_at": "2026-09-26T14:27:10.663785Z",
-      "assigned_at": "2026-09-26T14:27:10.663785Z"
+      "assigned_at": "2026-09-26T14:27:10.663785Z",
+      "result_manifest_sha256": "5f7af6611d282bf4e33d21175e87996027d6c8a133b2ab6ca00787234e2cd43c",
+      "result_summary": {
+        "scenarios": {
+          "normal": {
+            "monthly_geometric_net_percent": 4.143,
+            "max_drawdown_percent": 20.04,
+            "fills": 1878,
+            "months": 60
+          },
+          "fee_stress": {
+            "monthly_geometric_net_percent": 3.741,
+            "max_drawdown_percent": 20.51,
+            "fills": 1889,
+            "months": 60
+          },
+          "execution_stress": {
+            "monthly_geometric_net_percent": 3.741,
+            "max_drawdown_percent": 20.51,
+            "fills": 1889,
+            "months": 60
+          }
+        },
+        "independent_test": false,
+        "live_approved": false,
+        "audit_notes": "Engineering reproduced (counts exact, monthly within 0.03pp, DD within 0.2-0.8pp from documented coding deltas); look-ahead PASS; gate fails."
+      },
+      "audited_at": "2026-09-26T16:28:50.463842Z"
     },
     {
       "version": "v183",
       "track": "A",
       "direction_key": "v183-tp-exit-open-notional-budget",
-      "status": "running",
+      "status": "rejected",
       "parent_versions": [
         "v179"
       ],
@@ -7175,10 +7229,100 @@
       "write_scope": "research/parallel/rounds/parallel-20260906-r2/v183",
       "worker_agent_id": "01a07792-4a6b-7fc3-a08a-af2923b1778a",
       "worker_host_id": "local",
-      "result_manifest": null,
+      "result_manifest": "research\\parallel\\rounds\\parallel-20260906-r2\\v183\\result_manifest.json",
       "registered_at": "2026-09-26T14:34:03.515237Z",
-      "assigned_at": "2026-09-26T14:34:03.515237Z"
+      "assigned_at": "2026-09-26T14:34:03.515237Z",
+      "result_manifest_sha256": "77a761934030c0a004b4a2c6fddc5290ed3abe2f2d542d8595f60ed24e7f2eb9",
+      "result_summary": {
+        "scenarios": {
+          "normal": {
+            "monthly_geometric_net_percent": 4.284,
+            "max_drawdown_percent": 19.01,
+            "fills": 2185,
+            "months": 60
+          },
+          "fee_stress": {
+            "monthly_geometric_net_percent": 3.882,
+            "max_drawdown_percent": 19.13,
+            "fills": 2201,
+            "months": 60
+          },
+          "execution_stress": {
+            "monthly_geometric_net_percent": 3.882,
+            "max_drawdown_percent": 19.13,
+            "fills": 2201,
+            "months": 60
+          }
+        },
+        "independent_test": false,
+        "live_approved": false,
+        "audit_notes": "Reproduced (normal bit-exact, stress within 0.005pp); TP strictly after fill; open-notional budget uses past exits only. Gate DD met (19.01/19.13), monthly fails (4.284/3.882)."
+      },
+      "audited_at": "2026-09-26T16:31:11.104513Z"
+    },
+    {
+      "version": "v184",
+      "track": "B",
+      "direction_key": "v184-hourly-dip-ladder-shared-budget",
+      "status": "running",
+      "parent_versions": [
+        "v181"
+      ],
+      "model_family": "rule-sleeve-no-selection",
+      "objective": "Add an hourly-anchored dip ladder (sigma_1h rungs, TP, next-hour exit) to v183 under one shared open-notional stress budget",
+      "data_contract": "as v183",
+      "policy_contract": "4h ladder as v183 + hourly ladder per hour of the holding bar; fills in minute order, open notional <= 1/6; gate DD = max(4h, 1m)",
+      "hypothesis": "Shorter overshoots recover within the hour; short holding adds return inside the same tail budget",
+      "parent_commit": "1ecf947baddd5ef78444670330e9db62128dad50",
+      "write_scope": "research/parallel/rounds/parallel-20260906-r2/v184",
+      "worker_agent_id": "01a07791-eecb-7053-8866-dcdbe31e84d7",
+      "worker_host_id": "local",
+      "result_manifest": null,
+      "registered_at": "2026-09-26T16:26:18.732882Z",
+      "assigned_at": "2026-09-26T16:26:18.732882Z"
+    },
+    {
+      "version": "v185",
+      "track": "C",
+      "direction_key": "v185-sleeve-outside-governor",
+      "status": "running",
+      "parent_versions": [
+        "v182"
+      ],
+      "model_family": "rule-sleeve-no-selection",
+      "objective": "Size the dip sleeve outside the books' drawdown governor (its own open-notional budget controls its tail)",
+      "data_contract": "as v183",
+      "policy_contract": "v183 with rung notional s*0.25/4/1.657 (no g); gate DD = max(4h, 1m)",
+      "hypothesis": "Drawdown periods are rebound-rich; removing g from the sleeve raises return without raising the 1m DD above 20%",
+      "parent_commit": "1ecf947baddd5ef78444670330e9db62128dad50",
+      "write_scope": "research/parallel/rounds/parallel-20260906-r2/v185",
+      "worker_agent_id": "01a07748-5adc-7061-8052-0ed36705a8a8",
+      "worker_host_id": "local",
+      "result_manifest": null,
+      "registered_at": "2026-09-26T16:28:50.461462Z",
+      "assigned_at": "2026-09-26T16:28:50.461462Z"
+    },
+    {
+      "version": "v186",
+      "track": "A",
+      "direction_key": "v186-sleeve-eleven-assets-research",
+      "status": "running",
+      "parent_versions": [
+        "v183"
+      ],
+      "model_family": "rule-sleeve-no-selection",
+      "objective": "Research only: v183 sleeve on 11 perps (majors + DOGE/ADA/LINK/LTC/AVAX/TRX) under the same shared open-notional budget; books majors-only",
+      "data_contract": "majors + alts 1m archive 2020-2026, xs_universe 4h opens/funding",
+      "policy_contract": "v183 rules; budget 1/6 shared; alts not deployable without user OK",
+      "hypothesis": "Alt-specific flushes are less clustered; a wider universe fills the same tail budget with more independent rebounds",
+      "parent_commit": "1ecf947baddd5ef78444670330e9db62128dad50",
+      "write_scope": "research/parallel/rounds/parallel-20260906-r2/v186",
+      "worker_agent_id": "01a07792-4a6b-7fc3-a08a-af2923b1778a",
+      "worker_host_id": "local",
+      "result_manifest": null,
+      "registered_at": "2026-09-26T16:31:11.102500Z",
+      "assigned_at": "2026-09-26T16:31:11.102500Z"
     }
   ],
-  "updated_at": "2026-09-26T14:34:03.517286Z"
+  "updated_at": "2026-09-26T16:31:11.104513Z"
 }
