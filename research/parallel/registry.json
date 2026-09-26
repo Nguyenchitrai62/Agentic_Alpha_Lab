@@ -2,7 +2,7 @@
   "schema_version": 1,
   "project": "Agentic Alpha Lab BTC swing research",
   "created_at": "2026-09-06T00:00:00Z",
-  "next_version": 168,
+  "next_version": 169,
   "control": {
     "coordinator_model": "gpt-5.6-sol",
     "coordinator_reasoning": "high",
@@ -54,7 +54,7 @@
     "expected_workers": 3,
     "version_range": [
       45,
-      167
+      168
     ],
     "parent_commit": "1ecf947baddd5ef78444670330e9db62128dad50",
     "cloud_snapshot": {
@@ -6373,7 +6373,7 @@
       "version": "v166",
       "track": "A",
       "direction_key": "v166-member-agreement-confidence",
-      "status": "running",
+      "status": "rejected",
       "parent_versions": [
         "v161"
       ],
@@ -6386,9 +6386,36 @@
       "write_scope": "research/parallel/rounds/parallel-20260906-r2/v166",
       "worker_agent_id": "01a07792-4a6b-7fc3-a08a-af2923b1778a",
       "worker_host_id": "local",
-      "result_manifest": null,
+      "result_manifest": "research\\parallel\\rounds\\parallel-20260906-r2\\v166\\result_manifest.json",
       "registered_at": "2026-09-26T11:33:44.676749Z",
-      "assigned_at": "2026-09-26T11:33:44.676749Z"
+      "assigned_at": "2026-09-26T11:33:44.676749Z",
+      "result_manifest_sha256": "4d7cd46939005a6b8ea599974451cb49006e0e336cfcd3ce3a49d6ca7d1b0fa1",
+      "result_summary": {
+        "scenarios": {
+          "normal": {
+            "monthly_geometric_net_percent": 3.552,
+            "max_drawdown_percent": 19.37,
+            "fills": 10871,
+            "months": 60
+          },
+          "fee_stress": {
+            "monthly_geometric_net_percent": 3.552,
+            "max_drawdown_percent": 19.37,
+            "fills": 10871,
+            "months": 60
+          },
+          "execution_stress": {
+            "monthly_geometric_net_percent": 3.552,
+            "max_drawdown_percent": 19.37,
+            "fills": 10871,
+            "months": 60
+          }
+        },
+        "independent_test": false,
+        "live_approved": false,
+        "audit_notes": "Blind replication bit-exact; no look-ahead in the same-bar agreement multiplier. Neutral vs v154."
+      },
+      "audited_at": "2026-09-26T12:06:18.930049Z"
     },
     {
       "version": "v167",
@@ -6410,7 +6437,28 @@
       "result_manifest": null,
       "registered_at": "2026-09-26T11:34:39.858540Z",
       "assigned_at": "2026-09-26T11:34:39.858540Z"
+    },
+    {
+      "version": "v168",
+      "track": "A",
+      "direction_key": "v168-quantile-uncertainty-confidence",
+      "status": "running",
+      "parent_versions": [
+        "v166"
+      ],
+      "model_family": "hist-gradient-boosting-quantile",
+      "objective": "Uncertainty-aware confidence sizing of the v103 book: quantile HGBs (0.25/0.5/0.75), pred = median * clip((|median|/IQR)/c_ref, 0.5, 1.5), in all v154 members",
+      "data_contract": "v154 panels",
+      "policy_contract": "c_ref = median confidence on training rows; v92/v94 books unchanged; (A+B+D)/3, v144 engine rows; reference v154; fixed",
+      "hypothesis": "Predictions with narrow predicted uncertainty deserve larger positions; model uncertainty is a better confidence signal than member agreement",
+      "parent_commit": "1ecf947baddd5ef78444670330e9db62128dad50",
+      "write_scope": "research/parallel/rounds/parallel-20260906-r2/v168",
+      "worker_agent_id": "01a07792-4a6b-7fc3-a08a-af2923b1778a",
+      "worker_host_id": "local",
+      "result_manifest": null,
+      "registered_at": "2026-09-26T12:06:18.926811Z",
+      "assigned_at": "2026-09-26T12:06:18.926811Z"
     }
   ],
-  "updated_at": "2026-09-26T11:34:39.860540Z"
+  "updated_at": "2026-09-26T12:06:18.930049Z"
 }

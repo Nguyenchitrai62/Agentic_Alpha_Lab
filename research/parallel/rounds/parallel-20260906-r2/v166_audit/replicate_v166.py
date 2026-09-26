@@ -932,9 +932,9 @@ def main():
     o_ens = o_ens.ffill()
     carry_ens = ctxA["carry"].reindex(idx_union).fillna(0.0)
     ret1 = o_ens / o_ens.shift(1) - 1
-    realized = W_BOOKS * (books_ens.shift(2) * ret1).sum(axis=1) + W_CARRY * CARRY_LEV * carry_ens.shift(1)
-    vol_ens = realized.rolling(ROLL, min_periods=ROLL_MIN).std(ddof=1) * ANN
-    ctx154 = dict(idx=idx_union, o=o_ens, books=books_ens_plain, carry=carry_ens, vol=vol_ens)
+    realized_plain = W_BOOKS * (books_ens_plain.shift(2) * ret1).sum(axis=1) + W_CARRY * CARRY_LEV * carry_ens.shift(1)
+    vol_plain = realized_plain.rolling(ROLL, min_periods=ROLL_MIN).std(ddof=1) * ANN
+    ctx154 = dict(idx=idx_union, o=o_ens, books=books_ens_plain, carry=carry_ens, vol=vol_plain)
     # vol for the agreement-weighted books is recomputed from those books
     realized166 = W_BOOKS * (books_ens.shift(2) * ret1).sum(axis=1) + W_CARRY * CARRY_LEV * carry_ens.shift(1)
     vol166 = realized166.rolling(ROLL, min_periods=ROLL_MIN).std(ddof=1) * ANN

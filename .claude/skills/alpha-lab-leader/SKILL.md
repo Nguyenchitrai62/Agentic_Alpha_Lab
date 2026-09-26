@@ -91,7 +91,24 @@ to register and what to deploy; workers never edit the registry, ledger, `CONTIN
 - Run several workers in parallel on disjoint scopes; bundle related versions into one audit to save turns.
 - Never let a worker upload to Kaggle, touch credentials, or place orders; cloud submissions are leader-only.
 
+## Kaggle (two accounts, leader-only)
+
+- Account 1 `nguynchtrai` = default CLI auth; account 2 `trainguyenchi` = `KAGGLE_API_TOKEN_2` from `.env`, passed only in
+  the command env: `T2=$(grep -E '^KAGGLE_API_TOKEN_2=' .env | cut -d= -f2- | tr -d '" '); KAGGLE_API_TOKEN="$T2" kaggle ...`.
+  Never print or store token values.
+- Use them to train two DIFFERENT pre-registered models in parallel (one job per hypothesis). Private datasets are per
+  account: create the dataset on the account that runs the kernel (`datasets create -p <dir>` from inside the folder,
+  then poll `datasets status`), push with `kernels push -p <kernel dir>` from inside it (`PYTHONUTF8=1`).
+- Kaggle script kernels take no CLI args: add a `_kaggle_default_argv()` that finds the dataset under /kaggle/input.
+- Record `cloud_submission.json` (kernel id, account, sha256) in the version folder; monitor with `kernels status`;
+  download with `kernels output <id> -p artifacts/kaggle/vNNN/output`.
+
 ## Evaluation standard (current)
+
+- User rule (2026-09-26): evaluation must match live trading as closely as possible. Score every new candidate with
+  `<round>/engine_real/engine_real.py` (`evaluate(books, opens)`: actual signed funding at the settlement the position
+  is held through, carry with real spot/perp fees, capital budget, min notional, intrabar DD bound) next to the v144
+  engine row, and report the forward log with the `real` block of `scripts/forward_scorer.py`.
 
 - Acceptance gate: monthly geometric net >= 5% in `normal` (fee 0.0002), `fee_stress` (0.0006) and
   `execution_stress` (0.0006 + 0.0005 slippage); DD <= 20%; >= 30 fills; >= 12 months.
