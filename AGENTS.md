@@ -27,17 +27,30 @@ modified from this project.
   candidate must pass in general (the 5-year walk-forward and the most recent year) before any real money.
 - Prospective paper logs (`scripts/advisor_shadow.py`, `scripts/dip_sleeve_forward.py`) add evidence on data that did
   not exist when the rules were frozen.
+- Selection rule (user-approved 2026-09-27): compare and choose variants ONLY on the first four walk-forward years
+  (anchors 2021-2024). The most recent year is scored once, at the end, for the frozen finalist; it is never used to
+  pick between variants. Versions that already looked at the last year need the prospective log as clean evidence.
+- Gate (user-approved 2026-09-27): (a) 5-year walk-forward geometric mean >= 5%/month, (b) the most recent year alone
+  >= 5%/month, (c) no losing year; and drawdown <= 20% over the full path (max of 4h-close and 1m-marked DD).
+- Pre-register at most 2-3 variants per research direction, then close the direction.
+- Gate cost model (user's real trading, Bybit, 2026-09-27): entries and take-profits are limit orders (maker 0.02%),
+  stop/market exits are taker 0.04% (user's tier); no extra slippage term. Funding is deliberately adverse: longs pay
+  0.01% every 8h, shorts receive nothing (this also stands in for small slippage). The carry sleeve depends on short
+  funding income, so it earns nothing under this rule. Actual signed funding may be reported only as a labelled
+  side row.
 
 ## Current execution assumptions (research engine `research/parallel/rounds/parallel-20260906-r2/engine_real`)
 
 - Binance USD-M perps BTCUSDT, ETHUSDT, SOLUSDT, BNBUSDT, XRPUSDT; decisions at closed 4h bars; execution and
   intrabar risk on 1m klines (public archive).
 - Book orders: limit 10 bps better than the minute-0 price, resting 60 minutes; maker 0.0002 only on a 1m
-  trade-through, otherwise taker 0.0005 at the minute-60 open + 2 bps. Do not claim queue position from OHLC.
-- Dip-sleeve orders: resting limit bids filled only on a 1m trade-through (maker); exits by take-profit limit or by
-  taker at the next 4h open with slippage max(2 bps, 0.25 * minute range).
-- Funding: actual signed Binance funding at each settlement for the position held at that timestamp (longs pay
-  positive rates, shorts receive them). Carry sleeve: spot 0.001 + perp taker 0.0005 per leg switch.
+  trade-through, otherwise a market order at the minute-60 open (gate: taker 0.0004, no slippage term). Do not claim
+  queue position from OHLC.
+- Dip-sleeve orders: resting limit bids filled only on a 1m trade-through (maker 0.0002); exits by take-profit limit
+  (maker) or by market at the next 4h open (gate: taker 0.0004).
+- Funding (gate): longs pay 0.0001 per 8h settlement held, shorts zero (user rule above). engine_real's actual
+  signed funding (longs pay positive rates, shorts receive them) is a labelled side row only. Carry sleeve: spot 0.001
+  + perp taker per leg switch; no funding income under the gate rule.
 - Capital: compounded from current equity (indexed to 100); cross-margin budget (spot cash + perp gross / leverage
   setting <= 95% of equity); Binance minimum notional per symbol; liquidation check on 1m marks when leveraged.
 - Drawdown for the gate = max(4h-close full-path DD, 1m-marked full-path DD including open positions).
