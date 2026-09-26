@@ -73,7 +73,7 @@ def prepare(books, opens):
                 settle=settle_at_end, sig1h=sig1h)
 
 
-def simulate(books, opens, prep, m_sl=3.0, m_sleeve_sl=2.0, sleeve=True, target=0.25, cap=2.0, d_limit=D_LIMIT, win_end=60, sleeve_risk_budget=None, gap=0.02, m_sleeve_tp=1.0, rung_scale_fixed=None, size_mult=1.0, rungs=RUNGS, m_tp=None, hourly=False):
+def simulate(books, opens, prep, m_sl=3.0, m_sleeve_sl=2.0, sleeve=True, target=0.25, cap=2.0, d_limit=D_LIMIT, win_end=60, sleeve_risk_budget=None, gap=0.02, m_sleeve_tp=1.0, rung_scale_fixed=None, size_mult=1.0, rungs=RUNGS, m_tp=None, hourly=False, align=None):
     idx, cols = prep["idx"], prep["cols"]
     O, H, L, C = prep["O"], prep["H"], prep["L"], prep["C"]
     sig4, o1, o2, settle = prep["sig4"], prep["o1"], prep["o2"], prep["settle"]
@@ -215,13 +215,17 @@ def simulate(books, opens, prep, m_sl=3.0, m_sleeve_sl=2.0, sleeve=True, target=
                                 fills.append((a0 + int(np.argmax(hit)), 1, r, a, lv, s1[a], 60 * (h + 1)))
             fills.sort(key=lambda t: t[:4])
             taken = []
+            rn_base = rn
             for f, lad, r, a, lv, sg, end_m in fills:
+                rn = rn_base if align is None else rn_base * (align[0] if tgt[a] > 0 else align[1])
+                if rn <= 0:
+                    continue
                 if sleeve_risk_budget is None:
                     open_now = sum(1 for t in taken if t[4] > f)
                     if (open_now + 1) * rn > N_MAX + 1e-12:
                         continue
                 else:  # risk budget: loss if every open rung and the new one stop out (stop distance + gap allowance)
-                    risk_open = sum(rn * (m_sleeve_sl * t[6] + gap) for t in taken if t[4] > f)
+                    risk_open = sum(t[7] * (m_sleeve_sl * t[6] + gap) for t in taken if t[4] > f)
                     if risk_open + rn * (m_sleeve_sl * sg + gap) > sleeve_risk_budget + 1e-12:
                         continue
                 Ha, La, Ca, Oa = (X[i, :, a].astype(float) for X in (H, L, C, O))
@@ -246,7 +250,7 @@ def simulate(books, opens, prep, m_sl=3.0, m_sleeve_sl=2.0, sleeve=True, target=
                         ret = o2[i][a] / lv - 1 - MAKER - TAKER - (FUND_LONG if settle[i] else 0.0)
                     else:
                         ret = Oa[end_m] / lv - 1 - MAKER - TAKER
-                taken.append((f, r, a, lv, x, ret, sg))
+                taken.append((f, r, a, lv, x, ret, sg, rn))
                 sleeve_pnl += rn * ret
                 seg = np.zeros(240)
                 end = min(x, 240)

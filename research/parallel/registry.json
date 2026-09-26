@@ -2,7 +2,7 @@
   "schema_version": 1,
   "project": "Agentic Alpha Lab BTC swing research",
   "created_at": "2026-09-06T00:00:00Z",
-  "next_version": 204,
+  "next_version": 206,
   "control": {
     "coordinator_model": "gpt-5.6-sol",
     "coordinator_reasoning": "high",
@@ -54,7 +54,7 @@
     "expected_workers": 3,
     "version_range": [
       45,
-      203
+      205
     ],
     "parent_commit": "1ecf947baddd5ef78444670330e9db62128dad50",
     "cloud_snapshot": {
@@ -8080,7 +8080,7 @@
       "version": "v201",
       "track": "B",
       "direction_key": "v201-hourly-ladder-risk-budget",
-      "status": "running",
+      "status": "rejected",
       "parent_versions": [
         "v198"
       ],
@@ -8093,9 +8093,36 @@
       "write_scope": "research/parallel/rounds/parallel-20260906-r2/v201",
       "worker_agent_id": "01a07791-eecb-7053-8866-dcdbe31e84d7",
       "worker_host_id": "local",
-      "result_manifest": null,
+      "result_manifest": "research\\parallel\\rounds\\parallel-20260906-r2\\v201\\result_manifest.json",
       "registered_at": "2026-09-26T19:16:19.667284Z",
-      "assigned_at": "2026-09-26T19:16:19.667284Z"
+      "assigned_at": "2026-09-26T19:16:19.667284Z",
+      "result_manifest_sha256": "8c678ff4d58237d46d477d1c5035d741b587660854c4015d3111c48e42480808",
+      "result_summary": {
+        "scenarios": {
+          "normal": {
+            "monthly_geometric_net_percent": 4.996,
+            "max_drawdown_percent": 19.72,
+            "fills": 40078,
+            "months": 60
+          },
+          "fee_stress": {
+            "monthly_geometric_net_percent": 4.996,
+            "max_drawdown_percent": 19.72,
+            "fills": 40078,
+            "months": 60
+          },
+          "execution_stress": {
+            "monthly_geometric_net_percent": 4.996,
+            "max_drawdown_percent": 19.72,
+            "fills": 40078,
+            "months": 60
+          }
+        },
+        "independent_test": false,
+        "live_approved": false,
+        "audit_notes": "Bit-exact on all rows incl. gross exposure; v197 anchor confirmed twice under the corrected engine; look-ahead PASS; rejected."
+      },
+      "audited_at": "2026-09-26T19:35:22.523223Z"
     },
     {
       "version": "v202",
@@ -8122,7 +8149,7 @@
       "version": "v203",
       "track": "A",
       "direction_key": "v203-annual-quarterly-retrain-ensemble",
-      "status": "running",
+      "status": "rejected",
       "parent_versions": [
         "v200"
       ],
@@ -8135,10 +8162,79 @@
       "write_scope": "research/parallel/rounds/parallel-20260906-r2/v203",
       "worker_agent_id": "01a07792-4a6b-7fc3-a08a-af2923b1778a",
       "worker_host_id": "local",
-      "result_manifest": null,
+      "result_manifest": "research\\parallel\\rounds\\parallel-20260906-r2\\v203\\result_manifest.json",
       "registered_at": "2026-09-26T19:32:08.785582Z",
-      "assigned_at": "2026-09-26T19:32:08.785582Z"
+      "assigned_at": "2026-09-26T19:32:08.785582Z",
+      "result_manifest_sha256": "02dc591a4162093ade1e8b8c929d86374ccf827e0025c15b6094bac9db4e8122",
+      "result_summary": {
+        "scenarios": {
+          "normal": {
+            "monthly_geometric_net_percent": 4.996,
+            "max_drawdown_percent": 19.72,
+            "fills": 40078,
+            "months": 60
+          },
+          "fee_stress": {
+            "monthly_geometric_net_percent": 4.996,
+            "max_drawdown_percent": 19.72,
+            "fills": 40078,
+            "months": 60
+          },
+          "execution_stress": {
+            "monthly_geometric_net_percent": 4.996,
+            "max_drawdown_percent": 19.72,
+            "fills": 40078,
+            "months": 60
+          }
+        },
+        "independent_test": false,
+        "live_approved": false,
+        "audit_notes": "Bit-exact on both rows; v197 anchor confirmed; look-ahead PASS."
+      },
+      "audited_at": "2026-09-26T19:37:45.377176Z"
+    },
+    {
+      "version": "v204",
+      "track": "B",
+      "direction_key": "v204-sleeve-book-alignment",
+      "status": "running",
+      "parent_versions": [
+        "v201"
+      ],
+      "model_family": "rule-sleeve-no-selection",
+      "objective": "Dip-sleeve rung size by book direction: (long, short/flat) = (1,1), (1.5,0.5), (2,0)",
+      "data_contract": "cached members, 1m majors, engine_user",
+      "policy_contract": "v197 otherwise; robust worst-year selection on first four years",
+      "hypothesis": "Trend-aligned dips rebound more reliably; aligning the sleeve with the books improves the worst year",
+      "parent_commit": "1ecf947baddd5ef78444670330e9db62128dad50",
+      "write_scope": "research/parallel/rounds/parallel-20260906-r2/v204",
+      "worker_agent_id": "01a07791-eecb-7053-8866-dcdbe31e84d7",
+      "worker_host_id": "local",
+      "result_manifest": null,
+      "registered_at": "2026-09-26T19:35:22.520875Z",
+      "assigned_at": "2026-09-26T19:35:22.520875Z"
+    },
+    {
+      "version": "v205",
+      "track": "A",
+      "direction_key": "v205-ensemble-books-aligned-sleeve",
+      "status": "running",
+      "parent_versions": [
+        "v203"
+      ],
+      "model_family": "hist-gradient-boosting",
+      "objective": "Annual+quarterly retrained v151 book ensemble with the v204 book-aligned sleeve vs v204",
+      "data_contract": "members_v154 and members_quarterly caches, engine_user",
+      "policy_contract": "v204 otherwise; robust worst-year selection",
+      "hypothesis": "The ensemble's better worst year combines with the aligned sleeve's gain",
+      "parent_commit": "1ecf947baddd5ef78444670330e9db62128dad50",
+      "write_scope": "research/parallel/rounds/parallel-20260906-r2/v205",
+      "worker_agent_id": "01a07792-4a6b-7fc3-a08a-af2923b1778a",
+      "worker_host_id": "local",
+      "result_manifest": null,
+      "registered_at": "2026-09-26T19:37:45.375140Z",
+      "assigned_at": "2026-09-26T19:37:45.375140Z"
     }
   ],
-  "updated_at": "2026-09-26T19:32:08.787583Z"
+  "updated_at": "2026-09-26T19:37:45.377176Z"
 }

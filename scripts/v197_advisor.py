@@ -1,4 +1,9 @@
-"""Live advisory for the current best pipeline (v197) - RESEARCH OUTPUT ONLY, no orders are placed.
+"""Live advisory for the current best pipeline (v205; file kept as v197_advisor.py) - RESEARCH OUTPUT ONLY, no orders.
+
+v205 = v197 + dip-sleeve rungs sized x1.5 on assets the books are long and x0.5 otherwise (v204), with the books
+retrained on both an annual and a quarterly schedule (v205; in live use: retrain the frozen models every quarter,
+next 2026-12-24). Walk-forward: 5-year mean 5.49%/month, most recent year 4.15%/month, DD 19.8% (gate not passed).
+
 
 v197 (research/parallel/rounds/parallel-20260906-r2/v197, audited): v151 books (0.5 v144 + 0.5 options-flow model set,
 frozen models in models/frozen/) at portfolio vol target 0.25 (cap 2), plus the dip-sleeve ladder, traded like the
@@ -104,7 +109,7 @@ def main():
             row.update(limit_entry=round(entry, 6), stop_loss_market=round(sl, 6), take_profit_limit=round(tp, 6),
                        last_price=m["last"], valid_until=str(m["bar_open_time"] + pd.Timedelta(hours=4)))
         books.append(row)
-        rn = scale * g * RUNG_SIZE
+        rn = scale * g * RUNG_SIZE * (1.5 if w > 0.005 else 0.5)  # v204 alignment with the book direction
         for k in RUNGS:
             L = m["bar_open"] * (1 - k * m["sig4"])
             sleeve.append(dict(symbol=sym, rung_sigma=k, buy_limit=round(L, 6), take_profit_limit=round(L * (1 + M_TP_RUNG * m["sig4"]), 6),
@@ -113,13 +118,13 @@ def main():
                                live_from=str(m["bar_open_time"] + pd.Timedelta(minutes=16)),
                                live_until=str(m["bar_open_time"] + pd.Timedelta(minutes=238)),
                                exit_if_open_at=str(m["bar_open_time"] + pd.Timedelta(hours=4)), last_price=m["last"]))
-    out = dict(pipeline="v197", generated_at=now.isoformat(), decision_bar_close=adv["decision_bar_close"], governor_g=round(g, 3),
+    out = dict(pipeline="v205", generated_at=now.isoformat(), decision_bar_close=adv["decision_bar_close"], governor_g=round(g, 3),
                portfolio_scale=scale, books=books, dip_sleeve=sleeve, sleeve_risk_budget=RISK_BUDGET,
-               note=("RESEARCH OUTPUT, not financial advice; walk-forward: first four years 5.56%/month, 5-year mean 5.00%/month, "
-                     "most recent year 2.76%/month, DD 19.7%; the 5%/month gate is NOT passed; models frozen "
+               note=("RESEARCH OUTPUT, not financial advice; walk-forward v205: 5-year mean 5.49%/month, most recent year 4.15%/month, "
+                     "DD 19.8%; the 5%/month gate is NOT passed (last year); retrain models quarterly; models frozen "
                      + str(adv.get("models_cutoff"))))
     OUT.write_text(json.dumps(out, indent=1, default=str), encoding="utf-8")
-    print(f"PIPELINE v197 | nen 4h quyet dinh: {adv['decision_bar_close']} | scale {scale} | governor g {g:.2f}")
+    print(f"PIPELINE v205 | nen 4h quyet dinh: {adv['decision_bar_close']} | scale {scale} | governor g {g:.2f}")
     print("\n1) SACH GIAO DICH (vao lenh limit, SL market, TP limit; lenh chua khop se huy khi nen 4h ket thuc):")
     for r in books:
         if "limit_entry" in r:
@@ -136,7 +141,7 @@ def main():
         print(f"  {r['symbol']:8s} {r['rung_sigma']}sigma: BUY LIMIT {r['buy_limit']}  TP {r['take_profit_limit']}  SL {r['stop_loss_market']}  "
               f"size {r['size_frac']*100:.2f}% (~{r['size_usdt']} USDT)")
     print(f"\nDa luu: {OUT}")
-    print("Luu y: day la ket qua nghien cuu, KHONG phai loi khuyen dau tu; pipeline chua dat cong 5%/thang (nam gan nhat 2.76%/thang).")
+    print("Luu y: day la ket qua nghien cuu, KHONG phai loi khuyen dau tu; pipeline chua dat cong 5%/thang (nam gan nhat 4.15%/thang). Retrain mo hinh moi quy (lan toi 24/12/2026).")
 
 
 if __name__ == "__main__":
