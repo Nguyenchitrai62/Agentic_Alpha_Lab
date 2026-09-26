@@ -33,6 +33,10 @@ modified from this project.
 - Gate (user-approved 2026-09-27): (a) 5-year walk-forward geometric mean >= 5%/month, (b) the most recent year alone
   >= 5%/month, (c) no losing year; and drawdown <= 20% over the full path (max of 4h-close and 1m-marked DD).
 - Pre-register at most 2-3 variants per research direction, then close the direction.
+- Robust selection criterion (leader, 2026-09-27, applies to directions registered from v204 on; never retroactive):
+  among variants with DD <= 20% and no losing year in the first four years, prefer those whose first-four-year mean is
+  >= 5%/month (if any), and among them pick the highest WORST-YEAR monthly return of the first four years; ties -> the
+  higher mean. Rationale: dev-mean improvements (v189-v197) did not transfer to the most recent year.
 - Every trade must be structured like real trading (user rule 2026-09-27): limit entry, a stop-loss (market, taker
   0.055%) and a take-profit (limit, maker 0.02%) attached to every position, so a move against the forecast cannot cause
   an unbounded loss. Book entries/rebalances are limit orders; an unfilled limit expires (no market fallback for
