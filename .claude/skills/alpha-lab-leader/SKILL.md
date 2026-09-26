@@ -108,6 +108,8 @@ to register and what to deploy; workers never edit the registry, ledger, `CONTIN
   Each is hooked into `scripts/advisor_shadow.py` with a try/except error row. A new candidate: write an
   advisor, freeze models at a cutoff >= 17 days before today, test `advise`, add the hook, run the logger once.
 - Only `mode=prospective` rows (logged <= 6h after bar close) are forward evidence. Advisory only - no orders.
+- Score the forward log as paper trading with `python scripts/forward_scorer.py` (next-open fills, 2 bps per unit
+  turnover, long funding, optional v110 governor for UNGOVERNED candidates) -> artifacts/research/advisor_shadow/forward_score.json.
 
 ## Reporting to the user
 
