@@ -1,5 +1,14 @@
 # Continuous BTC research — active
 
+LEADER 2026-09-26 (v165-v179, user: evaluation must match reality): engine_real (audited) adds actual signed funding,
+real carry fees, capital budget, min notional; v154 = 3.71%/month there; v170 60-minute limit rest -> 3.80 (audited).
+Deep learning failed again on Kaggle (v165 MLP-PLR/FT-Transformer, v167 GRU). NEW LEAD: intrabar drops >= k sigma below
+the 4h open rebound by the next open (liquidation overshoot; spikes do NOT revert, v174). Taker-entry sleeve (v172):
+4.60%/month; resting limit bids (v175/v176) 5.2-5.6%/month; selection-free ladder 2.5/3/3.5/4 sigma (v178): 5.51%/month
+at 4h-close DD 18.6% BUT 1m-marked DD 27.8% (2025-10-10 crash) and 4.79 under cost stress -> gate fails; a stress-loss
+budget on sleeve notional (v179, ex post) gives 4.14%/month at 1m DD 19.8%. Gate DD is now max(4h, 1m-marked).
+Prospective paper log of the frozen dip rules: scripts/dip_sleeve_forward.py (FREEZE 2026-09-26 16:00 UTC, loop.sh).
+
 LEADER 2026-09-26 (v158-v160): more ensemble members all dilute the v154 ensemble: ETH options in the options member
 (v158 3.44%/month), Fear & Greed (v159 3.34), CFTC COT CME positioning (v160 2.68). Data added: Deribit ETH options,
 alternative.me Fear & Greed, CFTC TFF Bitcoin. v154 (base + BTC options + Coinbase premium, audited bit-exact) frozen as

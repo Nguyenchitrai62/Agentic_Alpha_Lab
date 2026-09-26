@@ -2,7 +2,7 @@
   "schema_version": 1,
   "project": "Agentic Alpha Lab BTC swing research",
   "created_at": "2026-09-06T00:00:00Z",
-  "next_version": 176,
+  "next_version": 184,
   "control": {
     "coordinator_model": "gpt-5.6-sol",
     "coordinator_reasoning": "high",
@@ -54,7 +54,7 @@
     "expected_workers": 3,
     "version_range": [
       45,
-      175
+      183
     ],
     "parent_commit": "1ecf947baddd5ef78444670330e9db62128dad50",
     "cloud_snapshot": {
@@ -6736,7 +6736,7 @@
       "version": "v173",
       "track": "A",
       "direction_key": "v173-learned-rebound-model",
-      "status": "running",
+      "status": "rejected",
       "parent_versions": [
         "v170"
       ],
@@ -6749,15 +6749,42 @@
       "write_scope": "research/parallel/rounds/parallel-20260906-r2/v173",
       "worker_agent_id": "01a07792-4a6b-7fc3-a08a-af2923b1778a",
       "worker_host_id": "local",
-      "result_manifest": null,
+      "result_manifest": "research\\parallel\\rounds\\parallel-20260906-r2\\v173\\result_manifest.json",
       "registered_at": "2026-09-26T13:25:55.823634Z",
-      "assigned_at": "2026-09-26T13:25:55.823634Z"
+      "assigned_at": "2026-09-26T13:25:55.823634Z",
+      "result_manifest_sha256": "81a7475b9f3e8e7f4cf6c048fba7d79f95d57334761a76450fb3f0c3989d796a",
+      "result_summary": {
+        "scenarios": {
+          "normal": {
+            "monthly_geometric_net_percent": 3.98,
+            "max_drawdown_percent": 25.12,
+            "fills": 10751,
+            "months": 60
+          },
+          "fee_stress": {
+            "monthly_geometric_net_percent": 3.98,
+            "max_drawdown_percent": 25.12,
+            "fills": 10751,
+            "months": 60
+          },
+          "execution_stress": {
+            "monthly_geometric_net_percent": 3.98,
+            "max_drawdown_percent": 25.12,
+            "fills": 10751,
+            "months": 60
+          }
+        },
+        "independent_test": false,
+        "live_approved": false,
+        "audit_notes": "Independent replication within edge-case tolerance (combined 3.918/25.43 vs 3.98/25.12; differences from NaN handling, one-hot asset code, exit base, dedup); IC positive every anchor; no look-ahead. Rejection supported."
+      },
+      "audited_at": "2026-09-26T13:48:38.202585Z"
     },
     {
       "version": "v174",
       "track": "B",
       "direction_key": "v174-intrabar-spike-fade-sleeve",
-      "status": "running",
+      "status": "rejected",
       "parent_versions": [
         "v172"
       ],
@@ -6770,15 +6797,42 @@
       "write_scope": "research/parallel/rounds/parallel-20260906-r2/v174",
       "worker_agent_id": "01a07791-eecb-7053-8866-dcdbe31e84d7",
       "worker_host_id": "local",
-      "result_manifest": null,
+      "result_manifest": "research\\parallel\\rounds\\parallel-20260906-r2\\v174\\result_manifest.json",
       "registered_at": "2026-09-26T13:33:55.011799Z",
-      "assigned_at": "2026-09-26T13:33:55.011799Z"
+      "assigned_at": "2026-09-26T13:33:55.011799Z",
+      "result_manifest_sha256": "ee9b19b8ebb0bfccc40de37be21a3e84732be947d61458c5b8fa21f78c8d3a90",
+      "result_summary": {
+        "scenarios": {
+          "normal": {
+            "monthly_geometric_net_percent": 4.402,
+            "max_drawdown_percent": 20.52,
+            "fills": 10782,
+            "months": 60
+          },
+          "fee_stress": {
+            "monthly_geometric_net_percent": 4.402,
+            "max_drawdown_percent": 20.52,
+            "fills": 10782,
+            "months": 60
+          },
+          "execution_stress": {
+            "monthly_geometric_net_percent": 4.402,
+            "max_drawdown_percent": 20.52,
+            "fills": 10782,
+            "months": 60
+          }
+        },
+        "independent_test": false,
+        "live_approved": false,
+        "audit_notes": "Exact replication; no look-ahead; short funding sign correct. Spikes do not mean-revert; rejected."
+      },
+      "audited_at": "2026-09-26T13:42:25.484454Z"
     },
     {
       "version": "v175",
       "track": "C",
       "direction_key": "v175-limit-bid-dip-sleeve",
-      "status": "running",
+      "status": "rejected",
       "parent_versions": [
         "v171"
       ],
@@ -6791,10 +6845,340 @@
       "write_scope": "research/parallel/rounds/parallel-20260906-r2/v175",
       "worker_agent_id": "01a07748-5adc-7061-8052-0ed36705a8a8",
       "worker_host_id": "local",
-      "result_manifest": null,
+      "result_manifest": "research\\parallel\\rounds\\parallel-20260906-r2\\v175\\result_manifest.json",
       "registered_at": "2026-09-26T13:38:14.817996Z",
-      "assigned_at": "2026-09-26T13:38:14.817996Z"
+      "assigned_at": "2026-09-26T13:38:14.817996Z",
+      "result_manifest_sha256": "0f4e66871a020bc42f8610e041ca63332caf0123a871d5f4f768fdb1ecd09c23",
+      "result_summary": {
+        "scenarios": {
+          "normal": {
+            "monthly_geometric_net_percent": 5.627,
+            "max_drawdown_percent": 22.81,
+            "fills": 10773,
+            "months": 60
+          },
+          "fee_stress": {
+            "monthly_geometric_net_percent": 5.627,
+            "max_drawdown_percent": 22.81,
+            "fills": 10773,
+            "months": 60
+          },
+          "execution_stress": {
+            "monthly_geometric_net_percent": 5.627,
+            "max_drawdown_percent": 22.81,
+            "fills": 10773,
+            "months": 60
+          }
+        },
+        "independent_test": false,
+        "live_approved": false,
+        "audit_notes": "CONDITIONAL PASS: no look-ahead, no optimistic fill (marketable-bid and gap fills are conservative at L); 2021-2023 and DD exact; 2024/2025 k-selection knife-edge (Sharpe gaps 0.0002) flips under sigma-seeding conventions (audit 5.509 vs 5.627). Fragilities: top-5% events >100% of 2021/2022 sleeve sums, exit-timing sensitivity, sleeve and books draw down together in 2021-22."
+      },
+      "audited_at": "2026-09-26T14:00:54.300392Z"
+    },
+    {
+      "version": "v176",
+      "track": "B",
+      "direction_key": "v176-total-portfolio-vol-target",
+      "status": "rejected",
+      "parent_versions": [
+        "v174"
+      ],
+      "model_family": "walk-forward-rule-sleeve",
+      "objective": "Portfolio vol target that includes the limit dip sleeve's risk (definitional fix, same target/cap/governor)",
+      "data_contract": "as v175",
+      "policy_contract": "realized_total = books + carry + sleeve_unit (sleeve/1.657); s = min(0.25/vol, 2) applied to books, carry and sleeve",
+      "hypothesis": "Measuring the whole portfolio in the vol target brings the full-path DD toward 20% at a small return cost",
+      "parent_commit": "1ecf947baddd5ef78444670330e9db62128dad50",
+      "write_scope": "research/parallel/rounds/parallel-20260906-r2/v176",
+      "worker_agent_id": "01a07791-eecb-7053-8866-dcdbe31e84d7",
+      "worker_host_id": "local",
+      "result_manifest": "research\\parallel\\rounds\\parallel-20260906-r2\\v176\\result_manifest.json",
+      "registered_at": "2026-09-26T13:42:25.482455Z",
+      "assigned_at": "2026-09-26T13:42:25.482455Z",
+      "result_manifest_sha256": "ce0fcb71dbf0ab3be2d011ec600f7fd9ef617b6509619cab5d8db62cdabbf902",
+      "result_summary": {
+        "scenarios": {
+          "normal": {
+            "monthly_geometric_net_percent": 5.239,
+            "max_drawdown_percent": 20.72,
+            "fills": 10777,
+            "months": 60
+          },
+          "fee_stress": {
+            "monthly_geometric_net_percent": 5.239,
+            "max_drawdown_percent": 20.72,
+            "fills": 10777,
+            "months": 60
+          },
+          "execution_stress": {
+            "monthly_geometric_net_percent": 5.239,
+            "max_drawdown_percent": 20.72,
+            "fills": 10777,
+            "months": 60
+          }
+        },
+        "independent_test": false,
+        "live_approved": false,
+        "audit_notes": "Loop reproduced (2021-2023 exact; k knife-edge flips in 2024/2025 as v175). Minor ~1-minute look-ahead: sleeve_unit[i-1] in the vol estimate includes the exit minute-0 range -> use shift(2) (fixed in v178 diagnostics). Stress: 4.507/22.27. 1m-marked DD 26.12 vs 20.72 close-sampled (FTX 2022-11-08). Gate fails."
+      },
+      "audited_at": "2026-09-26T14:08:48.194623Z"
+    },
+    {
+      "version": "v177",
+      "track": "A",
+      "direction_key": "v177-sleeve-concurrency-cap",
+      "status": "rejected",
+      "parent_versions": [
+        "v173"
+      ],
+      "model_family": "walk-forward-rule-sleeve",
+      "objective": "Cap simultaneous dip-sleeve fills at 2 per 4h bar (first in time) to cut crash concentration in v176",
+      "data_contract": "as v176",
+      "policy_contract": "v176 + only the first 2 limit fills per holding bar (minute order, ties by column order); k re-chosen with the cap",
+      "hypothesis": "Market-wide crash bars concentrate 1.25x sleeve exposure; a concurrency cap lowers full-path DD more than return",
+      "parent_commit": "1ecf947baddd5ef78444670330e9db62128dad50",
+      "write_scope": "research/parallel/rounds/parallel-20260906-r2/v177",
+      "worker_agent_id": "01a07792-4a6b-7fc3-a08a-af2923b1778a",
+      "worker_host_id": "local",
+      "result_manifest": "research\\parallel\\rounds\\parallel-20260906-r2\\v177\\result_manifest.json",
+      "registered_at": "2026-09-26T13:48:38.200578Z",
+      "assigned_at": "2026-09-26T13:48:38.200578Z",
+      "result_manifest_sha256": "dd6e3653a198fcbc4ee44bf6146e0bd2a7663f8d2c66d90abe592a61c64b1744",
+      "result_summary": {
+        "scenarios": {
+          "normal": {
+            "monthly_geometric_net_percent": 4.71,
+            "max_drawdown_percent": 21.1,
+            "fills": 10777,
+            "months": 60
+          },
+          "fee_stress": {
+            "monthly_geometric_net_percent": 4.71,
+            "max_drawdown_percent": 21.1,
+            "fills": 10777,
+            "months": 60
+          },
+          "execution_stress": {
+            "monthly_geometric_net_percent": 4.71,
+            "max_drawdown_percent": 21.1,
+            "fills": 10777,
+            "months": 60
+          }
+        },
+        "independent_test": false,
+        "live_approved": false,
+        "audit_notes": "Reproduced exactly; cap causal; rejected."
+      },
+      "audited_at": "2026-09-26T14:05:51.101946Z"
+    },
+    {
+      "version": "v178",
+      "track": "C",
+      "direction_key": "v178-limit-bid-ladder",
+      "status": "rejected",
+      "parent_versions": [
+        "v175"
+      ],
+      "model_family": "rule-sleeve-no-selection",
+      "objective": "Replace the knife-edge walk-forward k with a fixed ladder of limit bids at 2.5/3/3.5/4 sigma (quarter size each)",
+      "data_contract": "as v176",
+      "policy_contract": "4 resting bids per asset per bar, maker on trade-through, exit next 4h open; sleeve inside the portfolio vol target",
+      "hypothesis": "A selection-free ladder is as good as the selected k and more robust",
+      "parent_commit": "1ecf947baddd5ef78444670330e9db62128dad50",
+      "write_scope": "research/parallel/rounds/parallel-20260906-r2/v178",
+      "worker_agent_id": "01a07748-5adc-7061-8052-0ed36705a8a8",
+      "worker_host_id": "local",
+      "result_manifest": "research\\parallel\\rounds\\parallel-20260906-r2\\v178\\result_manifest.json",
+      "registered_at": "2026-09-26T14:00:54.296751Z",
+      "assigned_at": "2026-09-26T14:00:54.296751Z",
+      "result_manifest_sha256": "84ac8dbdd042cba836a1fbd4a3ec3be5359d67aef7636c988a500002de12e723",
+      "result_summary": {
+        "scenarios": {
+          "normal": {
+            "monthly_geometric_net_percent": 5.508,
+            "max_drawdown_percent": 27.79,
+            "fills": 0,
+            "months": 60
+          },
+          "fee_stress": {
+            "monthly_geometric_net_percent": 4.788,
+            "max_drawdown_percent": 27.81,
+            "fills": 0,
+            "months": 60
+          },
+          "execution_stress": {
+            "monthly_geometric_net_percent": 4.788,
+            "max_drawdown_percent": 27.81,
+            "fills": 0,
+            "months": 60
+          }
+        },
+        "independent_test": false,
+        "live_approved": false,
+        "audit_notes": "Reproduced exactly incl. the shift-2 causality fix, 1m DD 27.79 and worst bar; stress within 0.001pp. Gate fails (1m DD)."
+      },
+      "audited_at": "2026-09-26T14:27:10.665822Z"
+    },
+    {
+      "version": "v179",
+      "track": "A",
+      "direction_key": "v179-stress-budget-ladder",
+      "status": "rejected",
+      "parent_versions": [
+        "v177"
+      ],
+      "model_family": "rule-sleeve-no-selection",
+      "objective": "Bound the dip-sleeve tail: open sleeve notional per bar <= 0.05/0.30 of equity (ex post label, after the 2025-10-10 1m DD)",
+      "data_contract": "as v178",
+      "policy_contract": "v178 ladder + time-ordered fills until notional cap 1/6; gate DD = max(4h, 1m-marked); stress row",
+      "hypothesis": "A stress-loss budget keeps most of the sleeve return while cutting the crash-intrabar drawdown below 20%",
+      "parent_commit": "1ecf947baddd5ef78444670330e9db62128dad50",
+      "write_scope": "research/parallel/rounds/parallel-20260906-r2/v179",
+      "worker_agent_id": "01a07792-4a6b-7fc3-a08a-af2923b1778a",
+      "worker_host_id": "local",
+      "result_manifest": "research\\parallel\\rounds\\parallel-20260906-r2\\v179\\result_manifest.json",
+      "registered_at": "2026-09-26T14:05:51.099930Z",
+      "assigned_at": "2026-09-26T14:05:51.099930Z",
+      "result_manifest_sha256": "311cbb91fd9c98c956a013cf8fe73b0c33091ecda15c0dad2cfefd0d3aa96906",
+      "result_summary": {
+        "scenarios": {
+          "normal": {
+            "monthly_geometric_net_percent": 4.141,
+            "max_drawdown_percent": 19.81,
+            "fills": 2055,
+            "months": 60
+          },
+          "fee_stress": {
+            "monthly_geometric_net_percent": 3.729,
+            "max_drawdown_percent": 20.72,
+            "fills": 2074,
+            "months": 60
+          },
+          "execution_stress": {
+            "monthly_geometric_net_percent": 3.729,
+            "max_drawdown_percent": 20.72,
+            "fills": 2074,
+            "months": 60
+          }
+        },
+        "independent_test": false,
+        "live_approved": false,
+        "audit_notes": "Re-audit with the clarified total-only cap 1/6 reproduces monthly, 4h DD, 1m DD, worst bar, yearly and taken/cancelled exactly (stress within 0.01pp fee-accounting delta). Causal. Rejected (4.141 < 5)."
+      },
+      "audited_at": "2026-09-26T14:34:03.517286Z"
+    },
+    {
+      "version": "v180",
+      "track": "B",
+      "direction_key": "v180-model-gated-limit-ladder",
+      "status": "rejected",
+      "parent_versions": [
+        "v176"
+      ],
+      "model_family": "hist-gradient-boosting",
+      "objective": "Walk-forward model decides one minute before each potential rung fill whether the bid stays live; kept fills go through the v179 stress budget",
+      "data_contract": "Binance 1m OHLCV+taker majors 2020-2026, 4h opens, actual funding; v154 cached books",
+      "policy_contract": "HGB on minute f-1 state features; bid live iff pred > 0; budget 1/6 equity; gate DD = max(4h, 1m)",
+      "hypothesis": "Model gating spends the stress budget on better fills and recovers return lost in v179 at DD <= 20%",
+      "parent_commit": "1ecf947baddd5ef78444670330e9db62128dad50",
+      "write_scope": "research/parallel/rounds/parallel-20260906-r2/v180",
+      "worker_agent_id": "01a07791-eecb-7053-8866-dcdbe31e84d7",
+      "worker_host_id": "local",
+      "result_manifest": "research\\parallel\\rounds\\parallel-20260906-r2\\v180\\result_manifest.json",
+      "registered_at": "2026-09-26T14:08:48.192088Z",
+      "assigned_at": "2026-09-26T14:08:48.192088Z",
+      "result_manifest_sha256": "5dac2986d458fae5d89ed19f84015ba0784014737a7cdbc12eb3a2217fb9b922",
+      "result_summary": {
+        "scenarios": {
+          "normal": {
+            "monthly_geometric_net_percent": 4.088,
+            "max_drawdown_percent": 21.03,
+            "fills": 1771,
+            "months": 60
+          },
+          "fee_stress": {
+            "monthly_geometric_net_percent": 3.672,
+            "max_drawdown_percent": 21.3,
+            "fills": 1787,
+            "months": 60
+          },
+          "execution_stress": {
+            "monthly_geometric_net_percent": 3.672,
+            "max_drawdown_percent": 21.3,
+            "fills": 1787,
+            "months": 60
+          }
+        },
+        "independent_test": false,
+        "live_approved": false,
+        "audit_notes": "Engineering reproduced (counts exact; monthly within 0.1pp, DD within 1-1.5pp from documented feature-coding deltas); every feature <= minute f-1; gate fails (DD). Rejected."
+      },
+      "audited_at": "2026-09-26T14:24:29.151179Z"
+    },
+    {
+      "version": "v181",
+      "track": "B",
+      "direction_key": "v181-dip-ladder-out-of-universe",
+      "status": "running",
+      "parent_versions": [
+        "v180"
+      ],
+      "model_family": "rule-sleeve-no-selection",
+      "objective": "Test the frozen v178 dip ladder on six unseen perps (DOGE, ADA, LINK, LTC, AVAX, TRX) as evidence the effect is a real mechanism (research only)",
+      "data_contract": "Binance USD-M 1m archive 2020-2026 for the six alts (data/raw/alts_intraday_20260926), 4h opens and funding from xs_universe",
+      "policy_contract": "frozen v178 ladder, normal and stress costs; pre-registered criterion: pooled mean rung return > 0 in >= 4/5 years (normal) and > 0 pooled under stress",
+      "hypothesis": "Liquidation-overshoot rebounds exist beyond the five majors",
+      "parent_commit": "1ecf947baddd5ef78444670330e9db62128dad50",
+      "write_scope": "research/parallel/rounds/parallel-20260906-r2/v181",
+      "worker_agent_id": "01a07791-eecb-7053-8866-dcdbe31e84d7",
+      "worker_host_id": "local",
+      "result_manifest": null,
+      "registered_at": "2026-09-26T14:24:29.149128Z",
+      "assigned_at": "2026-09-26T14:24:29.149128Z"
+    },
+    {
+      "version": "v182",
+      "track": "C",
+      "direction_key": "v182-pooled-11-asset-rebound-gate",
+      "status": "running",
+      "parent_versions": [
+        "v178"
+      ],
+      "model_family": "hist-gradient-boosting",
+      "objective": "Rebound gate trained on ladder fills of 11 assets (majors + 6 alts, alts training-only), applied to the majors' ladder under the v179 budget",
+      "data_contract": "1m OHLCV+taker for majors (2019/2020-2026) and alts (data/raw/alts_intraday_20260926), 4h opens, funding",
+      "policy_contract": "HGB on minute f-1 state (no asset code, breadth over majors); rung live iff pred > 0; budget 1/6; gate DD = max(4h, 1m)",
+      "hypothesis": "More training data for the same mechanism makes the gate informative in early years",
+      "parent_commit": "1ecf947baddd5ef78444670330e9db62128dad50",
+      "write_scope": "research/parallel/rounds/parallel-20260906-r2/v182",
+      "worker_agent_id": "01a07748-5adc-7061-8052-0ed36705a8a8",
+      "worker_host_id": "local",
+      "result_manifest": null,
+      "registered_at": "2026-09-26T14:27:10.663785Z",
+      "assigned_at": "2026-09-26T14:27:10.663785Z"
+    },
+    {
+      "version": "v183",
+      "track": "A",
+      "direction_key": "v183-tp-exit-open-notional-budget",
+      "status": "running",
+      "parent_versions": [
+        "v179"
+      ],
+      "model_family": "rule-sleeve-no-selection",
+      "objective": "Take-profit limit exits at L*(1+sigma) and a stress budget on concurrently open sleeve notional, so more rungs fit under the same tail budget",
+      "data_contract": "as v179",
+      "policy_contract": "ladder; TP maker exit at first minute > fill with high > TP, else next 4h open taker; open-notional budget 1/6; gate DD = max(4h, 1m)",
+      "hypothesis": "Crash risk sits only in open positions; recycling closed rungs raises return at the same 1m DD",
+      "parent_commit": "1ecf947baddd5ef78444670330e9db62128dad50",
+      "write_scope": "research/parallel/rounds/parallel-20260906-r2/v183",
+      "worker_agent_id": "01a07792-4a6b-7fc3-a08a-af2923b1778a",
+      "worker_host_id": "local",
+      "result_manifest": null,
+      "registered_at": "2026-09-26T14:34:03.515237Z",
+      "assigned_at": "2026-09-26T14:34:03.515237Z"
     }
   ],
-  "updated_at": "2026-09-26T13:38:14.821153Z"
+  "updated_at": "2026-09-26T14:34:03.517286Z"
 }

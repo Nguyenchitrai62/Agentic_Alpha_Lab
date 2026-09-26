@@ -1,5 +1,9 @@
 # Handoff for the next coding agent
 
+ROUND parallel-20260906-r2 (2026-09-26, newest): use `/alpha-lab-leader`; state in .claude/skills/alpha-lab-leader/research-map.md.
+Evaluate with engine_real (audited); gate DD = max(4h-close, 1m-marked). Best: v178 dip-sleeve ladder 5.51%/month
+(1m DD 27.8%, fails), v179 budgeted 4.14% (1m DD 19.8%); v170 books 3.80%. Forward logs: advisor_shadow.py + dip_sleeve_forward.py.
+
 ROUND parallel-20260906-r2 (2026-09-26, latest): use the Claude skill `/alpha-lab-leader` (.claude/skills/alpha-lab-leader,
 research-map.md has the full state). Best realistic candidate v144 (3.37%/month, full-path DD 19.6%, realistic 1m
 execution, governor, target 0.25 ex post), frozen in scripts/v144_advisor.py; also logged v99/v104/v115/v127/v133.

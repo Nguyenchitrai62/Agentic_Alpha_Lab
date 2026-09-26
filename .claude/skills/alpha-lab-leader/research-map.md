@@ -1,11 +1,16 @@
 # Research map (update after every rotation)
 
-Last update: 2026-09-26 (after v165/v168, engine_real).
+Last update: 2026-09-26 (after v179).
 
 ## Honest status
 
 | candidate | normal / fee / execution %/month | full-path DD | hidden year (strict 1m exec) |
 |---|---|---|---|
+| v179 = v178 + stress budget on sleeve notional (<= 1/6 equity, ex post) | 4.14 (stress 3.73) | 18.2% 4h / 19.8% 1m | +68% |
+| v178 = selection-free ladder of limit bids (2.5/3/3.5/4 sigma) inside the vol target | 5.51 (stress 4.79) | 18.6% 4h / 27.8% 1m-marked (2025-10-10) | +106% |
+| **v176 = v154 books + v170 exec + v175 limit dip sleeve inside the portfolio vol target (audit pending)** | 0.25: 5.24 | 20.7% (2021) | +123% |
+| v175 = same, sleeve outside the vol target (audit pending) | 0.25: 5.63 | 22.8% | +119% |
+| v172 = taker-entry dip sleeve, crash-aware slippage (audited) | 0.25: 4.60 | 22.4% | +92% |
 | **v154 + v170 execution (60-min rest) on engine_real, audited** | 0.25: 3.80 | 18.9% close | +64.7% |
 | **v154 on engine_real (actual signed funding, real carry fees, capital budget, min notional; audited PASS)** | 0.25: 3.71 | 18.9% close / 19.0% true 1m-marked (v169) | +63.0% |
 | **v154 = (v144 + options + Coinbase-premium books)/3, realistic engine, 20% governor** | 0.25: 3.52; 0.28: 3.67 (v155, ex post) | 19.2% / 20.0% | +56.3% (0.25) |
@@ -47,6 +52,8 @@ current signal (IC ~0.1 at 7d, ~0.05 at 1d; Sharpe ~1.5-1.9).
 
 ## Evaluation standard (2026-09-26, user: match reality)
 
+GATE DD = max(4h-close full-path DD, 1m-marked full-path DD incl. open sleeve positions). Stress row = maker 0.0004 / taker 0.0007 + 5 bps on taker fills.
+
 `engine_real/engine_real.py` (`evaluate(books, opens)`, cached v154 books in artifacts/research/engine_real/): v144 loop +
 actual signed Binance funding at the t+2 settlement, carry with spot 0.1% + perp taker 0.05% and t+2 funding, capital
 budget (spot cash + perp gross/5 <= 95%), min notional at 10k USDT, intrabar DD bound. Ablation on v154: funding +0.20pp,
@@ -72,7 +79,7 @@ Pooled majors HGB (v92), 2017 spot prefix, causal vol targets, long/short horizo
 
 ## Idea queue (next)
 
-- NEW LEAD (v171, audit pending): intrabar dip-reversal sleeve on 1m data (buy after close <= -k sigma of the 4h open in minutes 16..238, exit next 4h open, taker both sides, k walk-forward): sleeve alone +8..+65%/yr, DD 7-9%, corr 0.04 with v154; v154+sleeve 5.96%/month but DD 21.85%. Robust to 10 bps slippage and 1-5 min delay (ex post diagnostic); top events are real crashes. v172 = crash-aware slippage + v170 execution. Next: v173 event model (which drops rebound) and a prospective paper log of the frozen rule.
+- NEW LEAD (v171, audit pending): intrabar dip-reversal sleeve on 1m data (buy after close <= -k sigma of the 4h open in minutes 16..238, exit next 4h open, taker both sides, k walk-forward): sleeve alone +8..+65%/yr, DD 7-9%, corr 0.04 with v154; v154+sleeve 5.96%/month but DD 21.85%. Robust to 10 bps slippage and 1-5 min delay (ex post diagnostic); top events are real crashes. v172 = crash-aware slippage + v170 execution. v173 learned rebound model: IC 0.08-0.17 but pred>0 too lax (3.98/25.1, rejected). v174 spike fade: spikes do NOT revert (rejected). v175 limit bids (maker on trade-through) let k 2.5-4 pay: 5.63/22.8. v176 sleeve inside the vol target: 5.24/20.72. Prospective log: scripts/dip_sleeve_forward.py (limit k=3.5 and taker k=4, FREEZE 2026-09-26 16:00 UTC, matches research events exactly).
 
 - Information-diverse ensembles work only with members that are good alone (options, Coinbase premium). Next: ETH options (download running to data/raw/deribit_opt_20260926/ETH_options_4h.parquet) as part of the options member (v158).
 - v151 frozen: scripts/v151_advisor.py (+ scripts/deribit_options_update.py appends live 4h options aggregates each run; backup BTC_options_4h.backup_20260926.parquet), logged as v151_deploy_v4.
