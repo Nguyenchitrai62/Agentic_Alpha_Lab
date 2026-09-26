@@ -17,20 +17,40 @@ modified from this project.
 6. Report gross PnL, fees, funding, net PnL, drawdown, trade count, and coverage.
 7. Persist the data range, model/checkpoint, parameters, costs, and execution assumptions.
 
-## Current execution assumptions
+## User goal and validation protocol (user, 2026-09-27)
 
-- Binance USD-M `BTCUSDT`, closed 5-minute candles.
-- Limit entry begins on the next candle and expires after the configured number of bars.
-- Fee is `0.0002` per entry/exit fill (0.04% round trip).
-- Stop/timeout exits are currently market-like at the scenario fee, NOT guaranteed maker/limit fills.
-- Long funding is `0.0001` every 8 hours; short funding is zero by user assumption.
-- Capital is compounded from current equity and reported with initial capital indexed to 100.
-- Keep fixed 1x as the baseline; report confidence-based leverage separately and cap it at 2x until validated.
+- Goal (mandatory): >= 5%/month compounded net with drawdown <= 20%, trading only the majors BTC, ETH, SOL, BNB,
+  XRP (Binance USD-M perps; account < 10k USDT, so limit orders on majors carry no size slippage).
+- Realistic simulation = the walk-forward replay: pretend "now" is the anchor date, freeze everything, run the
+  pipeline continuously over every candle of the following year and score it. The most recent year
+  (2025-09-24 .. 2026-09-23) plays "one year ago -> now"; the five anchors 2021-2025 repeat the same simulation. A
+  candidate must pass in general (the 5-year walk-forward and the most recent year) before any real money.
+- Prospective paper logs (`scripts/advisor_shadow.py`, `scripts/dip_sleeve_forward.py`) add evidence on data that did
+  not exist when the rules were frozen.
+
+## Current execution assumptions (research engine `research/parallel/rounds/parallel-20260906-r2/engine_real`)
+
+- Binance USD-M perps BTCUSDT, ETHUSDT, SOLUSDT, BNBUSDT, XRPUSDT; decisions at closed 4h bars; execution and
+  intrabar risk on 1m klines (public archive).
+- Book orders: limit 10 bps better than the minute-0 price, resting 60 minutes; maker 0.0002 only on a 1m
+  trade-through, otherwise taker 0.0005 at the minute-60 open + 2 bps. Do not claim queue position from OHLC.
+- Dip-sleeve orders: resting limit bids filled only on a 1m trade-through (maker); exits by take-profit limit or by
+  taker at the next 4h open with slippage max(2 bps, 0.25 * minute range).
+- Funding: actual signed Binance funding at each settlement for the position held at that timestamp (longs pay
+  positive rates, shorts receive them). Carry sleeve: spot 0.001 + perp taker 0.0005 per leg switch.
+- Capital: compounded from current equity (indexed to 100); cross-margin budget (spot cash + perp gross / leverage
+  setting <= 95% of equity); Binance minimum notional per symbol; liquidation check on 1m marks when leveraged.
+- Drawdown for the gate = max(4h-close full-path DD, 1m-marked full-path DD including open positions).
+- Cost stress row: maker 0.0004 / taker 0.0007 + 5 bps on taker fills (robustness report).
+- Keep fixed 1x as the baseline and report leveraged variants separately.
+- User rule (2026-09-27): leverage above 2x is allowed when the model's confidence is high, but only if it is
+  evaluated as realistically as possible: Binance USD-M cross margin (initial margin at the account leverage setting,
+  maintenance margin per symbol, an account liquidation check on 1m marks), funding and fees on the full notional,
+  and the DD <= 20% gate (max of 4h-close and 1m-marked DD) still holds. Trading stays majors-only
+  (BTC, ETH, SOL, BNB, XRP).
 - When stop and take-profit are both touched inside one OHLC bar, use stop-first.
-- Do not claim maker fill probability or queue position from OHLC alone.
-- Engine `ohlc-v2` suppresses targets on intrabar entry candles and rejects truncated holding windows.
-- Drawdown is trade-candle-close sampled, not true mark-price or full intrabar drawdown.
-- Legacy Phase A reports predate v2. Do not mix their results with v2 without explicit labels.
+- Legacy (pre-2026-09 BTC 5-minute engine `ohlc-v2`, flat funding 0.0001/8h longs, zero short funding, close-sampled
+  DD, Phase A reports): do not mix those results with engine_real results without explicit labels.
 
 ## Development
 

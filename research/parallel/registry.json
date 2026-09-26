@@ -2,7 +2,7 @@
   "schema_version": 1,
   "project": "Agentic Alpha Lab BTC swing research",
   "created_at": "2026-09-06T00:00:00Z",
-  "next_version": 187,
+  "next_version": 188,
   "control": {
     "coordinator_model": "gpt-5.6-sol",
     "coordinator_reasoning": "high",
@@ -54,7 +54,7 @@
     "expected_workers": 3,
     "version_range": [
       45,
-      186
+      187
     ],
     "parent_commit": "1ecf947baddd5ef78444670330e9db62128dad50",
     "cloud_snapshot": {
@@ -7264,7 +7264,7 @@
       "version": "v184",
       "track": "B",
       "direction_key": "v184-hourly-dip-ladder-shared-budget",
-      "status": "running",
+      "status": "rejected",
       "parent_versions": [
         "v181"
       ],
@@ -7277,9 +7277,36 @@
       "write_scope": "research/parallel/rounds/parallel-20260906-r2/v184",
       "worker_agent_id": "01a07791-eecb-7053-8866-dcdbe31e84d7",
       "worker_host_id": "local",
-      "result_manifest": null,
+      "result_manifest": "research\\parallel\\rounds\\parallel-20260906-r2\\v184\\result_manifest.json",
       "registered_at": "2026-09-26T16:26:18.732882Z",
-      "assigned_at": "2026-09-26T16:26:18.732882Z"
+      "assigned_at": "2026-09-26T16:26:18.732882Z",
+      "result_manifest_sha256": "7e4c8f6866669e420b6ccdab506d46aeac862198351f67524bc902ef65039801",
+      "result_summary": {
+        "scenarios": {
+          "normal": {
+            "monthly_geometric_net_percent": 3.893,
+            "max_drawdown_percent": 18.2,
+            "fills": 8478,
+            "months": 60
+          },
+          "fee_stress": {
+            "monthly_geometric_net_percent": 3.191,
+            "max_drawdown_percent": 18.99,
+            "fills": 8671,
+            "months": 60
+          },
+          "execution_stress": {
+            "monthly_geometric_net_percent": 3.191,
+            "max_drawdown_percent": 18.99,
+            "fills": 8671,
+            "months": 60
+          }
+        },
+        "independent_test": false,
+        "live_approved": false,
+        "audit_notes": "Reproduced (normal bit-exact, stress within 0.002pp); sigma_1h strictly before T; look-ahead PASS; rejected."
+      },
+      "audited_at": "2026-09-26T17:26:07.436061Z"
     },
     {
       "version": "v185",
@@ -7322,7 +7349,28 @@
       "result_manifest": null,
       "registered_at": "2026-09-26T16:31:11.102500Z",
       "assigned_at": "2026-09-26T16:31:11.102500Z"
+    },
+    {
+      "version": "v187",
+      "track": "B",
+      "direction_key": "v187-confidence-gated-leverage",
+      "status": "running",
+      "parent_versions": [
+        "v184"
+      ],
+      "model_family": "hist-gradient-boosting",
+      "objective": "Leverage above 2x only when the three v154 members agree (portfolio cap 2/3/4 by agreement share), with Binance cross-margin and 1m liquidation checks",
+      "data_contract": "v154 members A/B/D (cached), 1m majors, engine_real",
+      "policy_contract": "v183 + cap_t by agreement (<0.6: 2, <0.8: 3, else 4); 10x leverage setting, MMR 1%, liquidation check per bar; gate DD = max(4h, 1m)",
+      "hypothesis": "When members agree, higher leverage adds return without breaching the 20% realistic DD",
+      "parent_commit": "1ecf947baddd5ef78444670330e9db62128dad50",
+      "write_scope": "research/parallel/rounds/parallel-20260906-r2/v187",
+      "worker_agent_id": "01a07791-eecb-7053-8866-dcdbe31e84d7",
+      "worker_host_id": "local",
+      "result_manifest": null,
+      "registered_at": "2026-09-26T17:26:07.431808Z",
+      "assigned_at": "2026-09-26T17:26:07.431808Z"
     }
   ],
-  "updated_at": "2026-09-26T16:31:11.104513Z"
+  "updated_at": "2026-09-26T17:26:07.436061Z"
 }

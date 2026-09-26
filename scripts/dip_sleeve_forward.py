@@ -29,6 +29,8 @@ import requests
 from agentic_alpha_lab.data.binance_usdm import fetch_klines
 
 FREEZE = pd.Timestamp("2026-09-26T16:00:00Z")
+FREEZE_LADDER = pd.Timestamp("2026-09-26T20:00:00Z")  # v183 ladder + TP rule frozen from this bar
+RUNGS = (2.5, 3.0, 3.5, 4.0)
 SYMS = ("BTCUSDT", "ETHUSDT", "SOLUSDT", "BNBUSDT", "XRPUSDT")
 K, K_LIMIT, SIZE, TAKER, MAKER = 4.0, 3.5, 0.25, 0.0005, 0.0002
 OUT = Path("artifacts/research/advisor_shadow/dip_sleeve_forward.json")
@@ -83,6 +85,23 @@ def events_for(sym: str, sess) -> list[dict]:
             r = x_px / bid - 1 - MAKER - TAKER - f
             out.append(dict(rule="limit", symbol=sym, bar_open=T.isoformat(), trigger_minute=int(fill["off"].iloc[0]),
                             sigma=round(sig, 6), entry=bid, exit=x_px, funding=f, net_return=round(r, 6)))
+        if T >= FREEZE_LADDER:
+            for k in RUNGS:
+                lv = o[T] * (1 - k * sig)
+                fl = live[live["low"].astype(float) < lv]
+                if fl.empty:
+                    continue
+                fmin = int(fl["off"].iloc[0])
+                tp = lv * (1 + sig)
+                later = bar[(bar["off"] > fmin) & (bar["high"].astype(float) > tp)]
+                if not later.empty:
+                    r = tp / lv - 1 - 2 * MAKER
+                    xmin = int(later["off"].iloc[0])
+                else:
+                    r = x_px / lv - 1 - MAKER - TAKER - f
+                    xmin = 240
+                out.append(dict(rule="ladder_tp", symbol=sym, bar_open=T.isoformat(), rung_k=k, fill_minute=fmin,
+                                exit_minute=xmin, sigma=round(sig, 6), entry=lv, net_return=round(r, 6)))
         thr = o[T] * (1 - K * sig)
         hit = live[live["close"].astype(float) <= thr]
         if hit.empty:
@@ -106,16 +125,20 @@ def main():
             ev.extend(events_for(s, sess))
     ev.sort(key=lambda e: e["bar_open"])
     summary = {}
-    for rule in ("limit", "taker"):
+    for rule in ("limit", "taker", "ladder_tp"):
+        size = SIZE / len(RUNGS) if rule == "ladder_tp" else SIZE
         eq = 1.0
         by_bar: dict[str, float] = {}
         for e in ev:
             if e["rule"] == rule:
-                by_bar[e["bar_open"]] = by_bar.get(e["bar_open"], 0.0) + SIZE * e["net_return"]
+                by_bar[e["bar_open"]] = by_bar.get(e["bar_open"], 0.0) + size * e["net_return"]
         for b in sorted(by_bar):
             eq *= 1 + by_bar[b]
         summary[rule] = {"n_events": sum(e["rule"] == rule for e in ev), "sleeve_cum_return_pct": round(100 * (eq - 1), 3)}
-    out = {"rules": {"limit": "v175/v176 resting bid k=3.5, maker on trade-through", "taker": "v172 k=4 crash-aware taker"},
+    out = {"rules": {"limit": "v175/v176 resting bid k=3.5, maker on trade-through", "taker": "v172 k=4 crash-aware taker",
+                     "ladder_tp": "v183 ladder 2.5/3/3.5/4 sigma, TP at L(1+sigma) maker, else next 4h open taker (per-rung log; the "
+                                  "open-notional budget is applied when scoring with equity), frozen from FREEZE_LADDER"},
+           "freeze_ladder": FREEZE_LADDER.isoformat(),
            "size": SIZE, "freeze": FREEZE.isoformat(), "scored_until": datetime.now(timezone.utc).isoformat(),
            "summary": summary, "events": ev}
     OUT.write_text(json.dumps(out, indent=1))
