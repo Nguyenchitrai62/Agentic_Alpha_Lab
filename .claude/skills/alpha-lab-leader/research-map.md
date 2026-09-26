@@ -4,6 +4,8 @@ Last update: 2026-09-26 (after v179).
 
 ## Honest status
 
+USER-RULE ENGINE (engine_user, 2026-09-27; limit entry + SL market + TP limit per position, maker 0.02% / taker 0.055%, adverse funding, no carry; selection on first four years): v188 v154+sleeve SL m=4: 5y 3.53, last year 3.55, DD 19.0; v189 comparison selects v151+sleeve (dev4 3.90) -> 5y 3.58, last year 2.34, DD 19.4. Gate needs 5y >= 5, last year >= 5, no losing year, DD <= 20.
+
 | candidate | normal / fee / execution %/month | full-path DD | hidden year (strict 1m exec) |
 |---|---|---|---|
 | **v183 = ladder + TP maker exit at L(1+sigma) + budget on OPEN sleeve notional (audited)** | 4.28 (stress 3.88) | 18.8% 4h / 19.0% 1m (stress 19.1) | +67% |

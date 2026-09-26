@@ -2,7 +2,7 @@
   "schema_version": 1,
   "project": "Agentic Alpha Lab BTC swing research",
   "created_at": "2026-09-06T00:00:00Z",
-  "next_version": 188,
+  "next_version": 194,
   "control": {
     "coordinator_model": "gpt-5.6-sol",
     "coordinator_reasoning": "high",
@@ -54,7 +54,7 @@
     "expected_workers": 3,
     "version_range": [
       45,
-      187
+      193
     ],
     "parent_commit": "1ecf947baddd5ef78444670330e9db62128dad50",
     "cloud_snapshot": {
@@ -7312,7 +7312,7 @@
       "version": "v185",
       "track": "C",
       "direction_key": "v185-sleeve-outside-governor",
-      "status": "running",
+      "status": "rejected",
       "parent_versions": [
         "v182"
       ],
@@ -7325,15 +7325,42 @@
       "write_scope": "research/parallel/rounds/parallel-20260906-r2/v185",
       "worker_agent_id": "01a07748-5adc-7061-8052-0ed36705a8a8",
       "worker_host_id": "local",
-      "result_manifest": null,
+      "result_manifest": "research\\parallel\\rounds\\parallel-20260906-r2\\v185\\result_manifest.json",
       "registered_at": "2026-09-26T16:28:50.461462Z",
-      "assigned_at": "2026-09-26T16:28:50.461462Z"
+      "assigned_at": "2026-09-26T16:28:50.461462Z",
+      "result_manifest_sha256": "64a4a2b01b08e9b63729591009054b4f0a62180c7f74cad64536b0a2211928b4",
+      "result_summary": {
+        "scenarios": {
+          "normal": {
+            "monthly_geometric_net_percent": 4.311,
+            "max_drawdown_percent": 18.99,
+            "fills": 2143,
+            "months": 60
+          },
+          "fee_stress": {
+            "monthly_geometric_net_percent": 3.91,
+            "max_drawdown_percent": 19.13,
+            "fills": 2150,
+            "months": 60
+          },
+          "execution_stress": {
+            "monthly_geometric_net_percent": 3.91,
+            "max_drawdown_percent": 19.13,
+            "fills": 2150,
+            "months": 60
+          }
+        },
+        "independent_test": false,
+        "live_approved": false,
+        "audit_notes": "Reproduced (normal bit-exact, stress within 0.004pp); look-ahead PASS; gate fails on return."
+      },
+      "audited_at": "2026-09-26T17:55:43.840403Z"
     },
     {
       "version": "v186",
       "track": "A",
       "direction_key": "v186-sleeve-eleven-assets-research",
-      "status": "running",
+      "status": "rejected",
       "parent_versions": [
         "v183"
       ],
@@ -7346,15 +7373,42 @@
       "write_scope": "research/parallel/rounds/parallel-20260906-r2/v186",
       "worker_agent_id": "01a07792-4a6b-7fc3-a08a-af2923b1778a",
       "worker_host_id": "local",
-      "result_manifest": null,
+      "result_manifest": "research\\parallel\\rounds\\parallel-20260906-r2\\v186\\result_manifest.json",
       "registered_at": "2026-09-26T16:31:11.102500Z",
-      "assigned_at": "2026-09-26T16:31:11.102500Z"
+      "assigned_at": "2026-09-26T16:31:11.102500Z",
+      "result_manifest_sha256": "7f457dc6d2596c55ddc0daa52543a0fce529cb4753fb6f6faef4bd207be6bef7",
+      "result_summary": {
+        "scenarios": {
+          "normal": {
+            "monthly_geometric_net_percent": 4.29,
+            "max_drawdown_percent": 17.67,
+            "fills": 3317,
+            "months": 60
+          },
+          "fee_stress": {
+            "monthly_geometric_net_percent": 3.879,
+            "max_drawdown_percent": 17.84,
+            "fills": 3343,
+            "months": 60
+          },
+          "execution_stress": {
+            "monthly_geometric_net_percent": 3.879,
+            "max_drawdown_percent": 17.84,
+            "fills": 3343,
+            "months": 60
+          }
+        },
+        "independent_test": false,
+        "live_approved": false,
+        "audit_notes": "Reproduced (normal bit-exact, stress within 0.001pp); look-ahead PASS; research only (alts need user OK); gate fails on return."
+      },
+      "audited_at": "2026-09-26T17:58:05.270952Z"
     },
     {
       "version": "v187",
       "track": "B",
       "direction_key": "v187-confidence-gated-leverage",
-      "status": "running",
+      "status": "rejected",
       "parent_versions": [
         "v184"
       ],
@@ -7367,10 +7421,244 @@
       "write_scope": "research/parallel/rounds/parallel-20260906-r2/v187",
       "worker_agent_id": "01a07791-eecb-7053-8866-dcdbe31e84d7",
       "worker_host_id": "local",
-      "result_manifest": null,
+      "result_manifest": "research\\parallel\\rounds\\parallel-20260906-r2\\v187\\result_manifest.json",
       "registered_at": "2026-09-26T17:26:07.431808Z",
-      "assigned_at": "2026-09-26T17:26:07.431808Z"
+      "assigned_at": "2026-09-26T17:26:07.431808Z",
+      "result_manifest_sha256": "f55aecb4cde0606c10ace57fb6747024c2864bcb9df548bcbcfa7c58ae31d3d4",
+      "result_summary": {
+        "scenarios": {
+          "normal": {
+            "monthly_geometric_net_percent": 4.331,
+            "max_drawdown_percent": 18.96,
+            "fills": 2124,
+            "months": 60
+          },
+          "fee_stress": {
+            "monthly_geometric_net_percent": 3.929,
+            "max_drawdown_percent": 19.03,
+            "fills": 2141,
+            "months": 60
+          },
+          "execution_stress": {
+            "monthly_geometric_net_percent": 3.929,
+            "max_drawdown_percent": 19.03,
+            "fills": 2141,
+            "months": 60
+          }
+        },
+        "independent_test": false,
+        "live_approved": false,
+        "audit_notes": "Normals bit-exact, stress within 0.005pp; agreement/cap causal; zero liquidations confirmed; gate fails on return."
+      },
+      "audited_at": "2026-09-26T18:01:40.148919Z"
+    },
+    {
+      "version": "v188",
+      "track": "C",
+      "direction_key": "v188-user-engine-sl-tp",
+      "status": "running",
+      "parent_versions": [
+        "v185"
+      ],
+      "model_family": "hist-gradient-boosting",
+      "objective": "Re-score the best pipeline under the user's real trading rules: limit entries, SL market + TP limit on every position, Bybit fees, adverse funding, no carry",
+      "data_contract": "v154 cached books, 1m majors, engine_user",
+      "policy_contract": "book SL m in {2,3,4} daily sigma, TP 2m; sleeve TP L(1+sigma), SL L(1-2 sigma); select on first four years only",
+      "hypothesis": "The pipeline keeps its edge when traded exactly like the user trades",
+      "parent_commit": "1ecf947baddd5ef78444670330e9db62128dad50",
+      "write_scope": "research/parallel/rounds/parallel-20260906-r2/v188",
+      "worker_agent_id": "01a07748-5adc-7061-8052-0ed36705a8a8",
+      "worker_host_id": "local",
+      "result_manifest": null,
+      "registered_at": "2026-09-26T17:55:43.838352Z",
+      "assigned_at": "2026-09-26T17:55:43.838352Z"
+    },
+    {
+      "version": "v189",
+      "track": "A",
+      "direction_key": "v189-pipeline-comparison-user-engine",
+      "status": "rejected",
+      "parent_versions": [
+        "v186"
+      ],
+      "model_family": "hist-gradient-boosting",
+      "objective": "Compare v144, v151, v154 books with/without the dip sleeve under the user's real trading rules; select on the first four years",
+      "data_contract": "cached members A/B/D, 1m majors, engine_user",
+      "policy_contract": "book SL/TP m=4; sleeve v183 + SL 2 sigma; selection monthly_dev4 with DD<=20 and no losing year",
+      "hypothesis": "The information-diverse ensemble remains the best pipeline under the user's rules",
+      "parent_commit": "1ecf947baddd5ef78444670330e9db62128dad50",
+      "write_scope": "research/parallel/rounds/parallel-20260906-r2/v189",
+      "worker_agent_id": "01a07792-4a6b-7fc3-a08a-af2923b1778a",
+      "worker_host_id": "local",
+      "result_manifest": "research\\parallel\\rounds\\parallel-20260906-r2\\v189\\result_manifest.json",
+      "registered_at": "2026-09-26T17:58:05.268730Z",
+      "assigned_at": "2026-09-26T17:58:05.268730Z",
+      "result_manifest_sha256": "33201c95ed094f48db4000712d495965242a19a7a33167ab1c71356cbcb9ace0",
+      "result_summary": {
+        "scenarios": {
+          "normal": {
+            "monthly_geometric_net_percent": 3.584,
+            "max_drawdown_percent": 19.41,
+            "fills": 35288,
+            "months": 60
+          },
+          "fee_stress": {
+            "monthly_geometric_net_percent": 3.584,
+            "max_drawdown_percent": 19.41,
+            "fills": 35288,
+            "months": 60
+          },
+          "execution_stress": {
+            "monthly_geometric_net_percent": 3.584,
+            "max_drawdown_percent": 19.41,
+            "fills": 35288,
+            "months": 60
+          }
+        },
+        "independent_test": false,
+        "live_approved": false,
+        "audit_notes": "Bit-exact on all six rows (independent engine_user implementation); look-ahead PASS; selection uses first four years only; gate fails."
+      },
+      "audited_at": "2026-09-26T18:06:25.917483Z"
+    },
+    {
+      "version": "v190",
+      "track": "B",
+      "direction_key": "v190-bracket-target-model",
+      "status": "rejected",
+      "parent_versions": [
+        "v187"
+      ],
+      "model_family": "hist-gradient-boosting",
+      "objective": "Train long/short HGB on triple-barrier (SL 4 sigma_d, TP 8 sigma_d, 7d) trade returns aligned with the user's bracket orders; book E alone or blended with v151",
+      "data_contract": "v103 panel + 4h OHLC (spot prefix), embargo 78 bars, engine_user evaluation",
+      "policy_contract": "pred = p_long - p_short -> raw_ls, phased, vol-target; variants E alone, 0.5 v151 + 0.5 E; sleeve; SL/TP m=4; select on first four years",
+      "hypothesis": "Targets that match the traded bracket improve the realised return per unit of drawdown",
+      "parent_commit": "1ecf947baddd5ef78444670330e9db62128dad50",
+      "write_scope": "research/parallel/rounds/parallel-20260906-r2/v190",
+      "worker_agent_id": "01a07791-eecb-7053-8866-dcdbe31e84d7",
+      "worker_host_id": "local",
+      "result_manifest": "research\\parallel\\rounds\\parallel-20260906-r2\\v190\\result_manifest.json",
+      "registered_at": "2026-09-26T18:01:40.146883Z",
+      "assigned_at": "2026-09-26T18:01:40.146883Z",
+      "result_manifest_sha256": "7f8feb0caad0d022572bbefde6cf011d68d4b53b4e0353299c9adc56b9100eca",
+      "result_summary": {
+        "scenarios": {
+          "normal": {
+            "monthly_geometric_net_percent": 3.146,
+            "max_drawdown_percent": 21.06,
+            "fills": 34666,
+            "months": 60
+          },
+          "fee_stress": {
+            "monthly_geometric_net_percent": 3.146,
+            "max_drawdown_percent": 21.06,
+            "fills": 34666,
+            "months": 60
+          },
+          "execution_stress": {
+            "monthly_geometric_net_percent": 3.146,
+            "max_drawdown_percent": 21.06,
+            "fills": 34666,
+            "months": 60
+          }
+        },
+        "independent_test": false,
+        "live_approved": false,
+        "audit_notes": "Reference and engine reproduced exactly; E/blend within documented short-math/bar-source gaps (blind 22.04/20.70 DD); no leakage in labels, features or fit windows; rejected."
+      },
+      "audited_at": "2026-09-26T18:14:43.956145Z"
+    },
+    {
+      "version": "v191",
+      "track": "A",
+      "direction_key": "v191-sleeve-stop-width",
+      "status": "rejected",
+      "parent_versions": [
+        "v189"
+      ],
+      "model_family": "rule-sleeve-no-selection",
+      "objective": "Stop width of the dip-sleeve rungs (2/3/5 sigma_4h) under the user's rules on the v151 + sleeve pipeline",
+      "data_contract": "cached members, 1m majors, engine_user",
+      "policy_contract": "rung SL at L(1 - m sigma_4h), TP L(1 + sigma_4h); select on first four years",
+      "hypothesis": "A wider catastrophe stop keeps the rebounds while still bounding each rung's loss",
+      "parent_commit": "1ecf947baddd5ef78444670330e9db62128dad50",
+      "write_scope": "research/parallel/rounds/parallel-20260906-r2/v191",
+      "worker_agent_id": "01a07792-4a6b-7fc3-a08a-af2923b1778a",
+      "worker_host_id": "local",
+      "result_manifest": "research\\parallel\\rounds\\parallel-20260906-r2\\v191\\result_manifest.json",
+      "registered_at": "2026-09-26T18:06:25.915452Z",
+      "assigned_at": "2026-09-26T18:06:25.915452Z",
+      "result_manifest_sha256": "41ee84d2f04a8c986209e76d099a2892c323ce973cd5e38d6b88292dabca5c68",
+      "result_summary": {
+        "scenarios": {
+          "normal": {
+            "monthly_geometric_net_percent": 3.732,
+            "max_drawdown_percent": 19.08,
+            "fills": 35301,
+            "months": 60
+          },
+          "fee_stress": {
+            "monthly_geometric_net_percent": 3.732,
+            "max_drawdown_percent": 19.08,
+            "fills": 35301,
+            "months": 60
+          },
+          "execution_stress": {
+            "monthly_geometric_net_percent": 3.732,
+            "max_drawdown_percent": 19.08,
+            "fills": 35301,
+            "months": 60
+          }
+        },
+        "independent_test": false,
+        "live_approved": false,
+        "audit_notes": "Bit-exact on all rows; k=2 equals v189 P2+sleeve; look-ahead PASS; gate fails."
+      },
+      "audited_at": "2026-09-26T18:12:02.113130Z"
+    },
+    {
+      "version": "v192",
+      "track": "A",
+      "direction_key": "v192-book-limit-offset-window",
+      "status": "running",
+      "parent_versions": [
+        "v191"
+      ],
+      "model_family": "execution-rule-on-hgb-books",
+      "objective": "Offset and resting window of book limit orders without market fallback (10bps/60m ref, 10bps/bar, 3bps/bar)",
+      "data_contract": "cached members, 1m majors, engine_user",
+      "policy_contract": "v151 + sleeve (rung SL 5 sigma), book SL/TP m=4; select on first four years",
+      "hypothesis": "Resting longer or closer to the price fills more orders, reducing position lag, at a small price-improvement cost",
+      "parent_commit": "1ecf947baddd5ef78444670330e9db62128dad50",
+      "write_scope": "research/parallel/rounds/parallel-20260906-r2/v192",
+      "worker_agent_id": "01a07792-4a6b-7fc3-a08a-af2923b1778a",
+      "worker_host_id": "local",
+      "result_manifest": null,
+      "registered_at": "2026-09-26T18:12:02.109716Z",
+      "assigned_at": "2026-09-26T18:12:02.109716Z"
+    },
+    {
+      "version": "v193",
+      "track": "B",
+      "direction_key": "v193-sleeve-stop-risk-budget",
+      "status": "running",
+      "parent_versions": [
+        "v190"
+      ],
+      "model_family": "rule-sleeve-no-selection",
+      "objective": "Budget the dip sleeve by stop risk (sum rn*(5 sigma + 2% gap) <= X of equity) instead of notional; X in 0.03/0.05/0.08",
+      "data_contract": "cached members, 1m majors, engine_user",
+      "policy_contract": "v192 selection + sleeve rung SL 5 sigma, TP L(1+sigma); select on first four years",
+      "hypothesis": "Stops bound each rung's loss, so a risk budget admits more rebounds at the same drawdown",
+      "parent_commit": "1ecf947baddd5ef78444670330e9db62128dad50",
+      "write_scope": "research/parallel/rounds/parallel-20260906-r2/v193",
+      "worker_agent_id": "01a07791-eecb-7053-8866-dcdbe31e84d7",
+      "worker_host_id": "local",
+      "result_manifest": null,
+      "registered_at": "2026-09-26T18:14:43.953655Z",
+      "assigned_at": "2026-09-26T18:14:43.953655Z"
     }
   ],
-  "updated_at": "2026-09-26T17:26:07.436061Z"
+  "updated_at": "2026-09-26T18:14:43.956145Z"
 }
