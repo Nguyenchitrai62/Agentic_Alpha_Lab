@@ -2,7 +2,7 @@
   "schema_version": 1,
   "project": "Agentic Alpha Lab BTC swing research",
   "created_at": "2026-09-06T00:00:00Z",
-  "next_version": 206,
+  "next_version": 208,
   "control": {
     "coordinator_model": "gpt-5.6-sol",
     "coordinator_reasoning": "high",
@@ -54,7 +54,7 @@
     "expected_workers": 3,
     "version_range": [
       45,
-      205
+      207
     ],
     "parent_commit": "1ecf947baddd5ef78444670330e9db62128dad50",
     "cloud_snapshot": {
@@ -8128,7 +8128,7 @@
       "version": "v202",
       "track": "C",
       "direction_key": "v202-quarterly-retrain",
-      "status": "running",
+      "status": "rejected",
       "parent_versions": [
         "v199"
       ],
@@ -8141,9 +8141,36 @@
       "write_scope": "research/parallel/rounds/parallel-20260906-r2/v202",
       "worker_agent_id": "01a07748-5adc-7061-8052-0ed36705a8a8",
       "worker_host_id": "local",
-      "result_manifest": null,
+      "result_manifest": "research\\parallel\\rounds\\parallel-20260906-r2\\v202\\result_manifest.json",
       "registered_at": "2026-09-26T19:19:50.159320Z",
-      "assigned_at": "2026-09-26T19:19:50.159320Z"
+      "assigned_at": "2026-09-26T19:19:50.159320Z",
+      "result_manifest_sha256": "dca3b5b69e71432f2f33e06492597551446b3140cbec56438583c8a22299d1db",
+      "result_summary": {
+        "scenarios": {
+          "normal": {
+            "monthly_geometric_net_percent": 4.996,
+            "max_drawdown_percent": 19.72,
+            "fills": 40078,
+            "months": 60
+          },
+          "fee_stress": {
+            "monthly_geometric_net_percent": 4.996,
+            "max_drawdown_percent": 19.72,
+            "fills": 40078,
+            "months": 60
+          },
+          "execution_stress": {
+            "monthly_geometric_net_percent": 4.996,
+            "max_drawdown_percent": 19.72,
+            "fills": 40078,
+            "months": 60
+          }
+        },
+        "independent_test": false,
+        "live_approved": false,
+        "audit_notes": "Annual bit-exact; quarterly bit-exact under the driver alignment; members A/B bit-exact on two full quarterly rebuilds; look-ahead PASS. NOTE: the audit also printed the most recent year of the NON-selected quarterly row (4.31); it is not used for any decision."
+      },
+      "audited_at": "2026-09-26T21:22:12.195352Z"
     },
     {
       "version": "v203",
@@ -8218,7 +8245,7 @@
       "version": "v205",
       "track": "A",
       "direction_key": "v205-ensemble-books-aligned-sleeve",
-      "status": "running",
+      "status": "rejected",
       "parent_versions": [
         "v203"
       ],
@@ -8231,10 +8258,79 @@
       "write_scope": "research/parallel/rounds/parallel-20260906-r2/v205",
       "worker_agent_id": "01a07792-4a6b-7fc3-a08a-af2923b1778a",
       "worker_host_id": "local",
-      "result_manifest": null,
+      "result_manifest": "research\\parallel\\rounds\\parallel-20260906-r2\\v205\\result_manifest.json",
       "registered_at": "2026-09-26T19:37:45.375140Z",
-      "assigned_at": "2026-09-26T19:37:45.375140Z"
+      "assigned_at": "2026-09-26T19:37:45.375140Z",
+      "result_manifest_sha256": "e76af190091e02ac806d5eaa5da8f68cde7679afe9a2cd96dca7a82482b3df61",
+      "result_summary": {
+        "scenarios": {
+          "normal": {
+            "monthly_geometric_net_percent": 5.488,
+            "max_drawdown_percent": 19.76,
+            "fills": 41670,
+            "months": 60
+          },
+          "fee_stress": {
+            "monthly_geometric_net_percent": 5.488,
+            "max_drawdown_percent": 19.76,
+            "fills": 41670,
+            "months": 60
+          },
+          "execution_stress": {
+            "monthly_geometric_net_percent": 5.488,
+            "max_drawdown_percent": 19.76,
+            "fills": 41670,
+            "months": 60
+          }
+        },
+        "independent_test": false,
+        "live_approved": false,
+        "audit_notes": "Bit-exact on both rows; v204 anchor confirmed; look-ahead PASS (incl. decision-known book direction for the alignment); gate fails only on the most recent year (4.152)."
+      },
+      "audited_at": "2026-09-26T21:27:28.624950Z"
+    },
+    {
+      "version": "v206",
+      "track": "C",
+      "direction_key": "v206-three-member-retrain-ensemble",
+      "status": "running",
+      "parent_versions": [
+        "v202"
+      ],
+      "model_family": "hist-gradient-boosting",
+      "objective": "Add member D (Coinbase premium) to the annual+quarterly book ensemble: mean over {A,B,D} x {annual, quarterly}",
+      "data_contract": "members caches (annual, quarterly A/B, quarterly D rebuilt), engine_user",
+      "policy_contract": "v205 sleeve/rules; robust worst-year selection",
+      "hypothesis": "A third information source in the ensemble improves robustness across years",
+      "parent_commit": "1ecf947baddd5ef78444670330e9db62128dad50",
+      "write_scope": "research/parallel/rounds/parallel-20260906-r2/v206",
+      "worker_agent_id": "01a07748-5adc-7061-8052-0ed36705a8a8",
+      "worker_host_id": "local",
+      "result_manifest": null,
+      "registered_at": "2026-09-26T21:22:12.193063Z",
+      "assigned_at": "2026-09-26T21:22:12.193063Z"
+    },
+    {
+      "version": "v207",
+      "track": "A",
+      "direction_key": "v207-monthly-schedule-ensemble",
+      "status": "running",
+      "parent_versions": [
+        "v205"
+      ],
+      "model_family": "hist-gradient-boosting",
+      "objective": "Add a monthly retraining schedule (60 anchors) to the annual+quarterly v151 book ensemble (equal thirds)",
+      "data_contract": "members caches annual/quarterly + monthly rebuilt (same wrapping as v202), engine_user",
+      "policy_contract": "v205 sleeve/rules; robust worst-year selection",
+      "hypothesis": "Fresher, more diverse model sets improve robustness across years",
+      "parent_commit": "1ecf947baddd5ef78444670330e9db62128dad50",
+      "write_scope": "research/parallel/rounds/parallel-20260906-r2/v207",
+      "worker_agent_id": "01a07792-4a6b-7fc3-a08a-af2923b1778a",
+      "worker_host_id": "local",
+      "result_manifest": null,
+      "registered_at": "2026-09-26T21:27:28.621908Z",
+      "assigned_at": "2026-09-26T21:27:28.621908Z"
     }
   ],
-  "updated_at": "2026-09-26T19:37:45.377176Z"
+  "updated_at": "2026-09-26T21:27:28.624950Z"
 }
