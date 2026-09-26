@@ -2,7 +2,7 @@
   "schema_version": 1,
   "project": "Agentic Alpha Lab BTC swing research",
   "created_at": "2026-09-06T00:00:00Z",
-  "next_version": 198,
+  "next_version": 200,
   "control": {
     "coordinator_model": "gpt-5.6-sol",
     "coordinator_reasoning": "high",
@@ -54,7 +54,7 @@
     "expected_workers": 3,
     "version_range": [
       45,
-      197
+      199
     ],
     "parent_commit": "1ecf947baddd5ef78444670330e9db62128dad50",
     "cloud_snapshot": {
@@ -7456,7 +7456,7 @@
       "version": "v188",
       "track": "C",
       "direction_key": "v188-user-engine-sl-tp",
-      "status": "running",
+      "status": "rejected",
       "parent_versions": [
         "v185"
       ],
@@ -7469,9 +7469,36 @@
       "write_scope": "research/parallel/rounds/parallel-20260906-r2/v188",
       "worker_agent_id": "01a07748-5adc-7061-8052-0ed36705a8a8",
       "worker_host_id": "local",
-      "result_manifest": null,
+      "result_manifest": "research\\parallel\\rounds\\parallel-20260906-r2\\v188\\result_manifest.json",
       "registered_at": "2026-09-26T17:55:43.838352Z",
-      "assigned_at": "2026-09-26T17:55:43.838352Z"
+      "assigned_at": "2026-09-26T17:55:43.838352Z",
+      "result_manifest_sha256": "3456c908992ac383931d1bbf42595a49d3d70d49b72d9a9cb185a38ee450c1ed",
+      "result_summary": {
+        "scenarios": {
+          "normal": {
+            "monthly_geometric_net_percent": 3.533,
+            "max_drawdown_percent": 19.03,
+            "fills": 35882,
+            "months": 60
+          },
+          "fee_stress": {
+            "monthly_geometric_net_percent": 3.533,
+            "max_drawdown_percent": 19.03,
+            "fills": 35882,
+            "months": 60
+          },
+          "execution_stress": {
+            "monthly_geometric_net_percent": 3.533,
+            "max_drawdown_percent": 19.03,
+            "fills": 35882,
+            "months": 60
+          }
+        },
+        "independent_test": false,
+        "live_approved": false,
+        "audit_notes": "engine_user independently re-implemented: monthly within 0.06pp, selection/pass-fail identical, look-ahead PASS. Two conventions adopted from the audit afterwards (engine fix 2026-09-26): 1m-marked DD peaks now include intrabar highs (+0.27..0.89pp DD), and a stop on the held position wins a same-minute tie with a new fill."
+      },
+      "audited_at": "2026-09-26T18:37:57.937365Z"
     },
     {
       "version": "v189",
@@ -7813,7 +7840,7 @@
       "version": "v196",
       "track": "B",
       "direction_key": "v196-decoupled-books-sleeve-allocation",
-      "status": "running",
+      "status": "rejected",
       "parent_versions": [
         "v193"
       ],
@@ -7826,9 +7853,36 @@
       "write_scope": "research/parallel/rounds/parallel-20260906-r2/v196",
       "worker_agent_id": "01a07791-eecb-7053-8866-dcdbe31e84d7",
       "worker_host_id": "local",
-      "result_manifest": null,
+      "result_manifest": "research\\parallel\\rounds\\parallel-20260906-r2\\v196\\result_manifest.json",
       "registered_at": "2026-09-26T18:25:07.122401Z",
-      "assigned_at": "2026-09-26T18:25:07.122401Z"
+      "assigned_at": "2026-09-26T18:25:07.122401Z",
+      "result_manifest_sha256": "b383638fc8b73e3891f1b9e41d5e6883869bccdf020950f9cd97a45a9c390653",
+      "result_summary": {
+        "scenarios": {
+          "normal": {
+            "monthly_geometric_net_percent": 4.558,
+            "max_drawdown_percent": 19.44,
+            "fills": 39861,
+            "months": 60
+          },
+          "fee_stress": {
+            "monthly_geometric_net_percent": 4.558,
+            "max_drawdown_percent": 19.44,
+            "fills": 39861,
+            "months": 60
+          },
+          "execution_stress": {
+            "monthly_geometric_net_percent": 4.558,
+            "max_drawdown_percent": 19.44,
+            "fills": 39861,
+            "months": 60
+          }
+        },
+        "independent_test": false,
+        "live_approved": false,
+        "audit_notes": "Bit-exact on all rows; look-ahead PASS; S_FIX pre-registered; rejected."
+      },
+      "audited_at": "2026-09-26T18:30:55.364969Z"
     },
     {
       "version": "v197",
@@ -7850,7 +7904,49 @@
       "result_manifest": null,
       "registered_at": "2026-09-26T18:27:24.519886Z",
       "assigned_at": "2026-09-26T18:27:24.519886Z"
+    },
+    {
+      "version": "v198",
+      "track": "B",
+      "direction_key": "v198-tsmom-member",
+      "status": "running",
+      "parent_versions": [
+        "v196"
+      ],
+      "model_family": "time-series-momentum",
+      "objective": "Blend a vol-scaled 30/90/180-day time-series-momentum book with the v151 ML books (0/25/50%) under the v197 sleeve and the user's rules",
+      "data_contract": "4h opens, cached members, 1m majors, engine_user",
+      "policy_contract": "TSMOM sign ensemble, 0.20/vol/5 per asset clipped 0.5; select on first four years",
+      "hypothesis": "Trend following diversifies the ML books in bear/trend years where they are weak",
+      "parent_commit": "1ecf947baddd5ef78444670330e9db62128dad50",
+      "write_scope": "research/parallel/rounds/parallel-20260906-r2/v198",
+      "worker_agent_id": "01a07791-eecb-7053-8866-dcdbe31e84d7",
+      "worker_host_id": "local",
+      "result_manifest": null,
+      "registered_at": "2026-09-26T18:30:55.361898Z",
+      "assigned_at": "2026-09-26T18:30:55.361898Z"
+    },
+    {
+      "version": "v199",
+      "track": "C",
+      "direction_key": "v199-ladder-depth",
+      "status": "running",
+      "parent_versions": [
+        "v188"
+      ],
+      "model_family": "rule-sleeve-no-selection",
+      "objective": "Depth of the dip-sleeve ladder: (2.5-4), (2.5-4 + 5, 6), (3,4,5,6) sigma; corrected engine (intrabar peaks, stop-wins ties)",
+      "data_contract": "cached members, 1m majors, engine_user (post-audit fix)",
+      "policy_contract": "v197 selection otherwise; per-rung size fixed; select on first four years",
+      "hypothesis": "Deeper rungs capture the largest liquidation overshoots",
+      "parent_commit": "1ecf947baddd5ef78444670330e9db62128dad50",
+      "write_scope": "research/parallel/rounds/parallel-20260906-r2/v199",
+      "worker_agent_id": "01a07748-5adc-7061-8052-0ed36705a8a8",
+      "worker_host_id": "local",
+      "result_manifest": null,
+      "registered_at": "2026-09-26T18:37:57.935326Z",
+      "assigned_at": "2026-09-26T18:37:57.935326Z"
     }
   ],
-  "updated_at": "2026-09-26T18:27:24.522173Z"
+  "updated_at": "2026-09-26T18:37:57.937365Z"
 }

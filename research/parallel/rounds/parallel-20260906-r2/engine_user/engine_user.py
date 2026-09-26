@@ -68,7 +68,7 @@ def prepare(books, opens):
                 settle=settle_at_end)
 
 
-def simulate(books, opens, prep, m_sl=3.0, m_sleeve_sl=2.0, sleeve=True, target=0.25, cap=2.0, d_limit=D_LIMIT, win_end=60, sleeve_risk_budget=None, gap=0.02, m_sleeve_tp=1.0, rung_scale_fixed=None, size_mult=1.0):
+def simulate(books, opens, prep, m_sl=3.0, m_sleeve_sl=2.0, sleeve=True, target=0.25, cap=2.0, d_limit=D_LIMIT, win_end=60, sleeve_risk_budget=None, gap=0.02, m_sleeve_tp=1.0, rung_scale_fixed=None, size_mult=1.0, rungs=RUNGS):
     idx, cols = prep["idx"], prep["cols"]
     O, H, L, C = prep["O"], prep["H"], prep["L"], prep["C"]
     sig4, o1, o2, settle = prep["sig4"], prep["o1"], prep["o2"], prep["settle"]
@@ -80,7 +80,7 @@ def simulate(books, opens, prep, m_sl=3.0, m_sleeve_sl=2.0, sleeve=True, target=
     s = np.where(np.isnan(vol), 1.0, np.minimum(target / np.where(np.isnan(vol), 1.0, vol), cap))
     live = np.asarray((idx >= v110.START) & (idx < v110.END))
     mins = np.array([MIN_NOTIONAL.get(c, 5.0) for c in cols])
-    net, g, eq, eq_min = np.zeros(n), np.ones(n), np.ones(n), np.ones(n)
+    net, g, eq, eq_min, eq_max = np.zeros(n), np.ones(n), np.ones(n), np.ones(n), np.ones(n)
     w = np.zeros(na)            # position weights at bar start (fraction of equity, drifted)
     entry = np.full(na, np.nan)  # average entry price per asset
     stats = dict(fills=0, unfilled=0, stops=0, tps=0, rungs=0, rung_stops=0, rung_tps=0, liq=0, fees=0.0, funding=0.0)
@@ -94,6 +94,7 @@ def simulate(books, opens, prep, m_sl=3.0, m_sleeve_sl=2.0, sleeve=True, target=
         if not live[i] or not np.all(np.isfinite(o1[i])) or not np.all(np.isfinite(o2[i])):
             eq[i] = prev_eq
             eq_min[i] = prev_eq
+            eq_max[i] = prev_eq
             continue
         tgt = v99.W_BOOKS * s[i] * B[i] * g[i]
         sd = sig4[i] * np.sqrt(6)
@@ -155,7 +156,7 @@ def simulate(books, opens, prep, m_sl=3.0, m_sleeve_sl=2.0, sleeve=True, target=
                 qarr[mm:] = 0.0
                 cur_q, cur_e = 0.0, np.nan
 
-            seg_end = fill_min if fill_min < 240 else 240
+            seg_end = fill_min + 1 if fill_min < 240 else 240  # stop on the held position wins a same-minute tie (audit v188)
             ev = first_exit(cur_q, 0, seg_end)
             if ev is not None:
                 apply_exit(ev)
@@ -184,9 +185,9 @@ def simulate(books, opens, prep, m_sl=3.0, m_sleeve_sl=2.0, sleeve=True, target=
         # dip sleeve
         sleeve_pnl = 0.0
         if sleeve:
-            rn = (s[i] if rung_scale_fixed is None else rung_scale_fixed) * g[i] * size_mult * SIZE / len(RUNGS) / S_REF
+            rn = (s[i] if rung_scale_fixed is None else rung_scale_fixed) * g[i] * size_mult * SIZE / 4 / S_REF  # per-rung size fixed
             fills = []
-            for r, k in enumerate(RUNGS):
+            for r, k in enumerate(rungs):
                 for a in range(na):
                     if not np.isfinite(sig4[i][a]):
                         continue
@@ -236,6 +237,7 @@ def simulate(books, opens, prep, m_sl=3.0, m_sleeve_sl=2.0, sleeve=True, target=
         pnl = cash + sleeve_pnl
         eq[i] = prev_eq * (1 + pnl)
         eq_min[i] = prev_eq * (1 + min(0.0, float(path.min())))
+        eq_max[i] = prev_eq * (1 + max(0.0, float(path.max())))
         gross = float(np.abs(q * o2[i]).sum()) + (N_MAX if sleeve else 0.0)
         if 1 + float(path.min()) < MMR * max(gross, 1e-9):
             stats["liq"] += 1
@@ -243,10 +245,12 @@ def simulate(books, opens, prep, m_sl=3.0, m_sleeve_sl=2.0, sleeve=True, target=
         end_eq_rel = 1 + pnl
         w = np.where(np.isfinite(o2[i]), q * o2[i] / end_eq_rel, 0.0)
         net[i] = pnl
-    return summarize(idx, net, eq, eq_min, g, stats)
+    return summarize(idx, net, eq, eq_min, g, stats, eq_max)
 
 
-def summarize(idx, net, eq, eq_min, g, stats):
+def summarize(idx, net, eq, eq_min, g, stats, eq_max=None):
+    if eq_max is None:
+        eq_max = eq
     full = np.asarray((idx >= v110.START) & (idx < v110.END))
     years = []
     for a in ANCHORS:
@@ -254,17 +258,18 @@ def summarize(idx, net, eq, eq_min, g, stats):
         mk = np.asarray((idx >= a0) & (idx < a0 + pd.Timedelta(days=365)))
         first = int(np.argmax(mk))
         base = eq[first - 1] if first > 0 else 1.0
-        e, em = eq[mk] / base, eq_min[mk] / base
+        e, em, ex = eq[mk] / base, eq_min[mk] / base, eq_max[mk] / base
         years.append(dict(anchor=a, net_pct=round(100 * float(e[-1] - 1), 2),
                           monthly_pct=round(100 * float(e[-1] ** (1 / 12) - 1), 3),
-                          dd_1m_pct=round(100 * float(np.max(1 - np.minimum(e, em) / np.maximum.accumulate(np.concatenate([[1.0], e]))[1:])), 2),
+                          dd_1m_pct=round(100 * float(np.max(1 - np.minimum(e, em) / np.maximum.accumulate(np.concatenate([[1.0], np.maximum(e, ex)]))[1:])), 2),
                           mean_g=round(float(g[mk].mean()), 3)))
     first = int(np.argmax(full))
     base = eq[first - 1] if first > 0 else 1.0
-    e, em = eq[full] / base, eq_min[full] / base
+    e, em, ex = eq[full] / base, eq_min[full] / base, eq_max[full] / base
     peak = np.maximum.accumulate(np.concatenate([[1.0], e]))[1:]
+    peak1 = np.maximum.accumulate(np.concatenate([[1.0], np.maximum(e, ex)]))[1:]
     dd4 = float(np.max(1 - e / peak))
-    dd1 = float(np.max(1 - np.minimum(e, em) / peak))
+    dd1 = float(np.max(1 - np.minimum(e, em) / peak1))  # 1m-marked: peaks and troughs on the minute path (audit v188)
     geo5 = np.prod([1 + y["net_pct"] / 100 for y in years]) ** (1 / 5) - 1
     geo4 = np.prod([1 + y["net_pct"] / 100 for y in years[:4]]) ** (1 / 4) - 1
     out = dict(yearly=years,
