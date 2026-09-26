@@ -1,0 +1,158 @@
+{
+ "absolute_rules": [
+  "Verification only; no live orders, no cloud, no training/fitting/tuning/threshold changes",
+  "Causal past-only; sealed forward window stays sealed (no evals)",
+  "SMALL already-opened development slice only; GPU inference only for checkpoint forward passes (torch before pandas)",
+  "NEVER edit the OpenCode ledger or any Codex file",
+  "NEVER write outside: artifacts/research/opencode_r77_advisory/parity/verify_* + scripts/opencode_r77_verify*.py + tests/test_r77_verify.py + configs/opencode_r77_verify.json",
+  "PowerShell `; if ($?) {}` chaining",
+  "This config is a PRE-SPEC: written BEFORE any W1/W2 artifact existed; frozen before verification; no verification numbers claimed"
+ ],
+ "checkpoint_call_proof": {
+  "fields_required": [
+   "calls_on_slice >= 1",
+   "per_call timestamps + elapsed_ms",
+   "device + torch cuda counters or CPU-fallback note",
+   "checkpoint/model hash identity per call"
+  ],
+  "method": "W1 manifest inference-call log (authoritative) + harness cross-check: streaming decisions on slice are non-identical to any stored table AND denial run still predicts (proves forward pass, not cache)"
+ },
+ "comparison_branches": [
+  "normal (fee 0.0002/fill)",
+  "fee_stress (fee 0.00055/fill)",
+  "execution_stress (only if W2 declares support with explicit scenario matrix; otherwise recorded UNSUPPORTED and global PASS withheld)"
+ ],
+ "costs": {
+  "execution_stress": {
+   "fee_rate_per_fill": 0.0002,
+   "funding_interval_hours": 8,
+   "funding_long_rate": 0.0001,
+   "funding_short_rate": 0.0,
+   "note": "W2-defined stress deltas (latency/expiry/slippage); applied ONLY if W2 supports it"
+  },
+  "fee_stress": {
+   "fee_rate_per_fill": 0.00055,
+   "funding_interval_hours": 8,
+   "funding_long_rate": 0.0001,
+   "funding_short_rate": 0.0
+  },
+  "normal": {
+   "fee_rate_per_fill": 0.0002,
+   "funding_interval_hours": 8,
+   "funding_long_rate": 0.0001,
+   "funding_short_rate": 0.0
+  }
+ },
+ "coverage_rules": {
+  "forced_signals": 0,
+  "n_nonwait_stream_min": 1,
+  "wait_rows_emitted": 0
+ },
+ "dev_slice": {
+  "candles": "data/processed/swing_regime_research_v4/candles.parquet (already-opened development interval)",
+  "compute": "GPU inference only for checkpoint forward passes (local GTX1650; torch before pandas); engine rebuild + harness CPU",
+  "reference_signals": "artifacts/research/opencode_v15_mapensemble/confirmed_dd_guard/signals.parquet (harness-side reference ONLY, never on the streaming path)",
+  "slice": "decision rows [0, 40): first 40 decision grid points + full warmup history (all candles with close_time <= first slice signal_time). SMALL by design. Insufficient history is WARMUP, never a strategy WAIT",
+  "warmup_rule": "explicit per W1 manifest; adapter must refuse (WARMUP status) when history is short, never emit a silent WAIT",
+  "actual_slice": "artifacts/research/opencode_r77_advisory/runner/_inputs_candles_slice.parquet (37008 closed 5m bars 2022-01-01..2022-05-09; warmup 36864 -> 2 grid decisions, both WAIT)"
+ },
+ "expected_w1_runner": {
+  "cli": "scripts/opencode_r77_advisor.py (+ scripts/opencode_r77_advisor_core.py shared interfaces)",
+  "fresh_and_replay_share": [
+   "causal feature builder",
+   "checkpoint inference interface",
+   "decision adapter (explicit score/gate schema; no injected confidence=1.0; WAIT distinct from FLAT)",
+   "incremental FeedExecStrategy + FeedExecAccount on the STREAMING side (never run_backtest)"
+  ],
+  "manifest": "artifacts/research/opencode_r77_advisory/runner/replay_r29_slice/manifest.json (+ runner/summary.json; there is NO runner/manifest.json)",
+  "manifest_must_declare": [
+   "model_HASH + calibrator_HASH + config_HASH + source range/hash",
+   "UTC 6h anchor + stride rule (no positional-index-modulo identity)",
+   "streaming_engine name + class (MUST NOT be run_backtest; harness asserts this)",
+   "watermarks (decision watermark, frequency counters, cooldown, pending order, partial/open position, operating + independent control account, kill state, deterministic output IDs)",
+   "inference-call log (see checkpoint_call_proof)",
+   "observed_at/decision_time per record; WARMUP/OFF_CLOCK/STALE distinct from WAIT"
+  ],
+  "modes": [
+   "fresh (public klines, finite invocation, diagnostic-only past decisions never backdated to actionable alerts)",
+   "replay (raw candles -> features -> checkpoint -> decisions -> incremental fills -> equity)"
+  ],
+  "streaming_outputs": [
+   "signals journal (observed stream, once-only across repeated/overlapping/restart batches)",
+   "fills journal (per fill: quantity/remaining, price, timestamp, reason)",
+   "equity journal (gross/fees/funding/net per step + drawdown)",
+   "state snapshot (restart resume proof)"
+  ],
+  "outputs": "artifacts/research/opencode_r77_advisory/runner/{replay_r29_slice/,fresh_smoke/,summary.json,_inputs_candles_slice.parquet}"
+ },
+ "expected_w2_fixtures": {
+  "dir": "artifacts/research/opencode_r77_advisory/parity/fixtures/ (certified_expectations.json; convention is fixtures/ + certified file, not w2_* prefix)",
+  "fixtures_summary": "W2 must drop a fixtures summary manifest enumerating covered semantic cases",
+  "negative_controls": "W2 (or W3 test doubles) with deliberately wrong TP1 fraction / fee / entry timestamp / control routing MUST make parity FAIL",
+  "semantic_cases": [
+   "long AND short",
+   "TP1 then stop",
+   "TP1 then TP2",
+   "ambiguous entry/stop/target order within one OHLC bar (stop-first)",
+   "timeout exit",
+   "funding boundary (long pays 0.0001/8h; short zero)",
+   "entry expiry",
+   "pending-entry restart",
+   "partially-exited (post-TP1) position restart"
+  ]
+ },
+ "frozen_reference_policy": {
+  "branch": "confirmed_dd_guard",
+  "chain": "v29-iso4 (opencode_v02, bit-identical to published v30)",
+  "checkpoints": {
+   "fold_used": 10,
+   "loader": "safetensors ResidualTemporalValue residual_predict (batched, no_grad)",
+   "seeds": [
+    1729,
+    1730,
+    1731
+   ]
+  }
+ },
+ "hypothesis_id": "opencode-r77-stateful-advisory-verify",
+ "no_replay_inputs": {
+  "audit_method": "static-source-scan of W1 runner streaming-path sources (ALWAYS) + runtime file-access/denial audit (PREFERRED; fallback static-only with explicit downgrade label in summary.json)",
+  "forbidden_on_streaming_path": [
+   "predictions.npz / replay.npz / any stored prediction tables",
+   "signals.parquet / decisions.parquet / decision_indices",
+   "control CSV/parquet / normal_trades.csv / baseline_trades (control exits recomputed incrementally, never loaded)",
+   "any prerecorded signal/control/prediction table fed to inference"
+  ],
+  "reference_may_load": "the comparison HARNESS (scripts/opencode_r77_verify*.py, tests/test_r77_verify.py) is explicitly allowed to load reference artifacts; the ban applies to the W1 streaming/inference path only"
+ },
+ "pass_rules": {
+  "negative_controls_fail": "each deliberately-wrong double (TP1 fraction, fee, entry timestamp, control routing) MUST yield parity FAIL (proves the verifier is sensitive; matching two invocations of one engine is insufficient)",
+  "no_replay": "zero forbidden-input loads on the streaming path (static scan) AND denial run still yields actual predictions (runtime proof)",
+  "portfolio_match": "per-branch final equity AND per-trade equity path within 1e-6; trade counts equal; each fill compared (quantity/remaining, gross, fees, funding, net, timestamps)",
+  "signal_identity": "streaming signal set bit-identical to batch reference on key cols (bar_index, signal_time, direction, entry_limit, stop_loss, take_profit_1/2, holding_bars, leverage, entry_expiry_bars, tp1_fraction) \u00e2\u20ac\u201d absolute, no tolerance"
+ },
+ "restart_rules": {
+  "cases": [
+   "kill/resume mid-slice with pending entries",
+   "kill/resume with partially-exited (post-TP1) position"
+  ],
+  "pass": "fills identical + equity identical vs uninterrupted consumption of the same OBSERVED stream; reuse W1/W2 restart proofs if present, else W3's own"
+ },
+ "status": "PRE-SPEC + VERIFY-AMENDMENT-1 (paths corrected 2026-09-11; frozen values unchanged; verification numbers in parity/verify_*.json)",
+ "streaming_side_ban": "The streaming leg MUST NOT call run_backtest (Codex blocker B2: equal signals through the same engine prove nothing). Batch reference = verbatim ohlc-v2 run_backtest (harness side ONLY). Streaming equity = W1 incremental account/strategy journals. Harness asserts the W1 streaming module has zero references to run_backtest.",
+ "tolerances": {
+  "equity_tol": 1e-06,
+  "signal_identity_tol": 0.0
+ },
+ "path_corrections": {
+  "runner_cli_expected": "scripts/opencode_r77_runner.py",
+  "runner_cli_actual": "scripts/opencode_r77_advisor.py + scripts/opencode_r77_advisor_core.py",
+  "manifest_expected": "artifacts/research/opencode_r77_advisory/runner/manifest.json",
+  "manifest_actual": "artifacts/research/opencode_r77_advisory/runner/replay_r29_slice/manifest.json (+ runner/summary.json)",
+  "w2_expected": "parity/w2_* files",
+  "w2_actual": "parity/fixtures/certified_expectations.json"
+ },
+ "amendments": [
+  "2026-09-11 W3-VERIFY amendment 1 (leader-verified on disk): corrected W1/W2 paths above; all frozen values (policy, costs, tolerances, pass rules) UNCHANGED; verification numbers live in parity/verify_*.json, never in this config"
+ ]
+}

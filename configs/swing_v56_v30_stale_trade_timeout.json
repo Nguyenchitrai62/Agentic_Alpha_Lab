@@ -1,0 +1,13 @@
+{
+  "schema_version": 1,
+  "experiment_id": "v56",
+  "signal_path": "immutable v29 residual GRU plus v30 isotonic-4",
+  "leverage": 1.0,
+  "stale_trade_rule": {"hours_after_fill": 72, "close_fraction": 0.5, "condition": "TP1 not confirmed", "execution": "next candle open", "remaining_position": "original stop, targets and timeout"},
+  "fees": {"normal_per_fill": 0.0002, "stress_per_fill": 0.00055},
+  "funding": {"long_per_8h": 0.0001, "short_per_8h": 0.0},
+  "validation": {"embargo_days": 8, "post_hoc_tuning": false, "scenarios": ["normal", "fee_stress", "execution_stress"]},
+  "cloud": {"allowed": false},
+  "independent_test": false,
+  "live_approved": false
+}

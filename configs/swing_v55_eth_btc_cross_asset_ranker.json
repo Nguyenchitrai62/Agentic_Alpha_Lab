@@ -1,0 +1,56 @@
+{
+  "schema_version": 1,
+  "experiment_id": "v55",
+  "parent_versions": ["v46", "v53"],
+  "data": {
+    "target_symbol": "BTCUSDT",
+    "context_symbol": "ETHUSDT",
+    "market": "Binance USD-M",
+    "interval": "5m",
+    "source_start": "2022-01-01T00:00:00Z",
+    "source_end": "2026-03-23T00:00:00Z",
+    "decision_count": 4076,
+    "candidate_count_per_decision": 16,
+    "feature_windows_bars": [1, 3, 12, 48],
+    "feature_families": ["eth_return", "eth_range", "eth_realized_volatility", "eth_btc_relative_return", "eth_btc_correlation", "eth_btc_beta", "eth_lead_lag"],
+    "missing_policy": "explicit mask; no forward fill",
+    "as_of": "only completed ETH candle t no later than closed BTC candle t"
+  },
+  "validation": {
+    "folds": 11,
+    "training_window_days": 730,
+    "validation_days": 90,
+    "embargo_days": 8,
+    "transforms": "train only"
+  },
+  "probe": {
+    "candidate": "matched regularized BTC action ranker with ETH cross-asset context",
+    "control": "matched BTC-only regularized action ranker",
+    "minimum_source_coverage_percent": 99.0,
+    "minimum_rank_spearman_improvement": 0.01,
+    "minimum_relative_fill_brier_improvement": 0.01,
+    "future_mutation_invariance_required": true
+  },
+  "policy": {
+    "minimum_predicted_utility_percent": 0.0,
+    "minimum_fill_probability": 0.25,
+    "cooldown_days": 5,
+    "maximum_signals_per_month": 4,
+    "leverage": 1.0,
+    "post_hoc_tuning": false
+  },
+  "cloud": {
+    "provider": "private Kaggle/free GPU",
+    "maximum_jobs": 1,
+    "allowed_only_after_local_provenance_and_causality_gate": true,
+    "leader_approval_required": true
+  },
+  "evaluation": {
+    "scenarios": ["normal", "fee_stress", "execution_stress"],
+    "minimum_fills": 30,
+    "maximum_drawdown_percent": 20.0,
+    "minimum_monthly_geometric_return_percent": 5.0,
+    "independent_test": false,
+    "live_approved": false
+  }
+}

@@ -1,0 +1,69 @@
+{
+  "roll_version": "r79_roll/1",
+  "state_version": "r78_roll_state/1",
+  "supersedes": "r78_roll/2 (configs/opencode_r78_roll.json is FROZEN and unaltered; behavior changes are breaking and live here)",
+  "version_choice": "r79_roll/1 (not r78_roll/3): the bootstrap/missed-clock/validity/provenance changes are intentionally breaking vs r78_roll/2 semantics (fresh replay ingests that previously settled actionable intents are now diagnostic-only). A new major version prevents silent comparison of r78 vs r79 numbers.",
+  "advisor_config": "configs/opencode_r77_advisor.json",
+  "inference_prespec": "configs/opencode_r76_infer.json",
+  "policy_contract": "FROZEN policy only (confirmed_dd_guard, v29-iso4 chain). No threshold/architecture/frequency/ensemble changes. This module repairs the R77 runner-level rolling/state interface only; strategy/execution semantics are imported UNMODIFIED from scripts/opencode_r77_advisor_core.py. No R77/core edits in this round.",
+  "timeliness_policy": {
+    "stale_after_bars": 24,
+    "bar_seconds": 300,
+    "stale_after_description": "signals older than 24 closed 5-minute bars (2h) past their decision bar are DIAGNOSTIC-only, never actionable alerts/intents",
+    "rationale": "Pre-specified BEFORE implementation (unchanged from r78). N-decay ladder evidence (round10 v40: edge survives to d24/2h at +89%, dead at d48/4h) bounds the honest actionability horizon at (2h,4h]; 24 bars is the conservative end. NOTE (r79): this 24-bar rule is an OUTER bound only. It does NOT authorize retroactive next-bar execution on historical bars; the missed-clock rule below binds first.",
+    "enforcement": "decision_time more than stale_after_bars*bar_seconds behind the current observation instant forces DIAGNOSTIC-only (gates untouched). Missed-clock (decision bar precedes the latest new bar of the ingest) forces DIAGNOSTIC-only independently of age."
+  },
+  "missed_clock_policy": {
+    "rule": "Only decisions ON the latest new bar of an ingest may be actionable. Every earlier catch-up decision is DIAGNOSTIC-only: its entry window (signal_bar+1 onward) already passed before the decision actually became available, so simulating a fill is backtest fiction.",
+    "choice": "diagnostic-only. NO separately-versioned delayed-entry policy is shipped in r79.",
+    "rationale": "A late-placed limit order is a different execution (different queue position, different available prices) from the original next-bar entry; without a delayed-entry execution model versioned and shared with its batch reference, the only honest handling is diagnostic-only. A 2h signal-age rule alone is insufficient: a 65-minute-old signal (leader r78 repro) is 'timely' yet its entry bar long passed.",
+    "preserved": "Already-observed pending/open positions settle causally through catch-up bars (observe_bar with raw=None advances accounts); historical fills are never silently rewritten."
+  },
+  "reconcile": {
+    "identity": "market (symbol/interval) + open_time UTC; positional-index modulo FORBIDDEN",
+    "clock": "6h UTC grid from open_time via r77 core.on_grid (absolute grid, never positional)",
+    "expected_bar_seconds": 300,
+    "gap_policy": "FAIL CLOSED with pause: a gap stays UNRESOLVED until a seen candle open falls strictly inside its missing (after, before) range (verified backfill). Every new row at/after the earliest unresolved gap boundary is PAUSED: zero economic settlement, zero actionable intents, no gate consumption; the seen-key is flagged uncommitted and replays deterministically with its ORIGINAL exec_idx after backfill (exactly-once, no duplicates). Missing bars are NEVER synthesized and positions are NEVER settled through unobserved price paths. The pause persists across ingests until backfill; both empty and open portfolios are covered.",
+    "revision_policy": "historical OHLC revision on an already-settled bar is recorded as a revision event; the settled record is kept (no silent overwrite, no re-settlement). Additionally (r79): any ingest carrying revisions forces the WHOLE ingest diagnostic-only, because the inference frame consumes the full window and revised bytes must not reach inference silently.",
+    "forming_policy": "bars with close_time > observed_at are forming and excluded from settlement AND from the inference frame",
+    "nonfinite_policy": "bars with non-finite OHLC/volume are rejected (INCOMPLETE), excluded from settlement AND from the inference frame; an ingest with non-finite rows or a market mismatch forces diagnostic-only (fail closed)",
+    "invalid_recovery": "restored (backfilled) data recovers by resuming with the complete window: missing keys settle as new rows in time order, paused bars replay with original exec_idx, identity map prevents duplicates"
+  },
+  "bootstrap": {
+    "rule": "Fresh bootstrap observation starts at the ACTUAL observed_at (fetch instant). Every pre-observation inference is DIAGNOSTIC-only: zero actionable intents, fills, gate consumption, funding or account PnL from historical warmup. Warmup may prime read-only feature state only.",
+    "explicit_times": ["observation_time (fetch instant)", "decision_time (bar close)", "earliest_entry_time (signal_bar+1 open, engine-enforced)"],
+    "replay_note": "Replay mode is rehearsal, not observation: a fresh replay ingest likewise starts at its observed_at, so historical bars never produce actionable intents there either."
+  },
+  "raw_provenance": {
+    "rule": "Every ingest writes its own immutable snapshot raw_ingest_<UTC-ts>_<sha8>_g<gen>.parquet (never a write-once-shared file). Each commit associates EXACTLY the bytes consumed (sha256 + first_open/last_close/row_count). The append-only ingest_manifest.jsonl records per ingest: ingest_id, kind (bootstrap/resume, FRESH-OBSERVATION vs REHEARSAL-NOT-LIVE), observed_at, range, sha256, prev_sha256, generation (bootstrap/resume observation times + lineage).",
+    "legacy": "Pre-r79 out dirs may contain a write-once raw_candles.parquet; r79 never writes it and never hashes it as the consumed bytes."
+  },
+  "checkpoint": {
+    "scheme": "generation-counter + atomic rename (temp file + fsync + os.replace) + append-only JSONL journal + CURRENT pointer; exports rebuilt from journal without re-emitting",
+    "files": ["checkpoint-<gen>.json", "CURRENT", "journal.jsonl", "ingest_manifest.jsonl", "raw_ingest_*.parquet", "exports/"],
+    "corrupt_policy": "corrupt/truncated CURRENT or checkpoint fails clearly (names the file+generation) or recovers from the last verified generation; never resume on unverified bytes"
+  },
+  "identity_verification": {
+    "rule": "hash actual file BYTES on resume (never accept a declared hash when bytes differ); any change forces an explicit new run (refuse resume naming the field)",
+    "pinned_files": [
+      "scripts/opencode_r77_advisor_core.py",
+      "scripts/opencode_r77_advisor.py",
+      "scripts/opencode_r78_roll.py",
+      "configs/opencode_r77_advisor.json",
+      "configs/opencode_r79_roll.json",
+      "configs/opencode_r76_infer.json"
+    ],
+    "note": "checkpoint/calibrator model bytes listed in the prespec are also hashed when present on disk; missing model files fail closed (no stub substitution in production paths)"
+  },
+  "upstream_fix_map": {
+    "note": "W1 may NOT edit r77/v21 files. The fixed logic lives in scripts/opencode_r78_roll.py importing theirs. R77/core edits still needed by the leader (Track A does NOT make them):",
+    "fixes": [
+      "scripts/opencode_r77_advisor.py:108 start_bar = last_bar_idx + 1, then :178-185 start_bar >= len(df) returns 'nothing new' forever on same-length shifted windows; watermark timestamps saved but never used for suffix selection -> select unseen by (symbol/interval/open_time) identity instead",
+      "scripts/opencode_r77_advisor.py:190-209 raw_by_bar keyed by local positional bar_index + df.iloc[start_bar:] positional slicing with idx_offset=start_bar assumes stable cache origin -> map local inference indices to stable execution indices via open_time identity",
+      "scripts/opencode_r77_advisor.py:69-71,180-181,213-214 direct state_path.write_text overwrites with outputs written separately afterwards -> atomic temp+rename checkpoint + append-only journal + export rebuild from journal",
+      "scripts/opencode_r77_advisor_core.py:674-688 identity_block carries declared hashes with no byte verification on resume -> hash actual bytes before resuming; refuse on mismatch naming the field",
+      "scripts/opencode_r77_advisor.py fresh+replay main: shadow/observation anchored at first historical close (same backdate class as the r78_roll bug fixed in r79) -> anchor observation at the actual fetch/observation instant; pre-observation inference diagnostic-only",
+      "scripts/opencode_r77_advisor_core.py observe path: no missed-clock / gap-pause / revision-contamination guards at the strategy layer (currently enforced only in the r79 roll wrapper) -> port or mirror the r79 validity rules if the R77 CLI stays supported"
+    ]
+  }
+}

@@ -1,5 +1,41 @@
 # Handoff for the next coding agent
 
+ROUND parallel-20260906-r2 (2026-09-26, latest): use the Claude skill `/alpha-lab-leader` (.claude/skills/alpha-lab-leader,
+research-map.md has the full state). Best realistic candidate v144 (3.37%/month, full-path DD 19.6%, realistic 1m
+execution, governor, target 0.25 ex post), frozen in scripts/v144_advisor.py; also logged v99/v104/v115/v127/v133.
+Next: v150 Deribit options-flow features once data/raw/deribit_opt_20260926/BTC_options_4h.parquet exists
+(research/mj/fetch_deribit_options_4h.py BTC 2019-01-01; resumable monthly cache).
+
+ROUND parallel-20260906-r2 now holds v89/v90/v91 (see CONTINUOUS_RESEARCH.md top). Next: audit v89
+(OpenCode blind audit), then rotate v89 -> v92 (pooled majors model with 2017+ spot history and
+ex-ante vol-targeted sizing). v90 Kaggle package must be reviewed by the leader before any submit.
+
+HIDDEN-YEAR PROGRAM (2026-09-24, user protocol): read `RESEARCH_VF_RESULTS.md`.
+Train/select on all data before 2025-09-14, hide 2025-09-24..2026-09-23, replay.
+Lead candidate `vf_combo_fast20_don55_10_w0.5_k0.65`: hidden year +13.0% normal
+/ +8.1% stress, DD 9.0%, 5/5 real years positive; audited blind (W9) and by
+truncated replay. ~55 configs scored on the same hidden year; the trend variants
+are statistically indistinguishable (rank corr 0.12). Patterns, indicators,
+positioning, breadth, macro, DVOL, seasonality, HGB and TCN+GRU models all
+failed to add robust value. Forward tournament of 5 frozen families logs every
+4h via `scripts/advisor_shadow.py` (breadth family needs live alt data: TODO).
+
+PATTERN LAB r1-r4 (2026-09-24): read `RESEARCH_PATTERN_LAB_RESULTS.md`. Candle,
+chart and indicator features gave no model skill (AUC ~0.5); pattern models
+failed the opened-year check. Frozen candidate `pattern_lab_r4_R0_scaled_0.65`
+(4h EMA20/200 ribbon long, daily-ribbon entry gate, size 0.65) PASSED:
+opened year +13.6% / +7.4% stress, DD 10.7%, 48 trades. The BTC opened year is
+now fully spent; only prospective rows from `scripts/advisor_shadow.py`
+(mode=prospective) are clean evidence. No live orders.
+
+MA RIBBON R1 (2026-09-24, user request): read `RESEARCH_MA_RIBBON_R1_RESULTS.md`.
+Pre-registered daily SMA50/SMA200 ribbon long/short (H4) passed the research
+gate on the now-OPENED holdout year (+31.3% normal, +28.1% stress, DD 18.7%;
+22.6% DD under daily-rebalanced sizing). Plain golden/death cross and all ML
+rows failed. Only prospective data is clean now: run
+`research/opencode_r82_ma_replication/shadow_log.py` daily; count only
+`mode=prospective` rows. No live orders, 1x only.
+
 V44 COMPLETE/REJECTED: read `RESEARCH_V44_RESULTS.md`. The causal v29
 meta-ranker produced only0.218%/month in execution stress,24.745% DD, and66
 fills; do not repeat this meta-HGB path without a new representation.

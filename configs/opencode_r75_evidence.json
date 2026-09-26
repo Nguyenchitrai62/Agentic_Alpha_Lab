@@ -1,0 +1,80 @@
+{
+  "round": "round75_codex_assigned / worker A-EVIDENCE",
+  "objective": "Evidence + evaluation contract only (analysis/code, read-only on artifacts). No training/fitting/tuning, no live orders, no cloud.",
+  "output_dir": "artifacts/research/opencode_r75_practical/evidence/",
+  "claim_families": [
+    {
+      "family": "v30-iso4 calibration",
+      "artifact_dir": "artifacts/research/opencode_v02_reproduce_v30",
+      "key_files": ["plan.json", "summary.json", "isotonic_4/calibrators.json"],
+      "selection_dependencies": ["v29 residual-GRU checkpoints (artifacts/kaggle/v29_download, gitignored); iso windows 1/2/4/all fixed pre-probe per plan.json registration note"],
+      "known_test_range": "development interval 2023-2026 opened (frozen majority_1x signals 2023-09-10/2026-03-11 per forward protocol note)"
+    },
+    {
+      "family": "majority/confirmed ensemble",
+      "artifact_dir": "artifacts/research/opencode_v15_mapensemble",
+      "key_files": ["config.json", "summary.json"],
+      "selection_dependencies": ["v30-iso4 maps (iso2/iso4/isoall vote); unanimous/majority/confirmed compared on same development interval; confirmed_dd_guard selected after observing DD-safe monthly"],
+      "known_test_range": "same 2023-2026 development interval (control anchor +122.80% total / -20.09% DD / 65 trades reference)"
+    },
+    {
+      "family": "L3 pipeline",
+      "artifact_dir": "artifacts/research/opencode_v75_L3real",
+      "key_files": ["config.json", "summary.json", "gatecheck_official.json"],
+      "selection_dependencies": ["L1 pool v72 union (v38+v33+majority) -> L2 s0004 filter v73 -> L3 dd_guard/tp075 risk stage; MAE-stop killed (97% monthly loss); dd+tp075 chosen after observing DD-safe monthly"],
+      "known_test_range": "2023-2026 development interval (L1 pool 326 sigs/131 fills; control_1x 101 trades)"
+    },
+    {
+      "family": "v33 calibrations",
+      "artifact_dir": "artifacts/research/opencode_v42_v33cal",
+      "key_files": ["config.json", "summary.json"],
+      "selection_dependencies": ["v33 action-margin GRU predictions (v33d replay); percentile-gate rescue observed turning -5.9% into +87%/1.88%/mo; chosen post-hoc"],
+      "known_test_range": "2023-2026 development interval"
+    },
+    {
+      "family": "v38 calibrations",
+      "artifact_dir": "artifacts/research/opencode_v59_v38cal",
+      "key_files": ["config.json", "summary.json"],
+      "selection_dependencies": ["v38 rankloss predictions (rank +0.066, bias +3.81); isoall rescue +57%/+83% observed; percentile-gate HURTS ranked models (closed)"],
+      "known_test_range": "2023-2026 development interval"
+    },
+    {
+      "family": "v41 valfit calibration",
+      "artifact_dir": "artifacts/research/opencode_v112_v41valfit",
+      "key_files": ["config.json", "summary.json"],
+      "selection_dependencies": ["v41 rank +0.0727 predictions; TRUE held-out val per fold (33 val + 33 test); valfit chosen after observing identity DD-breach"],
+      "known_test_range": "2023-2026 development interval, per-fold val/test split"
+    },
+    {
+      "family": "v55c/v55bfix/student calibrations",
+      "artifact_dir": "artifacts/research/opencode_v97_v55ccal",
+      "key_files": ["config.json", "summary.json"],
+      "selection_dependencies": ["ranking-SSM predictions; calibration overlays after identity observed"],
+      "known_test_range": "2023-2026 development interval",
+      "sibling_dirs": ["artifacts/research/opencode_v121_v55bfixcal", "artifacts/research/opencode_v140_v137cal"]
+    },
+    {
+      "family": "forward OOS evals",
+      "artifact_dir": "artifacts/research/opencode_v159_fwdevaltop3",
+      "key_files": ["config.json", "summary.json", "SHA256SUMS.txt"],
+      "selection_dependencies": ["top-3 deployable-shaped books chosen AFTER observing full development history (majority/confirmed/L3/band2); sealed window 2026-03-23/2026-09-08 opened by v158 re-extend; returns observed exactly once per candidate per protocol"],
+      "known_test_range": "sealed forward window approx 2026-03-23 through 2026-09-08 (679 decisions, 48819 forward candles)",
+      "sibling_dirs": ["artifacts/research/opencode_v135_fwdeval38", "artifacts/research/opencode_v138_fwdeval33", "artifacts/research/opencode_v152_fwdevalmae", "artifacts/research/opencode_v154_fwdmaj", "artifacts/research/opencode_v156_oosdecomp", "artifacts/research/opencode_v158_reextend", "artifacts/research/opencode_v160_sealprep"]
+    },
+    {
+      "family": "paper rehearsals",
+      "artifact_dir": "artifacts/research/opencode_paper_v21",
+      "key_files": ["summary.json", "paper_v21_intents_x3_summary.json", "paper_v21_intents_drill_x3_summary.json"],
+      "selection_dependencies": ["paper-trader v2.1 components; rehearsal policies distinct from v159 top-3 candidates (identity/parity gap per assignment finding 3)"],
+      "known_test_range": "Track-C 265311-bar replay window + operating x2/x3 runs",
+      "sibling_dirs": ["artifacts/research/opencode_paper_combo", "artifacts/research/opencode_paper_38iso", "artifacts/research/opencode_v160_realistic"]
+    },
+    {
+      "family": "round72 Regime-MoE rejection",
+      "artifact_dir": "artifacts/research/opencode_v159_regimemoe",
+      "key_files": ["summary.json", "watch_log.jsonl"],
+      "selection_dependencies": ["v100/v101/v103 lineage (taus verbatim v101, opt_B rule verbatim v103); single-expert reference v145b"],
+      "known_test_range": "DEV-ONLY pre-2026-03-23 (trailing 730d, embargo 8d, FIXED 16ep)"
+    }
+  ]
+}

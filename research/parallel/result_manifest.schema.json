@@ -1,0 +1,91 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Parallel BTC research result manifest",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "experiment_id",
+    "track",
+    "status",
+    "parent_commit",
+    "hypothesis",
+    "hashes",
+    "chronology",
+    "scenarios",
+    "independent_test",
+    "live_approved",
+    "audit"
+  ],
+  "properties": {
+    "schema_version": {"const": 1},
+    "experiment_id": {"pattern": "^v(4[5-9]|[5-9][0-9]|[1-9][0-9]{2,})$"},
+    "track": {"enum": ["A", "B", "C"]},
+    "status": {"enum": ["audited", "accepted", "rejected", "blocked"]},
+    "parent_commit": {"pattern": "^[0-9a-f]{40}$"},
+    "hypothesis": {"type": "string", "minLength": 20},
+    "hashes": {
+      "type": "object",
+      "required": ["data", "config", "code"],
+      "properties": {
+        "data": {"type": "object"},
+        "cache": {"type": "object"},
+        "config": {"type": "object"},
+        "code": {"type": "object"},
+        "checkpoint": {"type": "object"}
+      },
+      "additionalProperties": false
+    },
+    "chronology": {
+      "type": "object",
+      "required": ["fold_type", "embargo_days", "decision_start", "decision_end"],
+      "properties": {
+        "fold_type": {"type": "string"},
+        "embargo_days": {"type": "number", "minimum": 8},
+        "decision_start": {"type": ["string", "null"]},
+        "decision_end": {"type": ["string", "null"]}
+      },
+      "additionalProperties": true
+    },
+    "scenarios": {
+      "type": "object",
+      "required": ["normal", "fee_stress", "execution_stress"],
+      "additionalProperties": {
+        "type": "object",
+        "required": [
+          "gross_pnl",
+          "fees",
+          "funding",
+          "net_pnl",
+          "max_drawdown_percent",
+          "fills",
+          "coverage_percent",
+          "monthly_geometric_return_percent"
+        ]
+      }
+    },
+    "independent_test": {"type": "boolean"},
+    "live_approved": {"const": false},
+    "cloud": {
+      "type": "object",
+      "properties": {
+        "provider": {"type": ["string", "null"]},
+        "job_id": {"type": ["string", "null"]},
+        "submission_count": {"type": "integer", "minimum": 0, "maximum": 1},
+        "quota_checked_at": {"type": ["string", "null"]},
+        "approval_boundary": {"enum": ["not_needed", "allowed", "blocked"]}
+      },
+      "additionalProperties": true
+    },
+    "audit": {
+      "type": "object",
+      "required": ["passed", "replay_complete", "notes"],
+      "properties": {
+        "passed": {"type": "boolean"},
+        "replay_complete": {"type": "boolean"},
+        "notes": {"type": "string"}
+      },
+      "additionalProperties": true
+    }
+  },
+  "additionalProperties": true
+}

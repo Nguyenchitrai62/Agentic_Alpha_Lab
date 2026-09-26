@@ -1,0 +1,12 @@
+{
+  "schema_version": 1,
+  "experiment_id": "v59",
+  "signal_path": "immutable v29 residual GRU plus v30 isotonic-4",
+  "sizing": {"formula": "1.0 + clip((score - 0.3) / 1.7, 0, 1)", "maximum_leverage": 2.0, "tuning": false},
+  "market_data": {"symbol": "BTCUSDT", "market": "Binance USD-M", "interval": "5m", "mark_price_required": true, "historical_funding_required": true, "publication_as_of_required": true, "gap_policy": "explicit mask or reject"},
+  "liquidation": {"price_source": "official mark price", "maintenance_margin_tiers": "documented BTCUSDT brackets captured with provenance", "intrabar_policy": "adverse mark-price high/low, stop-first"},
+  "validation": {"embargo_days": 8, "post_hoc_tuning": false, "scenarios": ["normal", "fee_stress", "execution_stress"], "minimum_fills": 30, "minimum_monthly_geometric_return_percent": 5.0, "maximum_drawdown_percent": 20.0},
+  "cloud": {"allowed": false},
+  "independent_test": false,
+  "live_approved": false
+}

@@ -1,0 +1,38 @@
+{
+  "id": "pattern_lab_r1",
+  "registered_at": "2026-09-24",
+  "question": "Do candlestick patterns, classical chart patterns and indicators, used as model features (and as standalone events), give a net-positive BTC trade-suggestion pipeline?",
+  "data": "data/raw/ma_ribbon_20260924 (Binance USD-M BTCUSDT 1h/4h/1d + funding), via agentic_alpha_lab.patterns.common.load_bars",
+  "windows": {
+    "development_decisions": ["2019-09-08", "2025-09-13"],
+    "selection_validation": ["2024-01-01", "2025-09-13"],
+    "opened_year_check": ["2025-09-24", "2026-09-22"],
+    "opened_year_status": "Opened on 2026-09-24 by ma_ribbon_r1 (only H1-H4 rows). Used here once, for pre-registered final pipelines only. Labelled 'opened-year check', not a pristine test.",
+    "prospective": "append-only shadow log from the day a pipeline is frozen"
+  },
+  "worker_rules": [
+    "Feature workers never set include_opened_year=True and never read bars at or after 2025-09-24.",
+    "Every compute/events function passes agentic_alpha_lab.patterns.common.assert_causal on real 1h, 4h and 1d development bars.",
+    "Chart-pattern pivots become available only after their confirmation bars have closed.",
+    "Event studies use common.event_study (development decisions, BH-FDR, half-stability)."
+  ],
+  "labels": {
+    "decision_tf": "4h primary, 1d secondary",
+    "triple_barrier": "entry at next open; long and short labelled separately; take-profit 2*ATR14 and stop 1*ATR14 from entry; timeout 12 bars (4h) or 10 bars (1d); stop-first when both touched in one bar; timeout label = sign of net move"
+  },
+  "model": {
+    "estimator": "sklearn HistGradientBoostingClassifier(max_depth=4, learning_rate=0.03, max_iter=400, min_samples_leaf=100, l2_regularization=1.0, random_state=0), one per side",
+    "feature_sets": ["base (returns, volatility, MA ribbon distances, daily context)", "base+candles", "base+chart", "base+indicators", "all"],
+    "walk_forward": "expanding, refit every 90 days, first prediction 2021-01-01, embargo 12 bars after the last realized label",
+    "policy": "enter side with the larger probability if it exceeds threshold; one position at a time; bracket exits TP/SL/timeout as in labels",
+    "threshold_grid": [0.40, 0.45, 0.50, 0.55, 0.60],
+    "threshold_selection": "maximize selection_validation net (normal costs) subject to >= 30 trades; ties -> higher threshold",
+    "gating_variants": ["ungated", "daily ribbon gate (long only if close>SMA50>SMA200 on last closed day, short only if close<SMA50<SMA200)"]
+  },
+  "costs": "same as ma_ribbon_r1: fee 0.0002 per fill normal; stress 0.0006 fee + 0.0005 slippage; long funding 0.0001 per 8h, short 0; 1x compounded from 100",
+  "acceptance": {
+    "development": "walk-forward 2021-01-01..2025-09-13 net > 0 under stress, Sharpe above buy-and-hold over same window, >= 100 trades",
+    "opened_year_check": "net > 0 under normal and stress, intrabar DD <= 20%, >= 30 trades",
+    "then": "freeze and start prospective shadow; no live orders; 3% monthly reported as aspiration only"
+  }
+}

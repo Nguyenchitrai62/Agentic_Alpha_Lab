@@ -1,0 +1,45 @@
+{
+  "schema_version": 1,
+  "experiment_id": "v62",
+  "parent_experiment": "v57",
+  "architecture_and_data": "identical hash-verified v57 selective SSM, matched control, candidate grid and causal v46 base plus mark/index/funding inputs",
+  "variants": {
+    "small_same_data_parameters": 4863365,
+    "large_same_data_parameters": 26786181,
+    "matched_optimizer_steps_per_fold": 2000
+  },
+  "chronology": {
+    "fold_count": 11,
+    "embargo_days": 8,
+    "labels_mature_before_refit": true,
+    "train_only_transforms": true
+  },
+  "training_budget": {
+    "seed": 1762,
+    "maximum_optimizer_steps_per_fold": 2000,
+    "micro_batch_size": 2,
+    "gradient_accumulation": 8,
+    "effective_batch_size": 16,
+    "mixed_precision": true,
+    "checkpoint_selection": "last fixed step",
+    "early_stopping": false,
+    "maximum_wall_clock_hours": 11.0,
+    "abort_without_result_before_hours": 11.5,
+    "maximum_private_kaggle_jobs": 1,
+    "local_heavy_training": false
+  },
+  "transport": {
+    "format": "flat expanded files",
+    "zip_required_at_runtime": false,
+    "credentials_in_bundle": false,
+    "private_dataset_and_kernel": true
+  },
+  "evaluation": {
+    "scenarios": ["normal", "fee_stress", "execution_stress"],
+    "minimum_fills": 30,
+    "minimum_monthly_geometric_return_percent": 5.0,
+    "maximum_drawdown_percent": 20.0,
+    "independent_test": false,
+    "live_approved": false
+  }
+}

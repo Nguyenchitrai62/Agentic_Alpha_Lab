@@ -1,0 +1,70 @@
+{
+  "accept_version": "r78_accept/1",
+  "mode_label": "SIMULATED/PAPER-research-advisor",
+  "exploratory": true,
+  "allow_live_orders": false,
+  "role": "W3 independent acceptance + execution stress (round78_codex_rolling)",
+  "frozen_policy": {
+    "policy_id": "confirmed_dd_guard",
+    "advisor_config": "configs/opencode_r77_advisor.json",
+    "runner_cli": "scripts/opencode_r77_advisor.py",
+    "runner_contract": "--mode replay --config <cfg> --candles <parquet-in-repo> --out <dir> [--resume]; fresh uses --candles live",
+    "execution": "ohlc-v2 via scripts/opencode_r76_feedexec.py FeedExecAccount (imported, NOT reimplemented); fee 0.0002/fill; long funding 0.0001/8h; short funding 0; stop-first; entry-bar suppression; expiry 12; holding 2016; tp1_fraction 0.5",
+    "note": "W1 output ABSENT at pre-spec time (artifacts/research/opencode_r78_rolling/w1/ empty 2026-09-11). Tests target the DOCUMENTED R77 CLI contract above; results recorded PREP-READY and W1-absent where the fix is required."
+  },
+  "prespec_cli_commands": {
+    "base_run": ".venv\\Scripts\\python.exe scripts/opencode_r77_advisor.py --mode replay --config configs/opencode_r77_advisor.json --candles <w3-parquet> --out <w3-out>",
+    "shifted_resume": ".venv\\Scripts\\python.exe scripts/opencode_r77_advisor.py --mode replay --config configs/opencode_r77_advisor.json --candles <w3-shifted-parquet> --out <w3-out> --resume",
+    "identical_resume": "same command with byte-identical candles parquet (expects idempotent re-verify, no new decisions)",
+    "known_bug": "runner computes start_bar = last_bar_idx + 1 positionally (scripts/opencode_r77_advisor.py:108) and short-circuits 'nothing new' when start_bar >= len(df) (line 178), ignoring the timestamp watermark. A same-length shifted window (drop oldest, append 1 new closed bar) MUST settle the new bar after the W1 fix; on unfixed code it settles zero bars. Regression test asserts the fixed behavior and therefore FAILS-before (bug reproduced) / PASSES-after."
+  },
+  "rolling_regression": {
+    "window_bars": 30,
+    "shift_bars": 1,
+    "expect_fixed": "shifted resume settles exactly the 1 new closed bar (decision_log grows only if the new bar is grid-eligible, but settled-bar accounting advances and state watermarks move)",
+    "expect_identical": "identical-window resume is idempotent: no new decisions, no new intents, state re-verified, exit code 0",
+    "variants": ["same-length-shift", "identical", "shorter-overlap", "longer-overlap"]
+  },
+  "crash_recovery_matrix": {
+    "kill_before_commit": "process dies after streaming bars but before final state.json write -> restart from last periodic commit must resume without duplicating intents/alerts/fills (exactly-once by deterministic IDs)",
+    "kill_after_commit_before_export": "state.json committed but outputs (decisions.csv/summary.json) missing -> resume/rebuild must regenerate missing exports even with zero new candles",
+    "kill_after_export": "full outputs present -> resume is clean no-op re-verify",
+    "corrupt_state": "truncated/garbage state.json must FAIL CLOSED with a clear error (no silent resume), or recover from a verified last committed generation if present"
+  },
+  "stress_scenario": {
+    "id": "r78-accept-adverse/1",
+    "kind": "scenario analysis, NOT a maker-fill probability claim",
+    "path": "incremental FeedExecAccount.on_bar_close (same path the integrated runner settles)",
+    "adverse_rule": "every fill price moved 10 bps against the trader vs the ohlc-v2 reference fill (entry limit crossed pays +10bps long / -10bps short; exits receive -10bps long / +10bps short). Fee/funding math unchanged (fee 0.0002/fill). Deterministic, versioned here.",
+    "batch_counterpart": "src/agentic_alpha_lab/backtest/engine.py run_backtest on the SAME candles+signals with reference fills",
+    "supports": "one bounded uniform-adverse-slip scenario with independent batch comparison",
+    "explicitly_unsupported": ["queue position / maker probability from OHLC", "volume-capped partial fills", "latency/t+2 entry delay", "intrabar sequencing beyond stop-first", "funding-schedule stress", "multi-scenario matrix"],
+    "rule": "the stress matrix is NOT labelled PASS beyond this single bounded scenario"
+  },
+  "negative_controls": {
+    "wrong_fee": "fee 0.0002 -> 0.001 must CHANGE equity; parity-vs-reference assertion must FAIL (control working)",
+    "wrong_tp1": "tp1_fraction 0.5 -> 0.75 must CHANGE exit split/accounting; parity must FAIL",
+    "wrong_timestamp": "shifted close_time watermark must CHANGE settled-bar selection; equality assertion must FAIL",
+    "control_tamper": "perturbed control equity trace must TRIP divergence/under-only guard or break parity; silent agreement must FAIL",
+    "rule": "each negative control is SATISFIED only when the mismatch is DETECTED (assertion fails as required). Positive counts matter: EMPTY comparisons are EMPTY/NOT_EXERCISED, never passing trading evidence."
+  },
+  "requirements": [
+    {"id": "R1", "text": "Same-length shifted rolling window settles new bars via integrated runner CLI", "need": "W1 fix; W1-absent => cannot PASS"},
+    {"id": "R2", "text": "Identical rolling window is idempotent via integrated runner CLI", "need": "holds on current code"},
+    {"id": "R3", "text": "Pending-order continuation through integrated runner kill/restart", "need": "AdvisorStrategy restore path"},
+    {"id": "R4", "text": "Partial-position (post-TP1) continuation through integrated runner kill/restart", "need": "AdvisorStrategy restore path"},
+    {"id": "R5", "text": "Kill-before-commit recovers without duplicate intents/alerts/fills", "need": "periodic commit + deterministic IDs"},
+    {"id": "R6", "text": "Kill-after-commit-before-export rebuilds missing exports with zero new candles", "need": "W1 rebuild path; absent => cannot PASS"},
+    {"id": "R7", "text": "Corrupt/truncated state fails closed or recovers from verified generation", "need": "atomic checkpoint + verify"},
+    {"id": "R8", "text": "Bounded adverse-fill scenario r78-accept-adverse/1 runs on incremental path with batch counterpart", "need": "this work package"},
+    {"id": "R9", "text": "Semantic long/short + TP1/stop/TP2 + expiry/timeout/funding retained", "need": "frozen engine parity"},
+    {"id": "R10", "text": "Negative controls (wrong fee/TP1/timestamp/control) FAIL as required; no EMPTY pass", "need": "this work package"},
+    {"id": "R11", "text": "Machine-readable requirement matrix with artifact links; required incompletes prevent overall PASS", "need": "this work package"},
+    {"id": "R12", "text": "No economic-edge claim from execution work; readiness vs robustness vs edge distinguished", "need": "reporting discipline"}
+  ],
+  "overall_pass_rule": "Overall PASS requires R1..R12 all PASS with non-empty positive evidence. Any required FAIL/BLOCKED/NOT_EXERCISED withholds overall PASS. W1-absent items are BLOCKED (not passed by fiat).",
+  "paths": {
+    "allowed": ["artifacts/research/opencode_r78_rolling/w3/", "scripts/opencode_r78_accept*.py", "tests/test_r78_accept.py", "configs/opencode_r78_accept.json"],
+    "forbidden": ["OpenCode ledger edits", "any Codex file", "W1/W2 files (read-only coordination)"]
+  }
+}

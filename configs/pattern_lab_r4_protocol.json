@@ -1,0 +1,21 @@
+{
+  "id": "pattern_lab_r4_chop_filter",
+  "registered_at": "2026-09-24",
+  "motivation": "r3 variant B (4h EMA20/200 ribbon long, enter only if daily ribbon != -1) had the best development Sharpe 1.14 but 28.8% intrabar DD, caused by a 2023 sideways whipsaw (14-loss streak; top 10 trades = 104% of gross). Test fixed chop filters, an ML forward-trend-efficiency filter, and a DD-targeted size.",
+  "windows": "same as pattern_lab_r1; pre_validation = 2021-01-01..2023-12-31",
+  "disclosure": "Variant B's development results were seen before this registration; its opened-year result is unseen. The r1 grid's opened-year result for the unfiltered 4h EMA20/200 ribbon long (+22.4%) was seen.",
+  "variants": {
+    "R0": "B unchanged",
+    "R1": "B with strict gate: daily ribbon == +1",
+    "R2": "B and 4h ADX(14) > 20 at entry (indicators.ind_adx_14)",
+    "R3": "B and 4h Kaufman efficiency ratio over the last 42 closes > 0.30 at entry",
+    "R4": "B and ML filter: HistGradientBoostingRegressor(max_depth=4, learning_rate=0.03, max_iter=400, min_samples_leaf=100, l2_regularization=1.0, random_state=0) on base+candles+indicators features (plus daily context) at every 4h bar predicts forward efficiency ratio ER_fwd[t] = |log(c[t+42]/c[t])| / sum_{k=t+1..t+42} |log(c[k]/c[k-1])|; walk-forward refit every 540 bars from 2021-01-01; a row is trainable if t+42+12 < refit bar; enter only if prediction >= median of the fitted model's predictions on its own training rows"
+  },
+  "selection": "among variants with walk-forward stress net > 0, highest validation Sharpe (normal)",
+  "risk_scale": "k = min(1, 0.20 / pre_validation intrabar DD of the selected variant) rounded down to 0.05; constant size k; validation and opened year are out-of-sample for k",
+  "costs": "ma_ribbon_r1 normal / stress / actual funding; fixed quantity at entry",
+  "acceptance": {
+    "opened_year_check": "selected+scaled variant: net > 0 under normal and stress, intrabar DD <= 20%; all variants reported unscaled and scaled",
+    "then": "freeze for prospective shadow; no live orders; 3% monthly is aspiration only"
+  }
+}

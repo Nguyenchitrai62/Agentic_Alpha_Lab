@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "experiment_id": "v60",
+  "ranking": {"source": "frozen v58 Bradley-Terry pairwise scorer", "minimum_rank_improvement": 0.01},
+  "fill_posterior": {"family": "hierarchical beta-binomial", "buckets": ["direction", "entry_distance_quartile"], "prior_strength": 32.0, "prior": "fold train global fill rate", "empty_bucket_fallback": "parent then global"},
+  "validation": {"folds": 11, "training_window_days": 730, "validation_days": 90, "embargo_days": 8, "minimum_relative_brier_improvement": 0.01, "post_hoc_tuning": false},
+  "policy": {"minimum_predicted_utility_percent": 0.0, "minimum_fill_probability": 0.25, "cooldown_days": 5, "maximum_signals_per_month": 4, "leverage": 1.0},
+  "cloud": {"allowed_only_after_local_gate": true, "maximum_jobs": 1},
+  "independent_test": false,
+  "live_approved": false
+}

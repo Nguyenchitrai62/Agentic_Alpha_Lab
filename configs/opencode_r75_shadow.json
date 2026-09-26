@@ -1,0 +1,94 @@
+{
+  "mode": "SIMULATED/PAPER - no live orders. This config must never contain secrets.",
+  "exploratory": true,
+  "allow_live_orders": false,
+  "shadow": {
+    "service": "opencode_r75_shadow",
+    "version": "r75_shadow/1",
+    "policy_id": "r75-shadow-confirmed-ddguard",
+    "policy_source": "OWN-FROZEN",
+    "policy_source_reason": "B bundle absent: artifacts/research/opencode_r75_practical/streaming/ is empty (0 files) as of 2026-09-11, so no B reference_policy.json exists. Using own frozen documented policy below. No weights invented: ReplayPredictor replays frozen signals only; no training/fitting/tuning anywhere in this runner.",
+    "chain_note": "Frozen v30 isotonic-4 geometry (opencode_v02 reproduce-v30, bit-identical to published v30) voted iso4-confirmed-by-isoall (v15 mapensemble 'confirmed' vote: d4 != 0 AND dAll == d4, geometry always iso4 choose() output), dd_guard sizing recomputed live from paper equity (past-only). The 'v29-iso4-confirmed' label in the round75 contract refers to this iso4-confirmed chain; exact frozen paths are pinned below.",
+    "chain": {
+      "predictions_isotonic_4": "artifacts/research/opencode_v02_reproduce_v30/isotonic_4/predictions.npz",
+      "predictions_isotonic_all": "artifacts/research/opencode_v02_reproduce_v30/isotonic_all/predictions.npz",
+      "decisions": "data/processed/swing_regime_research_v4/decisions.parquet",
+      "candles_source": "data/processed/swing_regime_research_v4/candles.parquet",
+      "signals": "artifacts/research/opencode_v15_mapensemble/confirmed_dd_guard/signals.parquet",
+      "baseline_trades": "artifacts/research/opencode_v15_mapensemble/confirmed_dd_guard/normal_trades.csv",
+      "baseline_signals": "artifacts/research/opencode_v15_mapensemble/confirmed_dd_guard/signals.parquet",
+      "ensemble_config": "artifacts/research/opencode_v15_mapensemble/config.json",
+      "signal_set_note": "confirmed_1x and confirmed_dd_guard signals.parquet are the identical 94-row set (same vote, sizing differs only); either baseline passes the v2.1 same-book identity check."
+    },
+    "b_bundle_path": "artifacts/research/opencode_r75_practical/streaming/reference_policy.json",
+    "b_bundle_note": "If B later drops a reference_policy.json bundle here with {signals_parquet, baseline_trades, baseline_signals, policy_id}, the runner adopts it (when files exist and identity passes) and records policy_source=B-BUNDLE. Absence falls back to the OWN-FROZEN chain above.",
+    "labels": {
+      "rehearsal": "REHEARSAL-NOT-LIVE",
+      "fresh": "FRESH-OBSERVATION"
+    },
+    "rehearsal_disclaimer": "Rehearsal proves functionality, NOT edge. Fixture/replay outcomes are historical plumbing exercises, never forward validation and never expected future returns.",
+    "divergence_rebase_note": "The v2.1 divergence baseline is the frozen backtest equity path. A shadow run may start at any bar, so the curve is REBASED at the window start (expected_start = initial equity, later points scaled by baseline_relative_move; disclosed transform, no fitting). The one-sided UNDER-only trip (Y=5%) then watches paper-vs-baseline-shape drift from run start."
+  },
+  "guard": {
+    "name": "dd_guard",
+    "dd_trigger": 0.1,
+    "guard_leverage": 0.5,
+    "full_leverage": 1.0,
+    "max_leverage": 1.0,
+    "reference": "scripts/opencode_risk_overlay_probe.py:47-61 (lev = 0.5 while past-only realized equity is >10% under its trailing peak, else 1.0). State updated on closed bars only, strictly before the signal bar's close."
+  },
+  "costs": {
+    "fee_rate_per_fill": 0.0002,
+    "funding_long_rate": 0.0001,
+    "funding_short_rate": 0.0,
+    "funding_interval_hours": 8
+  },
+  "policy_geometry": {
+    "entry_expiry_bars": 12,
+    "max_holding_bars": 2016,
+    "tp1_fraction_reference": 0.5,
+    "paper_exit_note": "Paper account takes the FULL position off at TP2 (no TP1 0.5 split) - a documented SIMPLIFICATION vs engine ohlc-v2. Do not compare paper equity 1:1 with backtest equity.",
+    "intrabar_policy": "stop_first",
+    "min_confidence": 0.25
+  },
+  "account": {
+    "initial_equity_indexed": 100.0
+  },
+  "kill_switch": {
+    "daily_loss_halt_pct": 0.03,
+    "max_positions": 1,
+    "note": "UTC-day loss halts NEW intents for the rest of the day (positions still managed to exit); max_positions=1 asserted fail-closed."
+  },
+  "divergence": {
+    "baseline": "artifacts/research/opencode_v15_mapensemble/confirmed_dd_guard/normal_trades.csv",
+    "baseline_signals": "artifacts/research/opencode_v15_mapensemble/confirmed_dd_guard/signals.parquet",
+    "tolerance_pct": 0.05,
+    "definition": "One-sided UNDER-only trip (v2.1): (paper-expected)/expected < -5% per closed bar vs the REBASED frozen confirmed_dd_guard normal path. Overperformance is info-only, never latches. Trip latches: all further new intents blocked + alert.",
+    "initial_equity": 100.0,
+    "latch": true,
+    "one_sided": "UNDER_ONLY"
+  },
+  "data": {
+    "default_fixture": "artifacts/research/opencode_r75_practical/shadow/fixture_REHEARSAL-NOT-LIVE_b439150-441099.parquet",
+    "expected_bar_seconds": 300,
+    "max_live_stale_minutes": 15,
+    "note": "Default mode replays the fixture parquet (closed 5m bars, labeled REHEARSAL-NOT-LIVE). Live-fetch mode (--candles live) pulls fresh PUBLIC klines only (no keys) and labels output FRESH-OBSERVATION. Never mixed in one run."
+  },
+  "public_klines": {
+    "host": "https://api.binance.com",
+    "path": "/api/v3/klines",
+    "symbol": "BTCUSDT",
+    "interval": "5m",
+    "default_limit": 500,
+    "timeout_seconds": 20,
+    "note": "Public market-data GET only (no keys, no orders). The forming candle is dropped; only closed candles are used."
+  },
+  "state": {
+    "persist_every_n_bars": 50,
+    "note": "State snapshot + decisions/alerts/fills logs live under --out. --resume reloads state and appends (restart parity)."
+  },
+  "live_feed": {
+    "enabled": false,
+    "wiring": "No order adapter, no external messaging, no schedules in this round. Advisory records only."
+  }
+}

@@ -1,0 +1,67 @@
+{
+  "id": "ma_ribbon_r1",
+  "registered_at": "2026-09-24",
+  "author": "Claude Code (leader) on user request 2026-09-24",
+  "question": "Do the TradingView MA Ribbon SMA50/SMA200 regime lines, alone or as features/gates for a small ML model, give a net-positive BTC trading edge that survives a hidden most-recent year?",
+  "data": {
+    "source": "Binance USD-M BTCUSDT public REST klines 1d/4h + fundingRate, data/raw/ma_ribbon_20260924/manifest.json",
+    "first_bar": "2019-09-08",
+    "last_closed_daily_bar": "2026-09-23"
+  },
+  "splits": {
+    "development_decisions": ["2019-09-08", "2025-09-13"],
+    "embargo_days": 10,
+    "holdout_decisions": ["2025-09-24", "2026-09-22"],
+    "holdout_rule": "Holdout rows are computed once, after this file is hashed. No parameter, threshold, feature, or selection change after holdout exposure. Any later variant is labelled post-holdout development.",
+    "exposure_disclosure": "The holdout year is NOT pristine in the human sense: earlier OpenCode/Codex rounds loaded 2022-2026 5m candles for other strategies, and the leader saw the user's TradingView chart. Protection comes only from this pre-registration and from not selecting on holdout."
+  },
+  "execution": {
+    "decision": "at close of bar t using only bars <= t and funding with fundingTime <= close(t)",
+    "fill": "open of bar t+1, market-like",
+    "fee_per_fill": {"normal": 0.0002, "stress": 0.0006},
+    "slippage_per_fill": {"normal": 0.0, "stress": 0.0005},
+    "funding": {"normal": "long pays 0.0001 per 8h on current notional, short 0 (AGENTS.md assumption)", "actual": "historical Binance funding applied by sign to both sides"},
+    "sizing": "fixed 1x of current equity at entry, compounded, initial capital 100",
+    "drawdown": "reported both daily-close sampled and intrabar worst (long uses bar low, short uses bar high)"
+  },
+  "primary_hypotheses": {
+    "H1_cross_long": "Long 1x when SMA50 > SMA200 on daily closes, else flat (user's exact lines, no tuning)",
+    "H2_cross_long_short": "Long when SMA50 > SMA200, short when SMA50 < SMA200",
+    "H3_ribbon_long": "Long when close > SMA50 and SMA50 > SMA200, else flat",
+    "H4_ribbon_long_short": "H3 plus short when close < SMA50 and SMA50 < SMA200",
+    "H5_ml_gated": "Frozen HGB classifier (spec below) fit on development only; long when p_up > 0.55 AND SMA50 > SMA200; short when p_up < 0.45 AND SMA50 < SMA200; else flat",
+    "benchmark": "Buy and hold 1x long with the same fees/funding"
+  },
+  "secondary_grid": {
+    "ma_type": ["SMA", "EMA"],
+    "fast": [20, 50, 100],
+    "slow": [100, 200],
+    "rule": ["cross", "close_above_slow", "ribbon"],
+    "direction": ["long", "long_short"],
+    "timeframe": ["1d", "4h"],
+    "constraint": "fast < slow; 4h periods are counted in 4h bars",
+    "selection_on_development_only": "maximize development annualized Sharpe of daily net returns (normal costs) subject to >= 8 development trades and development intrabar max DD <= 0.45; exactly one selected config is then evaluated once on holdout; the full grid holdout table is reported for context only"
+  },
+  "ml_spec": {
+    "features": "log(close/SMA k) k in 20,50,100,200; log(SMA50/SMA200); SMA50 10d slope; SMA200 20d slope; log returns 1,3,7,14,30,60,90d; realized vol 14d,30d and their ratio; 60d range position; funding mean 7d,30d; log volume z-score 30d; taker-buy ratio 7d",
+    "label": "sign of log(open[t+11]/open[t+1]) (10-day forward return from next open)",
+    "models": {
+      "HGB": "HistGradientBoostingClassifier(max_depth=3, learning_rate=0.03, max_iter=300, min_samples_leaf=40, l2_regularization=1.0, random_state=0)",
+      "LR": "StandardScaler + LogisticRegression(C=0.1, max_iter=2000)"
+    },
+    "thresholds": {"long": 0.55, "short": 0.45},
+    "variants": ["gated (H5)", "ungated (no MA gate)"],
+    "development_evaluation": "expanding walk-forward inside development, first fit on labels ending before 2021-01-01, refit every 90 days, 10-day embargo between last label end and first prediction",
+    "holdout_evaluation": {
+      "frozen": "single fit on all development labels ending before 2025-09-24 (primary)",
+      "walk_forward": "continue 90-day refits using only labels already realized (secondary)"
+    }
+  },
+  "report": ["gross", "fees", "funding", "net", "CAGR", "monthly geometric", "close DD", "intrabar DD", "trades", "exposure", "long/short split", "per-year rows", "block bootstrap 20d CI of holdout daily mean and of excess vs buy-and-hold"],
+  "acceptance": {
+    "research_candidate": "holdout net > 0 under normal AND stress costs, holdout intrabar DD <= 0.20, and development net > buy-and-hold on a risk-adjusted basis (Sharpe)",
+    "aspiration": "3% monthly is reported, not required; no return is guaranteed",
+    "statistical_caveat": "slow MA rules trade a few times per year; one holdout year cannot establish significance",
+    "not_authorized": "live orders, exchange credentials, leverage above 1x"
+  }
+}

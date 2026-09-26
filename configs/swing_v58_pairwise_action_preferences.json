@@ -1,0 +1,12 @@
+{
+  "schema_version": 1,
+  "experiment_id": "v58",
+  "representation": {"model": "Bradley-Terry logistic pairwise ranker", "pair_target": "higher realized normal-cost executable net utility", "pair_sampling": "fixed deterministic within-decision balanced pairs", "control": "parameter-matched pointwise ridge"},
+  "validation": {"folds": 11, "training_window_days": 730, "validation_days": 90, "embargo_days": 8, "transforms": "train only", "future_mutation_invariance_required": true},
+  "local_gate": {"minimum_rank_spearman_improvement": 0.01, "minimum_relative_fill_brier_improvement": 0.01, "null_probe_required": true},
+  "policy": {"minimum_predicted_utility_percent": 0.0, "minimum_fill_probability": 0.25, "cooldown_days": 5, "maximum_signals_per_month": 4, "leverage": 1.0, "post_hoc_tuning": false},
+  "cloud": {"maximum_jobs": 1, "allowed_only_after_local_gate": true},
+  "evaluation": {"scenarios": ["normal", "fee_stress", "execution_stress"], "minimum_fills": 30, "minimum_monthly_geometric_return_percent": 5.0, "maximum_drawdown_percent": 20.0},
+  "independent_test": false,
+  "live_approved": false
+}

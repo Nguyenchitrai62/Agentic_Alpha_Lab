@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "experiment_id": "v57",
+  "architecture": {"family": "causal selective state-space dual-stream", "control_parameters": [4000000, 8000000], "candidate_parameters": [20000000, 40000000], "streams": ["multi-resolution OHLCV", "mark-index-funding"], "heads": ["fill probability", "net return quantiles", "candidate rank"]},
+  "ablations": ["small_same_data", "large_same_data"],
+  "training": {"chronological_folds": 11, "embargo_days": 8, "fixed_seed": 1757, "transforms": "train only", "maximum_private_jobs": 1},
+  "transport": {"format": "flat expanded files", "zip_required_at_runtime": false, "bootstrap_dry_run_required": true, "credentials_in_bundle": false},
+  "evaluation": {"scenarios": ["normal", "fee_stress", "execution_stress"], "minimum_fills": 30, "minimum_monthly_geometric_return_percent": 5.0, "maximum_drawdown_percent": 20.0},
+  "independent_test": false,
+  "live_approved": false
+}

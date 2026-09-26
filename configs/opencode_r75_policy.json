@@ -1,0 +1,106 @@
+{
+ "costs": {
+  "fee_rate_per_fill": 0.0002,
+  "funding_interval_hours": 8,
+  "funding_long_rate": 0.0001,
+  "funding_short_rate": 0.0
+ },
+ "dataset": {
+  "candles": "data/processed/swing_regime_research_v4/candles.parquet",
+  "candles_n_bars": 444096,
+  "candles_range": {
+   "end": "2026-03-22T23:59:59.999+00:00",
+   "start": "2022-01-01T00:00:00+00:00"
+  },
+  "config": "data/processed/swing_regime_research_v4/config.json",
+  "decisions": "data/processed/swing_regime_research_v4/decisions.parquet",
+  "decisions_n_rows": 5628,
+  "parent_plan": "configs/swing_v15_continuous_folds.json",
+  "prediction_rows": "2023-06-01T00:04:59.999+00:00/2026-03-15T18:04:59.999+00:00 (decision_indices 1552..5627, n=4076)"
+ },
+ "engine": {
+  "entry_expiry_bars": 12,
+  "intrabar_policy": "stop_first",
+  "lev_max": 1.0,
+  "lev_min": 0.25,
+  "liquidation_taker_fee_rate": 0.00055,
+  "maintenance_margin_rate": 0.005,
+  "max_holding_bars": 2016,
+  "source": "src/agentic_alpha_lab/backtest/engine.py",
+  "tp1_fraction": 0.5,
+  "version": "ohlc-v2"
+ },
+ "execution_params": {
+  "entry": "limit, begins next candle (signal_bar+1), expires signal_bar+12",
+  "fee_per_fill": 0.0002,
+  "funding": "long 0.0001/8h on mark-proxy open, short 0",
+  "geometry": "choose() iso4 output on agreement rows (entry_limit/stop/tp1/tp2/holding_bars)",
+  "leverage": "1.0 normally, 0.5 under guard; execution cap lev_min 0.25 / lev_max 1.0",
+  "stop_timeout": "market-like at scenario fee, NOT guaranteed maker fills",
+  "take_profit": "tp1_fraction 0.5, stop-first intrabar"
+ },
+ "exploratory": true,
+ "frequency": {
+  "cooldown_days": 5,
+  "maximum_signals_per_month": 4
+ },
+ "frozen": true,
+ "guard_rule": {
+  "cutoff": "exit_time strictly before signal_time (1-microsecond cutoff)",
+  "formula": "lev 0.5 while control sampled equity >10% under trailing peak else 1.0",
+  "reference": "CONTROL book iso4_only_1x trade exit_time/equity_after, seed curve starts 100.0",
+  "sampling_note": "trade-candle-close sampled, NOT mark-price/intrabar"
+ },
+ "labels": "EXPLORATORY development interval 2023-2026 (opened data). NOT an independent test. No promotion claim.",
+ "mission": "round75 track B (streaming parity + execution realism). worker B-STREAMING.",
+ "policy_id": "opencode_r75_confirmed_dd_guard",
+ "policy_steps": [
+  "v29 predictions (frozen isotonic_2/4/all .npz on decision rows)",
+  "confirmed vote: d4 != 0 AND dAll == d4 (same-row only; iso2 ignored)",
+  "choose() iso4 geometry on agreement rows (frozen dataset policy config)",
+  "frequency cap4/cd5 (monthly max 4, 5-day cooldown, time order, causal)",
+  "dd_guard sizing from CONTROL equity (past-only, trigger 0.10, lev 0.5)"
+ ],
+ "reference_signals": {
+  "n_signals": 94,
+  "note": "batch reference; streaming replay must reproduce bit-identical",
+  "path": "artifacts/research/opencode_v15_mapensemble/confirmed_dd_guard/signals.parquet"
+ },
+ "registered_at": "2026-09-11T00:00:00+00:00",
+ "scenarios": {
+  "execution_stress": {
+   "allow_limit_price_improvement": false,
+   "entry_penetration_bps": 5,
+   "market_exit_fee_rate": 0.00055,
+   "market_exit_slippage_bps": 5,
+   "target_penetration_bps": 5
+  },
+  "fee_stress": {
+   "fee_rate_per_fill": 0.00055
+  },
+  "normal": {
+   "fee_rate_per_fill": 0.0002
+  }
+ },
+ "source_shas": {
+  "calibrators_iso4": "024fd9a134a2d55fb8623a941064ce518f0dc7f8d5e7ab94d137e1c8bf9364ad:artifacts/research/opencode_v02_reproduce_v30/isotonic_4/calibrators.json",
+  "candles": "20574e6ac973db1210d57b79897c461fd637c018417833cf9abe9176acce0e42:data/processed/swing_regime_research_v4/candles.parquet",
+  "dataset_config": "92c88c3a510ee49b0ee127976ad02aba587665d37e71abf3c2d90d0d05b19fb2:data/processed/swing_regime_research_v4/config.json",
+  "decisions": "1b882f64aa558d8d33d6f54572f5b9888c4edc9236727fd9e32dd9c87ee30c23:data/processed/swing_regime_research_v4/decisions.parquet",
+  "engine_py": "b87581b3337ca847169464d4130c39a91b9b8170327c12b7ac175332e25cf0fd:src/agentic_alpha_lab/backtest/engine.py",
+  "parent_plan": "36e3b3f47d1c191d00dc0b50a2e4615677b2db7bbbbb245decca7230e4366b10:configs/swing_v15_continuous_folds.json",
+  "predictions_iso2": "b7af7fc86bd5fcbec92434945643cfd62c6159a2bf2a14f73c56ff8bad97b2fa:artifacts/research/opencode_v02_reproduce_v30/isotonic_2/predictions.npz",
+  "predictions_iso4": "c770848d1ebaa967070635b8c44c19099239b574eadc6bd882f05526fbfb1d60:artifacts/research/opencode_v02_reproduce_v30/isotonic_4/predictions.npz",
+  "predictions_isoall": "70bcf64f414c45498beeed0b592d9e685865ade817e7cf0820aeb2e552ebf3ae:artifacts/research/opencode_v02_reproduce_v30/isotonic_all/predictions.npz",
+  "ref_signals_confirmed_dd_guard": "88ef895fbd6a7d88cf8488ee181d26d47640f6516dcd4125b162f74b3d866b48:artifacts/research/opencode_v15_mapensemble/confirmed_dd_guard/signals.parquet",
+  "ref_signals_iso4_only_1x": "6cffc3b5ec2d22f8e769b83c38fa5fd75dc98418cf63df18450b036a0cb85e98:artifacts/research/opencode_v15_mapensemble/iso4_only_1x/signals.parquet",
+  "swing_backtest_py": "1952ee5cc54d9256694889374b23278e19c7e53412b99b6b54b1be731cce9708:src/agentic_alpha_lab/backtest/swing.py",
+  "swing_data_py": "c2488f34f9fc16c90a8c869110833173eaf606221972e971baee29778ec4d9d0:src/agentic_alpha_lab/data/swing.py"
+ },
+ "vote": {
+  "confirmed": "d4 != 0 AND dAll == d4 (iso2 ignored)",
+  "geometry": "ALWAYS iso4 choose() output on agreement rows",
+  "majority": "d4 in majority (not used by reference policy)",
+  "unanimous": "d2 == d4 == dAll != 0 (not used by reference policy)"
+ }
+}

@@ -1,0 +1,37 @@
+{
+  "contract": "opencode_r75_assessment",
+  "version": "1.0.0",
+  "date": "2026-09-11",
+  "note": "3% monthly la ASPIRATION (bao cao, khong promise, khong force trades). Verdict 5% cu giu lam lich su, khong viet lai.",
+  "historical_reference_5pct": {
+    "gate": {"monthly_geometric_net_min": 0.05, "drawdown_max": 0.2, "fills_min": 30},
+    "status": "closed: 150+ branches REJECT, tran development majority_1x 2.935%/mo, forward 7+ luot REJECT"
+  },
+  "operational_readiness": {
+    "same_policy_parity": "PASS streaming/batch parity + prefix invariance (track B), neu FAIL thi dung promotion",
+    "paper_rehearsal_same_policy": "halt + trip-under + one-sided + same-book + prespecified params + resume parity, tren CUNG policy ung vien",
+    "causal_clock": "closed candles, next-candle entry, expiry/cancel, stop-first, full holding-window accounting, no backdated fills",
+    "halt_safety": "WAIT/halt khi missing/stale data, missing checkpoint, nonfinite output, risk limits"
+  },
+  "performance_evidence": {
+    "net_positive_all_scenarios": "net PnL duong o normal + fee_stress + execution_stress (L3 exec am -0.138% la vi du FAIL)",
+    "monthly_aspiration_3pct": "monthly_geometric_net >= 0.03 la aspiration, KHONG phai dieu kien PROMOTE duy nhat; duoi 3% van co the HOLD neu du fills + diffuse",
+    "drawdown_max": 0.2,
+    "fills_min_each_scenario": 30,
+    "duration_min_months": 6,
+    "concentration": {"top1_month_share_max": 0.35, "top3_months_share_max": 0.6, "top5_trades_warn": 0.5, "top5_trades_severe": 0.7},
+    "degradation_vs_reference": "forward monthly giu >= 50% reference cung-policy (can-thiet-khong-du; gate tuyet doi van buoc)"
+  },
+  "verdicts": {
+    "PROMOTE": "readiness PASS + net-positive 3 scenarios + DD/fills/duration/concentration PASS",
+    "INSUFFICIENT_EVIDENCE": "mau chua du (fills thieu, duration ngan, tap trung cao) — KHAC voi failure do duoc; duoc phep dong thoi voi FAILURE (vd MAE: DD-breach + mau du = FAILURE; band2 n=2 = INSUFFICIENT_EVIDENCE)",
+    "FAILURE": "hieu nang do duoc am/breach (vd MAE monthly am + DD breach; MoE monthly am + DD 38-58%)",
+    "HOLD": "con lai (thuong monthly-fail va/hoac DD-breach nhung fills du + diffuse)"
+  },
+  "one_interval_rule": "returns, exposure, calendar-bins, duration DUNG CHUNG mot declared interval (first_open/last_close); thang lich partial tinh pro-rata hoac loai tru khai bao; thang zero-trade giu so 0, khong omit; khong dem thang partial la full month",
+  "full_row_fields": ["gross_pnl", "fees", "funding", "net_pnl", "monthly_geometric_net", "max_drawdown", "fills", "offered_decisions", "eligible_decisions", "coverage", "long_short_split", "exposure_time", "dd_sampling_note"],
+  "dd_sampling_limits": "Drawdown la trade-candle-close sampled, khong phai mark-price hay full intrabar; stop/timeout la market-like o fee scenario, khong claim maker fill tu OHLC",
+  "block_uncertainty_rule": "block >= overlapping holding windows (toi thieu 14d); bao cao caveat few-independent-observations; KHONG goi 30 fills la proof; p=0.2 fill-thinning chi la assumption-sensitivity (fixed seeds, multi-draw, full distribution), khong phai queue realism",
+  "baselines_required": ["WAIT (abstain)", "constant/global action-prior", "cheap available baseline (vd iso4_only_1x)"],
+  "costs": {"fee_per_fill": 0.0002, "fee_stress_per_fill": 0.00055, "funding_long_8h": 0.0001, "funding_short": 0.0, "baseline_leverage": "fixed 1x; confidence leverage cap 2x"}
+}

@@ -1,0 +1,68 @@
+{
+  "artifact_policy": "copy exact counts/dates from delta artifacts; never invent rows; structural checks only",
+  "deltas_expected": {
+    "funding_new_rows_min": 1,
+    "klines_note": "~30h since last seal => ~360 new 5m candles (exact count from source, no fabrication)",
+    "macro_new_rows_min": 1
+  },
+  "eta_method": "window grows with wall-clock (1 day/day); ETA_12mo = 2027-03-23 minus now; ETA_15mo = 2027-06-23 minus now; decisions-equivalent rate from sealed counts (679 decisions / 169 days)",
+  "experiment": "opencode-r69d-reextend",
+  "exploratory": true,
+  "extension_outputs_new_only": [
+    "data/raw/opencode_forward_5m_ext_20260909/",
+    "data/processed/opencode_forward_20260323/candles_append_20260909.parquet",
+    "data/processed/opencode_forward_20260323/funding_append_20260909.parquet",
+    "data/processed/opencode_forward_20260323/macro_append_20260909.parquet",
+    "data/processed/opencode_forward_20260323/candles_extended_20260909.parquet",
+    "data/processed/opencode_forward_20260323/funding_extended_20260909.parquet",
+    "data/processed/opencode_forward_20260323/macro_extended_20260909.parquet",
+    "data/processed/opencode_forward_20260323/manifest_extend_20260909.json",
+    "data/processed/opencode_forward_20260323/SEAL_reaffirmation_20260909.json",
+    "artifacts/research/opencode_v158_reextend/summary.json"
+  ],
+  "family": "D-reextend: append-only extension of sealed forward window (no tuning, no labels, structural only)",
+  "forbidden": [
+    "overwrite candles.parquet / funding.parquet / macro.parquet / manifest.json / SEAL.json",
+    "returns / labels / PnL / distributions / price plots / thresholds / training / fitting",
+    "touch research/parallel/registry.json, CONTINUOUS_RESEARCH.md, NEXT_AGENT.md, research/parallel/rounds/*, ../Kronos, worktrees",
+    "fabricate / synthesize rows if a source fails (STOP with blocker audit instead)",
+    "commit / push"
+  ],
+  "gate": {
+    "dd_max": 0.2,
+    "fills_min": 30,
+    "monthly_min": 0.05
+  },
+  "hypothesis": "One extra day of wall-clock adds ~360 klines + ~4 funding + ~2 macro rows to the sealed window with zero gaps at the junction; sealed bytes bit-identical before/after; window still too short for the 30-fill gate (needs ~1850 decisions / ~15mo per v156).",
+  "live_approved": false,
+  "old_sha256_before": {
+    "candles.parquet": "cce98470a377232ed8f53eb296c9f2715f3b62af2652d4e4c1b6d1cd486c32af",
+    "funding.parquet": "dfb4272c3dbcd4cc8a1e0ad745cbfd9cd8fa2b5affd20a0352657a0468e5323f",
+    "macro.parquet": "32a7cfef3072a22ddd3d24a8274256c2653c38ec77b38d3f4fc18adbd799b7ea"
+  },
+  "sealed_cursors": {
+    "funding_last": "2026-09-08 08:00:00.002000+00:00 (fundingTime 1788854400002; next start = +1ms)",
+    "klines_last_close": "2026-09-08 12:14:59.999000+00:00",
+    "klines_last_open": "2026-09-08 12:10:00+00:00 (next open = +5m)",
+    "macro_last": {
+      "dxy": "2026-09-08",
+      "spy": "2026-09-04"
+    }
+  },
+  "sources": {
+    "funding": "https://fapi.binance.com/fapi/v1/fundingRate (public, BTCUSDT, paginate limit 1000, gap rule >9h)",
+    "klines": "https://fapi.binance.com/fapi/v1/klines (public, BTCUSDT 5m, paginate limit 1500, grid rule 5m)",
+    "macro": "Yahoo Finance Chart API v8 (public, SPY + DX-Y.NYB daily)"
+  },
+  "structural_checks": [
+    "row counts per source (delta + extended total)",
+    "junction continuity (first new open == last sealed open + 5m; funding gap <= 9h across junction; macro date > last per symbol)",
+    "date bounds first/last of delta within (cursor, now]",
+    "schema equality delta vs sealed (column names + dtypes)",
+    "monotonic open_time, duplicate scan on delta and on in-memory concat",
+    "OHLC bounds + positive-price + non-negative-volume on delta",
+    "UTC 5m grid alignment + bar-length check on delta",
+    "unclosed-candle exclusion (close_time < now UTC)",
+    "SHA256 of every new file + re-hash of sealed files (must match old_sha256_before)"
+  ]
+}

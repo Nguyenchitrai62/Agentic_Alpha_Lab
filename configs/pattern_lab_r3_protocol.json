@@ -1,0 +1,27 @@
+{
+  "id": "pattern_lab_r3_trend_risk",
+  "registered_at": "2026-09-24",
+  "motivation": "r1/r2: models picking winners had AUC ~0.5; daily-ribbon gating added most value; 4h EMA20/200 ribbon long was the strongest rule. Test fixed risk/sizing variants of the trend rule, plus one model-sizing variant.",
+  "windows": "same as pattern_lab_r1 (walk-forward 2021-01-01..2025-09-13, validation 2024-01-01..2025-09-13, opened-year check 2025-09-24..2026-09-22 once)",
+  "disclosure": "Variant A equals ma_ribbon_r1 grid config 4h_EMA20/200_ribbon_long whose opened-year result (+22.4%) was already seen. Variants B-G were not evaluated on the opened year before this registration.",
+  "definitions": {
+    "entry_4h": "4h close > EMA20 > EMA200 (long) or close < EMA20 < EMA200 (short); exit when the condition ends",
+    "daily_ribbon": "last closed daily bar: +1 if close > SMA50 > SMA200, -1 if close < SMA50 < SMA200, else 0",
+    "vol_target": "size = min(1, 0.60 / (std of last 30 daily log returns * sqrt(365))) read at entry"
+  },
+  "variants": {
+    "A": "4h long, 1x",
+    "B": "4h long, enter only if daily_ribbon != -1, 1x",
+    "C": "4h long, vol_target size",
+    "D": "B with vol_target size",
+    "E": "B longs + 4h shorts entered only if daily_ribbon == -1, vol_target size",
+    "F": "E at 1x",
+    "G": "F with model size: HGB regressor (max_depth=3, lr=0.03, 300 iters, min_samples_leaf=30, l2=1, random_state=0) on pattern_pipeline 'all' features + side at entry predicts primary trade net return; walk-forward refit every 540 bars from 2021-01-01, trainable if exit fill + 12 bars < refit bar; size 1.0 if prediction > 0 else 0.25; before the first fit size 1.0"
+  },
+  "costs": "ma_ribbon_r1 normal / stress / actual funding; fixed quantity at entry",
+  "selection": "among variants with walk-forward stress net > 0 and walk-forward intrabar DD <= 25%, choose highest validation Sharpe (normal); if none qualify, report failure",
+  "acceptance": {
+    "opened_year_check": "selected variant: net > 0 normal and stress, intrabar DD <= 20%; all variants reported",
+    "then": "freeze selected variant for prospective shadow; no live orders; 3% monthly is aspiration only"
+  }
+}

@@ -1,5 +1,126 @@
 # Continuous BTC research — active
 
+LEADER 2026-09-26 (v158-v160): more ensemble members all dilute the v154 ensemble: ETH options in the options member
+(v158 3.44%/month), Fear & Greed (v159 3.34), CFTC COT CME positioning (v160 2.68). Data added: Deribit ETH options,
+alternative.me Fear & Greed, CFTC TFF Bitcoin. v154 (base + BTC options + Coinbase premium, audited bit-exact) frozen as
+scripts/v154_advisor.py and logged (v154_deploy_v5). Best within DD 20%: ~3.5%/month (0.25) to 3.67% (0.28, ex post).
+
+LEADER 2026-09-26 (v150-v157): Deribit BTC options trades 2019-2026 fetched (aggregated per 4h). Options-flow member
+alone is unstable (v150), but information-diverse ENSEMBLES help: v151 (base + options) 3.53%/month, full-path DD 19.4%;
+v154 (base + options + Coinbase premium, audited bit-exact) 3.52%/month, DD 19.2%, hidden year +56%, all years positive;
+v155 frontier: target 0.28 -> 3.67%/month at DD 20.0% (ex post). Members that dilute: positioning (v153), DVOL (v156),
+macro (v157). v152: even a 30% governor only reaches ~4.1%/month at DD 25% (leverage cap binds). v151 frozen as
+scripts/v151_advisor.py (live options update each run). Gate not met; next: ETH options in the options member.
+
+LEADER 2026-09-26 (v141-v149): best realistic configuration v144 = v142 books (selected cross-sectional deviation/rank
+features vs the other majors, +0.11pp in all flat-fee scenarios) + vol-forecast sizing + tranching + 10 bps limit
+execution simulated on 1m data + v110 drawdown governor at portfolio target 0.25 (ex-post frontier choice): 3.37%/month,
+full-path DD 19.6%, yearly +20/+42/+89/+60/+41% (hidden year last); reproduced to the last digit by the blind
+v141_v142 audit. Frozen as scripts/v144_advisor.py (ungoverned weights logged; apply the governor on paper equity).
+v148 block bootstrap: median 1y +45%, P(DD>20%) 19% (conservative), P(loss) 8.5%, P(>=5%/month) 24.5%; at target 0.15
+ungoverned P(DD>20%) 5%, median +30%. Rejected: cross-asset attention NN (v143), xs for all features (v145), relative
+positioning (v146), 12h horizon (v147), xs vol forecast (v149). In progress: Deribit BTC options-flow features (v150;
+data being fetched to data/raw/deribit_opt_20260926). Gate (5%/month at DD<=20% in all scenarios) not met.
+
+LEADER 2026-09-26 (v127-v140, alpha-lab-leader Claude skill created at .claude/skills/alpha-lab-leader): honest
+deployable candidate v133 = tranched v115 books + v129 vol-forecast sizing: 2.44/2.22/1.95 %/month (normal/fee/execution),
+full-path DD 15.2/16.6/18.4%, hidden year strict 1m execution +29.0% DD 10.1% (audited exact), frozen as
+scripts/v133_advisor.py and logged (v133_deploy_v2). v135 execution: limits 10 bps better than the 4h open, market at
+minute 15 -> realistic 1m-execution 5y 2.24%/month, full DD 16.3%, hidden year +30.5%. v137 realistic frontier (ex post):
+target 0.19 -> 2.73%/month at DD 19.3%. Rejected: halving-cycle features (v128), spot-vs-perp flow/basis (v130),
+signal-strength leverage (v131), DOGE/TRX/ADA breadth (v132), bear-only shorts (v134, biased), feature selection
+(v136), HGB+ridge (v138), Binance OI/long-short metrics (v139), forward-Sharpe targets (v140). Gate still not met.
+
+LEADER 2026-09-26 (v116-v126): IMPORTANT CORRECTION (v126): the daily rebalance hour matters by luck. v115 uses phase 0
+(decisions on the 00:00 UTC 4h bar), the best of six phases; per-phase ranking changes each year. Luck-free (phase-mean)
+v115: 2.31%/month normal, 2.09 fee, 1.82 execution stress; worst phase full-path DD 24.3% (execution). All earlier
+phase-0 results are inflated by ~0.3pp/month (relative comparisons unaffected). Other results (all audited or pending):
+v117 slower rebalance worse; v118 no-trade band 0.05 +0.07-0.22pp in flat-fee scenarios but v124 shows no gain under
+strict 1m execution (hidden year 33.95% vs 36.0%, orders /17); v119 nested-CV hyperparameters worse; v120 risk
+frontier: full-path DD <= 20% in all scenarios only up to target 0.15; v121 bagged v103 worse; v122 28-day book neutral;
+v123 multi-timeframe MA-ribbon features add nothing (daily ribbon already captures it); v125 tranching = phase mean.
+Gate (5%/month at DD <= 20%) remains far: honest level ~2.3%/month at DD ~17-24%.
+
+Exploratory (not registered): Binance vs Bybit funding differential (data/raw/bybit_20260925) is too thin for a
+cross-venue arbitrage sleeve: naive sign-following earned ~1-1.4 bps per 8h settlement in 2020-21 but only 0.1-0.3 bps
+in 2025-26 (autocorr 0.26-0.52), ~2-3%/yr gross on notional before 4-leg switching costs and two-venue capital.
+
+LEADER 2026-09-26 (v111-v115): v111 Coinbase premium features rejected (hidden-year IC up to 0.29 but 2024 IC ~0;
+5y worse). v112 sign classifiers rejected (0.83%/month). Longer history WORKS modestly: v113 (Coinbase BTC 2015 / ETH
+2016 prefix) v96 blend 2.62%/month (was 2.47), v92 LO DD 23.5% (was 28.5%); v114 (+ Bitstamp BTC 2013-2015) v96 blend
+2.74%/month, DD 22.8%, v94 LS 2.50%. v115 = v104 with v114-history v92/v94 books: 2.61%/month normal, 2.39% fee,
+2.11% execution stress; full-path DD 16.8/17.3/19.1% (all <= 20%); hidden year strict 1m execution +36.0%, DD 10.3%,
+Sharpe 1.88 -> NEW BEST DD<=20% CANDIDATE (audit running); frozen in scripts/v115_advisor.py (cutoff 2026-09-08),
+logged prospectively as v115_models_portfolio. Governed 25% variant 3.64%/month but full-path DD 20.8-25.1%.
+Gate (5%/month in all scenarios) still not met. Next: v116 nested inner-CV hyperparameters on the v114 panel.
+Advisor logging: duplicate-loop rows removed (corrections.log); advisor_shadow now runs under a lock file.
+
+LEADER 2026-09-26 (v103-v110): v103 (1d/3d horizons + order-flow features: taker buy ratio, flow imbalance,
+trade size/count z, intrabar range; LS daily book) 2.67%/month, DD 24.6%; 50/50 with v96 books 2.62%/month,
+worst DD 17.9% (execution stress 2.09%, 19.8%). v104 = v99 wrapper with v103 added: 2.44%/month normal, 1.95%
+execution stress, worst-year DD 15.8/16.9%, hidden year strict 1m execution +28.3%, DD 11.5%, maker 85.5%;
+frozen (scripts/v104_advisor.py, cutoff 2026-09-08) and logged prospectively as v104_models_portfolio.
+v105 ablation: flow adds ~0.5pp/month at short horizons but hurts the 7d model. v103-v105 audited bit-exact.
+Rejected: v107 intrabar 1h features (spot 1h prefix fetched) no gain; v108 4h/12h rebalancing worse than daily
+under costs; v109 trailing-IC gate cuts return (0.97%/month) without cutting DD (audited exact). v110 (v104 at 25%
+vol target + causal DD governor on the 90-day equity peak): 3.28%/month normal with full-path DD 19.7% (all years
+positive), but fee/execution stress 2.96%/2.56% with full-path DD 21.9%/24.9% -> best return inside the 20% DD
+budget under normal costs, still below the gate (audit running). Next: v111 Coinbase premium features (Coinbase
+1h BTC/ETH fetched to data/raw/coinbase_20260925).
+
+LEADER 2026-09-26 (v97-v102): audits v97 (spec-wording deviation only: leader code imputes for ExtraTrees
+only; no leakage), v98 (bit-exact) and v99 (normal within 0.18pp; hidden-year 1m execution 1.26pp lower
+under the blind minutes-2..15 window -> conservative figure +17.43%, DD 17.11%, maker 0.868 adopted) all
+passed. New, all rejected (audit v100_v102 running): v100 4x phase-shifted 4h training rows 2.05%/month
+(leaf 1200) / 2.33% (leaf 300); v101 training on majors + 13 large-cap perps (trade majors only) 2.80%/month,
+DD 30%, hidden year +5.7%; v102 market-neutral cross-sectional majors book 0.25%/month alone (hidden IC
+-0.02), corr 0.10 with v99; 25/75 blend 1.80%/month at DD 10%. Conclusion: more rows, more assets,
+ensembles and relative-value books do not lift the 7-day trend model (IC ~0.1). Next (v103, prepared):
+breadth route IR ~ IC*sqrt(N): 1d/3d horizons with order-flow features (taker buy ratio, flow imbalance,
+trade size/count z, intrabar range), long/short daily book.
+
+LEADER 2026-09-26 (after usage reset): v90 Kaggle run COMPLETE (15 checkpoints; local reload parity 3.6e-6)
+but IC -0.03/0.19/0.02/0.04/-0.03 (hidden -0.028), every run early-stopped at epoch 9 -> rejected; deep
+sequence models again lose to HGB. v95/v96 audited (v96 exact). v97 tree ensemble (15 HGB + ExtraTrees):
+2.67%/month, worst DD 23.8% (lower return and DD than v92). v98 recency weights (half-life 2y): 2.69%/month,
+worst DD 20.8% (1y: 2.21%, DD 31%). v99 deployment candidate (80% v96 books + 20% carry x3, 15% portfolio vol
+target): 2.27%/month normal, 2.07% fee, 1.82% execution stress, worst-year DD 15.3/16.7/18.4%, all five OOS
+years positive; hidden year with 1m execution +18.7% (1.44%/month), DD 16.6%, maker fill 90% (audits of
+v97-v99 pending). v99 frozen (models trained to 2026-09-08 cutoff, scripts/v99_advisor.py) and logged
+prospectively as v99_models_portfolio. Gate (5%/month) still not met; plateau ~2.3-2.9%/month at DD 15-28%.
+
+LEADER 2026-09-26: v93/v94 audited-rejected (v94 exact; v93 within 0.41pp). v95 (rich cross-asset,
+positioning, macro, DVOL features on the v92 pipeline) FAILED: IC 2021 -0.09, hidden 0.123, book
+0.44%/month, DD 38.9% -> extra sources add noise (staggered start dates act as time proxies); keep
+the compact v92 feature set. v96 (fixed 50/50 v92 long-only + v94 long/short, own vol targets):
+2.47%/month, all five OOS years positive (+4.2/+26.8/+67.5/+48.9/+31.2%), worst-year DD 20.9%,
+hidden year DD 16.4% -> most balanced so far, still below the 5% gate (audit pending).
+v90 submitted to private Kaggle 2026-09-25T17:04Z (kernel nguynchtrai/v90-pooled-majors-seq v1,
+dataset nguynchtrai/v90-majors-4h-bundle; single submission; hashes in v90/cloud_submission.json).
+
+LEADER 2026-09-25 (later): v89 audited-rejected (blind audit exact on rows, IC diff 0.008). v91
+audited-rejected (leader re-run 149/149 metrics identical): 3-book hidden year +10.7% realistic
+execution, 0.85%/month. v92 audited-rejected (auditor's independent script reproduces all ICs,
+rows and hidden +16.69%/DD 28.47% exactly on 5 assets): pooled majors HGB + 2017 spot prefix +
+causal 20% vol target, positive every OOS year (+8.1/+52.6/+87.9/+56.8/+16.7%), 2.93%/month
+(fee 2.73, execution 2.48), worst-year DD 28.5% -> best result of the program, still below gate.
+v93 (v92 70% + carry 30% x3, 15% portfolio vol target): 2.31%/month, worst DD 21.6%, all years
+positive (awaiting audit). v94 (3d/7d/14d ensemble; long/short): hidden year +45.5% DD 14.4% but
+2021-23 weak -> 1.93%/month; long-only ensemble 2.45%/month (awaiting audit). v90 package under
+revision (per-asset masking so training starts ~2020, open-based labels) before a Kaggle run.
+
+LEADER 2026-09-25 (Claude Code, alpha-lab-leader skill): stale v82/v84 (never executed) and v88
+(preflight only, no kernel; parent v62 kernel ended ERROR) were closed as rejected/not-executed and
+rotated into v89 (A: pooled majors HGB 7d sizing), v90 (B: pooled majors sequence model, Kaggle
+package; leader submits after audit) and v91 (C: 3-book portfolio 1m execution audit). Successors
+inherit inactive Codex worker IDs from the registry; they are executed by OpenCode sessions
+(muse-spark-1.3-contributor) under leader supervision (see artifacts/research/opencode_background).
+v89 result (awaiting blind audit): IC rises with pooled data 0.036/0.032/0.066/0.129/0.168 (hidden
+year); hidden-year model +10.7%, DD 5.4% at K=0.35 while unsized TSMOM lost 8.4%; 5-year monthly
+0.45% (first-year overfit forces K=0.35) -> rejected vs gate, hypothesis direction supported.
+Program context: RESEARCH_VF_RESULTS.md, RESEARCH_MJ_RESULTS.md, RESEARCH_MA_RIBBON_SR_EVALUATION.md.
+Best gate-relevant evidence so far: 3-book portfolio ~2.6%/month OOS 2021-2026, DD 19% (not 5%).
+
 V44 COMPLETE/REJECTED 2026-09-06: the causal v29 meta-ranker reached only
 0.218%/month in execution stress with24.745% DD and66 fills; normal was
 0.559%/month with28.423% DD. Read `RESEARCH_V44_RESULTS.md`.

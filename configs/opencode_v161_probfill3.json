@@ -1,0 +1,64 @@
+{
+  "experiment": "opencode-v161-probfill3",
+  "family": "A2-ARCH neutral: seeded prob-fill p=0.2 (v30 protocol VERBATIM) on top-3 DD-safe books",
+  "hypothesis": "Do su song sot (robustness) cua 3 book DD-safe tot nhat duoi mo hinh khop xac suat seeded-deterministic p_fill=0.2 + slippage adverse 1 tick p_slip=0.5 (SAME seeds nhu v30). Muc tieu la do survival, KHONG phai tang loi nhuan, KHONG phai promotion.",
+  "books": {
+    "band2": {
+      "signals": "artifacts/research/opencode_v49_band2conf/confirmed_band2_1x/signals.parquet",
+      "n_signals": 50,
+      "sizing": "1x (ExecutionConfig 1.0/1.0; signals khong co cot leverage)",
+      "execution": {"tp1_fraction": 0.5, "leverage": 1.0, "max_leverage": 1.0},
+      "control_reference_normal": {"total_return": 1.2714637662525927, "max_drawdown": -0.07248384849096634, "trades": 30, "monthly_geometric_net": 0.024636954616895412},
+      "kill_half_monthly": 0.012318477308447706
+    },
+    "l3combo": {
+      "signals": "artifacts/research/opencode_v75_L3real/dd_guard_tp075/signals.parquet",
+      "n_signals": 210,
+      "sizing": "dd_guard FROZEN verbatim (cot leverage 203x1.0/7x0.5 giu nguyen, KHONG tinh lai guard; ExecutionConfig floor 0.25/max 1.0 de bao ton 0.5 — giong driver v75 verbatim)",
+      "execution": {"tp1_fraction": 0.75, "leverage": 0.25, "max_leverage": 1.0},
+      "control_reference_normal": {"total_return": 1.6590074162267956, "max_drawdown": -0.16573345360670333, "trades": 101, "monthly_geometric_net": 0.029436464245190752},
+      "kill_half_monthly": 0.014718232122595376
+    },
+    "confirmed": {
+      "signals": "artifacts/research/opencode_v15_mapensemble/confirmed_1x/signals.parquet",
+      "n_signals": 94,
+      "sizing": "1x + NOTE: v15 co bien the confirmed_dd_guard nhung pre-spec DUNG 1x (file confirmed_1x), khong dung dd_guard — theo mission",
+      "execution": {"tp1_fraction": 0.5, "leverage": 1.0, "max_leverage": 1.0},
+      "control_reference_normal": {"total_return": 1.5785811193475512, "max_drawdown": -0.16094964732093653, "trades": 60, "monthly_geometric_net": 0.028498934099778994},
+      "kill_half_monthly": 0.014249467049889497
+    }
+  },
+  "candles": "data/processed/swing_regime_research_v4/candles.parquet",
+  "dataset_config": "data/processed/swing_regime_research_v4/config.json",
+  "parent_plan": "configs/swing_v15_continuous_folds.json",
+  "seed_base": 1729,
+  "tick": 0.1,
+  "protocol": "v30-VERBATIM (scripts/opencode_r7n_probfill.py): entry_kind + precompute_probfill + run_probfill_backtest copy nguyen van, chi khac execution per-book o tren",
+  "touch_definition": "LONG: no-touch neu bar.low > limit; open-through neu low <= limit VA open <= limit (khop dam bao, khong draw); touch-only neu low <= limit VA open > limit (draw U<p_fill). SHORT doi xung: no-touch neu high < limit; open-through neu high >= limit VA open >= limit; touch-only neu high >= limit VA open < limit. Khop nhanh re engine _entry_fill.",
+  "rng_scheme": "Tien xu ly deterministic per-signal: tin hieu thu j (0-indexed trong signals sort by bar_index), rng_j = numpy.random.default_rng(seed_base + j), seed_base=1729. Duyet expiry theo thu tu: open-through -> fill ngay (khong draw fill); touch-only -> draw U, fill neu U < p_fill, fail thi thu bar ke tiep trong expiry; no-touch -> tiep. Fill -> draw them 1 U_slip, slip neu U_slip < p_slip thi entry_price += direction*tick (LONG +0.1, SHORT -0.1 adverse). Moi branch reset RNG tu dau.",
+  "second_chance_expiry": "entry_expiry_bars=12 tu dataset config (scan signal_index+1 .. signal_index+12, bo bar no-touch/failed touch-only, second chances trong expiry). holding cap = max(holding_days)*288 = 2016.",
+  "slippage": "tick BTCUSDT 0.1 adverse, chi shift entry_price khi slip draw trung. Khong doi stop/TP frozen.",
+  "branches": ["band2_control", "band2_probfill", "l3combo_control", "l3combo_probfill", "confirmed_control", "confirmed_probfill"],
+  "branch_specs": {
+    "band2_control": {"book": "band2", "p_fill": 1.0, "p_slip": 0.0},
+    "band2_probfill": {"book": "band2", "p_fill": 0.2, "p_slip": 0.5},
+    "l3combo_control": {"book": "l3combo", "p_fill": 1.0, "p_slip": 0.0},
+    "l3combo_probfill": {"book": "l3combo", "p_fill": 0.2, "p_slip": 0.5},
+    "confirmed_control": {"book": "confirmed", "p_fill": 1.0, "p_slip": 0.0},
+    "confirmed_probfill": {"book": "confirmed", "p_fill": 0.2, "p_slip": 0.5}
+  },
+  "scenarios": ["normal", "fee_stress"],
+  "fee_stress_rate": 0.00055,
+  "no_exec_stress_reason": "probfill IS the stress (mo hinh khop xac suat thay the gia dinh khop-100%-khi-cham cua ohlc-v2). Them exec-stress 5bps penetration se double-count entry uncertainty va pha vo tinh cong bang seeded (control vs prob khong con khac nhau dung 1 yeu to). Giong v30: chi normal + fee_stress.",
+  "control_gate": "Moi control (p_fill=1.0/p_slip=0.0) normal phai khop published control_reference (total_return + max_drawdown + trades, tolerance 1e-9) hoac STOP toan bo. 3/3 controls rerun de so sanh exact (12 cells = 6 control + 6 prob).",
+  "kill_criterion": "PRE-SPEC: mot book MAT deployable shape neu probfill-normal giu fills>=30 NHUNG monthly_geometric_net < 0.5 x control-rerun-normal monthly (tuc monthly halving). Nguong half lay tu control rerun (du kien ~ published kill_half_monthly o tren). Fills<30 la mat gate rieng (khong phai kill-by-halving).",
+  "gate": {"monthly_min": 0.05, "dd_max": 0.2, "fills_min": 30},
+  "monthly_formula": "ratio=final_equity/100; duration_years=(complete_evaluation_until - folds[0][0])/(365.2425*86400) theo parent_plan; monthly_geometric_net=ratio^(1/(12*duration_years))-1; headline NORMAL, fee_stress reference.",
+  "engine_note": "Phan con lai (stop/timeout market-like o scenario fee, TP1 per-book fraction + TP2, funding long 0.0001/8h short 0, stop-first intrabar, TP suppression tren intrabar entry candle, drawdown trade-candle-close sampled, compounding, overlap next_available_index, holding validation) GIU NGUYEN nhu engine ohlc-v2 run_backtest. Chi entry-search thay bang precomputed probfill.",
+  "output": "artifacts/research/opencode_v161_probfill3",
+  "layout": "{book}/{control,probfill}/... + summary.json (full metrics + kill verdicts + gate flags + exploratory + sha256)",
+  "causal_notes": ["Signals frozen, never refit.", "RNG past-only per-signal precompute; khong dung tuong lai.", "Khoang 2023-2026 da mo (exploratory), KHONG phai independent test.", "p_fill/p_slip la gia dinh stress chu quan co seed, KHONG phai maker fill probability/queue do duoc tu OHLC.", "Drawdown trade-candle-close sampled; stop/timeout market-like o scenario fee."],
+  "independent_test": false,
+  "exploratory": true,
+  "live_approved": false
+}

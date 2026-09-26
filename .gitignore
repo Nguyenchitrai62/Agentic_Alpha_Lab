@@ -21,3 +21,20 @@ reports/**/*.json
 reports/**/*.png
 reports/**/*.parquet
 !reports/.gitkeep
+
+# Local-only outputs (user rule 2026-09-26: commit code only; models and logs stay local)
+models/
+*.log
+research/parallel/rounds/**/*.csv
+research/parallel/rounds/**/*.parquet
+research/parallel/rounds/**/*_result.json
+research/parallel/rounds/**/replication.json
+research/parallel/rounds/**/result_manifest.json
+research/parallel/rounds/**/__pycache__/
+*.pt
+*.npz
+nul
+research/**/smoke_out/
+research/**/kaggle_error_output*/
+research/**/*_report.json
+research/**/log_*.json

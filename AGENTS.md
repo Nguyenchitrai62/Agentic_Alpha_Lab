@@ -42,6 +42,8 @@ modified from this project.
 - On this Windows host, import `torch` before `pandas` in GPU entry points to avoid a DLL load-order failure.
 - Run `.venv/Scripts/python.exe -m pytest` before handing off changes.
 - Keep downloaded data, checkpoints, predictions, and reports out of Git.
+- User rule (2026-09-26): commit code/docs only. Trained deployment models live locally in `models/frozen/`
+  (gitignored; see `models/frozen/manifest.json`); logs, result JSONs and audit CSVs stay local too.
 - Exception: the existing public dashboard demo snapshots are tracked, explicitly dated, and research-only.
 - Read `TRAINING.md` for the working Colab/baseline loop and the already-opened smoke-test interval.
 - Prefer small, versioned experiment configs over agent-authored ad hoc parameter changes.

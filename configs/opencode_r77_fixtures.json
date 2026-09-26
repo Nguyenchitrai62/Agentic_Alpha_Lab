@@ -1,0 +1,47 @@
+{
+  "id": "opencode-r77-fixtures-w2",
+  "role": "W2-FIXTURES worker (Codex round77 items 3+4, bounded)",
+  "engine_pin": "ohlc-v2 (src/agentic_alpha_lab/backtest/engine.py run_backtest)",
+  "stress_pin": "ohlc-stress-v1 (execution_stress.py run_stress)",
+  "rules": [
+    "frozen semantics only: no policy/threshold/model changes",
+    "hand-derive expectations FIRST, then assert the audited engine matches; investigate mismatches",
+    "no live orders, no cloud, no training/fitting/tuning, exploratory labels only"
+  ],
+  "execution": {
+    "entry_expiry_bars": 3,
+    "max_holding_bars": 12,
+    "tp1_fraction": 0.5,
+    "leverage": 1.0,
+    "max_leverage": 1.0,
+    "intrabar_policy": "stop_first"
+  },
+  "costs": {
+    "normal": {"fee_rate_per_fill": 0.0002, "funding_long_rate": 0.0001, "funding_short_rate": 0.0, "funding_interval_hours": 8},
+    "fee_stress": {"fee_rate_per_fill": 0.00055, "funding_long_rate": 0.0001, "funding_short_rate": 0.0, "funding_interval_hours": 8},
+    "execution_stress": "FillStress(entry_penetration_bps=5, target_penetration_bps=5, market_exit_slippage_bps=5, market_exit_fee_rate=0.00055, allow_limit_price_improvement=False)"
+  },
+  "initial_equity": 100.0,
+  "tolerance": 1e-9,
+  "fixtures": [
+    {"id": "F1_long_tp1_tp2", "direction": 1, "covers": "LONG, TP1 then TP2 across bars"},
+    {"id": "F2_long_tp1_stop", "direction": 1, "covers": "LONG, TP1 then stop on remainder"},
+    {"id": "F3_short_tp1_tp2", "direction": -1, "covers": "SHORT, TP1 then TP2 across bars"},
+    {"id": "F4_short_tp1_stop", "direction": -1, "covers": "SHORT, TP1 then stop on remainder"},
+    {"id": "F5_ambiguous_stop_first", "direction": 1, "covers": "stop+TP touched same bar -> stop-first, TP1 skipped"},
+    {"id": "F6_suppression", "direction": 1, "covers": "intrabar-entry target suppression (entry not at open)"},
+    {"id": "F7_timeout", "direction": 1, "covers": "timeout exit at holding-bar open"},
+    {"id": "F8_funding_long", "direction": 1, "covers": "LONG funding-boundary crossing (08:00 UTC charge)"},
+    {"id": "F8s_funding_short", "direction": -1, "covers": "SHORT funding-boundary crossing (zero charge)"},
+    {"id": "F9_expiry", "direction": 1, "covers": "entry expiry/cancel, no fill"},
+    {"id": "F10_pending_restart", "direction": 1, "covers": "pending-entry intent survives JSON restart"},
+    {"id": "F11_partial_restart", "direction": 1, "covers": "post-TP1 partial position restart, stub-vs-engine parity"}
+  ],
+  "unsupported_scenarios": [
+    "liquidation path (fixtures stay 1x; stress simulator has no liquidation model)",
+    "true intrabar/mark-price drawdown (engine samples trade-candle closes only)",
+    "maker queue-position / fill-probability claims from OHLC"
+  ],
+  "global_pass": false,
+  "global_pass_reason": "WITHHELD per assignment: unsupported scenarios above are not implemented; per-fixture normal/fee/execution results are recorded individually."
+}

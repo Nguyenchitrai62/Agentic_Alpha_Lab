@@ -1,0 +1,52 @@
+{
+  "schema_version": 1,
+  "experiment_id": "v53",
+  "parent_versions": ["v47", "v49", "v51"],
+  "data": {
+    "symbol": "BTCUSDT",
+    "market": "Binance USD-M",
+    "interval": "5m",
+    "source_start": "2022-01-01T00:00:00Z",
+    "source_end": "2026-03-23T00:00:00Z",
+    "decision_count": 4076,
+    "candidate_count_per_decision": 16,
+    "features": ["taker_buy_base_fraction", "taker_buy_quote_fraction", "signed_quote_flow_imbalance", "log_quote_volume", "log_trade_count", "quote_volume_per_trade"],
+    "missing_policy": "explicit mask; no forward fill",
+    "as_of": "closed candle t"
+  },
+  "validation": {
+    "folds": 11,
+    "training_window_days": 730,
+    "validation_days": 90,
+    "embargo_days": 8,
+    "transforms": "train/validation only"
+  },
+  "probe": {
+    "control": "matched OHLCV-only regularized ranker",
+    "minimum_source_coverage_percent": 99.0,
+    "minimum_rank_spearman_improvement": 0.01,
+    "minimum_relative_fill_brier_improvement": 0.01,
+    "future_mutation_invariance_required": true
+  },
+  "policy": {
+    "minimum_predicted_utility_percent": 0.0,
+    "minimum_fill_probability": 0.25,
+    "cooldown_days": 5,
+    "maximum_signals_per_month": 4,
+    "leverage": 1.0,
+    "post_hoc_tuning": false
+  },
+  "cloud": {
+    "provider": "private Kaggle/free GPU",
+    "maximum_jobs": 1,
+    "allowed_only_after_local_gate": true
+  },
+  "evaluation": {
+    "scenarios": ["normal", "fee_stress", "execution_stress"],
+    "minimum_fills": 30,
+    "maximum_drawdown_percent": 20.0,
+    "minimum_monthly_geometric_return_percent": 5.0,
+    "independent_test": false,
+    "live_approved": false
+  }
+}

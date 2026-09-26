@@ -1,0 +1,24 @@
+{
+  "id": "pattern_lab_r2_trend_meta",
+  "registered_at": "2026-09-24",
+  "motivation": "ma_ribbon_r1 found edge only in slow trend rules; pattern_lab_r1 base 2-day triple-barrier labels showed AUC ~0.5. Test whether a model can filter trend-rule trades (meta-labeling) using pattern/indicator features.",
+  "data_and_windows": "identical to configs/pattern_lab_r1_protocol.json (development decisions 2019-09-08..2025-09-13, selection validation 2024-01-01..2025-09-13, opened-year check 2025-09-24..2026-09-22 once)",
+  "primaries": {
+    "P_long": "4h EMA20/EMA200 ribbon long: long while close > EMA20 > EMA200 (dev-selected in ma_ribbon_r1)",
+    "P_long_short": "same plus short while close < EMA20 < EMA200"
+  },
+  "candidate_trade": "each primary entry (target changes to +1/-1 at decision t) until the primary target changes (decision e, exit at open e+1)",
+  "meta_label": "1 if the primary trade's net return under normal costs is > 0",
+  "features": "pattern_pipeline.build_matrix at the entry decision bar (4h plus daily context); feature sets: base, all (base+candles+chart+indicators); columns kept if >50% non-missing and non-constant in development",
+  "model": "HistGradientBoostingClassifier(max_depth=3, learning_rate=0.03, max_iter=300, min_samples_leaf=30, l2_regularization=1.0, random_state=0), one model over both sides with a side feature",
+  "walk_forward": "expanding; refit every 90 days from 2021-01-01; a trade is trainable only if its exit fill bar is at least 12 bars before the refit bar",
+  "policy": "take the primary trade iff p > threshold; skipped trades stay flat until the next primary entry",
+  "threshold_grid": [0.40, 0.45, 0.50, 0.55, 0.60],
+  "threshold_selection": "maximize validation net (normal) subject to >= 20 validation trades; ties -> higher threshold",
+  "costs": "ma_ribbon_r1 normal / stress / actual funding; fixed quantity at entry; also report daily-rebalanced sensitivity is NOT required here",
+  "acceptance": {
+    "development": "walk-forward net > 0 under stress, Sharpe above the unfiltered primary over the same window, >= 60 trades",
+    "opened_year_check": "net > 0 normal and stress, intrabar DD <= 20%, and above the unfiltered primary",
+    "then": "freeze; prospective shadow; no live orders"
+  }
+}

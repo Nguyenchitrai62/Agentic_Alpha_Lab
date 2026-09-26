@@ -1,0 +1,150 @@
+{
+ "absolute_rules": [
+  "Frozen policy/params only: no threshold/architecture/frequency/ensemble changes.",
+  "No training/fitting/tuning. No live orders. No cloud. No commit/push.",
+  "Opened dev data only (data/processed/swing_regime_research_v4/candles.parquet); sealed forward window stays sealed.",
+  "New files ONLY in: artifacts/research/opencode_r78_rolling/w2/ + scripts/opencode_r78_nonwait*.py + tests/test_r78_nonwait.py + configs/opencode_r78_nonwait.json.",
+  "NEVER edit the OpenCode ledger or any Codex file.",
+  "PowerShell `; if ($?) {}` chaining.",
+  "This config is a PRE-SPEC: written BEFORE any W2 execution; interval + policy refs + SHAs frozen before running.",
+  "Exploratory labels; no profit/deployment claim."
+ ],
+ "batch_reference": {
+  "branch_note": "fixed-1x baseline per portfolio, reported separately from overlays (never mixed)",
+  "harness_only_loads": [
+   "published confirmed/iso4 signals for diagnosis only AFTER the raw path ran; never fed into the model path"
+  ],
+  "method": "independently written chain in scripts/opencode_r78_nonwait.py (own forward invocation + own gates + own run_backtest settlement); static + runtime denial asserts the tested raw path never loads stored predictions/signals",
+  "settle": "verbatim ohlc-v2 engine.run_backtest, ExecutionConfig(entry_expiry 12, max_holding 2016, tp1_fraction 0.5, leverage 1.0/max 1.0), CostModel normal fee 0.0002/fill, funding long 0.0001/8h short 0.0",
+  "tolerances": {
+   "per_trade_equity_after": 1e-06,
+   "final_equity": 1e-06,
+   "geometry": "bit-exact",
+   "raw_scores": "bit-exact on slice decisions (same GPU, same batching)"
+  }
+ },
+ "chunk_restart": {
+  "boundary_bar": 214000,
+  "chunks": [
+   "A bars [0,214000)",
+   "B bars [214000,218500) resume from snapshot"
+  ],
+  "method": "full run once; chunked run streams A to snapshot then resumes B reusing recomputed raw inference (deterministic hash check); assert identical decision continuation + fills + equity",
+  "nonvacancy_assert": "snapshot at boundary must show open/pending position OR realized fills OR consumed gate counters; exact counts recorded, else the restart leg is marked NOT_EXERCISED (never forced)"
+ },
+ "comparison_branches": [
+  "normal (fee 0.0002/fill)"
+ ],
+ "device": "cuda when available (local GTX1650; torch before pandas); engine + harness CPU",
+ "execution": {
+  "engine": "ohlc-v2 via FeedExecAccount (imported, NOT reimplemented) = the actual runner path",
+  "entry_expiry_bars": 12,
+  "intrabar_policy": "stop_first",
+  "max_holding_bars": 2016,
+  "max_positions": 1,
+  "tp1_fraction": 0.5
+ },
+ "experiment": "opencode-r78-W2-nonwait-pipeline",
+ "exploratory": true,
+ "frozen_policy": {
+  "branch": "confirmed operating (pre-guard admission) + iso4_only_1x control; dd_guard sizing + daily-halt + divergence-trip are versioned overlays reported separately",
+  "calibrators": {
+   "iso2": {
+    "path": "artifacts/research/opencode_v02_reproduce_v30/isotonic_2/calibrators.json",
+    "sha256": "9f848d88906491b6054a9dc83d3156c861118af75a38a25dc6bf108ecb2cdc3c"
+   },
+   "iso4": {
+    "path": "artifacts/research/opencode_v02_reproduce_v30/isotonic_4/calibrators.json",
+    "sha256": "024fd9a134a2d55fb8623a941064ce518f0dc7f8d5e7ab94d137e1c8bf9364ad"
+   },
+   "isoall": {
+    "path": "artifacts/research/opencode_v02_reproduce_v30/isotonic_all/calibrators.json",
+    "sha256": "89a749e205c35b39cb0caa784789a220c3562220809dc118efbef05ebc0fecc3"
+   }
+  },
+  "checkpoints": {
+   "fold_used": 10,
+   "paths": [
+    "artifacts/kaggle/v29_download/tcn-training/seed1729/checkpoints/fold_10/model.safetensors",
+    "artifacts/kaggle/v29_download/tcn-training/seed1730/checkpoints/fold_10/model.safetensors",
+    "artifacts/kaggle/v29_download/tcn-training/seed1731/checkpoints/fold_10/model.safetensors"
+   ],
+   "sha256": [
+    "99398ad0920baf44f730cfb9b55ca9f66af43ba53fdcd8b716891e5d40800e4a",
+    "6bf9d09eb13b0d904d901b4afbaee4860c28982f1762ae20da6ca020e30dd123",
+    "9faf404968265b97daf71e3475493f45da57b4f99d204e3fda9734a5997f7180"
+   ]
+  },
+  "class": "ResidualTemporalValue(candidates, width=48, dropout=0.15)",
+  "cooldown_days": 5,
+  "frequency_cap_per_month": 4,
+  "gates": "independent iso4-only gate + independent confirmed gate (verbatim r77 core semantics)",
+  "inference_prespec": "configs/opencode_r76_infer.json",
+  "inference_prespec_sha256": "63d5f3013a6a9cd90faadf122ae4b18197acfe621baf5e8592ed40e35f98b4b3",
+  "research_config": {
+   "path": "data/processed/swing_regime_research_v4/config.json",
+   "sha256": "92c88c3a510ee49b0ee127976ad02aba587665d37e71abf3c2d90d0d05b19fb2"
+  },
+  "runner_config": "configs/opencode_r77_advisor.json",
+  "runner_config_sha256": "b2c4b30f5189793f0e8c92c979046725f48ae52194406266ee7c58e43d143acb",
+  "seeds": [
+   1729,
+   1730,
+   1731
+  ],
+  "vote": "confirmed (d4 != 0 AND dall == d4, iso4 geometry via choose())"
+ },
+ "interval": {
+  "anchor_note": "published confirmed bar 213768 = research decision row 2457; bar 215208 = row 2477 (rows locate fixtures only, never feed the model path)",
+  "candle_bars": "[0, 218500) positional (218500 closed 5m bars from 2022-01-01)",
+  "candle_source": "data/processed/swing_regime_research_v4/candles.parquet",
+  "decision_rows": "[2450, 2485) = 35 grid decisions (first bar 213264, last bar 215712)",
+  "holding_tail": "last slice decision 215712 + 12 expiry + 2016 holding = 217740 <= 218499 (complete windows)",
+  "known_anchor_signals": [
+   {
+    "bar_index": 213768,
+    "decision_row": 2457,
+    "direction": -1,
+    "published": "artifacts/research/opencode_v15_mapensemble/confirmed_dd_guard/signals.parquet"
+   },
+   {
+    "bar_index": 215208,
+    "decision_row": 2477,
+    "direction": -1,
+    "published": "artifacts/research/opencode_v15_mapensemble/confirmed_dd_guard/signals.parquet"
+   }
+  ],
+  "recorded_before_execution": true,
+  "candle_note": "444096 rows, already-opened dev; sealed forward window untouched"
+ },
+ "overlays": {
+  "divergence_trip": "r77-overlays/1 one-sided 5% (reported separately)",
+  "daily_halt": "r77-overlays/1 3% UTC-day (reported separately)",
+  "fixed_1x_baseline": "operating/control pure 1x from batch reference AND streaming control; streaming operating leverage column recorded per intent",
+  "guard": "dd_guard trigger 0.1 / guard lev 0.5 / full 1.0 (reads control exits strictly before T)"
+ },
+ "repo": {
+  "branch": "opencode/profit-round1"
+ },
+ "role": "W2-PIPELINE worker (Codex round78 W2: real-model non-WAIT evidence)",
+ "runner_path": {
+  "adapter": "scripts/opencode_r77_advisor_core.py::infer_full (real checkpoint forward, fail-closed) + scripts/opencode_r76_infer.py helpers",
+  "core": "scripts/opencode_r77_advisor_core.py::AdvisorStrategy (shared streaming consumer)",
+  "core_sha256": "ee7786f17e9e1074759a6dd0de26f935e5e6abd5958c57eda7c63b3a3ef22637",
+  "engine_sha256": "b87581b3337ca847169464d4130c39a91b9b8170327c12b7ac175332e25cf0fd",
+  "feedexec_sha256": "f341cf30d1380ce414ad72ea14e46046a87f8aa5af7d84027dcfc037d4ef75e7",
+   "infer_sha256": "cf9e4406dd296afbe3488a425d83e06fdfa89a3f8284f3d7e845b569df42f57e"
+ },
+ "source_modules": {
+  "ensemble_value_sha256": "360517bcc8a47771a14db20e0de99477afd41570f0a4ce597f57a3a9b5ad213b",
+  "residual_temporal_value_sha256": "d9343d3567a7d6a50a2887807e4e3c78b23ef015960bc557616ab76fb1c26875",
+  "sequence_context_sha256": "b4f194df3e1b4067550983dfbf07493407f9c139f60a80d1eefeaed3126e707d",
+  "swing_sha256": "c2488f34f9fc16c90a8c869110833173eaf606221972e971baee29778ec4d9d0"
+ },
+ "status": "PRE-SPEC (no execution numbers claimed)",
+ "stop_rule": "If the frozen implementation never reproduces a previously known signal on this slice: STOP the pipeline claim and diagnose the FIRST numerical divergence (stage + values); do NOT call training the only remedy.",
+ "verdict_rules": {
+  "BLOCKED": "genuinely no non-WAIT after honest effort -> mark BLOCKED with per-stage counts, never force trades or fabricate confidence",
+  "PASS_needs": "non-WAIT reproduced + signal identity vs batch + fills/equity deltas within tol + nonempty chunk/restart identity"
+ }
+}

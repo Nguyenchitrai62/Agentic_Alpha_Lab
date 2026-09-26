@@ -1,0 +1,39 @@
+{
+  "schema_version": 1,
+  "experiment_id": "v61",
+  "ranking": {
+    "source": "frozen v58 deterministic pairs and Bradley-Terry feature contract",
+    "refit": "past-only chronological folds",
+    "bootstrap": {
+      "family": "moving-block bootstrap ensemble",
+      "replicates": 64,
+      "block_days": 28,
+      "seed": 1761
+    }
+  },
+  "selection": {
+    "rule": "accept the top-ranked executable action only when at least 80% of bootstrap replicas agree on its direction and at least 75% agree it beats the runner-up; otherwise abstain",
+    "direction_agreement_min": 0.8,
+    "top_vs_runner_agreement_min": 0.75,
+    "post_hoc_tuning": false
+  },
+  "chronology": {
+    "fold_plan": "configs/swing_v15_continuous_folds.json",
+    "embargo_days": 8,
+    "labels_mature_before_fit": true,
+    "future_mutation_invariance_required": true
+  },
+  "local_gate": {
+    "v58_rank_parity_required": true,
+    "accepted_action_precision_improvement_min": 0.02,
+    "minimum_accepted_decisions": 30,
+    "minimum_coverage_percent": 1.0,
+    "scenario_replay_only_after_gate": true
+  },
+  "cloud": {
+    "allowed_before_local_gate": false,
+    "maximum_jobs": 0
+  },
+  "independent_test": false,
+  "live_approved": false
+}

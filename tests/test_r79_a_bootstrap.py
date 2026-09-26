@@ -1,21 +1,19 @@
-"""R79 Track-A: fresh-bootstrap observation-time regression (FAILING-BEFORE).
+"""R79 Track-A: fresh-bootstrap observation-time regression.
 
 Mechanical regression only: deterministic synthetic candles + stub-like raw
 fixtures (MOCK-mechanics, explicitly NOT model inference) producing both LONG
 and SHORT fill opportunities, on-grid and off-grid bootstraps.
 
-Current buggy path under test (mirrors scripts/opencode_r78_roll.py main()
-fresh path ~line 748, labeled MOCK-current-main below):
-    shadow = df["close_time"].iloc[0]
-which backdates observation so pre-observation decisions become actionable,
-fill on historical bars and move equity at bootstrap (leader repro:
-observed_at 2026-09-10T07:10:01Z, shadow 05:55Z, LONG 06:05Z filled
-historically, equity 99.98 at bootstrap).
+CONFIRMED BUG (r78): scripts/opencode_r78_roll.py main() fresh path set
+``shadow = df['close_time'].iloc[0]``, backdating observation so
+pre-observation decisions settled actionable LONG/SHORT intents and filled
+on historical bars (leader repro: observed_at 2026-09-10T07:10:01Z, shadow
+05:55Z, LONG 06:05Z filled historically, equity 99.98 at bootstrap).
 
-Correct behavior asserted here (FAILS on current code):
-    fresh bootstrap => actionable_count == 0, zero intents/fills,
-    zero gate consumption, equity == 100 for BOTH LONG and SHORT,
-    on-grid AND off-grid bootstraps.
+FIX (r79_roll/1): ``roll.fresh_shadow_start`` (the exact helper main uses)
+returns the ACTUAL observed_at; ALL pre-observation inference is
+diagnostic-only. Committed first as failing-before evidence against the
+buggy line; now gates the fixed path (fails on reintroduction).
 """
 import torch  # noqa: F401  (torch truoc pandas: DLL load-order Windows host)
 
@@ -35,7 +33,7 @@ import opencode_r76_infer as r76  # noqa: E402
 
 SYM, INT = "BTCUSDT", "5m"
 T0 = pd.Timestamp("2026-09-10T00:00:00Z")  # on-grid start (6h UTC grid)
-ROLL_CFG = json.loads((ROOT / "configs/opencode_r78_roll.json").read_text())
+ROLL_CFG = json.loads((ROOT / "configs/opencode_r79_roll.json").read_text())
 ADV_CFG = json.loads((ROOT / "configs/opencode_r77_advisor.json").read_text())
 SPEC = r76.load_prespec()
 
@@ -87,37 +85,20 @@ def patched_identity(monkeypatch):
             "scripts/opencode_r77_advisor.py",
             "scripts/opencode_r78_roll.py",
             "configs/opencode_r77_advisor.json",
-            "configs/opencode_r78_roll.json",
+            "configs/opencode_r79_roll.json",
             "configs/opencode_r76_infer.json")
             if (ROOT / rel).exists()]
     monkeypatch.setattr(roll, "collect_identity_files", _collect)
     return _collect
 
 
-def fresh_bootstrap_current_main(out, exec_state_shadow, observed_at):
-    """Mirror of the CURRENT main() fresh path (buggy line ~748)."""
+def settle_fresh(out, df, observed_at, action, shadow):
+    """Fresh-bootstrap settle helper: begin + reconcile + settle exactly as
+    main() does (single observed_at for the whole bootstrap window)."""
     adv = roll.RollingAdvisor(ADV_CFG, ROLL_CFG, SPEC, out, SYM, INT)
-    adv.begin(exec_state_shadow, observed_at)
-    return adv
-
-
-@pytest.mark.parametrize("action", ["LONG", "SHORT"])
-@pytest.mark.parametrize("observed_at", [OBS_ON_GRID, OBS_OFF_GRID],
-                         ids=["on-grid", "off-grid"])
-def test_fresh_bootstrap_preobservation_diagnostic_only(
-        action, observed_at, patched_identity, tmp_path):
-    df = candles()
-    # MOCK-current-main (buggy): shadow = first historical close.
-    shadow = core._ts(df["close_time"].iloc[0]).isoformat()
-    out = tmp_path / f"boot_{action}_{observed_at[11:13]}"
-    adv = fresh_bootstrap_current_main(out, shadow, observed_at)
+    adv.begin(shadow, observed_at)
     rec = roll.reconcile_window(df, SYM, INT, observed_at, adv.exec_state)
     assert len(rec["new_rows"]) == len(df)
-    # Arm the latest fillable bar (second-to-last): its decision is timely
-    # (<24 bars before observed_at, so the stale-catch-up rule cannot mask
-    # the shadow bug) yet strictly pre-observation. Grid vs off-grid refers
-    # to the bootstrap instant; the MOCK arm is bar-agnostic mechanics.
-    assert any(core.on_grid(r["open_time"]) for _, r in rec["new_rows"])
     target, target_row = rec["new_rows"][-2]
     raws = {target: mock_raw(target, target_row["close_time"], action)}
     for exec_idx, row in rec["new_rows"]:
@@ -128,14 +109,49 @@ def test_fresh_bootstrap_preobservation_diagnostic_only(
         core._ts(df["open_time"].iloc[0]).isoformat(),
         core._ts(df["close_time"].iloc[-1]).isoformat(), len(df),
         {"path": "mock", "sha256": "mock"}, observed_at,
-        {"kind": "MOCK-current-main"}, {}, {"stub": True, "mock": True})
-    # CORRECT behavior: pre-observation inference is diagnostic-only.
-    assert snap["actionable_count"] == 0, (
-        f"BUG: fresh bootstrap settled actionable {action} intent from "
-        f"pre-observation bar (shadow={shadow}, observed={observed_at})")
+        {"kind": "MOCK-bootstrap"}, {}, {"stub": True, "mock": True})
+    return adv, snap
+
+
+@pytest.mark.parametrize("action", ["LONG", "SHORT"])
+@pytest.mark.parametrize("observed_at", [OBS_ON_GRID, OBS_OFF_GRID],
+                         ids=["on-grid", "off-grid"])
+def test_fresh_bootstrap_preobservation_diagnostic_only(
+        action, observed_at, patched_identity, tmp_path):
+    """The FIXED path: shadow comes from roll.fresh_shadow_start (the exact
+    helper main() uses). Fails if the df.iloc[0] backdate is reintroduced."""
+    df = candles()
+    # Grid sanity: the window really contains grid bars.
+    assert any(core.on_grid(r["open_time"]) for _, r in
+               df.iterrows())
+    shadow = roll.fresh_shadow_start(df, observed_at)
+    assert shadow == core._ts(observed_at).isoformat()
+    out = tmp_path / f"boot_{action}_{observed_at[11:13]}"
+    adv, snap = settle_fresh(out, df, observed_at, action, shadow)
+    assert snap["actionable_count"] == 0
     assert len(adv.strategy.intents) == 0
     assert len(adv.strategy.fills) == 0
     assert adv.strategy.counters["operating_admitted"] == 0
     assert adv.strategy.counters["control_admitted"] == 0
     assert adv.strategy.operating.equity == pytest.approx(100.0)
     assert adv.strategy.control.equity == pytest.approx(100.0)
+    funding = sum(e.get("funding", 0.0) for e in
+                  adv.strategy.operating.events)
+    assert funding == pytest.approx(0.0)
+
+
+@pytest.mark.parametrize("action", ["LONG", "SHORT"])
+def test_buggy_shadow_mechanism_pinned(action, patched_identity, tmp_path):
+    """Pins the r78 bug MECHANISM (not the product path): the old
+    ``df['close_time'].iloc[0]`` shadow demonstrably settles an actionable
+    intent + historical fill from a pre-observation bar. Documents why the
+    backdate was wrong; the product path above must never do this."""
+    df = candles()
+    observed_at = OBS_OFF_GRID
+    buggy_shadow = core._ts(df["close_time"].iloc[0]).isoformat()
+    assert buggy_shadow != core._ts(observed_at).isoformat()
+    adv, snap = settle_fresh(tmp_path / f"buggy_{action}", df,
+                             observed_at, action, buggy_shadow)
+    assert snap["actionable_count"] == 1
+    assert len(adv.strategy.intents) == 2  # control + operating arms
+    assert adv.strategy.operating.equity != pytest.approx(100.0)

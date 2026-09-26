@@ -1,0 +1,32 @@
+{
+  "schema_version": 1,
+  "experiment_id": "v64",
+  "parent_experiments": ["v29", "v30", "v37", "v59", "v63"],
+  "signal_path": "immutable v29 residual-GRU plus v30 isotonic-4 selected signals",
+  "sizing": {
+    "confidence_unit": "clip((expected_net_percent - 0.3) / 1.7, 0, 1)",
+    "selected_candidate_downside": "v29 conditional_net_quantiles_percent[q10]",
+    "exposure_formula": "1.0 + confidence_unit * indicator(selected_candidate_q10_percent >= 0)",
+    "minimum_leverage": 1.0,
+    "maximum_leverage": 2.0,
+    "q10_threshold_percent": 0.0,
+    "post_hoc_tuning": false
+  },
+  "execution": {
+    "source": "frozen v59 official mark-price, funding and maintenance-tier replay",
+    "next_candle_fill": true,
+    "stop_first": true,
+    "mark_price_liquidation": true,
+    "official_historical_funding": true,
+    "preserve_mark_gaps": true
+  },
+  "evaluation": {
+    "scenarios": ["normal", "fee_stress", "execution_stress"],
+    "minimum_fills": 30,
+    "minimum_monthly_geometric_return_percent": 5.0,
+    "maximum_drawdown_percent": 20.0,
+    "require_v59_signal_fill_exit_parity": true,
+    "independent_test": false,
+    "live_approved": false
+  }
+}
