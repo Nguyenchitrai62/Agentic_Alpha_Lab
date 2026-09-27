@@ -1,0 +1,18 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "frontend",
+      "runtimeExecutable": ".venv/Scripts/python.exe",
+      "runtimeArgs": ["-m", "http.server", "5500", "--bind", "127.0.0.1", "--directory", "frontend"],
+      "port": 5500
+    },
+    {
+      "name": "backend-test",
+      "runtimeExecutable": ".venv/Scripts/python.exe",
+      "runtimeArgs": ["-m", "uvicorn", "backend.server:app", "--host", "127.0.0.1", "--port", "8724", "--no-access-log"],
+      "env": { "WEB_SCHEDULER_ENABLED": "false" },
+      "port": 8724
+    }
+  ]
+}

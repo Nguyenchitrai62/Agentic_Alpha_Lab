@@ -1,0 +1,150 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Alpha Lab – Gợi ý giao dịch</title>
+  <meta name="description" content="Gợi ý giao dịch BTC/ETH/SOL/BNB/XRP từ pipeline nghiên cứu v205 (chỉ tham khảo)." />
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%230f1a2b'/%3E%3Cpath d='M6 22l6-7 5 4 9-11' stroke='%2322c55e' stroke-width='3' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E" />
+  <link rel="stylesheet" href="styles.css" />
+  <script src="config.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/lightweight-charts@4.2.0/dist/lightweight-charts.standalone.production.js" defer></script>
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
+  <script src="app.js" defer></script>
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <svg viewBox="0 0 32 32" width="26" height="26" aria-hidden="true"><rect width="32" height="32" rx="7" fill="var(--panel-2)"/><path d="M6 22l6-7 5 4 9-11" stroke="var(--up)" stroke-width="3" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      <span>Alpha Lab</span><span class="tag" id="pipelineTag">v205</span>
+    </div>
+    <nav class="tabs" id="tabs" hidden>
+      <button data-view="signal" class="active">Tín hiệu hiện tại</button>
+      <button data-view="history">Lịch sử gợi ý</button>
+      <button data-view="perf">Hiệu suất</button>
+      <button data-view="admin" id="adminTab" hidden>Admin</button>
+    </nav>
+    <div class="user" id="userBox"></div>
+  </header>
+
+  <main>
+    <!-- login -->
+    <section id="view-login" class="view center">
+      <div class="card login-card">
+        <h1>Gợi ý giao dịch crypto</h1>
+        <p class="muted">BTC · ETH · SOL · BNB · XRP — Binance USD-M, nến 4h. Đăng nhập Google để xem.</p>
+        <div id="gsiButton"></div>
+        <p id="loginMsg" class="msg"></p>
+        <p class="fine">Chỉ là gợi ý nghiên cứu, không phải lời khuyên đầu tư. Hệ thống không đặt lệnh thật.</p>
+      </div>
+    </section>
+
+    <section id="view-pending" class="view center" hidden>
+      <div class="card login-card">
+        <h1>Đang chờ duyệt</h1>
+        <p class="muted">Tài khoản <b id="pendingEmail"></b> đã đăng nhập nhưng chưa được admin cấp quyền xem.</p>
+        <button class="btn" id="pendingLogout">Đăng xuất</button>
+      </div>
+    </section>
+
+    <!-- current signal -->
+    <section id="view-signal" class="view" hidden>
+      <div class="kpis" id="sigKpis"></div>
+      <div class="grid2">
+        <div class="card chart-card">
+          <div class="toolbar">
+            <div class="seg" id="sigSymbols"></div>
+            <div class="seg" id="sigIntervals"></div>
+          </div>
+          <div class="chart" id="sigChart"></div>
+          <div class="legend">
+            <span><i class="ln entry"></i>Entry limit</span><span><i class="ln sl"></i>Stop-loss (market)</span>
+            <span><i class="ln tp"></i>Take-profit (limit)</span><span><i class="ln dip"></i>Lệnh chờ mua dip</span>
+          </div>
+        </div>
+        <div class="card">
+          <h3>Vị thế đề xuất <span class="muted small" id="sigValid"></span></h3>
+          <div class="table-wrap"><table class="tbl" id="booksTbl"></table></div>
+          <h3>Lệnh chờ mua dip (sleeve)</h3>
+          <div class="table-wrap"><table class="tbl" id="sleeveTbl"></table></div>
+          <p class="fine">Vốn dùng = % tổng vốn (100% = không đòn bẩy, 150% = dùng 1.5 lần vốn). Entry là lệnh limit
+            chờ 4 giờ, không khớp thì huỷ; mỗi vị thế có SL market và TP limit. Độ tin cậy đã phản ánh vào mức vốn dùng.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- history -->
+    <section id="view-history" class="view" hidden>
+      <div class="card">
+        <div class="toolbar wrap">
+          <label>Nguồn
+            <select id="hSource">
+              <option value="walkforward">Walk-forward 2021–2026 (năm giấu, ngoài mẫu)</option>
+              <option value="live">Chạy thực (từ khi triển khai)</option>
+            </select>
+          </label>
+          <div class="seg" id="hSymbols"></div>
+          <div class="seg" id="hIntervals"></div>
+          <label>Từ <input type="date" id="hFrom" /></label>
+          <label>Đến <input type="date" id="hTo" /></label>
+          <button class="btn" id="hLoad">Xem</button>
+          <label class="chk"><input type="checkbox" id="hBook" checked /> Lệnh book</label>
+          <label>khớp ≥
+            <select id="hMinW"><option value="0">tất cả</option><option value="0.01">1% vốn</option>
+              <option value="0.03" selected>3% vốn</option><option value="0.05">5% vốn</option></select>
+          </label>
+          <label class="chk"><input type="checkbox" id="hDip" checked /> Dip sleeve</label>
+          <label class="chk"><input type="checkbox" id="hLevels" checked /> SL/TP</label>
+        </div>
+        <div class="chart tall" id="hChart"></div>
+        <div class="legend">
+          <span><i class="dot up"></i>Mua/TP</span><span><i class="dot down"></i>Bán/SL</span><span><i class="dot dip"></i>Dip</span>
+          <span><i class="ln sl"></i>SL</span><span><i class="ln tp"></i>TP</span><span><i class="bar"></i>Tỷ trọng vị thế (dưới)</span>
+          <span class="muted">Bấm vào một nến để xem gợi ý tại thời điểm đó.</span>
+        </div>
+      </div>
+      <div class="grid2">
+        <div class="card"><h3>Gợi ý tại <span id="hAtTime" class="muted">—</span></h3><div class="table-wrap"><table class="tbl" id="hAtTbl"></table></div></div>
+        <div class="card"><h3>Giao dịch trong khoảng</h3><div class="table-wrap scroll"><table class="tbl" id="hTrades"></table></div></div>
+      </div>
+    </section>
+
+    <!-- performance -->
+    <section id="view-perf" class="view" hidden>
+      <div class="kpis" id="perfKpis"></div>
+      <div class="grid2">
+        <div class="card chart-card"><h3>Vốn walk-forward (log, 1 = vốn ban đầu)</h3><div class="chart" id="wfChart"></div></div>
+        <div class="card"><h3>Theo năm (mỗi năm mô hình đóng băng tại mốc)</h3><div class="table-wrap"><table class="tbl" id="yearTbl"></table></div>
+          <p class="fine">Phí Bybit: maker 0.02% (entry, TP), taker 0.055% (SL). Funding bất lợi: long trả 0.01%/8h, short = 0.
+            DD = max(DD nến 4h, DD đánh dấu theo phút). Lựa chọn mô hình chỉ dùng 4 năm đầu; năm gần nhất chấm 1 lần.</p></div>
+      </div>
+      <div class="grid2">
+        <div class="card chart-card"><h3>Paper trading tiến tới (từ lúc đóng băng)</h3><div class="chart short" id="fwChart"></div></div>
+        <div class="card"><h3>Tóm tắt paper trading</h3><div id="fwSummary"></div></div>
+      </div>
+    </section>
+
+    <!-- admin -->
+    <section id="view-admin" class="view" hidden>
+      <div class="card">
+        <h3>Chạy pipeline</h3>
+        <div class="toolbar wrap">
+          <button class="btn primary" data-run="cycle">Chạy chu kỳ (nến → tín hiệu → paper)</button>
+          <button class="btn" data-run="signal">Chỉ tín hiệu</button>
+          <button class="btn" data-run="candles">Cập nhật nến</button>
+          <button class="btn" data-run="forward">Paper trading</button>
+          <button class="btn" data-run="walkforward">Tính lại walk-forward</button>
+        </div>
+        <p class="fine">Lịch tự động: sau mỗi nến 4h đóng (UTC 00/04/08/12/16/20 + vài phút).</p>
+        <div class="table-wrap scroll"><table class="tbl" id="jobsTbl"></table></div>
+      </div>
+      <div class="card">
+        <h3>Người dùng</h3>
+        <div class="toolbar"><input type="email" id="newEmail" placeholder="email@gmail.com" /><button class="btn" id="addUser">Cấp quyền xem</button></div>
+        <div class="table-wrap"><table class="tbl" id="usersTbl"></table></div>
+      </div>
+    </section>
+  </main>
+  <div id="toast" class="toast" hidden></div>
+</body>
+</html>

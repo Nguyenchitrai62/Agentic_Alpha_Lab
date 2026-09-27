@@ -38,3 +38,4 @@ research/**/smoke_out/
 research/**/kaggle_error_output*/
 research/**/*_report.json
 research/**/log_*.json
+!.env.example

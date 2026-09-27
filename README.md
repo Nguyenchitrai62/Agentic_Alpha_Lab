@@ -7,6 +7,14 @@ Môi trường nghiên cứu leakage-aware cho BTC futures: dữ liệu Binance 
 Kronos zero-shot, chuyển forecast thành signal, backtest limit-order, và sau đó
 mở rộng sang fine-tuning/agentic experiment search.
 
+## Web app (gợi ý giao dịch v205)
+
+- `backend/`: FastAPI + SQLite (WAL) chạy trên máy này ở `127.0.0.1:8724`, public qua Cloudflare Tunnel
+  `api-crypto.nguyenchitrai.id.vn`. Scheduler chạy pipeline sau mỗi nến 4h; admin chạy tay ở trang Admin.
+- `frontend/`: site tĩnh (Vercel) có đăng nhập Google, biểu đồ nến kèm entry/SL/TP, lịch sử gợi ý walk-forward và chạy
+  thực, hiệu suất, paper trading.
+- Hướng dẫn triển khai: [`docs/WEB_DEPLOY.md`](docs/WEB_DEPLOY.md). Lấy gợi ý nhanh bằng dòng lệnh: `./run.ps1`.
+
 ## Tiếp tục từ trạng thái hiện tại
 
 Đã có pipeline dataset bất biến → MLP đa khung + logistic baseline → calibration →
@@ -17,7 +25,7 @@ Smoke MLP mới: vốn 100 → **99,6459**, net **-0,3541%**, Max DD **0,9029%**
 Không đạt điều kiện ứng dụng. Không tune tiếp trên khoảng test đã mở.
 Kết quả Phase A là engine cũ; engine v2 sửa thứ tự TP/entry và funding, không so sánh ngang mà bỏ qua version.
 
-Dashboard local: `cd web`, `npm ci`, `npm run dev`, mở URL mà server in ra.
+Dashboard demo cũ (đã lưu trữ): `cd archive/legacy_web_dashboard`, `npm ci`, `npm run dev`.
 `npm run build` và kiểm tra TypeScript đã chạy thành công. Dữ liệu infer là snapshot,
 không có API tự cập nhật. Tái tạo infer bằng `scripts/generate_dashboard_data.py`;
 `--refresh-reports-only` chỉ cập nhật bảng backtest, không làm mới timestamp forecast.

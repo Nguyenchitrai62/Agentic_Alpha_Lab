@@ -73,7 +73,8 @@ def prepare(books, opens):
                 settle=settle_at_end, sig1h=sig1h)
 
 
-def simulate(books, opens, prep, m_sl=3.0, m_sleeve_sl=2.0, sleeve=True, target=0.25, cap=2.0, d_limit=D_LIMIT, win_end=60, sleeve_risk_budget=None, gap=0.02, m_sleeve_tp=1.0, rung_scale_fixed=None, size_mult=1.0, rungs=RUNGS, m_tp=None, hourly=False, align=None):
+def simulate(books, opens, prep, m_sl=3.0, m_sleeve_sl=2.0, sleeve=True, target=0.25, cap=2.0, d_limit=D_LIMIT, win_end=60, sleeve_risk_budget=None, gap=0.02, m_sleeve_tp=1.0, rung_scale_fixed=None, size_mult=1.0, rungs=RUNGS, m_tp=None, hourly=False, align=None, events=None, bars=None):
+    # events: optional list; when given, every fill / stop / take-profit / sleeve rung is appended as a dict (no effect on results)
     idx, cols = prep["idx"], prep["cols"]
     O, H, L, C = prep["O"], prep["H"], prep["L"], prep["C"]
     sig4, o1, o2, settle = prep["sig4"], prep["o1"], prep["o2"], prep["settle"]
@@ -156,6 +157,9 @@ def simulate(books, opens, prep, m_sl=3.0, m_sleeve_sl=2.0, sleeve=True, target=
             def apply_exit(ev):
                 nonlocal cur_q, cur_e
                 mm, px, fee, kind = ev
+                if events is not None:
+                    events.append(dict(t=idx[i] + pd.Timedelta(hours=4, minutes=int(mm)), symbol=cols[a], kind="book_" + kind[:-1],
+                                       side="sell" if cur_q > 0 else "buy", price=float(px), weight=float(-cur_q * px / (prev_eq if prev_eq else 1.0))))
                 carr[mm:] += cur_q * px - abs(cur_q) * px * fee
                 stats["fees"] += abs(cur_q) * px * fee
                 stats[kind] += 1
@@ -176,6 +180,9 @@ def simulate(books, opens, prep, m_sl=3.0, m_sleeve_sl=2.0, sleeve=True, target=
                 carr[fill_min:] -= dq * fill_px + abs(dq) * fill_px * MAKER
                 stats["fees"] += abs(dq) * fill_px * MAKER
                 qarr[fill_min:] = new_q
+                if events is not None:
+                    events.append(dict(t=idx[i] + pd.Timedelta(hours=4, minutes=int(fill_min)), symbol=cols[a], kind="book_fill",
+                                       side="buy" if dq > 0 else "sell", price=float(fill_px), weight=float(dw), target=float(tgt[a])))
                 cur_q = new_q
                 ev = first_exit(cur_q, fill_min, 240)
                 if ev is not None:
@@ -231,7 +238,7 @@ def simulate(books, opens, prep, m_sl=3.0, m_sleeve_sl=2.0, sleeve=True, target=
                 Ha, La, Ca, Oa = (X[i, :, a].astype(float) for X in (H, L, C, O))
                 tp = lv * (1 + m_sleeve_tp * sg)
                 sl = lv * (1 - m_sleeve_sl * sg)
-                x, ret = end_m, None
+                x, ret, xk = end_m, None, "rung_timeout"
                 if f + 1 < end_m:
                     hs = La[f + 1:end_m] <= sl
                     ht = Ha[f + 1:end_m] > tp
@@ -242,9 +249,11 @@ def simulate(books, opens, prep, m_sl=3.0, m_sleeve_sl=2.0, sleeve=True, target=
                         if hs[k]:
                             ret = min(sl, Oa[x]) / lv - 1 - MAKER - TAKER
                             stats["rung_stops"] += 1
+                            xk = "rung_sl"
                         else:
                             ret = tp / lv - 1 - 2 * MAKER
                             stats["rung_tps"] += 1
+                            xk = "rung_tp"
                 if ret is None:
                     if end_m >= 240:
                         ret = o2[i][a] / lv - 1 - MAKER - TAKER - (FUND_LONG if settle[i] else 0.0)
@@ -252,6 +261,12 @@ def simulate(books, opens, prep, m_sl=3.0, m_sleeve_sl=2.0, sleeve=True, target=
                         ret = Oa[end_m] / lv - 1 - MAKER - TAKER
                 taken.append((f, r, a, lv, x, ret, sg, rn))
                 sleeve_pnl += rn * ret
+                if events is not None:
+                    t0 = idx[i] + pd.Timedelta(hours=4)
+                    events.append(dict(t=t0 + pd.Timedelta(minutes=int(f)), symbol=cols[a], kind="rung_fill", side="buy", price=float(lv),
+                                       weight=float(rn), rung=float(rungs[r])))
+                    events.append(dict(t=t0 + pd.Timedelta(minutes=int(min(x, 240))), symbol=cols[a], kind=xk, side="sell",
+                                       price=float(lv * (1 + ret)), weight=float(rn), ret=float(ret)))
                 seg = np.zeros(240)
                 end = min(x, 240)
                 seg[f:end] = Ca[f:end] / lv - 1
@@ -274,6 +289,9 @@ def simulate(books, opens, prep, m_sl=3.0, m_sleeve_sl=2.0, sleeve=True, target=
         end_eq_rel = 1 + pnl
         w = np.where(np.isfinite(o2[i]), q * o2[i] / end_eq_rel, 0.0)
         net[i] = pnl
+        if bars is not None:
+            bars.append(dict(t=idx[i] + pd.Timedelta(hours=4), target=[float(x) for x in tgt], scale=float(s[i]), governor=float(g[i]),
+                             equity=float(eq[i]), sig_d=[float(x) for x in sd], open=[float(x) for x in o1[i]]))
     return summarize(idx, net, eq, eq_min, g, stats, eq_max)
 
 
