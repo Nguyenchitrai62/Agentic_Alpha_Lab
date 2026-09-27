@@ -41,6 +41,15 @@ Phân quyền:
 
 ## 3. Chạy backend
 
+**Cách nhanh:** double-click `run_backend.bat` ở gốc repo, hoặc chạy `.un_backend.ps1`. Script bật backend (cổng 8724) và
+connector Cloudflare tunnel, bỏ qua phần nào đang chạy rồi, sau đó kiểm tra `/health` cả cục bộ lẫn public.
+- `.un_backend.ps1 -Status`: chỉ xem trạng thái.
+- `.un_backend.ps1 -Stop`: tắt cả hai.
+
+Token tunnel đặt ở `CLOUDFLARE_TUNNEL_TOKEN` trong `.env` cục bộ, không commit.
+
+Cách chạy từng phần:
+
 ```powershell
 .venv\Scripts\python.exe -m pip install -r backend\requirements.txt   # nếu thiếu thư viện
 powershell -ExecutionPolicy Bypass -File deploy\start_backend.ps1          # chạy + tự khởi động lại khi lỗi
