@@ -73,11 +73,15 @@ def prepare(books, opens):
                 settle=settle_at_end, sig1h=sig1h)
 
 
-def simulate(books, opens, prep, m_sl=3.0, m_sleeve_sl=2.0, sleeve=True, target=0.25, cap=2.0, d_limit=D_LIMIT, win_end=60, sleeve_risk_budget=None, gap=0.02, m_sleeve_tp=1.0, rung_scale_fixed=None, size_mult=1.0, rungs=RUNGS, m_tp=None, hourly=False, align=None, events=None, bars=None, exec_policy=None):
+def simulate(books, opens, prep, m_sl=3.0, m_sleeve_sl=2.0, sleeve=True, target=0.25, cap=2.0, d_limit=D_LIMIT, win_end=60, sleeve_risk_budget=None, gap=0.02, m_sleeve_tp=1.0, rung_scale_fixed=None, size_mult=1.0, rungs=RUNGS, m_tp=None, hourly=False, align=None, events=None, bars=None, exec_policy=None, fixed_levels=False, attrib=None):
     # events: optional list; when given, every fill / stop / take-profit / sleeve rung is appended as a dict (no effect on results)
-    # exec_policy: optional callable (i, a, dw, w_a, tgt_a, sig4_ia) -> ("limit", offset) | ("market", 0) | ("skip", 0) deciding how
+    # exec_policy: optional callable (i, a, dw, w_a, tgt_a, sig4_ia) -> ("limit", offset[, weight]) | ("market", 0[, weight]) | ("skip", 0)
+    #   deciding how (and, with the optional weight, to which weight instead of the target)
     #   the book change of asset a at decision i is executed; None = limit d_limit (the audited default, unchanged results).
     #   market = taker fill at the minute-0 open of the holding bar; skip = no order this bar (position kept).
+    # fixed_levels: SL/TP use sigma_d of the bar the position was opened (or flipped) instead of the current bar's sigma,
+    #   so the levels only move when the average entry moves (never, when the policy sends no adds).
+    # attrib: optional list; per live bar appends (t, per-asset book PnL array, sleeve PnL), fractions of bar-start equity.
     idx, cols = prep["idx"], prep["cols"]
     O, H, L, C = prep["O"], prep["H"], prep["L"], prep["C"]
     sig4, o1, o2, settle = prep["sig4"], prep["o1"], prep["o2"], prep["settle"]
@@ -92,6 +96,7 @@ def simulate(books, opens, prep, m_sl=3.0, m_sleeve_sl=2.0, sleeve=True, target=
     net, g, eq, eq_min, eq_max = np.zeros(n), np.ones(n), np.ones(n), np.ones(n), np.ones(n)
     w = np.zeros(na)            # position weights at bar start (fraction of equity, drifted)
     entry = np.full(na, np.nan)  # average entry price per asset
+    entry_sd = np.full(na, np.nan)  # sigma_d at the opening of the current position (fixed_levels)
     stats = dict(fills=0, unfilled=0, stops=0, tps=0, rungs=0, rung_stops=0, rung_tps=0, liq=0, fees=0.0, funding=0.0, gross_sum=0.0, gross_max=0.0, bars=0)
     if exec_policy is not None:
         stats.update(market=0, skipped=0, limit_offset_sum=0.0)
@@ -113,6 +118,7 @@ def simulate(books, opens, prep, m_sl=3.0, m_sleeve_sl=2.0, sleeve=True, target=
         q = w / o1[i]                    # quantities (equity units per price unit)
         start_val = float((q * o1[i]).sum())
         path = np.zeros(240)             # mark-to-market PnL path (fraction of start equity)
+        asset_pnl = np.zeros(na)
         for a in range(na):
             Oa, Ha, La, Ca = (X[i, :, a].astype(float) for X in (O, H, L, C))
             if not np.isfinite(Oa[0]):
@@ -121,7 +127,9 @@ def simulate(books, opens, prep, m_sl=3.0, m_sleeve_sl=2.0, sleeve=True, target=
             dw = tgt[a] - w[a]
             fill_min, fill_px, fill_fee, fill_type = 999, np.nan, MAKER, "limit"
             if abs(dw) * prev_eq * ACCOUNT >= mins[a] or (tgt[a] == 0 and w[a] != 0):
-                how, off = ("limit", d_limit) if exec_policy is None else exec_policy(i, a, dw, w[a], tgt[a], sig4[i][a])
+                how, off, *over = ("limit", d_limit) if exec_policy is None else exec_policy(i, a, dw, w[a], tgt[a], sig4[i][a])
+                if over and over[0] is not None:  # the policy trades to its own weight (e.g. 0 = close fully)
+                    dw = over[0] - w[a]
                 if how == "market":
                     fill_min, fill_px, fill_fee, fill_type = 0, Oa[0], TAKER, "market"
                     stats["fills"] += 1
@@ -146,12 +154,13 @@ def simulate(books, opens, prep, m_sl=3.0, m_sleeve_sl=2.0, sleeve=True, target=
             exit_done = False
 
             def levels(qq, ee):
-                if qq == 0 or not np.isfinite(ee) or not np.isfinite(sd[a]):
+                sg = entry_sd[a] if fixed_levels and np.isfinite(entry_sd[a]) else sd[a]
+                if qq == 0 or not np.isfinite(ee) or not np.isfinite(sg):
                     return None, None
                 mt = 2 * m_sl if m_tp is None else m_tp
                 if qq > 0:
-                    return ee * (1 - m_sl * sd[a]), ee * (1 + mt * sd[a])
-                return ee * (1 + m_sl * sd[a]), ee * (1 - mt * sd[a])
+                    return ee * (1 - m_sl * sg), ee * (1 + mt * sg)
+                return ee * (1 + m_sl * sg), ee * (1 - mt * sg)
 
             def first_exit(qq, lo_m, hi_m):
                 sl, tp = levels(qq, cur_e)
@@ -181,6 +190,7 @@ def simulate(books, opens, prep, m_sl=3.0, m_sleeve_sl=2.0, sleeve=True, target=
                 stats[kind] += 1
                 qarr[mm:] = 0.0
                 cur_q, cur_e = 0.0, np.nan
+                entry_sd[a] = np.nan
 
             seg_end = fill_min + 1 if fill_min < 240 else 240  # stop on the held position wins a same-minute tie (audit v188)
             ev = first_exit(cur_q, 0, seg_end)
@@ -191,6 +201,7 @@ def simulate(books, opens, prep, m_sl=3.0, m_sleeve_sl=2.0, sleeve=True, target=
                 new_q = cur_q + dq
                 if cur_q == 0 or np.sign(new_q) != np.sign(cur_q):
                     cur_e = fill_px if new_q != 0 else np.nan
+                    entry_sd[a] = sd[a] if new_q != 0 else np.nan
                 elif abs(new_q) > abs(cur_q):
                     cur_e = (abs(cur_q) * cur_e + abs(dq) * fill_px) / abs(new_q)
                 carr[fill_min:] -= dq * fill_px + abs(dq) * fill_px * fill_fee
@@ -211,6 +222,7 @@ def simulate(books, opens, prep, m_sl=3.0, m_sleeve_sl=2.0, sleeve=True, target=
             stats["funding"] += fund
             path += val_path
             cash += end_val - qa * o1[i][a] - fund
+            asset_pnl[a] = end_val - qa * o1[i][a] - fund
             q[a], entry[a] = cur_q, cur_e
         # dip sleeve
         sleeve_pnl = 0.0
@@ -292,6 +304,8 @@ def simulate(books, opens, prep, m_sl=3.0, m_sleeve_sl=2.0, sleeve=True, target=
                 path += rn * seg
             stats["rungs"] += len(taken)
         pnl = cash + sleeve_pnl
+        if attrib is not None:
+            attrib.append((idx[i] + pd.Timedelta(hours=4), asset_pnl.copy(), float(sleeve_pnl)))
         eq[i] = prev_eq * (1 + pnl)
         eq_min[i] = prev_eq * (1 + min(0.0, float(path.min())))
         eq_max[i] = prev_eq * (1 + max(0.0, float(path.max())))

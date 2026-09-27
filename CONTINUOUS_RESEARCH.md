@@ -1,5 +1,13 @@
 # Continuous BTC research — active
 
+LEADER 2026-09-27 (v209, user: SL/TP move and most positions close by flips/rebalances - luck?): diagnostics of v205
+(no selection): book-only alpha 0.117%/day, Newey-West t 3.53, beta 0.08 (R2 0.03); 40 circular-shift placebo books
+all below the real book (real 3.60 vs placebo max 0.66 %/month 5y, mean -0.48); long-only |books| 1.91, -books -3.29.
+Book and sleeve are positive in every anchor year. Book profit comes from 50 episodes ridden to TP (SL -34%, flips and
+rebalances +27% net at ~49% win rate) - a trend-following profile; top-10 episodes 59% of book PnL. Discrete trades
+(one entry, fixed SL/TP, exit by SL/TP/flip/close) keep every dev year positive but dev4 4.09-4.40 / worst 0.74-1.60
+(vs 5.82 / 3.41): continuous vol-targeted sizing is part of the edge. v205 stays; v208 audit PASS.
+
 LEADER 2026-09-27 (v208, user: entries look like market, want explicit limits / market when useful): execution policy
 for the v205 book orders (engine_user exec_policy hook, default unchanged). Vol-scaled limit max(0.10%, 0.25 sigma_4h)
 (mean offset 0.35%, fills 41670 -> 33900): dev4 5.881 / worst 3.514 but gate DD 20.03; + market on strong opens (74
