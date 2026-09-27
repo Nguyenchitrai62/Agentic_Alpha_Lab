@@ -1,5 +1,12 @@
 # Continuous BTC research — active
 
+LEADER 2026-09-27 (v208, user: entries look like market, want explicit limits / market when useful): execution policy
+for the v205 book orders (engine_user exec_policy hook, default unchanged). Vol-scaled limit max(0.10%, 0.25 sigma_4h)
+(mean offset 0.35%, fills 41670 -> 33900): dev4 5.881 / worst 3.514 but gate DD 20.03; + market on strong opens (74
+orders): 5.853 / 3.51 / 20.17; + no-trade band (fills -> 7272): 5.628 / 3.29 / 20.13. All breach DD <= 20 -> v205
+stays (robust selection). Market entries do not pay the taker fee on 4h signals; the band removes 83% of the churn
+for -0.2pp/month. Web: every fill is now drawn at its exact price (the old flat box used the 162-fill average).
+
 LEADER 2026-09-26 (v165-v179, user: evaluation must match reality): engine_real (audited) adds actual signed funding,
 real carry fees, capital budget, min notional; v154 = 3.71%/month there; v170 60-minute limit rest -> 3.80 (audited).
 Deep learning failed again on Kaggle (v165 MLP-PLR/FT-Transformer, v167 GRU). NEW LEAD: intrabar drops >= k sigma below

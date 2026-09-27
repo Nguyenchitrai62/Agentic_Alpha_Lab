@@ -73,8 +73,11 @@ def prepare(books, opens):
                 settle=settle_at_end, sig1h=sig1h)
 
 
-def simulate(books, opens, prep, m_sl=3.0, m_sleeve_sl=2.0, sleeve=True, target=0.25, cap=2.0, d_limit=D_LIMIT, win_end=60, sleeve_risk_budget=None, gap=0.02, m_sleeve_tp=1.0, rung_scale_fixed=None, size_mult=1.0, rungs=RUNGS, m_tp=None, hourly=False, align=None, events=None, bars=None):
+def simulate(books, opens, prep, m_sl=3.0, m_sleeve_sl=2.0, sleeve=True, target=0.25, cap=2.0, d_limit=D_LIMIT, win_end=60, sleeve_risk_budget=None, gap=0.02, m_sleeve_tp=1.0, rung_scale_fixed=None, size_mult=1.0, rungs=RUNGS, m_tp=None, hourly=False, align=None, events=None, bars=None, exec_policy=None):
     # events: optional list; when given, every fill / stop / take-profit / sleeve rung is appended as a dict (no effect on results)
+    # exec_policy: optional callable (i, a, dw, w_a, tgt_a, sig4_ia) -> ("limit", offset) | ("market", 0) | ("skip", 0) deciding how
+    #   the book change of asset a at decision i is executed; None = limit d_limit (the audited default, unchanged results).
+    #   market = taker fill at the minute-0 open of the holding bar; skip = no order this bar (position kept).
     idx, cols = prep["idx"], prep["cols"]
     O, H, L, C = prep["O"], prep["H"], prep["L"], prep["C"]
     sig4, o1, o2, settle = prep["sig4"], prep["o1"], prep["o2"], prep["settle"]
@@ -90,6 +93,8 @@ def simulate(books, opens, prep, m_sl=3.0, m_sleeve_sl=2.0, sleeve=True, target=
     w = np.zeros(na)            # position weights at bar start (fraction of equity, drifted)
     entry = np.full(na, np.nan)  # average entry price per asset
     stats = dict(fills=0, unfilled=0, stops=0, tps=0, rungs=0, rung_stops=0, rung_tps=0, liq=0, fees=0.0, funding=0.0, gross_sum=0.0, gross_max=0.0, bars=0)
+    if exec_policy is not None:
+        stats.update(market=0, skipped=0, limit_offset_sum=0.0)
     minute = np.arange(240)
     for i in range(n):
         if i >= 2:
@@ -114,15 +119,26 @@ def simulate(books, opens, prep, m_sl=3.0, m_sleeve_sl=2.0, sleeve=True, target=
                 continue
             qa, ea = q[a], entry[a]
             dw = tgt[a] - w[a]
-            fill_min, fill_px = 999, np.nan
+            fill_min, fill_px, fill_fee, fill_type = 999, np.nan, MAKER, "limit"
             if abs(dw) * prev_eq * ACCOUNT >= mins[a] or (tgt[a] == 0 and w[a] != 0):
-                lim = Oa[0] * (1 - d_limit) if dw > 0 else Oa[0] * (1 + d_limit)
-                win = La[2:win_end] < lim if dw > 0 else Ha[2:win_end] > lim
-                if win.any():
-                    fill_min, fill_px = 2 + int(np.argmax(win)), lim
+                how, off = ("limit", d_limit) if exec_policy is None else exec_policy(i, a, dw, w[a], tgt[a], sig4[i][a])
+                if how == "market":
+                    fill_min, fill_px, fill_fee, fill_type = 0, Oa[0], TAKER, "market"
                     stats["fills"] += 1
+                    stats["market"] += 1
+                elif how == "skip":
+                    stats["skipped"] += 1
                 else:
-                    stats["unfilled"] += 1
+                    lim = Oa[0] * (1 - off) if dw > 0 else Oa[0] * (1 + off)
+                    win = La[2:win_end] < lim if dw > 0 else Ha[2:win_end] > lim
+                    fill_type = f"limit {100 * off:.2f}%"
+                    if win.any():
+                        fill_min, fill_px = 2 + int(np.argmax(win)), lim
+                        stats["fills"] += 1
+                        if exec_policy is not None:
+                            stats["limit_offset_sum"] += off
+                    else:
+                        stats["unfilled"] += 1
             dq = dw / o1[i][a] if fill_min < 999 else 0.0
             qarr = np.full(240, qa)
             carr = np.zeros(240)
@@ -177,12 +193,13 @@ def simulate(books, opens, prep, m_sl=3.0, m_sleeve_sl=2.0, sleeve=True, target=
                     cur_e = fill_px if new_q != 0 else np.nan
                 elif abs(new_q) > abs(cur_q):
                     cur_e = (abs(cur_q) * cur_e + abs(dq) * fill_px) / abs(new_q)
-                carr[fill_min:] -= dq * fill_px + abs(dq) * fill_px * MAKER
-                stats["fees"] += abs(dq) * fill_px * MAKER
+                carr[fill_min:] -= dq * fill_px + abs(dq) * fill_px * fill_fee
+                stats["fees"] += abs(dq) * fill_px * fill_fee
                 qarr[fill_min:] = new_q
                 if events is not None:
                     events.append(dict(t=idx[i] + pd.Timedelta(hours=4, minutes=int(fill_min)), symbol=cols[a], kind="book_fill",
-                                       side="buy" if dq > 0 else "sell", price=float(fill_px), weight=float(dw), target=float(tgt[a])))
+                                       side="buy" if dq > 0 else "sell", price=float(fill_px), weight=float(dw), target=float(tgt[a]),
+                                       entry_type=fill_type))
                 cur_q = new_q
                 ev = first_exit(cur_q, fill_min, 240)
                 if ev is not None:
