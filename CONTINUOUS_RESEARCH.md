@@ -1,5 +1,14 @@
 # Continuous BTC research — active
 
+LEADER 2026-09-28 (v210/v211, user: suggestions must be executable - one resting limit order, no fill in the first 5
+minutes after the close, in a position only SL/TP may change): engine_user trade mode (tests/test_engine_trade_mode.py).
+5-minute rule alone on continuous v205: dev4 5.58 / DD 19.88. Trade mode, full-target size: no management dev4 3.06
+(2021 -23%, DD 40); + break-even at +2 sigma_d and stop tightened on an opposite signal (T2): 4.47 / worst 0.52 / DD
+25.5, win rate 68% (half are break-even stops); + partial TP: 4.38 / DD 24.0. Selected T2, final 5y 4.25, last year
+3.38 -> gate fails. v211 risk sizing (1-2% per trade, optional 5% open-risk cap) is worse (dev4 2.3-3.7, 2022 losing,
+DD 23-33): sizing by signal strength carries the edge. The executable structure costs ~1.4pp/month and ~5pp DD vs
+continuous re-sizing. v208, v209 audits PASS.
+
 LEADER 2026-09-27 (v209, user: SL/TP move and most positions close by flips/rebalances - luck?): diagnostics of v205
 (no selection): book-only alpha 0.117%/day, Newey-West t 3.53, beta 0.08 (R2 0.03); 40 circular-shift placebo books
 all below the real book (real 3.60 vs placebo max 0.66 %/month 5y, mean -0.48); long-only |books| 1.91, -books -3.29.

@@ -73,7 +73,7 @@ def prepare(books, opens):
                 settle=settle_at_end, sig1h=sig1h)
 
 
-def simulate(books, opens, prep, m_sl=3.0, m_sleeve_sl=2.0, sleeve=True, target=0.25, cap=2.0, d_limit=D_LIMIT, win_end=60, sleeve_risk_budget=None, gap=0.02, m_sleeve_tp=1.0, rung_scale_fixed=None, size_mult=1.0, rungs=RUNGS, m_tp=None, hourly=False, align=None, events=None, bars=None, exec_policy=None, fixed_levels=False, attrib=None):
+def simulate(books, opens, prep, m_sl=3.0, m_sleeve_sl=2.0, sleeve=True, target=0.25, cap=2.0, d_limit=D_LIMIT, win_end=60, sleeve_risk_budget=None, gap=0.02, m_sleeve_tp=1.0, rung_scale_fixed=None, size_mult=1.0, rungs=RUNGS, m_tp=None, hourly=False, align=None, events=None, bars=None, exec_policy=None, fixed_levels=False, attrib=None, trade=None, win_start=2):
     # events: optional list; when given, every fill / stop / take-profit / sleeve rung is appended as a dict (no effect on results)
     # exec_policy: optional callable (i, a, dw, w_a, tgt_a, sig4_ia) -> ("limit", offset[, weight]) | ("market", 0[, weight]) | ("skip", 0)
     #   deciding how (and, with the optional weight, to which weight instead of the target)
@@ -82,6 +82,11 @@ def simulate(books, opens, prep, m_sl=3.0, m_sleeve_sl=2.0, sleeve=True, target=
     # fixed_levels: SL/TP use sigma_d of the bar the position was opened (or flipped) instead of the current bar's sigma,
     #   so the levels only move when the average entry moves (never, when the policy sends no adds).
     # attrib: optional list; per live bar appends (t, per-asset book PnL array, sleeve PnL), fractions of bar-start equity.
+    # win_start: first minute of the holding bar at which a new book limit may fill (2 = audited default; 5 = user rule
+    #   2026-09-28: the pipeline needs ~5 minutes after the close, no fill is allowed before).
+    # trade: optional dict -> discrete TRADE MODE for the book (see _trade_bar): one position per asset, opened by a resting
+    #   limit order issued at a decision and valid `n_valid` bars, never re-sized; while in a position only the SL/TP may be
+    #   changed (break-even, partial take-profit, tighten on an opposite signal); exits only by SL (market) or TP (limit).
     idx, cols = prep["idx"], prep["cols"]
     O, H, L, C = prep["O"], prep["H"], prep["L"], prep["C"]
     sig4, o1, o2, settle = prep["sig4"], prep["o1"], prep["o2"], prep["settle"]
@@ -101,6 +106,146 @@ def simulate(books, opens, prep, m_sl=3.0, m_sleeve_sl=2.0, sleeve=True, target=
     if exec_policy is not None:
         stats.update(market=0, skipped=0, limit_offset_sum=0.0)
     minute = np.arange(240)
+    if trade is not None:
+        stats.update(issued=0, cancelled=0, expired=0, partials=0, be_moves=0, tightened=0, risk_skipped=0)
+    T = dict(sl=np.full(na, np.nan), tp=np.full(na, np.nan), sd=np.full(na, np.nan), be=np.zeros(na, bool),
+             part=np.zeros(na, bool), side=np.zeros(na, int), px=np.full(na, np.nan), w=np.zeros(na), exp=np.full(na, -1),
+             psd=np.full(na, np.nan), issued=np.full(na, -1), risk=np.zeros(na))
+
+    def _ev(i, a, mm, kind, side, price, weight, **kw):
+        if events is not None:
+            events.append(dict(t=idx[i] + pd.Timedelta(hours=4, minutes=int(mm)), symbol=cols[a], kind=kind, side=side,
+                               price=float(price), weight=float(weight), **kw))
+
+    def _trade_bar(i, a, Oa, Ha, La, qa, ea, tg, prev_eq, sd_a, s4_a, g_i=1.0):
+        """Trade mode for one asset and one holding bar -> (cash path, quantity path, end quantity, entry)."""
+        carr, qarr = np.zeros(240), np.full(240, qa)
+        cur_q, cur_e = qa, ea
+        th = trade.get("theta", 0.05)
+        sgn = int(np.sign(tg)) if abs(tg) >= th else 0
+        m0 = 0
+        if cur_q == 0:
+            ps = int(T["side"][a])
+            if ps != 0 and ps != sgn:
+                stats["cancelled"] += 1
+                _ev(i, a, 0, "order_cancel", "buy" if ps > 0 else "sell", T["px"][a], 0.0)
+                T["side"][a] = ps = 0
+                T["risk"][a] = 0.0
+            elif ps != 0 and i >= T["exp"][a]:
+                stats["expired"] += 1
+                _ev(i, a, 0, "order_expire", "buy" if ps > 0 else "sell", T["px"][a], 0.0)
+                T["side"][a] = ps = 0
+                T["risk"][a] = 0.0
+            start = 0  # an order resting from an earlier bar may fill from minute 0
+            size, r_new = abs(tg), 0.0
+            if trade.get("risk") and np.isfinite(sd_a) and sd_a > 0:
+                # risk sizing: the loss at the initial stop = risk * governor (fraction of equity), capped weight
+                r_new = trade["risk"] * g_i
+                size = min(r_new / (m_sl * sd_a), trade.get("max_w", 1.0))
+                if trade.get("risk_cap") and ps == 0 and sgn != 0 and T["risk"].sum() + r_new > trade["risk_cap"] + 1e-12:
+                    stats["risk_skipped"] += 1
+                    size = 0.0
+            if ps == 0 and sgn != 0 and size > 0 and size * prev_eq * ACCOUNT >= mins[a] and np.isfinite(sd_a) and np.isfinite(s4_a):
+                off = max(trade.get("min_off", 0.001), trade.get("k_off", 0.25) * s4_a)
+                T["side"][a], T["px"][a], T["w"][a] = sgn, Oa[0] * (1 - sgn * off), size
+                T["risk"][a] = r_new
+                T["exp"][a], T["psd"][a], T["issued"][a] = i + trade.get("n_valid", 2), sd_a, i
+                stats["issued"] += 1
+                _ev(i, a, 0, "order_issue", "buy" if sgn > 0 else "sell", T["px"][a], sgn * size, offset=float(off))
+                ps, start = sgn, win_start  # a new order: no fill in the first minutes (pipeline run time)
+            if ps == 0:
+                return carr, qarr, 0.0, np.nan
+            px = T["px"][a]
+            hit = La[start:240] < px if ps > 0 else Ha[start:240] > px
+            if not hit.any():
+                return carr, qarr, 0.0, np.nan
+            m0 = start + int(np.argmax(hit))
+            dq = ps * T["w"][a] / px
+            carr[m0:] -= dq * px + abs(dq) * px * MAKER
+            stats["fees"] += abs(dq) * px * MAKER
+            stats["fills"] += 1
+            qarr[m0:] = dq
+            cur_q, cur_e = dq, px
+            sdv = T["psd"][a]
+            mt = 2 * m_sl if m_tp is None else m_tp
+            T["sl"][a], T["tp"][a], T["sd"][a] = px * (1 - ps * m_sl * sdv), px * (1 + ps * mt * sdv), sdv
+            T["be"][a] = T["part"][a] = False
+            T["side"][a] = 0
+            _ev(i, a, m0, "book_fill", "buy" if ps > 0 else "sell", px, ps * T["w"][a], entry_type="limit", sl=float(T["sl"][a]),
+                tp=float(T["tp"][a]), issued_bars_ago=int(i - T["issued"][a]))
+        else:
+            side = 1 if cur_q > 0 else -1
+            k_t = trade.get("tighten")
+            if k_t and sgn == -side and np.isfinite(sd_a):
+                new = Oa[0] * (1 - side * k_t * sd_a)
+                if (new - T["sl"][a]) * side > 0 and (Oa[0] - new) * side > 0:
+                    T["sl"][a] = new
+                    stats["tightened"] += 1
+                    _ev(i, a, 0, "sl_move", "sell" if side > 0 else "buy", new, 0.0, why="opposite signal")
+        side = 1 if cur_q > 0 else -1
+        m, ent, sdv = m0, cur_e, T["sd"][a]
+        while cur_q != 0 and m < 240:
+            sl, tp = T["sl"][a], T["tp"][a]
+            Ls, Hs = La[m:], Ha[m:]
+            hs = Ls <= sl if side > 0 else Hs >= sl
+            ht = Hs > tp if side > 0 else Ls < tp
+            none = np.zeros(len(Ls), bool)
+            tp1 = ent * (1 + side * trade["partial_k"] * sdv) if trade.get("partial_k") and not T["part"][a] else None
+            hp = none if tp1 is None else (Hs > tp1 if side > 0 else Ls < tp1)
+            trig = ent * (1 + side * trade["be_k"] * sdv) if trade.get("be_k") and not T["be"][a] else None
+            hb = none if trig is None else (Hs >= trig if side > 0 else Ls <= trig)
+            anyhit = hs | ht | hp | hb
+            if not anyhit.any():
+                break
+            k = int(np.argmax(anyhit))
+            mm = m + k
+            if hs[k]:  # stop first on any tie
+                px = min(sl, Oa[mm]) if side > 0 else max(sl, Oa[mm])
+                carr[mm:] += cur_q * px - abs(cur_q) * px * TAKER
+                stats["fees"] += abs(cur_q) * px * TAKER
+                stats["stops"] += 1
+                _ev(i, a, mm, "book_stop", "sell" if side > 0 else "buy", px, -cur_q * px / (prev_eq if prev_eq else 1.0))
+                qarr[mm:] = 0.0
+                cur_q = 0.0
+            elif ht[k]:
+                carr[mm:] += cur_q * tp - abs(cur_q) * tp * MAKER
+                stats["fees"] += abs(cur_q) * tp * MAKER
+                stats["tps"] += 1
+                _ev(i, a, mm, "book_tp", "sell" if side > 0 else "buy", tp, -cur_q * tp / (prev_eq if prev_eq else 1.0))
+                qarr[mm:] = 0.0
+                cur_q = 0.0
+            elif hp[k]:
+                f = trade.get("partial_frac", 0.5)
+                dq = cur_q * f
+                carr[mm:] += dq * tp1 - abs(dq) * tp1 * MAKER
+                stats["fees"] += abs(dq) * tp1 * MAKER
+                stats["partials"] += 1
+                cur_q -= dq
+                qarr[mm:] = cur_q
+                T["part"][a] = True
+                _ev(i, a, mm, "book_partial", "sell" if side > 0 else "buy", tp1, -dq * tp1 / (prev_eq if prev_eq else 1.0))
+                be_px = ent * (1 + side * trade.get("be_off", 0.001))
+                if (be_px - T["sl"][a]) * side > 0:
+                    T["sl"][a] = be_px
+                    T["risk"][a] = 0.0
+                    _ev(i, a, mm, "sl_move", "sell" if side > 0 else "buy", be_px, 0.0, why="break-even after partial")
+                T["be"][a] = True
+                m = mm + 1
+            else:
+                be_px = ent * (1 + side * trade.get("be_off", 0.001))
+                if (be_px - T["sl"][a]) * side > 0:
+                    T["sl"][a] = be_px
+                    stats["be_moves"] += 1
+                    T["risk"][a] = 0.0
+                    _ev(i, a, mm, "sl_move", "sell" if side > 0 else "buy", be_px, 0.0, why="break-even")
+                T["be"][a] = True
+                m = mm + 1
+        if cur_q == 0:
+            T["sl"][a] = T["tp"][a] = np.nan
+            T["risk"][a] = 0.0
+            return carr, qarr, 0.0, np.nan
+        return carr, qarr, cur_q, cur_e
+
     for i in range(n):
         if i >= 2:
             j = i - 2
@@ -124,97 +269,100 @@ def simulate(books, opens, prep, m_sl=3.0, m_sleeve_sl=2.0, sleeve=True, target=
             if not np.isfinite(Oa[0]):
                 continue
             qa, ea = q[a], entry[a]
-            dw = tgt[a] - w[a]
-            fill_min, fill_px, fill_fee, fill_type = 999, np.nan, MAKER, "limit"
-            if abs(dw) * prev_eq * ACCOUNT >= mins[a] or (tgt[a] == 0 and w[a] != 0):
-                how, off, *over = ("limit", d_limit) if exec_policy is None else exec_policy(i, a, dw, w[a], tgt[a], sig4[i][a])
-                if over and over[0] is not None:  # the policy trades to its own weight (e.g. 0 = close fully)
-                    dw = over[0] - w[a]
-                if how == "market":
-                    fill_min, fill_px, fill_fee, fill_type = 0, Oa[0], TAKER, "market"
-                    stats["fills"] += 1
-                    stats["market"] += 1
-                elif how == "skip":
-                    stats["skipped"] += 1
-                else:
-                    lim = Oa[0] * (1 - off) if dw > 0 else Oa[0] * (1 + off)
-                    win = La[2:win_end] < lim if dw > 0 else Ha[2:win_end] > lim
-                    fill_type = f"limit {100 * off:.2f}%"
-                    if win.any():
-                        fill_min, fill_px = 2 + int(np.argmax(win)), lim
+            if trade is not None:
+                carr, qarr, cur_q, cur_e = _trade_bar(i, a, Oa, Ha, La, qa, ea, tgt[a], prev_eq, sd[a], sig4[i][a], g[i])
+            else:
+                dw = tgt[a] - w[a]
+                fill_min, fill_px, fill_fee, fill_type = 999, np.nan, MAKER, "limit"
+                if abs(dw) * prev_eq * ACCOUNT >= mins[a] or (tgt[a] == 0 and w[a] != 0):
+                    how, off, *over = ("limit", d_limit) if exec_policy is None else exec_policy(i, a, dw, w[a], tgt[a], sig4[i][a])
+                    if over and over[0] is not None:  # the policy trades to its own weight (e.g. 0 = close fully)
+                        dw = over[0] - w[a]
+                    if how == "market":
+                        fill_min, fill_px, fill_fee, fill_type = 0, Oa[0], TAKER, "market"
                         stats["fills"] += 1
-                        if exec_policy is not None:
-                            stats["limit_offset_sum"] += off
+                        stats["market"] += 1
+                    elif how == "skip":
+                        stats["skipped"] += 1
                     else:
-                        stats["unfilled"] += 1
-            dq = dw / o1[i][a] if fill_min < 999 else 0.0
-            qarr = np.full(240, qa)
-            carr = np.zeros(240)
-            cur_q, cur_e = qa, ea
-            exit_done = False
+                        lim = Oa[0] * (1 - off) if dw > 0 else Oa[0] * (1 + off)
+                        win = La[win_start:win_end] < lim if dw > 0 else Ha[win_start:win_end] > lim
+                        fill_type = f"limit {100 * off:.2f}%"
+                        if win.any():
+                            fill_min, fill_px = win_start + int(np.argmax(win)), lim
+                            stats["fills"] += 1
+                            if exec_policy is not None:
+                                stats["limit_offset_sum"] += off
+                        else:
+                            stats["unfilled"] += 1
+                dq = dw / o1[i][a] if fill_min < 999 else 0.0
+                qarr = np.full(240, qa)
+                carr = np.zeros(240)
+                cur_q, cur_e = qa, ea
+                exit_done = False
 
-            def levels(qq, ee):
-                sg = entry_sd[a] if fixed_levels and np.isfinite(entry_sd[a]) else sd[a]
-                if qq == 0 or not np.isfinite(ee) or not np.isfinite(sg):
-                    return None, None
-                mt = 2 * m_sl if m_tp is None else m_tp
-                if qq > 0:
-                    return ee * (1 - m_sl * sg), ee * (1 + mt * sg)
-                return ee * (1 + m_sl * sg), ee * (1 - mt * sg)
+                def levels(qq, ee):
+                    sg = entry_sd[a] if fixed_levels and np.isfinite(entry_sd[a]) else sd[a]
+                    if qq == 0 or not np.isfinite(ee) or not np.isfinite(sg):
+                        return None, None
+                    mt = 2 * m_sl if m_tp is None else m_tp
+                    if qq > 0:
+                        return ee * (1 - m_sl * sg), ee * (1 + mt * sg)
+                    return ee * (1 + m_sl * sg), ee * (1 - mt * sg)
 
-            def first_exit(qq, lo_m, hi_m):
-                sl, tp = levels(qq, cur_e)
-                if sl is None or hi_m <= lo_m:
-                    return None
-                Ls, Hs = La[lo_m:hi_m], Ha[lo_m:hi_m]
-                hs = Ls <= sl if qq > 0 else Hs >= sl
-                ht = Hs > tp if qq > 0 else Ls < tp
-                hit = hs | ht
-                if not hit.any():
-                    return None
-                k = int(np.argmax(hit))
-                mm = lo_m + k
-                if hs[k]:
-                    px = min(sl, Oa[mm]) if qq > 0 else max(sl, Oa[mm])
-                    return mm, px, TAKER, "stops"
-                return mm, tp, MAKER, "tps"
+                def first_exit(qq, lo_m, hi_m):
+                    sl, tp = levels(qq, cur_e)
+                    if sl is None or hi_m <= lo_m:
+                        return None
+                    Ls, Hs = La[lo_m:hi_m], Ha[lo_m:hi_m]
+                    hs = Ls <= sl if qq > 0 else Hs >= sl
+                    ht = Hs > tp if qq > 0 else Ls < tp
+                    hit = hs | ht
+                    if not hit.any():
+                        return None
+                    k = int(np.argmax(hit))
+                    mm = lo_m + k
+                    if hs[k]:
+                        px = min(sl, Oa[mm]) if qq > 0 else max(sl, Oa[mm])
+                        return mm, px, TAKER, "stops"
+                    return mm, tp, MAKER, "tps"
 
-            def apply_exit(ev):
-                nonlocal cur_q, cur_e
-                mm, px, fee, kind = ev
-                if events is not None:
-                    events.append(dict(t=idx[i] + pd.Timedelta(hours=4, minutes=int(mm)), symbol=cols[a], kind="book_" + kind[:-1],
-                                       side="sell" if cur_q > 0 else "buy", price=float(px), weight=float(-cur_q * px / (prev_eq if prev_eq else 1.0))))
-                carr[mm:] += cur_q * px - abs(cur_q) * px * fee
-                stats["fees"] += abs(cur_q) * px * fee
-                stats[kind] += 1
-                qarr[mm:] = 0.0
-                cur_q, cur_e = 0.0, np.nan
-                entry_sd[a] = np.nan
+                def apply_exit(ev):
+                    nonlocal cur_q, cur_e
+                    mm, px, fee, kind = ev
+                    if events is not None:
+                        events.append(dict(t=idx[i] + pd.Timedelta(hours=4, minutes=int(mm)), symbol=cols[a], kind="book_" + kind[:-1],
+                                           side="sell" if cur_q > 0 else "buy", price=float(px), weight=float(-cur_q * px / (prev_eq if prev_eq else 1.0))))
+                    carr[mm:] += cur_q * px - abs(cur_q) * px * fee
+                    stats["fees"] += abs(cur_q) * px * fee
+                    stats[kind] += 1
+                    qarr[mm:] = 0.0
+                    cur_q, cur_e = 0.0, np.nan
+                    entry_sd[a] = np.nan
 
-            seg_end = fill_min + 1 if fill_min < 240 else 240  # stop on the held position wins a same-minute tie (audit v188)
-            ev = first_exit(cur_q, 0, seg_end)
-            if ev is not None:
-                apply_exit(ev)
-                exit_done = True
-            elif fill_min < 240:
-                new_q = cur_q + dq
-                if cur_q == 0 or np.sign(new_q) != np.sign(cur_q):
-                    cur_e = fill_px if new_q != 0 else np.nan
-                    entry_sd[a] = sd[a] if new_q != 0 else np.nan
-                elif abs(new_q) > abs(cur_q):
-                    cur_e = (abs(cur_q) * cur_e + abs(dq) * fill_px) / abs(new_q)
-                carr[fill_min:] -= dq * fill_px + abs(dq) * fill_px * fill_fee
-                stats["fees"] += abs(dq) * fill_px * fill_fee
-                qarr[fill_min:] = new_q
-                if events is not None:
-                    events.append(dict(t=idx[i] + pd.Timedelta(hours=4, minutes=int(fill_min)), symbol=cols[a], kind="book_fill",
-                                       side="buy" if dq > 0 else "sell", price=float(fill_px), weight=float(dw), target=float(tgt[a]),
-                                       entry_type=fill_type))
-                cur_q = new_q
-                ev = first_exit(cur_q, fill_min, 240)
+                seg_end = fill_min + 1 if fill_min < 240 else 240  # stop on the held position wins a same-minute tie (audit v188)
+                ev = first_exit(cur_q, 0, seg_end)
                 if ev is not None:
                     apply_exit(ev)
+                    exit_done = True
+                elif fill_min < 240:
+                    new_q = cur_q + dq
+                    if cur_q == 0 or np.sign(new_q) != np.sign(cur_q):
+                        cur_e = fill_px if new_q != 0 else np.nan
+                        entry_sd[a] = sd[a] if new_q != 0 else np.nan
+                    elif abs(new_q) > abs(cur_q):
+                        cur_e = (abs(cur_q) * cur_e + abs(dq) * fill_px) / abs(new_q)
+                    carr[fill_min:] -= dq * fill_px + abs(dq) * fill_px * fill_fee
+                    stats["fees"] += abs(dq) * fill_px * fill_fee
+                    qarr[fill_min:] = new_q
+                    if events is not None:
+                        events.append(dict(t=idx[i] + pd.Timedelta(hours=4, minutes=int(fill_min)), symbol=cols[a], kind="book_fill",
+                                           side="buy" if dq > 0 else "sell", price=float(fill_px), weight=float(dw), target=float(tgt[a]),
+                                           entry_type=fill_type))
+                    cur_q = new_q
+                    ev = first_exit(cur_q, fill_min, 240)
+                    if ev is not None:
+                        apply_exit(ev)
             val_path = carr + qarr * Ca - qa * o1[i][a]
             pnl_cash = carr[-1]
             end_val = pnl_cash + cur_q * o2[i][a]
@@ -323,7 +471,9 @@ def simulate(books, opens, prep, m_sl=3.0, m_sleeve_sl=2.0, sleeve=True, target=
         if bars is not None:
             bars.append(dict(t=idx[i] + pd.Timedelta(hours=4), target=[float(x) for x in tgt], scale=float(s[i]), governor=float(g[i]),
                              equity=float(eq[i]), sig_d=[float(x) for x in sd], open=[float(x) for x in o1[i]],
-                             entry=[float(x) for x in entry], qty=[float(x) for x in q]))
+                             entry=[float(x) for x in entry], qty=[float(x) for x in q],
+                             sl=[float(x) for x in T["sl"]], tp=[float(x) for x in T["tp"]],
+                             pending=[float(T["px"][k]) if T["side"][k] else float("nan") for k in range(na)]))
     return summarize(idx, net, eq, eq_min, g, stats, eq_max)
 
 
