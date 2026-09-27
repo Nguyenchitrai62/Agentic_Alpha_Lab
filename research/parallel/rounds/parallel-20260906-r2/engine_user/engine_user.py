@@ -114,7 +114,10 @@ def simulate(books, opens, prep, m_sl=3.0, m_sleeve_sl=2.0, sleeve=True, target=
              psd=np.full(na, np.nan), issued=np.full(na, -1), risk=np.zeros(na),
              # in-position order: ak +1 add / -1 reduce, price, add weight or reduce fraction, expiry, issue bar
              ak=np.zeros(na, int), apx=np.full(na, np.nan), aw=np.zeros(na), aexp=np.full(na, -1), aiss=np.full(na, -1),
-             nadd=np.zeros(na, int), nred=np.zeros(na, int))
+             nadd=np.zeros(na, int), nred=np.zeros(na, int), open_i=np.full(na, -1))
+    # trade["policy"](i, a, state) -> action; flat: "wait" | "open" | "open_deep"; in a position: "hold" | "reduce" | "close" |
+    # "add" | "tighten". The break-even rule, SL/TP, resting-order expiry and signal-loss cancel stay mechanical.
+    policy = trade.get("policy") if trade is not None else None
 
     def _ev(i, a, mm, kind, side, price, weight, **kw):
         if events is not None:
@@ -149,8 +152,15 @@ def simulate(books, opens, prep, m_sl=3.0, m_sleeve_sl=2.0, sleeve=True, target=
                 if trade.get("risk_cap") and ps == 0 and sgn != 0 and T["risk"].sum() + r_new > trade["risk_cap"] + 1e-12:
                     stats["risk_skipped"] += 1
                     size = 0.0
+            k_off = trade.get("k_off", 0.25)
+            if policy is not None and ps == 0 and sgn != 0:
+                act = policy(i, a, dict(pos=0, tg=tg, sgn=sgn, sd=sd_a, s4=s4_a, g=g_i, open=Oa[0], valid=("wait", "open", "open_deep")))
+                if act == "wait":
+                    size = 0.0
+                elif act == "open_deep":
+                    k_off = trade.get("k_off_deep", 0.75)
             if ps == 0 and sgn != 0 and size > 0 and size * prev_eq * ACCOUNT >= mins[a] and np.isfinite(sd_a) and np.isfinite(s4_a):
-                off = max(trade.get("min_off", 0.001), trade.get("k_off", 0.25) * s4_a)
+                off = max(trade.get("min_off", 0.001), k_off * s4_a)
                 T["side"][a], T["px"][a], T["w"][a] = sgn, Oa[0] * (1 - sgn * off), size
                 T["risk"][a] = r_new
                 T["exp"][a], T["psd"][a], T["issued"][a] = i + trade.get("n_valid", 2), sd_a, i
@@ -176,8 +186,43 @@ def simulate(books, opens, prep, m_sl=3.0, m_sleeve_sl=2.0, sleeve=True, target=
             T["be"][a] = T["part"][a] = False
             T["side"][a] = 0
             T["ak"][a], T["nadd"][a], T["nred"][a] = 0, 0, 0
+            T["open_i"][a] = i
             _ev(i, a, m0, "book_fill", "buy" if ps > 0 else "sell", px, ps * T["w"][a], entry_type="limit", sl=float(T["sl"][a]),
                 tp=float(T["tp"][a]), issued_bars_ago=int(i - T["issued"][a]))
+        elif policy is not None:
+            side = 1 if cur_q > 0 else -1
+            if T["ak"][a] != 0 and i >= T["aexp"][a]:
+                _ev(i, a, 0, "order_expire", "buy" if T["ak"][a] * side > 0 else "sell", T["apx"][a], 0.0, scale=int(T["ak"][a]))
+                T["ak"][a] = 0
+            if np.isfinite(s4_a):
+                cur_w = abs(cur_q) * Oa[0]
+                sde = T["sd"][a]
+                slot_free = T["ak"][a] == 0  # one resting in-position order at a time
+                can_add = slot_free and sgn == side and T["nadd"][a] < trade.get("max_adds", 1) and (abs(tg) - cur_w) * prev_eq * ACCOUNT >= mins[a]
+                valid = ("hold", "tighten") + (("reduce", "close") if slot_free else ()) + (("add",) if can_add else ())
+                st = dict(pos=side, w=cur_w, tg=tg, sgn=sgn, sd=sd_a, s4=s4_a, g=g_i, open=Oa[0],
+                          upnl=(Oa[0] / cur_e - 1) * side / sde if sde > 0 else 0.0, bars=i - T["open_i"][a], be=bool(T["be"][a]),
+                          nadd=int(T["nadd"][a]), nred=int(T["nred"][a]),
+                          dsl=(Oa[0] / T["sl"][a] - 1) * side / sde if sde > 0 else 0.0,
+                          dtp=(T["tp"][a] / Oa[0] - 1) * side / sde if sde > 0 else 0.0, valid=valid)
+                act = policy(i, a, st)
+                acts = {act} if isinstance(act, str) else set(act)  # several actions may be combined, e.g. {"tighten", "reduce"}
+                off = max(trade.get("min_off", 0.001), trade.get("k_off", 0.25) * s4_a)
+                if "tighten" in acts and np.isfinite(sd_a):
+                    new = Oa[0] * (1 - side * trade.get("tighten", 1.5) * sd_a)
+                    if (new - T["sl"][a]) * side > 0 and (Oa[0] - new) * side > 0:
+                        T["sl"][a] = new
+                        stats["tightened"] += 1
+                        _ev(i, a, 0, "sl_move", "sell" if side > 0 else "buy", new, 0.0, why="agent tighten")
+                if slot_free and (acts & {"reduce", "close"} or ("add" in acts and can_add)):
+                    if "add" in acts and can_add:
+                        T["ak"][a], T["apx"][a], T["aw"][a] = 1, Oa[0] * (1 - side * off), abs(tg) - cur_w
+                    else:
+                        T["ak"][a], T["apx"][a], T["aw"][a] = -1, Oa[0] * (1 + side * off), 1.0 if "close" in acts else trade.get("reduce_frac", 0.5)
+                    T["aexp"][a], T["aiss"][a] = i + trade.get("n_valid", 2), i
+                    stats["scale_orders"] += 1
+                    _ev(i, a, 0, "order_issue", "buy" if T["ak"][a] * side > 0 else "sell", T["apx"][a],
+                        side * T["aw"][a] if T["ak"][a] > 0 else 0.0, scale=int(T["ak"][a]), offset=float(off), agent="+".join(sorted(acts)))
         else:
             side = 1 if cur_q > 0 else -1
             k_t = trade.get("tighten")
