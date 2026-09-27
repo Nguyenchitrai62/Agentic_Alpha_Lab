@@ -92,9 +92,25 @@ def conn() -> sqlite3.Connection:
     return c
 
 
+# columns added after the first release: (table, column, type)
+MIGRATIONS = [
+    ("run_books", "held", "REAL"),        # position actually held after the bar (fraction of equity, signed)
+    ("run_books", "avg_entry", "REAL"),   # average entry of that position
+    ("run_books", "pos_sl", "REAL"),      # stop-loss / take-profit in force for it (move with avg entry and sigma)
+    ("run_books", "pos_tp", "REAL"),
+    ("orders", "avg_px", "REAL"),         # average entry after all adds (entry_px is the first fill)
+    ("orders", "fills", "INTEGER"),       # number of limit fills in the episode
+    ("orders", "entry_type", "TEXT"),     # how the first fill was made
+]
+
+
 def init() -> None:
     with _write_lock:
-        conn().executescript(SCHEMA)
+        c = conn()
+        c.executescript(SCHEMA)
+        for table, col, typ in MIGRATIONS:
+            if col not in {r[1] for r in c.execute(f"PRAGMA table_info({table})")}:
+                c.execute(f"ALTER TABLE {table} ADD COLUMN {col} {typ}")
 
 
 @contextmanager

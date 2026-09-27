@@ -97,7 +97,8 @@ def test_build_orders_episodes(backend):
     dip = [r for r in rows if r[1] == "dip"]
     assert len(book) == 2 and len(dip) == 1
     long_ = book[0]
-    assert long_[2] == "LONG" and abs(long_[5] - 105.0) < 1e-9 and abs(long_[8] - 0.20) < 1e-9
+    assert long_[2] == "LONG" and long_[5] == 100.0 and abs(long_[14] - 105.0) < 1e-9 and abs(long_[8] - 0.20) < 1e-9
+    assert long_[15] == 2  # two limit fills in the episode
     assert long_[12] == "TP" and long_[7] == 121.8 and abs(long_[13] - 100 * (121.8 / 105 - 1)) < 1e-9
     short = book[1]
     assert short[2] == "SHORT" and short[12] == "Rebalance về 0" and short[13] > 0  # 120 -> 118 on a short

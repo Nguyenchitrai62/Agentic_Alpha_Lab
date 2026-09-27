@@ -269,7 +269,7 @@
 
   // ================================================================== HISTORY
   const H = { chart: null, series: null, wSeries: null, prim: null, ws: null, candles: [], times: [], orders: [], pos: [],
-              noOlder: false, loadingOlder: false, gen: 0 };
+              posAt: [], fills: [], noOlder: false, loadingOlder: false, gen: 0 };
 
   function idxAt(t) { // last candle index with time <= t (or -1)
     const a = H.times; let lo = 0, hi = a.length - 1, r = -1;
@@ -285,30 +285,65 @@
     paneViews() { return [this._view]; }
     update() { this._p && this._p.requestUpdate(); }
     draw(target) {
-      if (!$("tZone").checked || !H.chart) return;
-      const ts = H.chart.timeScale(), s = H.series, last = H.times.length - 1;
-      target.useMediaCoordinateSpace(({ context: ctx, mediaSize }) => {
-        for (const o of H.orders) {
-          if (o.kind !== "book" || o.sl == null || o.tp == null) continue;
-          const i1 = idxAt(o.entry_t), i2 = o.exit_t ? idxAt(o.exit_t) : last;
-          if (i2 < 0) continue;
-          const x1 = ts.logicalToCoordinate(Math.max(i1, 0)), x2 = ts.logicalToCoordinate(i2);
-          if (x1 == null || x2 == null || x2 < -5 || x1 > mediaSize.width + 5) continue;
-          const ye = s.priceToCoordinate(o.entry_px), ysl = s.priceToCoordinate(o.sl), ytp = s.priceToCoordinate(o.tp);
-          if (ye == null || ysl == null || ytp == null) continue;
-          const sel = o.id === state.h.selected, w = Math.max(x2 - x1, 2);
-          ctx.fillStyle = sel ? "rgba(8,153,129,.28)" : "rgba(8,153,129,.10)";
-          ctx.fillRect(x1, Math.min(ye, ytp), w, Math.abs(ytp - ye));
-          ctx.fillStyle = sel ? "rgba(242,54,69,.28)" : "rgba(242,54,69,.10)";
-          ctx.fillRect(x1, Math.min(ye, ysl), w, Math.abs(ysl - ye));
-          ctx.fillStyle = o.side === "LONG" ? "#089981" : "#f23645";
-          ctx.fillRect(x1, ye - (sel ? 1 : 0.5), w, sel ? 2 : 1);
-          if (sel) {
-            const txt = `${o.side} ${pct(o.size, 0)} · ${o.pnl_pct == null ? "đang mở" : (o.pnl_pct >= 0 ? "+" : "") + o.pnl_pct.toFixed(2) + "%"} · ${REASON[o.exit_reason] || o.exit_reason}`;
+      if (!H.chart) return;
+      const ts = H.chart.timeScale(), s = H.series;
+      const vr = ts.getVisibleLogicalRange(); if (!vr) return;
+      const lo = Math.max(0, Math.floor(vr.from) - 1), hi = Math.min(H.times.length - 1, Math.ceil(vr.to) + 1);
+      const x0 = ts.logicalToCoordinate(lo), x1 = ts.logicalToCoordinate(lo + 1);
+      const bs = x0 != null && x1 != null ? Math.max(x1 - x0, 0.5) : 6; // bar spacing in px
+      const sel = H.orders.find((o) => o.id === state.h.selected);
+      const inSel = (t) => sel && t >= Math.floor(sel.entry_t / IV_MS[state.h.interval]) * IV_MS[state.h.interval] &&
+        (sel.exit_t == null || t <= sel.exit_t);
+      target.useMediaCoordinateSpace(({ context: ctx }) => {
+        // 1) the position actually held in each bar: average entry, and the stop-loss / take-profit in force for it
+        if ($("tZone").checked) {
+          for (let i = lo; i <= hi; i++) {
+            const p = H.posAt[i]; if (!p || !p.held || p.avg_entry == null) continue;
+            const x = ts.logicalToCoordinate(i); if (x == null) continue;
+            const ye = s.priceToCoordinate(p.avg_entry), ysl = s.priceToCoordinate(p.pos_sl), ytp = s.priceToCoordinate(p.pos_tp);
+            if (ye == null || ysl == null || ytp == null) continue;
+            const hl = inSel(H.times[i]), L = x - bs / 2;
+            ctx.fillStyle = hl ? "rgba(8,153,129,.26)" : "rgba(8,153,129,.09)"; ctx.fillRect(L, Math.min(ye, ytp), bs, Math.abs(ytp - ye));
+            ctx.fillStyle = hl ? "rgba(242,54,69,.26)" : "rgba(242,54,69,.09)"; ctx.fillRect(L, Math.min(ye, ysl), bs, Math.abs(ysl - ye));
+            ctx.fillStyle = p.held > 0 ? "rgba(8,153,129,.9)" : "rgba(242,54,69,.9)"; ctx.fillRect(L, ye - 0.75, bs, 1.5);
+          }
+        }
+        // 2) every fill at its exact price: ▲ buy limit, ▼ sell limit, ✕ stop-loss, ● take-profit; dip bids in orange
+        const tBook = $("tBook").checked, tDip = $("tDip").checked, minW = bs < 3 ? 0.03 : bs < 6 ? 0.01 : 0.002;
+        const t0 = H.times[lo], t1 = H.times[hi] + IV_MS[state.h.interval];
+        for (const f of H.fills) {
+          if (f.t < t0 || f.t >= t1) continue;
+          const dip = f.kind.startsWith("rung");
+          if ((dip && !tDip) || (!dip && !tBook)) continue;
+          const w = Math.abs(f.weight || 0);
+          if (f.kind === "book_fill" && w < minW && !inSel(f.t)) continue;
+          const i = idxAt(f.t), x = ts.logicalToCoordinate(i), y = s.priceToCoordinate(f.price);
+          if (x == null || y == null) continue;
+          const r = Math.min(8, 3 + 14 * Math.sqrt(w));
+          const col = dip ? "#ff9800" : f.side === "buy" ? "#26d9b0" : "#ff5b6b";
+          ctx.fillStyle = col; ctx.strokeStyle = "#0b0e14"; ctx.lineWidth = 1;
+          ctx.beginPath();
+          if (f.kind === "book_stop" || f.kind === "rung_sl") {
+            ctx.strokeStyle = "#ff5b6b"; ctx.lineWidth = 2;
+            ctx.moveTo(x - 5, y - 5); ctx.lineTo(x + 5, y + 5); ctx.moveTo(x + 5, y - 5); ctx.lineTo(x - 5, y + 5); ctx.stroke(); continue;
+          }
+          if (f.kind === "book_tp" || f.kind === "rung_tp" || f.kind === "rung_timeout") {
+            ctx.fillStyle = f.kind === "rung_timeout" ? "#9598a1" : dip ? "#ff9800" : "#26d9b0";
+            ctx.arc(x, y, f.kind === "book_tp" ? 5 : 3, 0, 2 * Math.PI); ctx.fill(); ctx.stroke(); continue;
+          }
+          if (f.side === "buy") { ctx.moveTo(x, y); ctx.lineTo(x - r, y + r * 1.4); ctx.lineTo(x + r, y + r * 1.4); }
+          else { ctx.moveTo(x, y); ctx.lineTo(x - r, y - r * 1.4); ctx.lineTo(x + r, y - r * 1.4); }
+          ctx.closePath(); ctx.fill(); ctx.stroke();
+        }
+        // 3) label of the selected order
+        if (sel) {
+          const i = idxAt(sel.entry_t), x = ts.logicalToCoordinate(i), y = s.priceToCoordinate(sel.entry_px);
+          if (x != null && y != null) {
+            const txt = `${sel.side} · khớp đầu ${fmtPx(sel.entry_px)} · ${sel.fills} lần khớp · ${sel.pnl_pct == null ? "đang mở" : (sel.pnl_pct >= 0 ? "+" : "") + sel.pnl_pct.toFixed(2) + "%"} (${REASON[sel.exit_reason] || sel.exit_reason})`;
             ctx.font = "600 11px Inter, sans-serif";
-            const tw = ctx.measureText(txt).width + 12, y = Math.min(ye, ytp, ysl) - 20;
-            ctx.fillStyle = "rgba(30,34,45,.92)"; ctx.fillRect(x1, y, tw, 18);
-            ctx.fillStyle = o.pnl_pct == null ? "#d1d4dc" : o.pnl_pct >= 0 ? "#089981" : "#f23645"; ctx.fillText(txt, x1 + 6, y + 13);
+            const tw = ctx.measureText(txt).width + 12, yy = sel.side === "LONG" ? y + 16 : y - 34;
+            ctx.fillStyle = "rgba(30,34,45,.94)"; ctx.fillRect(x - 6, yy, tw, 18);
+            ctx.fillStyle = sel.pnl_pct == null ? "#d1d4dc" : sel.pnl_pct >= 0 ? "#26d9b0" : "#ff5b6b"; ctx.fillText(txt, x, yy + 13);
           }
         }
       });
@@ -326,7 +361,7 @@
         (x) => ({ all: "Tất cả", book: "Lệnh 4h", dip: "Dip" })[x]);
       seg($("oResult"), ["all", "win", "loss", "open"], state.h.result, (v) => { state.h.result = v; renderOrders(); },
         (x) => ({ all: "Mọi kết quả", win: "Lãi", loss: "Lỗ", open: "Đang mở" })[x]);
-      for (const id of ["tBook", "tDip"]) $(id).onchange = () => setMarkers();
+      for (const id of ["tBook", "tDip"]) $(id).onchange = () => { setMarkers(); H.prim && H.prim.update(); };
       $("tZone").onchange = () => H.prim && H.prim.update();
       $("tWeight").onchange = () => H.wSeries && H.wSeries.applyOptions({ visible: $("tWeight").checked });
       $("zIn").onclick = () => zoom(0.6); $("zOut").onclick = () => zoom(1 / 0.6);
@@ -375,15 +410,16 @@
     const { symbol, interval } = state.h;
     $("hLoading").hidden = false;
     try {
-      const [cand, orders, pos] = await Promise.all([
+      const [cand, orders, pos, fills] = await Promise.all([
         api(`/api/candles?symbol=${symbol}&interval=${interval}&limit=${FIRST_LOAD[interval]}`),
         api(`/api/orders?symbol=${symbol}&source=walkforward&limit=30000`),
         api(`/api/positions?symbol=${symbol}&source=walkforward&limit=30000`),
+        api(`/api/trades?symbol=${symbol}&source=walkforward&limit=30000`),
       ]);
       if (gen !== H.gen) return;
       if (H.chart) { H.chart.remove(); H.chart = null; }
       if (H.ws) { H.ws.close(); H.ws = null; }
-      H.candles = cand; H.times = cand.map((c) => c.t); H.orders = orders.slice().reverse(); H.pos = pos; H.noOlder = false;
+      H.candles = cand; H.times = cand.map((c) => c.t); H.orders = orders.slice().reverse(); H.pos = pos; H.fills = fills; H.noOlder = false;
       const c = H.chart = makeChart($("hChart"));
       H.series = c.addCandlestickSeries({ upColor: "#089981", downColor: "#f23645", borderVisible: false, wickUpColor: "#089981",
         wickDownColor: "#f23645", priceFormat: { type: "custom", formatter: fmtPx, minMove: 0.00001 } });
@@ -442,37 +478,36 @@
     H.chart.timeScale().setVisibleLogicalRange({ from: i, to: H.times.length + 8 });
   }
 
-  function setWeights() {
+  function setWeights() { // position record in force for every candle (4h decision rows mapped onto 1h / 1D candles)
+    const pos = H.pos, daily = state.h.interval === "1d"; let j = -1;
+    H.posAt = H.candles.map((k) => {
+      while (j + 1 < pos.length && pos[j + 1].t <= k.t + (daily ? IV_MS["1d"] - IV_MS["4h"] : 0)) j++;
+      return j >= 0 && k.t - pos[j].t < IV_MS[daily ? "1d" : "4h"] ? pos[j] : null;
+    });
     if (!H.wSeries) return;
-    const pos = H.pos; let j = -1; const step = IV_MS[state.h.interval];
-    H.wSeries.setData(H.candles.map((k) => {
-      while (j + 1 < pos.length && pos[j + 1].t <= k.t) j++;
-      const p = j >= 0 && k.t - pos[j].t < step + IV_MS["4h"] ? pos[j] : null;
-      return { time: toChart(k.t), value: p ? p.weight * 100 : 0, color: p && p.weight < 0 ? "rgba(242,54,69,.45)" : "rgba(41,98,255,.45)" };
+    H.wSeries.setData(H.candles.map((k, i) => {
+      const p = H.posAt[i], v = p ? (p.held ?? p.weight) : 0;
+      return { time: toChart(k.t), value: v * 100, color: v < 0 ? "rgba(242,54,69,.45)" : "rgba(41,98,255,.45)" };
     }));
   }
 
-  function setMarkers() {
+  function setMarkers() { // only the selected order; the primitive draws every fill at its exact price
     if (!H.series) return;
-    const showBook = $("tBook").checked, showDip = $("tDip").checked, out = [], seen = new Set();
-    const add = (t, m, key) => { const i = idxAt(t); if (i < 0 || seen.has(i + key)) return; seen.add(i + key); out.push({ time: toChart(H.times[i]), ...m }); };
-    for (const o of H.orders) {
-      if (o.kind === "book" && showBook) {
-        const L = o.side === "LONG", sel = o.id === state.h.selected;
-        add(o.entry_t, L ? { position: "belowBar", color: "#089981", shape: "arrowUp", text: sel ? "LONG" : "L" }
-                         : { position: "aboveBar", color: "#f23645", shape: "arrowDown", text: sel ? "SHORT" : "S" }, "e" + o.id);
-        const hit = o.exit_reason === "TP" || o.exit_reason === "SL";
-        if (o.exit_t) add(o.exit_t, { position: L ? "aboveBar" : "belowBar", color: o.pnl_pct >= 0 ? "#089981" : "#f23645", shape: "circle",
-          text: sel || hit ? `${hit ? o.exit_reason + " " : ""}${o.pnl_pct >= 0 ? "+" : ""}${o.pnl_pct.toFixed(1)}%` : "" }, "x" + o.id);
-      } else if (o.kind === "dip" && showDip) {
-        add(o.entry_t, { position: "belowBar", color: "#ff9800", shape: "arrowUp", text: "" }, "d");
-        if (o.exit_reason === "SL") add(o.exit_t, { position: "belowBar", color: "#f23645", shape: "square", text: "SL dip" }, "ds");
-      }
+    const o = H.orders.find((x) => x.id === state.h.selected), out = [];
+    if (o) {
+      const L = o.side === "LONG", i = idxAt(o.entry_t);
+      if (i >= 0) out.push({ time: toChart(H.times[i]), position: L ? "belowBar" : "aboveBar", color: L ? "#26d9b0" : "#ff5b6b",
+        shape: L ? "arrowUp" : "arrowDown", text: `Mở ${o.side}` });
+      const k = o.exit_t ? idxAt(o.exit_t) : -1;
+      if (k >= 0) out.push({ time: toChart(H.times[k]), position: L ? "aboveBar" : "belowBar", color: o.pnl_pct >= 0 ? "#26d9b0" : "#ff5b6b",
+        shape: "circle", text: `${REASON[o.exit_reason] || o.exit_reason} ${o.pnl_pct >= 0 ? "+" : ""}${o.pnl_pct.toFixed(2)}%` });
+      out.sort((a, b) => a.time - b.time);
     }
-    out.sort((a, b) => a.time - b.time);
     H.series.setMarkers(out);
   }
 
+  const KINDVI = { book_fill: "khớp limit", book_stop: "stop-loss", book_tp: "take-profit", rung_fill: "khớp dip", rung_tp: "TP dip",
+                  rung_sl: "SL dip", rung_timeout: "đóng dip" };
   function onCrosshair(p) {
     const { symbol, interval } = state.h;
     let i = H.times.length - 1;
@@ -480,11 +515,15 @@
     const k = H.candles[i];
     if (!k) { $("hLegend").innerHTML = ""; return; }
     const ch = (k.c / k.o - 1) * 100, cls = ch >= 0 ? "up" : "down";
-    const act = H.orders.find((o) => o.kind === "book" && o.entry_t <= k.t + IV_MS[interval] && (o.exit_t == null || o.exit_t >= k.t));
+    const ps = H.posAt[i], step = IV_MS[interval];
+    const inBar = H.fills.filter((f) => f.t >= k.t && f.t < k.t + step && (f.kind !== "book_fill" || Math.abs(f.weight) >= 0.002)).slice(0, 4);
+    const fl = inBar.map((f) => `<span class="${f.side === "buy" ? "up" : "down"}">${f.side === "buy" ? "▲ mua" : "▼ bán"}</span> ${KINDVI[f.kind] || f.kind} ${fmtPx(f.price)}` +
+      (f.kind === "book_fill" ? ` <span class="muted">(${pct(Math.abs(f.weight))} vốn, ${((f.price / k.o - 1) * 100).toFixed(2)}% so với giá mở)</span>` : "")).join(" · ");
     $("hLegend").innerHTML = `<div class="l1">${coin(symbol)}USDT.P · ${IV_LABEL[interval]} · Binance <span class="muted small">${dt(k.t)}</span></div>
       <div class="ohlc">O <b class="${cls}">${fmtPx(k.o)}</b> H <b class="${cls}">${fmtPx(k.h)}</b> L <b class="${cls}">${fmtPx(k.l)}</b> C <b class="${cls}">${fmtPx(k.c)}</b> <b class="${cls}">${ch >= 0 ? "+" : ""}${ch.toFixed(2)}%</b></div>
-      <div>${act ? `${sideBadge(act.side, act.size)} <span class="muted">vào ${fmtPx(act.entry_px)} · SL ${fmtPx(act.sl)} · TP ${fmtPx(act.tp)} · phát ${dt(act.signal_t)}</span>`
-        : '<span class="badge flat">Không có vị thế 4h</span>'}</div>`;
+      <div>${ps && ps.held ? `${sideBadge(ps.held > 0 ? "LONG" : "SHORT", ps.held)} <span class="muted">giá vào TB ${fmtPx(ps.avg_entry)} · SL ${fmtPx(ps.pos_sl)} · TP ${fmtPx(ps.pos_tp)} · mục tiêu ${pct(ps.weight)}</span>`
+        : '<span class="badge flat">Không giữ vị thế 4h</span>'}</div>
+      ${fl ? `<div>${fl}</div>` : ""}`;
   }
 
   function pickOrderAt(t) {
@@ -508,11 +547,12 @@
       <span>Từ <b>${first ? dt(first) : "—"}</b></span>`;
     const rows = list.slice().reverse().slice(0, 800).map((o) => `<tr class="click ${o.id === state.h.selected ? "sel" : ""}" data-id="${o.id}">
       <td>${dt(o.signal_t)}</td><td>${o.kind === "dip" ? '<span class="badge dip">DIP</span>' : "4h"}</td><td>${sideBadge(o.side)}</td>
-      <td>${fmtPx(o.entry_px)}</td><td class="down">${fmtPx(o.sl)}</td><td class="up">${fmtPx(o.tp)}</td><td>${pct(o.size)}</td>
-      <td>${dt(o.entry_t)}</td><td>${o.exit_t ? dt(o.exit_t) : "—"}</td><td>${fmtPx(o.exit_px)}</td>
+      <td title="khớp lúc ${dt(o.entry_t)}">${fmtPx(o.entry_px)}</td><td>${fmtPx(o.avg_px ?? o.entry_px)}</td><td>${o.fills ?? 1}</td>
+      <td class="down">${fmtPx(o.sl)}</td><td class="up">${fmtPx(o.tp)}</td><td>${pct(o.size)}</td>
+      <td>${o.exit_t ? dt(o.exit_t) : "—"}</td><td>${fmtPx(o.exit_px)}</td>
       <td>${esc(REASON[o.exit_reason] || o.exit_reason || "")}</td><td>${o.pnl_pct == null ? '<span class="muted">đang mở</span>' : sgn(o.pnl_pct)}</td></tr>`);
-    table($("ordersTbl"), ["Phát lúc (nến 4h)", "Loại", "Hướng", "Giá vào", "SL", "TP", "Tỷ trọng", "Khớp lúc", "Thoát lúc", "Giá thoát", "Lý do", "Kết quả"],
-      rows, "Không có lệnh");
+    table($("ordersTbl"), ["Phát lúc (nến 4h)", "Loại", "Hướng", "Khớp đầu", "Giá vào TB", "Số lần khớp", "SL lúc thoát", "TP lúc thoát",
+      "Tỷ trọng max", "Thoát lúc", "Giá thoát", "Lý do", "Kết quả (theo giá TB)"], rows, "Không có lệnh");
     $("ordersTbl").onclick = (e) => { const tr = e.target.closest("tr[data-id]"); if (tr) selectOrder(+tr.dataset.id, true); };
   }
 

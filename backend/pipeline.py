@@ -173,7 +173,7 @@ def build_orders(events: list[dict], bars: list[dict], cols: list[str]) -> list[
                 ft, fp, fw = pending.pop(sym)
                 reason = {"rung_tp": "TP", "rung_sl": "SL", "rung_timeout": "Hết 4h (market)"}[kind]
                 rows.append((sym, "dip", "LONG", ft // H4 * H4, ft, fp, None,
-                             None, fw, 0, t, e["price"], reason, 100 * (e["price"] / fp - 1)))
+                             None, fw, 0, t, e["price"], reason, 100 * (e["price"] / fp - 1), fp, 1, "limit (dip)"))
             continue
     for sym in cols:
         evs = sorted((e for e in events if e["symbol"] == sym and e["kind"].startswith("book")), key=lambda e: e["t"])
@@ -182,7 +182,7 @@ def build_orders(events: list[dict], bars: list[dict], cols: list[str]) -> list[
         def levels(t):  # the engine's stop / take-profit for the average entry, with sigma_d of the bar at t
             sd = sig.get((t // H4 * H4, sym)) or sig.get((t // H4 * H4 - H4, sym))
             k = 1 if o["side"] == "LONG" else -1
-            return (o["entry_px"] * (1 - k * 4 * sd), o["entry_px"] * (1 + k * 8 * sd)) if sd else (o["sl"], o["tp"])
+            return (o["avg_px"] * (1 - k * 4 * sd), o["avg_px"] * (1 + k * 8 * sd)) if sd else (o["sl"], o["tp"])
 
         def close(t, px, reason):
             nonlocal o
@@ -193,16 +193,17 @@ def build_orders(events: list[dict], bars: list[dict], cols: list[str]) -> list[
             elif reason == "SL" and sl is not None and (px - sl) * side > 0:
                 sl = px  # the level in force was at the fill (a gap-through fills beyond it and keeps sl)
             rows.append((sym, "book", o["side"], o["signal_t"], o["entry_t"], o["entry_px"], sl, tp, o["size"],
-                         o["adds"], t, px, reason, 100 * side * (px / o["entry_px"] - 1)))
+                         o["adds"], t, px, reason, 100 * side * (px / o["avg_px"] - 1), o["avg_px"], o["fills"], o["entry_type"]))
             o = None
 
-        def open_(t, px, size):
+        def open_(t, px, size, e):
             nonlocal o
             side = "LONG" if size > 0 else "SHORT"
             sd = sig.get((t // H4 * H4, sym))
             k = 1 if size > 0 else -1
-            o = dict(side=side, signal_t=t // H4 * H4, entry_t=t, entry_px=px, size=abs(size), adds=0,
-                     sl=px * (1 - k * 4 * sd) if sd else None, tp=px * (1 + k * 8 * sd) if sd else None)
+            o = dict(side=side, signal_t=t // H4 * H4, entry_t=t, entry_px=px, avg_px=px, size=abs(size), adds=0, fills=1,
+                     sl=px * (1 - k * 4 * sd) if sd else None, tp=px * (1 + k * 8 * sd) if sd else None,
+                     entry_type=e.get("entry_type", "limit"))
 
         for e in evs:
             t, px = _ms(e["t"]), e["price"]
@@ -214,21 +215,23 @@ def build_orders(events: list[dict], bars: list[dict], cols: list[str]) -> list[
             new = pos + e["weight"]
             if o is None:
                 if abs(new) >= OPEN_EPS:
-                    open_(t, px, new)
+                    open_(t, px, new, e)
             elif (new > 0) != (o["side"] == "LONG") and abs(new) >= CLOSE_EPS:
                 close(t, px, "Đảo chiều")
                 if abs(new) >= OPEN_EPS:
-                    open_(t, px, new)
+                    open_(t, px, new, e)
             elif abs(new) < CLOSE_EPS:
                 close(t, px, "Rebalance về 0")
-            elif abs(new) > abs(pos):
-                o["entry_px"] = (o["entry_px"] * abs(pos) + px * (abs(new) - abs(pos))) / abs(new)
-                o["size"], o["adds"] = max(o["size"], abs(new)), o["adds"] + 1
+            else:
+                o["fills"] += 1
+                if abs(new) > abs(pos):
+                    o["avg_px"] = (o["avg_px"] * abs(pos) + px * (abs(new) - abs(pos))) / abs(new)
+                    o["size"], o["adds"] = max(o["size"], abs(new)), o["adds"] + 1
             pos = new
         if o:  # still open at the end of the replay
             sl, tp = levels(_ms(bars[-1]["t"]))
             rows.append((sym, "book", o["side"], o["signal_t"], o["entry_t"], o["entry_px"], sl, tp, o["size"],
-                         o["adds"], None, None, "Đang mở", None))
+                         o["adds"], None, None, "Đang mở", None, o["avg_px"], o["fills"], o["entry_type"]))
     return rows
 
 
@@ -255,7 +258,7 @@ def job_walkforward() -> str:
         c.execute("DELETE FROM orders WHERE source = 'walkforward'")
         orders = build_orders(events, bars, cols)
         c.executemany("INSERT INTO orders(source, symbol, kind, side, signal_t, entry_t, entry_px, sl, tp, size, adds, exit_t, exit_px, "
-                      "exit_reason, pnl_pct) VALUES('walkforward',?,?,?,?,?,?,?,?,?,?,?,?,?,?)", orders)
+                      "exit_reason, pnl_pct, avg_px, fills, entry_type) VALUES('walkforward',?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)", orders)
         now = db.now_ms()
         for b in bars:
             t = _ms(b["t"])
@@ -264,16 +267,23 @@ def job_walkforward() -> str:
             recs = []
             for j, sym in enumerate(cols):
                 w, sd, o = b["target"][j], b["sig_d"][j], b["open"][j]
+                held = b["qty"][j] * o if np.isfinite(o) else 0.0
+                ae = b["entry"][j]
+                if abs(held) > 1e-6 and np.isfinite(ae) and np.isfinite(sd):
+                    k = 1 if held > 0 else -1
+                    pos = (held, ae, ae * (1 - k * 4 * sd), ae * (1 + k * 8 * sd))
+                else:
+                    pos = (0.0, None, None, None)
                 side = "LONG" if w > 0.005 else ("SHORT" if w < -0.005 else "FLAT")
                 if side == "FLAT" or not np.isfinite(sd) or not np.isfinite(o):
-                    recs.append((rid, sym, side, w, None, None, None, None, None, None))
+                    recs.append((rid, sym, side, w, None, None, None, None, None, None) + pos)
                     continue
                 entry = o * (1 - 0.001) if w > 0 else o * (1 + 0.001)
                 sl = entry * (1 - 4 * sd) if w > 0 else entry * (1 + 4 * sd)
                 tp = entry * (1 + 8 * sd) if w > 0 else entry * (1 - 8 * sd)
-                recs.append((rid, sym, side, w, entry, sl, tp, None, None, None))
-            c.executemany("INSERT INTO run_books(run_id, symbol, side, weight, entry, sl, tp, confidence, strength, members_agree) "
-                          "VALUES(?,?,?,?,?,?,?,?,?,?)", recs)
+                recs.append((rid, sym, side, w, entry, sl, tp, None, None, None) + pos)
+            c.executemany("INSERT INTO run_books(run_id, symbol, side, weight, entry, sl, tp, confidence, strength, members_agree, "
+                          "held, avg_entry, pos_sl, pos_tp) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)", recs)
         c.executemany("INSERT INTO trades(source, t, symbol, kind, side, price, weight, extra) VALUES('walkforward',?,?,?,?,?,?,?)",
                       [(_ms(e["t"]), e["symbol"], e["kind"], e.get("side"), e.get("price"), e.get("weight"),
                         json.dumps({k: v for k, v in e.items() if k not in ("t", "symbol", "kind", "side", "price", "weight")}))

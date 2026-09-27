@@ -209,13 +209,14 @@ def positions(request: Request, symbol: str, source: str = "walkforward", start:
     a, b = _ms_range(start, end)
     key = f"pos:{source}:{sym}:{a}:{b}:{limit}"
     return cached(request, key, 60, lambda: list(reversed(db.rows(
-        "SELECT r.decision_time AS t, k.weight, k.side, k.entry, k.sl, k.tp FROM runs r JOIN run_books k ON k.run_id = r.id AND k.symbol = ? "
+        "SELECT r.decision_time AS t, k.weight, k.side, k.entry, k.sl, k.tp, k.held, k.avg_entry, k.pos_sl, k.pos_tp "
+        "FROM runs r JOIN run_books k ON k.run_id = r.id AND k.symbol = ? "
         "WHERE r.source = ? AND r.decision_time BETWEEN ? AND ? ORDER BY r.decision_time DESC LIMIT ?", (sym, source, a, b, limit)))))
 
 
 @app.get("/api/trades")
 def trades(request: Request, symbol: str, source: str = "walkforward", start: str | None = None, end: str | None = None,
-           limit: int = Query(2000, ge=1, le=MAX_ROWS), user: dict = Depends(auth.require_viewer)):
+           limit: int = Query(2000, ge=1, le=MAX_CANDLES), user: dict = Depends(auth.require_viewer)):
     sym = _check_symbol(symbol)
     a, b = _ms_range(start, end)
     key = f"trades:{source}:{sym}:{a}:{b}:{limit}"
@@ -235,7 +236,8 @@ def orders(request: Request, symbol: str | None = None, source: str = "walkforwa
         where.append("symbol = ?"); args.append(_check_symbol(symbol))
     if kind in ("book", "dip"):
         where.append("kind = ?"); args.append(kind)
-    sql = (f"SELECT id, symbol, kind, side, signal_t, entry_t, entry_px, sl, tp, size, adds, exit_t, exit_px, exit_reason, pnl_pct "
+    sql = (f"SELECT id, symbol, kind, side, signal_t, entry_t, entry_px, sl, tp, size, adds, exit_t, exit_px, exit_reason, pnl_pct, "
+           f"avg_px, fills, entry_type "
            f"FROM orders WHERE {' AND '.join(where)} ORDER BY entry_t DESC LIMIT ?")
     return cached(request, f"orders:{source}:{symbol}:{kind}:{a}:{b}:{limit}", 120, lambda: db.rows(sql, tuple(args + [limit])))
 
