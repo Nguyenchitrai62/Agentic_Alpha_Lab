@@ -119,8 +119,8 @@ def main() -> None:
     )
     parser.add_argument("--kronos-repo", type=Path, default=Path("../Kronos"))
     parser.add_argument("--model-root", type=Path, default=Path("artifacts/models"))
-    parser.add_argument("--output", type=Path, default=Path("web/app/dashboard-data.json"))
-    parser.add_argument("--public-output", type=Path, default=Path("web/public/data/dashboard.json"))
+    parser.add_argument("--output", type=Path, default=Path("archive/legacy_web_dashboard/app/dashboard-data.json"))
+    parser.add_argument("--public-output", type=Path, default=Path("archive/legacy_web_dashboard/public/data/dashboard.json"))
     parser.add_argument("--artifact", type=Path, default=Path("artifacts/multitimeframe_forecast.json"))
     args = parser.parse_args()
 

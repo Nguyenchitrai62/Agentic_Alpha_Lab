@@ -90,6 +90,10 @@ modified from this project.
 - Keep downloaded data, checkpoints, predictions, and reports out of Git.
 - User rule (2026-09-26): commit code/docs only. Trained deployment models live locally in `models/frozen/`
   (gitignored; see `models/frozen/manifest.json`); logs, result JSONs and audit CSVs stay local too.
-- Exception: the existing public dashboard demo snapshots are tracked, explicitly dated, and research-only.
-- Read `TRAINING.md` for the working Colab/baseline loop and the already-opened smoke-test interval.
+- Exception: the old public dashboard demo (`archive/legacy_web_dashboard/`) snapshots are tracked, dated, research-only.
+- Web app: `backend/` (FastAPI + SQLite, runs on this machine, port 8724, exposed by a Cloudflare tunnel) and
+  `frontend/` (static site deployed by the user on Vercel). Secrets (Google client id, session secret, admin emails)
+  live only in the local `.env`; never commit them.
+- Legacy docs (Colab/baseline loop, Kronos, older result reports) live in `docs/legacy/` and `docs/research_reports/`;
+  OpenCode assignments and the shared worker rules (`OPENCODE_VF_COMMON.md`) live in `docs/opencode/`.
 - Prefer small, versioned experiment configs over agent-authored ad hoc parameter changes.
