@@ -54,3 +54,23 @@ def test_schema_and_rollback(backend):
             raise RuntimeError("boom")
     assert [r["t"] for r in db.rows("SELECT t FROM candles")] == [1]
     assert db.one("PRAGMA journal_mode")["journal_mode"] == "wal"
+
+
+def _request(client_host, headers):
+    from starlette.requests import Request
+    scope = {"type": "http", "method": "GET", "path": "/", "headers": [(k.lower().encode(), v.encode()) for k, v in headers.items()],
+             "client": (client_host, 50000), "query_string": b""}
+    return Request(scope)
+
+
+def test_local_requests_skip_login_but_tunnel_does_not(backend):
+    _, _, auth = backend
+    local = auth.current_user(_request("127.0.0.1", {"host": "127.0.0.1:8724"}))
+    assert local and local["role"] == "admin" and local["email"] == "admin@example.com"
+    assert auth.current_user(_request("127.0.0.1", {"host": "localhost:8724"}))["role"] == "admin"
+    # via cloudflared: loopback client but Cloudflare headers and the public host
+    assert auth.current_user(_request("127.0.0.1", {"host": "api-crypto.nguyenchitrai.id.vn", "cf-connecting-ip": "1.2.3.4",
+                                                    "cf-ray": "x"})) is None
+    assert auth.current_user(_request("127.0.0.1", {"host": "api-crypto.nguyenchitrai.id.vn"})) is None  # public host
+    assert auth.current_user(_request("127.0.0.1", {"host": "evil.example:8724"})) is None  # DNS rebinding
+    assert auth.current_user(_request("192.168.1.5", {"host": "127.0.0.1:8724"})) is None  # LAN client

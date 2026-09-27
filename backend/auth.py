@@ -6,6 +6,7 @@ import base64
 import hashlib
 import hmac
 import json
+import logging
 import time
 
 from fastapi import Depends, HTTPException, Request
@@ -20,6 +21,7 @@ except ImportError:  # pragma: no cover
     g_requests = g_id_token = None
 
 ISS = "agentic-alpha-lab"
+log = logging.getLogger("uvicorn.error")
 _google_req = g_requests.Request() if g_requests else None
 
 
@@ -73,9 +75,10 @@ def verify_google(credential: str) -> dict:
     if g_id_token is None:
         raise HTTPException(500, "google-auth is not installed on the backend.")
     try:
-        info = g_id_token.verify_oauth2_token(credential, _google_req, SETTINGS.google_client_id)
+        info = g_id_token.verify_oauth2_token(credential, _google_req, SETTINGS.google_client_id, clock_skew_in_seconds=60)
     except ValueError as exc:
-        raise HTTPException(401, "Google sign-in token is invalid or expired.") from exc
+        log.warning("Google token rejected: %s", exc)
+        raise HTTPException(401, f"Google sign-in token is invalid or expired ({exc}).") from exc
     if not info.get("email_verified"):
         raise HTTPException(401, "Google account email is not verified.")
     return info
@@ -97,9 +100,31 @@ def login(credential: str) -> dict:
                                                          "picture": info.get("picture"), "role": role}}
 
 
+_LOOPBACK = {"127.0.0.1", "::1", "localhost"}
+_LOCAL_HOSTS = {"127.0.0.1", "localhost", "[::1]"}
+
+
+def is_local_request(request: Request) -> bool:
+    """True only for a request made on this machine directly to uvicorn.
+
+    Tunnelled requests also arrive from 127.0.0.1 (cloudflared), but Cloudflare always adds CF-Connecting-IP / CF-Ray and
+    keeps the public Host header, so they never qualify. The Host check also blocks DNS-rebinding pages.
+    """
+    client = request.client.host if request.client else ""
+    if client not in _LOOPBACK:
+        return False
+    if any(h in request.headers for h in ("cf-connecting-ip", "cf-ray", "cf-visitor", "x-forwarded-for")):
+        return False
+    host = request.headers.get("host", "").lower()
+    host = host.rsplit(":", 1)[0] if not host.endswith("]") else host
+    return host in _LOCAL_HOSTS
+
+
 def current_user(request: Request) -> dict | None:
     auth = request.headers.get("Authorization", "")
     if not auth.lower().startswith("bearer "):
+        if SETTINGS.local_no_auth and SETTINGS.admin_emails and is_local_request(request):
+            return {"email": SETTINGS.admin_emails[0], "role": "admin", "name": "Local admin", "picture": None, "local": True}
         return None
     email = _read_session(auth[7:].strip())
     u = db.one("SELECT name, picture FROM users WHERE email = ?", (email,)) or {}

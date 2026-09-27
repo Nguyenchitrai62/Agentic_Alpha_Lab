@@ -13,7 +13,9 @@ mở rộng sang fine-tuning/agentic experiment search.
   `api-crypto.nguyenchitrai.id.vn`. Scheduler chạy pipeline sau mỗi nến 4h; admin chạy tay ở trang Admin.
 - `frontend/`: site tĩnh (Vercel) có đăng nhập Google, biểu đồ nến kèm entry/SL/TP, lịch sử gợi ý walk-forward và chạy
   thực, hiệu suất, paper trading.
-- Bật backend + tunnel: double-click `run_backend.bat` (hoặc `.un_backend.ps1`, `-Status`, `-Stop`).
+- Xem web trên máy này, không cần đăng nhập: `run_frontend.bat` (http://localhost:5500).
+- Bật backend + tunnel: double-click `run_backend.bat` (hoặc `.
+un_backend.ps1`, `-Status`, `-Stop`).
 - Hướng dẫn triển khai: [`docs/WEB_DEPLOY.md`](docs/WEB_DEPLOY.md). Lấy gợi ý nhanh bằng dòng lệnh: `./run.ps1`.
 
 ## Tiếp tục từ trạng thái hiện tại

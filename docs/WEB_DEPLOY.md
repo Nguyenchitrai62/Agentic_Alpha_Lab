@@ -41,10 +41,13 @@ Phân quyền:
 
 ## 3. Chạy backend
 
-**Cách nhanh:** double-click `run_backend.bat` ở gốc repo, hoặc chạy `.un_backend.ps1`. Script bật backend (cổng 8724) và
+**Cách nhanh:** double-click `run_backend.bat` ở gốc repo, hoặc chạy `.
+un_backend.ps1`. Script bật backend (cổng 8724) và
 connector Cloudflare tunnel, bỏ qua phần nào đang chạy rồi, sau đó kiểm tra `/health` cả cục bộ lẫn public.
-- `.un_backend.ps1 -Status`: chỉ xem trạng thái.
-- `.un_backend.ps1 -Stop`: tắt cả hai.
+- `.
+un_backend.ps1 -Status`: chỉ xem trạng thái.
+- `.
+un_backend.ps1 -Stop`: tắt cả hai.
 
 Token tunnel đặt ở `CLOUDFLARE_TUNNEL_TOKEN` trong `.env` cục bộ, không commit.
 
@@ -58,6 +61,13 @@ powershell -ExecutionPolicy Bypass -File deploy\install_autostart.ps1      # (tu
 
 Lần chạy đầu, nếu DB trống, scheduler tự tải nến, chạy tín hiệu hiện tại và backfill walk-forward 2021–2026
 (khoảng 1 phút). Log nằm ở `artifacts/web/backend.log`. Kiểm tra bằng `http://127.0.0.1:8724/health`.
+
+### Xem web trên chính máy server, không cần đăng nhập
+
+Double-click `run_frontend.bat` (hoặc chạy `.un_frontend.ps1`) để mở `http://localhost:5500`.
+- Khi request đi thẳng vào `127.0.0.1:8724` từ máy này, backend coi là admin và không cần Google.
+- Request đi qua tunnel luôn phải đăng nhập, vì chúng mang header Cloudflare và host public.
+- Tắt chế độ này bằng `WEB_LOCAL_NO_AUTH=false`.
 
 ## 4. Cloudflare Tunnel
 

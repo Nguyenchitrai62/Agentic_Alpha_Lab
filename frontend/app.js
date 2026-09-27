@@ -118,8 +118,8 @@
     const u = state.user;
     $("userBox").innerHTML = `${u.picture ? `<img src="${esc(u.picture)}" alt="" referrerpolicy="no-referrer">` : ""}
       <div><div class="name">${esc(u.name || u.email)}</div><div class="role">${u.role === "admin" ? "Admin" : u.role === "viewer" ? "Người xem" : "Chờ duyệt"}</div></div>
-      <button class="btn sm" id="logoutBtn">Đăng xuất</button>`;
-    $("logoutBtn").onclick = logout;
+      ${u.local ? '<span class="tag">local</span>' : '<button class="btn sm" id="logoutBtn">Đăng xuất</button>'}`;
+    if (!u.local) $("logoutBtn").onclick = logout;
     if (u.role === "pending") { $("pendingEmail").textContent = u.email; showOnly("pending"); $("tabs").hidden = true; return; }
     $("tabs").hidden = false; $("adminTab").hidden = u.role !== "admin";
     route();
@@ -408,6 +408,9 @@
       try { state.user = await api("/api/auth/me"); enter(); return; }
       catch (e) { if (state.token) logout(); return; }
     }
+    try {  // on the server machine itself the backend signs in as the local admin (no Google login)
+      state.user = await api("/api/auth/me"); enter(); return;
+    } catch (e) { /* not local: Google sign-in */ }
     showOnly("login");
     initGsi();
   }

@@ -16,8 +16,9 @@ if (Test-Path $envFile) {
 while ($true) {
     $stamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
     Add-Content -Path (Join-Path $logDir "backend_supervisor.log") -Value "$stamp start backend on 127.0.0.1:$port"
-    & $py -m uvicorn backend.server:app --host 127.0.0.1 --port $port --no-access-log --timeout-keep-alive 30 `
-        *>> (Join-Path $logDir "backend.log")
+    # cmd redirection keeps the log as plain UTF-8 text (PowerShell 5 *>> would write UTF-16 error records)
+    $log = Join-Path $logDir "backend.log"
+    cmd /c "`"$py`" -m uvicorn backend.server:app --host 127.0.0.1 --port $port --no-access-log --timeout-keep-alive 30 >> `"$log`" 2>&1"
     $stamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
     Add-Content -Path (Join-Path $logDir "backend_supervisor.log") -Value "$stamp backend exited ($LASTEXITCODE); restarting in 10s"
     Start-Sleep -Seconds 10
