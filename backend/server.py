@@ -24,6 +24,7 @@ from .config import SETTINGS
 
 APP_VERSION = "1.0.0"
 MAX_ROWS = 5000
+MAX_CANDLES = 30000
 app = FastAPI(title="Agentic Alpha Lab API", version=APP_VERSION, default_response_class=ORJSONResponse)
 app.add_middleware(GZipMiddleware, minimum_size=1024)
 app.add_middleware(CORSMiddleware, allow_origins=list(SETTINGS.cors_origins), allow_origin_regex=SETTINGS.cors_origin_regex or None,
@@ -190,7 +191,7 @@ def signal_detail(request: Request, run_id: int, user: dict = Depends(auth.requi
 
 @app.get("/api/candles")
 def candles(request: Request, symbol: str, interval: str = "4h", start: str | None = None, end: str | None = None,
-            limit: int = Query(1500, ge=1, le=MAX_ROWS), user: dict = Depends(auth.require_viewer)):
+            limit: int = Query(1500, ge=1, le=MAX_CANDLES), user: dict = Depends(auth.require_viewer)):
     sym = _check_symbol(symbol)
     if interval not in pipeline.INTERVALS:
         raise HTTPException(400, f"interval must be one of {list(pipeline.INTERVALS)}")
@@ -203,7 +204,7 @@ def candles(request: Request, symbol: str, interval: str = "4h", start: str | No
 
 @app.get("/api/positions")
 def positions(request: Request, symbol: str, source: str = "walkforward", start: str | None = None, end: str | None = None,
-              limit: int = Query(3000, ge=1, le=MAX_ROWS), user: dict = Depends(auth.require_viewer)):
+              limit: int = Query(3000, ge=1, le=MAX_CANDLES), user: dict = Depends(auth.require_viewer)):
     sym = _check_symbol(symbol)
     a, b = _ms_range(start, end)
     key = f"pos:{source}:{sym}:{a}:{b}:{limit}"
@@ -221,6 +222,30 @@ def trades(request: Request, symbol: str, source: str = "walkforward", start: st
     return cached(request, key, 60, lambda: list(reversed(db.rows(
         "SELECT t, kind, side, price, weight, extra FROM trades WHERE source = ? AND symbol = ? AND t BETWEEN ? AND ? ORDER BY t DESC LIMIT ?",
         (source, sym, a, b, limit)))))
+
+
+@app.get("/api/orders")
+def orders(request: Request, symbol: str | None = None, source: str = "walkforward", kind: str | None = None,
+           start: str | None = None, end: str | None = None, limit: int = Query(5000, ge=1, le=MAX_CANDLES),
+           user: dict = Depends(auth.require_viewer)):
+    """Orders (position episodes / dip bids) with signal time, entry, SL, TP, exit and result, newest first."""
+    a, b = _ms_range(start, end)
+    where, args = ["source = ?", "entry_t BETWEEN ? AND ?"], [source, a, b]
+    if symbol:
+        where.append("symbol = ?"); args.append(_check_symbol(symbol))
+    if kind in ("book", "dip"):
+        where.append("kind = ?"); args.append(kind)
+    sql = (f"SELECT id, symbol, kind, side, signal_t, entry_t, entry_px, sl, tp, size, adds, exit_t, exit_px, exit_reason, pnl_pct "
+           f"FROM orders WHERE {' AND '.join(where)} ORDER BY entry_t DESC LIMIT ?")
+    return cached(request, f"orders:{source}:{symbol}:{kind}:{a}:{b}:{limit}", 120, lambda: db.rows(sql, tuple(args + [limit])))
+
+
+@app.get("/api/orders/stats")
+def orders_stats(request: Request, source: str = "walkforward", user: dict = Depends(auth.require_viewer)):
+    """Order counts, win rate and average result per symbol / kind / exit reason."""
+    return cached(request, f"ostats:{source}", 300, lambda: db.rows(
+        "SELECT symbol, kind, exit_reason, COUNT(*) AS n, AVG(pnl_pct) AS avg_pnl, AVG(pnl_pct > 0) AS win, AVG(size) AS avg_size, "
+        "MIN(entry_t) AS first_t, MAX(entry_t) AS last_t FROM orders WHERE source = ? GROUP BY symbol, kind, exit_reason", (source,)))
 
 
 @app.get("/api/equity")
@@ -290,7 +315,11 @@ def _scheduler():
         nxt = now.replace(minute=0, second=0, microsecond=0) + timedelta(hours=4 - now.hour % 4, minutes=SETTINGS.schedule_offset_minutes)
         if nxt - now > timedelta(hours=4):
             nxt -= timedelta(hours=4)
-        time.sleep(max(5.0, (nxt - now).total_seconds()))
+        while (wait := (nxt - datetime.now(timezone.utc)).total_seconds()) > 5:
+            time.sleep(min(wait, 900))
+            if (nxt - datetime.now(timezone.utc)).total_seconds() > 60:
+                pipeline.refresh_candles_quietly()  # keep candles <= 15 min old between cycles
+                clear_cache()
         pipeline.run_job("cycle", pipeline.job_cycle, "scheduler")
         clear_cache()
         db.optimize()

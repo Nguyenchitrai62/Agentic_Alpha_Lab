@@ -64,7 +64,8 @@ Lần chạy đầu, nếu DB trống, scheduler tự tải nến, chạy tín h
 
 ### Xem web trên chính máy server, không cần đăng nhập
 
-Double-click `run_frontend.bat` (hoặc chạy `.un_frontend.ps1`) để mở `http://localhost:5500`.
+Double-click `run_frontend.bat` (hoặc chạy `.
+un_frontend.ps1`) để mở `http://localhost:5500`.
 - Khi request đi thẳng vào `127.0.0.1:8724` từ máy này, backend coi là admin và không cần Google.
 - Request đi qua tunnel luôn phải đăng nhập, vì chúng mang header Cloudflare và host public.
 - Tắt chế độ này bằng `WEB_LOCAL_NO_AUTH=false`.
@@ -107,6 +108,8 @@ Public hostname: `api-crypto.nguyenchitrai.id.vn` → `HTTP` → `localhost:8724
   - `/api/signals/at?t=`
   - `/api/signals/{id}`
   - `/api/candles?symbol=&interval=1h|4h|1d&start=&end=&limit=`
+  - `/api/orders?symbol=&kind=book|dip&source=walkforward`: mỗi lệnh gồm lúc phát, giá vào trung bình, SL, TP, tỷ trọng, lúc/giá thoát, lý do, kết quả
+  - `/api/orders/stats`
   - `/api/positions`, `/api/trades`, `/api/equity?source=walkforward|forward`
 - **Admin:**
   - `POST /api/admin/run {kind: cycle|signal|candles|forward|walkforward}`

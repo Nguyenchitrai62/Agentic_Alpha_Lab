@@ -45,6 +45,16 @@ CREATE TABLE IF NOT EXISTS trades(
   side TEXT, price REAL, weight REAL, extra TEXT
 );
 CREATE INDEX IF NOT EXISTS trades_q ON trades(source, symbol, t);
+CREATE TABLE IF NOT EXISTS orders(
+  id INTEGER PRIMARY KEY, source TEXT NOT NULL, symbol TEXT NOT NULL,
+  kind TEXT NOT NULL,              -- 'book' (4h directional position) | 'dip' (dip-sleeve limit bid)
+  side TEXT NOT NULL,              -- LONG | SHORT
+  signal_t INTEGER NOT NULL,       -- start of the 4h bar whose decision created the order (ms)
+  entry_t INTEGER, entry_px REAL, sl REAL, tp REAL, size REAL, adds INTEGER,
+  exit_t INTEGER, exit_px REAL, exit_reason TEXT, pnl_pct REAL
+);
+CREATE INDEX IF NOT EXISTS orders_q ON orders(source, symbol, entry_t);
+CREATE INDEX IF NOT EXISTS orders_t ON orders(source, entry_t);
 CREATE TABLE IF NOT EXISTS equity(
   source TEXT NOT NULL, t INTEGER NOT NULL, equity REAL NOT NULL, PRIMARY KEY(source, t)
 ) WITHOUT ROWID;

@@ -24,7 +24,7 @@ from .config import ROOT, SETTINGS
 
 SYMS = ["BTCUSDT", "ETHUSDT", "SOLUSDT", "BNBUSDT", "XRPUSDT"]
 INTERVALS = {"4h": 4 * 3600_000, "1h": 3600_000, "1d": 86400_000}
-HISTORY_START = {"4h": "2021-06-01", "1h": "2025-09-01", "1d": "2020-01-01"}
+HISTORY_START = {"4h": "2021-06-01", "1h": "2023-06-01", "1d": "2020-01-01"}
 PIPELINE = "v205"
 _job_lock = threading.Lock()
 RD = ROOT / "research/parallel/rounds/parallel-20260906-r2"
@@ -64,19 +64,39 @@ def job_candles() -> str:
     now = datetime.now(timezone.utc)
     for sym in SYMS:
         for iv, step in INTERVALS.items():
-            last = db.one("SELECT MAX(t) AS t FROM candles WHERE symbol = ? AND interval = ?", (sym, iv))["t"]
+            span = db.one("SELECT MIN(t) AS a, MAX(t) AS b FROM candles WHERE symbol = ? AND interval = ?", (sym, iv))
+            first = pd.Timestamp(HISTORY_START[iv], tz="UTC")
+            ranges = []
+            if span["a"] and span["a"] > int(first.timestamp() * 1000) + step:  # backfill older history once
+                ranges.append((first, pd.Timestamp(span["a"] - step, unit="ms", tz="UTC")))
             # re-fetch the newest stored candle: it may have been stored while still forming
-            start = pd.Timestamp(last, unit="ms", tz="UTC") if last else pd.Timestamp(HISTORY_START[iv], tz="UTC")
-            k = fetch_klines(sym, iv, start.to_pydatetime(), now, session=sess)
-            if k.empty:
-                continue
-            ot = pd.to_datetime(k["open_time"], utc=True)
-            recs = [(sym, iv, int(t.timestamp() * 1000), float(o), float(h), float(l), float(c_), float(v))
-                    for t, o, h, l, c_, v in zip(ot, k["open"], k["high"], k["low"], k["close"], k["volume"])]
-            with db.write() as c:
-                c.executemany("INSERT OR REPLACE INTO candles(symbol, interval, t, o, h, l, c, v) VALUES(?,?,?,?,?,?,?,?)", recs)
-            total += len(recs)
+            ranges.append((pd.Timestamp(span["b"], unit="ms", tz="UTC") if span["b"] else first, pd.Timestamp(now)))
+            for a, b in ranges:
+                try:
+                    k = fetch_klines(sym, iv, a.to_pydatetime(), b.to_pydatetime(), session=sess)
+                except RuntimeError:  # nothing in range (e.g. before the symbol was listed)
+                    continue
+                if k.empty:
+                    continue
+                ot = pd.to_datetime(k["open_time"], utc=True)
+                recs = [(sym, iv, int(t.timestamp() * 1000), float(o), float(h), float(l), float(c_), float(v))
+                        for t, o, h, l, c_, v in zip(ot, k["open"], k["high"], k["low"], k["close"], k["volume"])]
+                with db.write() as c:
+                    c.executemany("INSERT OR REPLACE INTO candles(symbol, interval, t, o, h, l, c, v) VALUES(?,?,?,?,?,?,?,?)", recs)
+                total += len(recs)
     return f"candles upserted: {total}"
+
+
+def refresh_candles_quietly() -> None:
+    """Incremental candle refresh between cycles, without a jobs row; skipped while another job runs."""
+    if not _job_lock.acquire(blocking=False):
+        return
+    try:
+        job_candles()
+    except Exception:  # network hiccups are retried on the next tick
+        pass
+    finally:
+        _job_lock.release()
 
 
 # ---------------------------------------------------------------- live signal
@@ -131,6 +151,87 @@ def _load(name, path):
     return mod
 
 
+H4 = 4 * 3600_000
+OPEN_EPS, CLOSE_EPS = 0.01, 0.004  # position size (fraction of equity) that opens / closes an order (hysteresis)
+
+
+def build_orders(events: list[dict], bars: list[dict], cols: list[str]) -> list[tuple]:
+    """Turn engine fills/exits into orders: one row per position episode (book) or per filled dip bid.
+
+    A book order opens when the position leaves ~0, averages in on adds, and closes on its stop-loss, take-profit, a
+    rebalance back to ~0 or a flip. SL/TP are the levels at the opening fill (entry -/+ 4 and 8 sigma_d of that bar).
+    """
+    sig = {(_ms(b["t"]), cols[j]): b["sig_d"][j] for b in bars for j in range(len(cols))}
+    rows, book = [], {}
+    pending = {}
+    for e in events:  # append order: a rung fill is always followed by its own exit
+        sym, t, kind = e["symbol"], _ms(e["t"]), e["kind"]
+        if kind.startswith("rung"):
+            if kind == "rung_fill":
+                pending[sym] = (t, e["price"], e["weight"])
+            elif sym in pending:
+                ft, fp, fw = pending.pop(sym)
+                reason = {"rung_tp": "TP", "rung_sl": "SL", "rung_timeout": "Hết 4h (market)"}[kind]
+                rows.append((sym, "dip", "LONG", ft // H4 * H4, ft, fp, None,
+                             None, fw, 0, t, e["price"], reason, 100 * (e["price"] / fp - 1)))
+            continue
+    for sym in cols:
+        evs = sorted((e for e in events if e["symbol"] == sym and e["kind"].startswith("book")), key=lambda e: e["t"])
+        pos, o = 0.0, None
+
+        def levels(t):  # the engine's stop / take-profit for the average entry, with sigma_d of the bar at t
+            sd = sig.get((t // H4 * H4, sym)) or sig.get((t // H4 * H4 - H4, sym))
+            k = 1 if o["side"] == "LONG" else -1
+            return (o["entry_px"] * (1 - k * 4 * sd), o["entry_px"] * (1 + k * 8 * sd)) if sd else (o["sl"], o["tp"])
+
+        def close(t, px, reason):
+            nonlocal o
+            side = 1 if o["side"] == "LONG" else -1
+            sl, tp = levels(t)
+            if reason == "TP":
+                tp = px  # the take-profit limit fills exactly at its level
+            elif reason == "SL" and sl is not None and (px - sl) * side > 0:
+                sl = px  # the level in force was at the fill (a gap-through fills beyond it and keeps sl)
+            rows.append((sym, "book", o["side"], o["signal_t"], o["entry_t"], o["entry_px"], sl, tp, o["size"],
+                         o["adds"], t, px, reason, 100 * side * (px / o["entry_px"] - 1)))
+            o = None
+
+        def open_(t, px, size):
+            nonlocal o
+            side = "LONG" if size > 0 else "SHORT"
+            sd = sig.get((t // H4 * H4, sym))
+            k = 1 if size > 0 else -1
+            o = dict(side=side, signal_t=t // H4 * H4, entry_t=t, entry_px=px, size=abs(size), adds=0,
+                     sl=px * (1 - k * 4 * sd) if sd else None, tp=px * (1 + k * 8 * sd) if sd else None)
+
+        for e in evs:
+            t, px = _ms(e["t"]), e["price"]
+            if e["kind"] in ("book_stop", "book_tp"):
+                if o:
+                    close(t, px, "SL" if e["kind"] == "book_stop" else "TP")
+                pos = 0.0
+                continue
+            new = pos + e["weight"]
+            if o is None:
+                if abs(new) >= OPEN_EPS:
+                    open_(t, px, new)
+            elif (new > 0) != (o["side"] == "LONG") and abs(new) >= CLOSE_EPS:
+                close(t, px, "Đảo chiều")
+                if abs(new) >= OPEN_EPS:
+                    open_(t, px, new)
+            elif abs(new) < CLOSE_EPS:
+                close(t, px, "Rebalance về 0")
+            elif abs(new) > abs(pos):
+                o["entry_px"] = (o["entry_px"] * abs(pos) + px * (abs(new) - abs(pos))) / abs(new)
+                o["size"], o["adds"] = max(o["size"], abs(new)), o["adds"] + 1
+            pos = new
+        if o:  # still open at the end of the replay
+            sl, tp = levels(_ms(bars[-1]["t"]))
+            rows.append((sym, "book", o["side"], o["signal_t"], o["entry_t"], o["entry_px"], sl, tp, o["size"],
+                         o["adds"], None, None, "Đang mở", None))
+    return rows
+
+
 def job_walkforward() -> str:
     eu = _load("engine_user_web", RD / "engine_user/engine_user.py")
     books154, opens = eu.er.v154_books()
@@ -151,6 +252,10 @@ def job_walkforward() -> str:
         c.execute("DELETE FROM runs WHERE source = 'walkforward'")
         c.execute("DELETE FROM trades WHERE source = 'walkforward'")
         c.execute("DELETE FROM equity WHERE source = 'walkforward'")
+        c.execute("DELETE FROM orders WHERE source = 'walkforward'")
+        orders = build_orders(events, bars, cols)
+        c.executemany("INSERT INTO orders(source, symbol, kind, side, signal_t, entry_t, entry_px, sl, tp, size, adds, exit_t, exit_px, "
+                      "exit_reason, pnl_pct) VALUES('walkforward',?,?,?,?,?,?,?,?,?,?,?,?,?,?)", orders)
         now = db.now_ms()
         for b in bars:
             t = _ms(b["t"])
@@ -176,7 +281,7 @@ def job_walkforward() -> str:
         c.executemany("INSERT INTO equity(source, t, equity) VALUES('walkforward', ?, ?)", [(_ms(b["t"]) + 4 * 3600_000, b["equity"]) for b in bars])
         c.execute("INSERT INTO kv(k, v) VALUES('walkforward_summary', ?) ON CONFLICT(k) DO UPDATE SET v = excluded.v", (json.dumps(summary),))
     db.optimize()
-    return f"walk-forward: {len(bars)} bars, {len(events)} trade events, 5y {summary['monthly_5y']}%/month, last year {summary['monthly_last_year']}"
+    return f"walk-forward: {len(bars)} bars, {len(events)} trade events, {len(orders)} orders, 5y {summary['monthly_5y']}%/month, last year {summary['monthly_last_year']}"
 
 
 def job_cycle() -> str:

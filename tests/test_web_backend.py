@@ -74,3 +74,31 @@ def test_local_requests_skip_login_but_tunnel_does_not(backend):
     assert auth.current_user(_request("127.0.0.1", {"host": "api-crypto.nguyenchitrai.id.vn"})) is None  # public host
     assert auth.current_user(_request("127.0.0.1", {"host": "evil.example:8724"})) is None  # DNS rebinding
     assert auth.current_user(_request("192.168.1.5", {"host": "127.0.0.1:8724"})) is None  # LAN client
+
+
+def test_build_orders_episodes(backend):
+    import pandas as pd
+    pipeline = importlib.import_module("backend.pipeline")
+    t0 = pd.Timestamp("2024-01-01", tz="UTC")
+    bars = [dict(t=t0 + pd.Timedelta(hours=4 * i), sig_d=[0.02]) for i in range(10)]
+    ev = lambda h, kind, side, px, w, **k: dict(t=t0 + pd.Timedelta(hours=h, minutes=5), symbol="BTCUSDT", kind=kind,
+                                                side=side, price=px, weight=w, **k)
+    events = [
+        ev(0, "book_fill", "buy", 100.0, 0.10),        # open LONG 10%
+        ev(4, "book_fill", "buy", 110.0, 0.10),        # add -> avg 105, size 20%
+        ev(8, "book_tp", "sell", 121.8, -0.20),        # take-profit
+        ev(12, "book_fill", "sell", 120.0, -0.05),     # open SHORT 5%
+        ev(16, "book_fill", "buy", 118.0, 0.049),      # back to ~0 -> closed by rebalance
+        ev(20, "rung_fill", "buy", 90.0, 0.08, rung=2.5),
+        ev(21, "rung_sl", "sell", 85.0, 0.08, ret=-0.0556),
+    ]
+    rows = pipeline.build_orders(events, bars, ["BTCUSDT"])
+    book = [r for r in rows if r[1] == "book"]
+    dip = [r for r in rows if r[1] == "dip"]
+    assert len(book) == 2 and len(dip) == 1
+    long_ = book[0]
+    assert long_[2] == "LONG" and abs(long_[5] - 105.0) < 1e-9 and abs(long_[8] - 0.20) < 1e-9
+    assert long_[12] == "TP" and long_[7] == 121.8 and abs(long_[13] - 100 * (121.8 / 105 - 1)) < 1e-9
+    short = book[1]
+    assert short[2] == "SHORT" and short[12] == "Rebalance về 0" and short[13] > 0  # 120 -> 118 on a short
+    assert dip[0][12] == "SL" and dip[0][13] < 0

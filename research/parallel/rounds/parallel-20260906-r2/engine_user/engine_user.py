@@ -291,7 +291,8 @@ def simulate(books, opens, prep, m_sl=3.0, m_sleeve_sl=2.0, sleeve=True, target=
         net[i] = pnl
         if bars is not None:
             bars.append(dict(t=idx[i] + pd.Timedelta(hours=4), target=[float(x) for x in tgt], scale=float(s[i]), governor=float(g[i]),
-                             equity=float(eq[i]), sig_d=[float(x) for x in sd], open=[float(x) for x in o1[i]]))
+                             equity=float(eq[i]), sig_d=[float(x) for x in sd], open=[float(x) for x in o1[i]],
+                             entry=[float(x) for x in entry], qty=[float(x) for x in q]))
     return summarize(idx, net, eq, eq_min, g, stats, eq_max)
 
 
