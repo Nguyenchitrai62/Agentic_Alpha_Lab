@@ -1,0 +1,42 @@
+{
+  // Terminal > Run Task... : backend / frontend with live logs in the VS Code terminal (Ctrl+C or the trash icon stops them)
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Backend: run (live logs)",
+      "type": "shell",
+      "command": "powershell -NoProfile -ExecutionPolicy Bypass -File ${workspaceFolder}/run_backend.ps1",
+      "isBackground": true,
+      "problemMatcher": [],
+      "presentation": { "panel": "dedicated", "reveal": "always", "clear": true }
+    },
+    {
+      "label": "Backend: run with HTTP access log",
+      "type": "shell",
+      "command": "powershell -NoProfile -ExecutionPolicy Bypass -File ${workspaceFolder}/run_backend.ps1 -AccessLog",
+      "isBackground": true,
+      "problemMatcher": [],
+      "presentation": { "panel": "dedicated", "reveal": "always", "clear": true }
+    },
+    {
+      "label": "Backend: status",
+      "type": "shell",
+      "command": "powershell -NoProfile -ExecutionPolicy Bypass -File ${workspaceFolder}/run_backend.ps1 -Status",
+      "problemMatcher": []
+    },
+    {
+      "label": "Backend: stop",
+      "type": "shell",
+      "command": "powershell -NoProfile -ExecutionPolicy Bypass -File ${workspaceFolder}/run_backend.ps1 -Stop",
+      "problemMatcher": []
+    },
+    {
+      "label": "Frontend: run (localhost:5500)",
+      "type": "shell",
+      "command": "powershell -NoProfile -ExecutionPolicy Bypass -File ${workspaceFolder}/run_frontend.ps1",
+      "isBackground": true,
+      "problemMatcher": [],
+      "presentation": { "panel": "dedicated", "reveal": "always" }
+    }
+  ]
+}

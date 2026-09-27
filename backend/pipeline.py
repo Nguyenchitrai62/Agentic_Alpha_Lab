@@ -20,7 +20,7 @@ import numpy as np
 import pandas as pd
 
 from . import db
-from .config import ROOT, SETTINGS
+from .config import ROOT, SETTINGS, log
 
 SYMS = ["BTCUSDT", "ETHUSDT", "SOLUSDT", "BNBUSDT", "XRPUSDT"]
 INTERVALS = {"4h": 4 * 3600_000, "1h": 3600_000, "1d": 86400_000}
@@ -38,8 +38,10 @@ def _ms(ts) -> int:
 
 def run_job(kind: str, fn, triggered_by: str = "scheduler") -> dict:
     if not _job_lock.acquire(blocking=False):
+        log.warning("job %s skipped: another pipeline job is running", kind)
         return {"status": "busy", "message": "another pipeline job is running"}
     started = db.now_ms()
+    log.info("job %s started (by %s)", kind, triggered_by)
     with db.write() as c:
         job_id = c.execute("INSERT INTO jobs(kind, status, started_at, triggered_by) VALUES(?, 'running', ?, ?)",
                            (kind, started, triggered_by)).lastrowid
@@ -52,6 +54,11 @@ def run_job(kind: str, fn, triggered_by: str = "scheduler") -> dict:
         _job_lock.release()
     with db.write() as c:
         c.execute("UPDATE jobs SET status = ?, finished_at = ?, message = ? WHERE id = ?", (status, db.now_ms(), str(msg)[:4000], job_id))
+    secs = (db.now_ms() - started) / 1000
+    if status == "done":
+        log.info("job %s done in %.0fs: %s", kind, secs, str(msg)[:300])
+    else:
+        log.error("job %s FAILED after %.0fs: %s", kind, secs, str(msg)[:1500])
     return {"status": status, "message": msg, "job_id": job_id}
 
 
@@ -92,9 +99,9 @@ def refresh_candles_quietly() -> None:
     if not _job_lock.acquire(blocking=False):
         return
     try:
-        job_candles()
-    except Exception:  # network hiccups are retried on the next tick
-        pass
+        log.info("candles refreshed: %s", job_candles())
+    except Exception as exc:  # network hiccups are retried on the next tick
+        log.warning("candle refresh failed (retry in 15 min): %s", exc)
     finally:
         _job_lock.release()
 
@@ -235,6 +242,60 @@ def build_orders(events: list[dict], bars: list[dict], cols: list[str]) -> list[
     return rows
 
 
+HIDDEN_START = "2025-09-24"  # the most recent walk-forward year (the hidden year)
+
+
+def confidence_of(orders: list[tuple], bars: list[dict], cols: list[str], A: pd.DataFrame, B: pd.DataFrame) -> list[tuple]:
+    """Append (confidence, strength, agree) to every order with the live advisor's rule at the opening decision:
+    agree = both annual members (A, B) point in the order's direction; strength = min(|target| / (0.4 * scale), 1);
+    CAO if agree and strength >= 0.5, TRUNG BINH if agree and strength >= 0.2, else THAP. Dip orders get 'DIP'."""
+    bar_at = {_ms(b["t"]): b for b in bars}
+    col_ix = {c: j for j, c in enumerate(cols)}
+    out = []
+    for o in orders:
+        if o[1] != "book":
+            out.append(o + ("DIP", None, None))
+            continue
+        b, j = bar_at.get(o[3]), col_ix[o[0]]
+        row_t = pd.Timestamp(o[3] - H4, unit="ms", tz="UTC")  # the decision row (books index) behind this holding bar
+        k = 1 if o[2] == "LONG" else -1
+        try:
+            a, bb = float(A.at[row_t, o[0]]), float(B.at[row_t, o[0]])
+        except KeyError:
+            a = bb = 0.0
+        agree = a != 0 and np.sign(a) == k and np.sign(bb) == k
+        strength = min(abs(b["target"][j]) / (0.4 * b["scale"]), 1.0) if b and b["scale"] > 0 else 0.0
+        conf = "CAO" if agree and strength >= 0.5 else ("TRUNG BINH" if agree and strength >= 0.2 else "THAP")
+        out.append(o + (conf, round(strength, 3), int(agree)))
+    return out
+
+
+def confidence_stats(orders: list[tuple]) -> dict:
+    """Win rate / average result per confidence level, first four walk-forward years vs the hidden year."""
+    hid = _ms(pd.Timestamp(HIDDEN_START, tz="UTC"))
+    groups: dict = {}
+    for o in orders:
+        if o[13] is None:  # still open
+            continue
+        per = "hidden" if o[4] >= hid else "dev"
+        g = groups.setdefault(o[17], {}).setdefault(per, [])
+        g.append((o[13], o[12]))
+    stats = {}
+    for conf, by in groups.items():
+        stats[conf] = {}
+        for per, rows in by.items():
+            pn = np.array([r[0] for r in rows])
+            win = pn > 0
+            stats[conf][per] = dict(n=int(len(pn)), win_rate=round(float(win.mean()), 3), avg_pct=round(float(pn.mean()), 3),
+                                    avg_win_pct=round(float(pn[win].mean()), 3) if win.any() else None,
+                                    avg_loss_pct=round(float(pn[~win].mean()), 3) if (~win).any() else None,
+                                    tp_rate=round(float(np.mean([r[1] == "TP" for r in rows])), 3),
+                                    sl_rate=round(float(np.mean([r[1] == "SL" for r in rows])), 3))
+    return {"rule": "CAO: 2 members agree and strength >= 0.5; TRUNG BINH: agree and >= 0.2; THAP: otherwise; "
+                    "win = order result > 0 (price move vs average entry, before fees)",
+            "dev": "anchors 2021-2024", "hidden": f"from {HIDDEN_START}", "levels": stats}
+
+
 def job_walkforward() -> str:
     eu = _load("engine_user_web", RD / "engine_user/engine_user.py")
     books154, opens = eu.er.v154_books()
@@ -256,9 +317,12 @@ def job_walkforward() -> str:
         c.execute("DELETE FROM trades WHERE source = 'walkforward'")
         c.execute("DELETE FROM equity WHERE source = 'walkforward'")
         c.execute("DELETE FROM orders WHERE source = 'walkforward'")
-        orders = build_orders(events, bars, cols)
+        orders = confidence_of(build_orders(events, bars, cols), bars, cols, A, B)
         c.executemany("INSERT INTO orders(source, symbol, kind, side, signal_t, entry_t, entry_px, sl, tp, size, adds, exit_t, exit_px, "
-                      "exit_reason, pnl_pct, avg_px, fills, entry_type) VALUES('walkforward',?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)", orders)
+                      "exit_reason, pnl_pct, avg_px, fills, entry_type, confidence, strength, agree) "
+                      "VALUES('walkforward',?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)", orders)
+        c.execute("INSERT INTO kv(k, v) VALUES('confidence_stats', ?) ON CONFLICT(k) DO UPDATE SET v = excluded.v",
+                  (json.dumps(confidence_stats(orders)),))
         now = db.now_ms()
         for b in bars:
             t = _ms(b["t"])

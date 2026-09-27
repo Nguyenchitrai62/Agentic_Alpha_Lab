@@ -101,6 +101,9 @@ MIGRATIONS = [
     ("orders", "avg_px", "REAL"),         # average entry after all adds (entry_px is the first fill)
     ("orders", "fills", "INTEGER"),       # number of limit fills in the episode
     ("orders", "entry_type", "TEXT"),     # how the first fill was made
+    ("orders", "confidence", "TEXT"),     # CAO / TRUNG BINH / THAP at the opening decision (same rule as the live advisor)
+    ("orders", "strength", "REAL"),       # |target| / (0.4 * vol scale), capped at 1
+    ("orders", "agree", "INTEGER"),       # both annual member models point in the order's direction
 ]
 
 

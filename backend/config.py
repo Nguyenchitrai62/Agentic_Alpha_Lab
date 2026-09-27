@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import logging
 import os
 import secrets
+import sys
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -45,6 +47,15 @@ class Settings:
 
 
 SETTINGS = Settings()
+
+# console log of the pipeline jobs and the scheduler (uvicorn prints the HTTP side)
+log = logging.getLogger("alphalab")
+if not log.handlers:
+    _h = logging.StreamHandler(sys.stderr)
+    _h.setFormatter(logging.Formatter("%(asctime)s  %(levelname)-5s %(message)s", "%Y-%m-%d %H:%M:%S"))
+    log.addHandler(_h)
+    log.setLevel(os.getenv("WEB_LOG_LEVEL", "INFO").upper())
+    log.propagate = False
 if not SETTINGS.session_secret:
     # a per-process secret still works (sessions reset on restart); set AUTH_SESSION_SECRET in .env to persist them
     object.__setattr__(SETTINGS, "session_secret", secrets.token_urlsafe(48))

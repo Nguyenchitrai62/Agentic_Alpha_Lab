@@ -20,7 +20,7 @@ from fastapi.responses import JSONResponse, ORJSONResponse, Response
 import orjson
 
 from . import auth, db, pipeline
-from .config import SETTINGS
+from .config import SETTINGS, log
 
 APP_VERSION = "1.0.0"
 MAX_ROWS = 5000
@@ -102,7 +102,8 @@ def _check_symbol(symbol: str) -> str:
 @app.get("/health")
 def health():
     last = db.one("SELECT kind, status, started_at, finished_at FROM jobs ORDER BY id DESC LIMIT 1")
-    return {"status": "ok", "version": APP_VERSION, "pipeline": pipeline.PIPELINE, "last_job": last}
+    return {"status": "ok", "version": APP_VERSION, "pipeline": pipeline.PIPELINE, "last_job": last,
+            "scheduler": SETTINGS.scheduler_enabled, "next_cycle_utc": _next_cycle["t"]}
 
 
 @app.get("/api/public/config")
@@ -237,7 +238,7 @@ def orders(request: Request, symbol: str | None = None, source: str = "walkforwa
     if kind in ("book", "dip"):
         where.append("kind = ?"); args.append(kind)
     sql = (f"SELECT id, symbol, kind, side, signal_t, entry_t, entry_px, sl, tp, size, adds, exit_t, exit_px, exit_reason, pnl_pct, "
-           f"avg_px, fills, entry_type "
+           f"avg_px, fills, entry_type, confidence, strength, agree "
            f"FROM orders WHERE {' AND '.join(where)} ORDER BY entry_t DESC LIMIT ?")
     return cached(request, f"orders:{source}:{symbol}:{kind}:{a}:{b}:{limit}", 120, lambda: db.rows(sql, tuple(args + [limit])))
 
@@ -248,6 +249,12 @@ def orders_stats(request: Request, source: str = "walkforward", user: dict = Dep
     return cached(request, f"ostats:{source}", 300, lambda: db.rows(
         "SELECT symbol, kind, exit_reason, COUNT(*) AS n, AVG(pnl_pct) AS avg_pnl, AVG(pnl_pct > 0) AS win, AVG(size) AS avg_size, "
         "MIN(entry_t) AS first_t, MAX(entry_t) AS last_t FROM orders WHERE source = ? GROUP BY symbol, kind, exit_reason", (source,)))
+
+
+@app.get("/api/confidence")
+def confidence(request: Request, user: dict = Depends(auth.require_viewer)):
+    """Historical win rate per confidence level (first four walk-forward years vs the hidden year)."""
+    return cached(request, "confidence", 300, lambda: db.kv_get("confidence_stats", {}))
 
 
 @app.get("/api/equity")
@@ -303,6 +310,9 @@ def admin_set_user(payload: dict = Body(...), user: dict = Depends(auth.require_
 
 
 # ------------------------------------------------------------------ scheduler
+_next_cycle: dict = {"t": None}
+
+
 def _scheduler():
     time.sleep(5)
     if not db.one("SELECT 1 AS x FROM candles LIMIT 1"):
@@ -317,6 +327,9 @@ def _scheduler():
         nxt = now.replace(minute=0, second=0, microsecond=0) + timedelta(hours=4 - now.hour % 4, minutes=SETTINGS.schedule_offset_minutes)
         if nxt - now > timedelta(hours=4):
             nxt -= timedelta(hours=4)
+        log.info("scheduler: next pipeline cycle at %s UTC (%s local); candles refresh every 15 min",
+                 nxt.strftime("%Y-%m-%d %H:%M"), nxt.astimezone().strftime("%H:%M"))
+        _next_cycle["t"] = nxt.isoformat()
         while (wait := (nxt - datetime.now(timezone.utc)).total_seconds()) > 5:
             time.sleep(min(wait, 900))
             if (nxt - datetime.now(timezone.utc)).total_seconds() > 60:
@@ -330,5 +343,7 @@ def _scheduler():
 @app.on_event("startup")
 def _startup():
     db.init()
+    log.info("backend up on http://%s:%s (db %s); scheduler %s", SETTINGS.host, SETTINGS.port, SETTINGS.db_path,
+             "ON" if SETTINGS.scheduler_enabled else "OFF")
     if SETTINGS.scheduler_enabled:
         threading.Thread(target=_scheduler, name="pipeline-scheduler", daemon=True).start()

@@ -1,11 +1,17 @@
-# Start the web backend (127.0.0.1:8724) and the Cloudflare tunnel connector (api-crypto.nguyenchitrai.id.vn).
-#   .\run_backend.ps1          start whatever is not running yet, then check local + public health
-#   .\run_backend.ps1 -Stop    stop both
-#   .\run_backend.ps1 -Status  show status only
+# Web backend (127.0.0.1:8724) + Cloudflare tunnel connector (api-crypto.nguyenchitrai.id.vn).
+#
+#   .\run_backend.ps1              run in THIS terminal: logs stream here (VS Code terminal works), Ctrl+C stops the backend
+#                                  and the tunnel. The scheduler inside the backend runs the pipeline after every 4h close
+#                                  (+8 min) and refreshes candles every 15 min - watch the "job ..." / "scheduler" lines.
+#   .\run_backend.ps1 -AccessLog   same, also print every HTTP request
+#   .\run_backend.ps1 -Background  run hidden (auto-restart on crash), logs in artifacts\web\backend.log
+#   .\run_backend.ps1 -Status      show what is running and check local + public /health
+#   .\run_backend.ps1 -Stop        stop the backend (foreground or background) and the tunnel connector
 # The tunnel token is read from CLOUDFLARE_TUNNEL_TOKEN in the local .env (gitignored; never commit it).
-param([switch]$Stop, [switch]$Status)
+param([switch]$Background, [switch]$Stop, [switch]$Status, [switch]$AccessLog)
 
 $root = $PSScriptRoot
+$py = Join-Path $root ".venv\Scripts\python.exe"
 $logDir = Join-Path $root "artifacts\web"
 New-Item -ItemType Directory -Force $logDir | Out-Null
 $cfLog = Join-Path $logDir "cloudflared_api.log"
@@ -19,52 +25,66 @@ function Get-EnvValue([string]$name, [string]$default = "") {
     }
     return $default
 }
-
 $port = [int](Get-EnvValue "WEB_PORT" "8724")
-$procs = Get-CimInstance Win32_Process
-$supervisors = $procs | Where-Object { $_.Name -eq "powershell.exe" -and $_.CommandLine -match "start_backend\.ps1" }
-$servers = $procs | Where-Object { $_.Name -eq "python.exe" -and $_.CommandLine -match ("backend" + "\.server:app") }
-$tunnels = $procs | Where-Object { $_.Name -eq "cloudflared.exe" -and $_.CommandLine -match "cloudflared_api\.log" }
 
-function Test-Local {
-    try { return (Invoke-WebRequest -UseBasicParsing "http://127.0.0.1:$port/health" -TimeoutSec 5).StatusCode -eq 200 } catch { return $false }
+function Get-Procs {
+    $all = Get-CimInstance Win32_Process
+    [pscustomobject]@{
+        Supervisors = @($all | Where-Object { $_.Name -eq "powershell.exe" -and $_.CommandLine -match "start_backend\.ps1" })
+        Servers     = @($all | Where-Object { $_.Name -eq "python.exe" -and $_.CommandLine -match ("backend" + "\.server:app") })
+        Tunnels     = @($all | Where-Object { $_.Name -eq "cloudflared.exe" -and $_.CommandLine -match "cloudflared_api\.log" })
+    }
 }
-function Test-Public {
-    try { return (Invoke-WebRequest -UseBasicParsing $publicUrl -TimeoutSec 15).StatusCode -eq 200 } catch { return $false }
+function Stop-All {
+    $p = Get-Procs
+    @($p.Supervisors + $p.Servers + $p.Tunnels) | Where-Object { $_ } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }
+}
+function Test-Url([string]$url, [int]$timeout = 5) {
+    try { return (Invoke-WebRequest -UseBasicParsing $url -TimeoutSec $timeout).StatusCode -eq 200 } catch { return $false }
+}
+function Start-Tunnel {
+    $token = Get-EnvValue "CLOUDFLARE_TUNNEL_TOKEN"
+    $exe = (Get-Command cloudflared.exe -ErrorAction SilentlyContinue).Source
+    if (-not $exe) { $exe = "C:\Program Files (x86)\cloudflared\cloudflared.exe" }
+    if (-not $token) { Write-Host "Tunnel: CLOUDFLARE_TUNNEL_TOKEN is not set in .env - skipped (local only)." -ForegroundColor Yellow; return $null }
+    if (-not (Test-Path $exe)) { Write-Host "Tunnel: cloudflared.exe not found - skipped." -ForegroundColor Yellow; return $null }
+    Write-Host "Tunnel: connecting api-crypto.nguyenchitrai.id.vn -> 127.0.0.1:$port (log: artifacts\web\cloudflared_api.log)"
+    return Start-Process $exe -WindowStyle Hidden -PassThru -ArgumentList "tunnel", "--no-autoupdate", "--logfile", $cfLog, "run", "--token", $token
 }
 
-if ($Stop) {
-    @(@($supervisors) + @($servers) + @($tunnels)) | Where-Object { $_ } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }
-    Write-Host "Stopped backend and tunnel connector."
+if ($Stop) { Stop-All; Write-Host "Stopped backend and tunnel connector."; return }
+
+if ($Status) {
+    $p = Get-Procs
+    Write-Host ("Backend processes: {0} (background supervisor: {1}) | tunnel connectors: {2}" -f $p.Servers.Count, $p.Supervisors.Count, $p.Tunnels.Count)
+    try { $h = Invoke-RestMethod "http://127.0.0.1:$port/health" -TimeoutSec 5; Write-Host ("Local  OK  - last job: {0} {1} | next cycle (UTC): {2}" -f $h.last_job.kind, $h.last_job.status, $h.next_cycle_utc) }
+    catch { Write-Host "Local  http://127.0.0.1:$port/health : NOT RESPONDING" -ForegroundColor Red }
+    Write-Host ("Public {0} : {1}" -f $publicUrl, $(if (Test-Url $publicUrl 15) { "OK" } else { "NOT REACHABLE" }))
     return
 }
 
-if (-not $Status) {
-    if (-not $supervisors) {
-        if ($servers) { $servers | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue } }
-        Start-Process powershell.exe -WindowStyle Hidden -WorkingDirectory $root `
-            -ArgumentList "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", (Join-Path $root "deploy\start_backend.ps1")
-        Write-Host "Backend: starting on 127.0.0.1:$port ..."
-    } else { Write-Host "Backend: already running." }
-
-    if (-not $tunnels) {
-        $token = Get-EnvValue "CLOUDFLARE_TUNNEL_TOKEN"
-        $exe = (Get-Command cloudflared.exe -ErrorAction SilentlyContinue).Source
-        if (-not $exe) { $exe = "C:\Program Files (x86)\cloudflared\cloudflared.exe" }
-        if (-not $token) {
-            Write-Host "Tunnel: CLOUDFLARE_TUNNEL_TOKEN is not set in .env - skipped." -ForegroundColor Yellow
-        } elseif (-not (Test-Path $exe)) {
-            Write-Host "Tunnel: cloudflared.exe not found - install it from Cloudflare first." -ForegroundColor Yellow
-        } else {
-            Start-Process $exe -WindowStyle Hidden -ArgumentList "tunnel", "--no-autoupdate", "--logfile", $cfLog, "run", "--token", $token
-            Write-Host "Tunnel: connector starting ..."
-        }
-    } else { Write-Host "Tunnel: already running." }
+if ($Background) {
+    Stop-All
+    Start-Process powershell.exe -WindowStyle Hidden -WorkingDirectory $root `
+        -ArgumentList "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", (Join-Path $root "deploy\start_backend.ps1")
+    Start-Tunnel | Out-Null
+    $ok = $false; for ($i = 0; $i -lt 20 -and -not $ok; $i++) { Start-Sleep -Seconds 2; $ok = Test-Url "http://127.0.0.1:$port/health" }
+    Write-Host ("Backend (background): {0}. Logs: artifacts\web\backend.log. Stop with .\run_backend.ps1 -Stop" -f $(if ($ok) { "OK" } else { "NOT RESPONDING" }))
+    return
 }
 
-$ok = $false
-for ($i = 0; $i -lt 20 -and -not $ok; $i++) { $ok = Test-Local; if (-not $ok) { Start-Sleep -Seconds 2 } }
-Write-Host ("Local  http://127.0.0.1:{0}/health : {1}" -f $port, $(if ($ok) { "OK" } else { "NOT RESPONDING (see artifacts\web\backend.log)" }))
-$pub = $false
-for ($i = 0; $i -lt 6 -and -not $pub; $i++) { $pub = Test-Public; if (-not $pub) { Start-Sleep -Seconds 3 } }
-Write-Host ("Public {0} : {1}" -f $publicUrl, $(if ($pub) { "OK" } else { "NOT REACHABLE (see artifacts\web\cloudflared_api.log)" }))
+# ---------------- foreground (default)
+Stop-All   # one instance only: replaces a background or older run
+Set-Location $root
+$env:PYTHONUTF8 = "1"
+$tunnel = Start-Tunnel
+Write-Host "Backend: http://127.0.0.1:$port  (Ctrl+C to stop backend + tunnel)" -ForegroundColor Green
+$uv = @("-m", "uvicorn", "backend.server:app", "--host", "127.0.0.1", "--port", "$port", "--timeout-keep-alive", "30")
+if (-not $AccessLog) { $uv += "--no-access-log" }
+try {
+    & $py @uv
+}
+finally {
+    if ($tunnel) { Stop-Process -Id $tunnel.Id -Force -ErrorAction SilentlyContinue }
+    Write-Host "Backend and tunnel stopped." -ForegroundColor Yellow
+}

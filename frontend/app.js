@@ -177,6 +177,7 @@
     mountTv(state.live.symbol);
     try {
       state.live.latest = await api("/api/signals/latest?source=live");
+      if (!state.live.conf) state.live.conf = await api("/api/confidence").catch(() => null);
       renderWatchlist(); renderSignal(); renderDips(); loadRecent();
     } catch (e) { toast(e.message); }
   }
@@ -235,6 +236,7 @@
         <span>Hiệu lực đến: <b>${dt(until)}</b> (còn <b id="sgLeft">${hms(until - Date.now())}</b>)</span>
         <span>Tổng vốn dùng danh mục: <b>${pct(run.gross, 0)}</b> · hệ số ${(run.scale ?? 0).toFixed(2)}×</span>
       </div>
+      ${flat ? "" : confBlock(b.confidence)}
       <p class="fine">Lệnh entry là limit chờ trong nến 4h hiện tại; không khớp thì huỷ. Sau khi khớp đặt ngay SL (market) và TP (limit).</p>`;
     updateLiveDistances();
   }
@@ -249,11 +251,29 @@
     if (run && el && state.view === "live") el.textContent = hms(run.decision_time + IV_MS["4h"] - Date.now());
   }, 1000);
 
+  function confLine(st, label) {
+    if (!st) return "";
+    return `<tr><td>${label}</td><td>${st.n}</td><td><b>${(100 * st.win_rate).toFixed(0)}%</b></td><td class="up">+${(st.avg_win_pct ?? 0).toFixed(1)}%</td>
+      <td class="down">${(st.avg_loss_pct ?? 0).toFixed(1)}%</td><td>${sgn(st.avg_pct)}</td></tr>`;
+  }
+  function confBlock(level) { // historical win rate of orders opened at the same confidence level (walk-forward replay)
+    const lv = state.live.conf?.levels?.[level];
+    if (!lv) return "";
+    return `<div class="conf"><div class="muted small">Lịch sử các lệnh cùng mức tin cậy "${esc(CONF[level] || level)}" (mô phỏng walk-forward, chưa trừ phí):</div>
+      <table class="tbl compact"><thead><tr><th>Giai đoạn</th><th>Số lệnh</th><th>Thắng</th><th>TB thắng</th><th>TB thua</th><th>TB/lệnh</th></tr></thead>
+      <tbody>${confLine(lv.dev, "4 năm đầu")}${confLine(lv.hidden, "Năm giấu")}</tbody></table>
+      <div class="muted small">Lưu ý: nhãn tin cậy hiện tại chưa phân biệt tốt (97% lệnh là "Thấp"); đang nghiên cứu điểm tin cậy mới.</div></div>`;
+  }
+
   function renderDips() {
     const sym = state.live.symbol;
     const rows = (state.live.latest?.sleeve || []).filter((r) => r.symbol === sym);
     table($("dipTbl"), ["Bậc", "Mua limit", "TP", "SL", "Vốn"], rows.map((r) => `<tr><td>${r.rung}σ</td><td>${fmtPx(r.buy_limit)}</td>
       <td class="up">${fmtPx(r.tp)}</td><td class="down">${fmtPx(r.sl)}</td><td>${pct(r.size_frac)}</td></tr>`), "Không có lệnh chờ");
+    const d = state.live.conf?.levels?.DIP;
+    const note = $("dipNote") || Object.assign(document.createElement("div"), { id: "dipNote", className: "muted small" });
+    note.innerHTML = d ? `Lịch sử lệnh dip: thắng <b>${(100 * d.dev.win_rate).toFixed(0)}%</b> (${d.dev.n} lệnh, 4 năm đầu) · năm giấu <b>${(100 * d.hidden.win_rate).toFixed(0)}%</b> (${d.hidden.n} lệnh) · TB thắng +${d.dev.avg_win_pct.toFixed(2)}% / thua ${d.dev.avg_loss_pct.toFixed(2)}%` : "";
+    $("dipTbl").after(note);
   }
 
   async function loadRecent() {
