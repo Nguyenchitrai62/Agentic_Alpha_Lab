@@ -129,3 +129,31 @@ def test_risk_sizing_loses_the_risk_budget_at_the_stop():
     exp = q * (stop - LIMIT) - q * LIMIT * eu.MAKER - q * stop * eu.TAKER
     assert out["net"][0] == pytest.approx(exp, rel=1e-9)
     assert out["net"][0] == pytest.approx(-0.01, abs=0.0005)  # about 1% of equity lost at the stop
+
+
+def test_scale_in_limit_after_minute_five_when_in_profit_and_signal_grows():
+    trade = dict(TRADE, add_k=1.5, max_adds=1)
+    args = dict(nbars=3, books_vals=(1.0, 1.0, 3.0), opens_bar=(100.0, 101.0, 102.0))
+    out = run(*make(lows={(0, 6): 99.0, (2, 2): 101.0}, **args), trade=trade)
+    assert out["stats"]["adds"] == 0  # the add order may not fill before minute 5
+    out = run(*make(lows={(0, 6): 99.0, (2, 10): 101.0}, **args), trade=trade)
+    add = [e for e in out["events"] if e["kind"] == "book_add"]
+    assert len(add) == 1 and add[0]["price"] == pytest.approx(102.0 * (1 - 0.25 * SIG)) and add[0]["t"].minute == 10
+    assert LIMIT < add[0]["avg_entry"] < add[0]["price"]
+
+
+def test_scale_out_limit_when_signal_weakens():
+    trade = dict(TRADE, reduce_k=0.5, reduce_frac=0.5, max_reduces=1)
+    out = run(*make(nbars=2, books_vals=(1.0, 0.2), lows={(0, 6): 99.0}, highs={(1, 10): 100.5}), trade=trade)
+    red = [e for e in out["events"] if e["kind"] == "book_reduce"]
+    assert len(red) == 1 and red[0]["price"] == pytest.approx(100 * (1 + 0.25 * SIG))
+    fill = [e for e in out["events"] if e["kind"] == "book_fill"][0]
+    assert red[0]["weight"] == pytest.approx(-0.5 * fill["weight"] * red[0]["price"] / LIMIT, rel=0.02)
+
+
+def test_limit_exit_when_the_signal_is_gone():
+    trade = dict(TRADE, exit_on_signal_loss=True)
+    out = run(*make(nbars=2, books_vals=(1.0, 0.0), lows={(0, 6): 99.0}, highs={(1, 3): 100.5, (1, 12): 100.5}), trade=trade)
+    close = [e for e in out["events"] if e["kind"] == "book_close"]
+    assert len(close) == 1 and close[0]["t"].minute == 12  # not before minute 5 of the deciding bar
+    assert close[0]["price"] == pytest.approx(100 * (1 + 0.25 * SIG)) and out["stats"]["limit_exits"] == 1
