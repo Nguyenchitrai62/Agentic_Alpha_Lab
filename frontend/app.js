@@ -33,7 +33,9 @@
   const toChart = (ms) => Math.floor(ms / 1000) + TZ;
   const fromChart = (t) => (t - TZ) * 1000;
   const CONF = { CAO: "Cao", "TRUNG BINH": "Trung bình", THAP: "Thấp" };
-  const REASON = { TP: "TP", SL: "SL", "Rebalance về 0": "Đóng (rebalance)", "Đảo chiều": "Đảo chiều", "Đang mở": "Đang mở", "Hết 4h (market)": "Hết 4h" };
+  const REASON = { TP: "Chạm TP", SL: "Chạm SL", "SL hoà vốn": "SL hoà vốn", "Đóng limit": "Đóng bằng limit", "Hết giờ": "Hết giờ (dip)",
+                  "Rebalance về 0": "Đóng (rebalance)", "Đảo chiều": "Đảo chiều", "Đang mở": "Đang mở", "Hết 4h (market)": "Hết 4h" };
+  const histSource = () => `tm_${state.h.pipe || "v240"}`;
   const sideBadge = (s, w) => s === "LONG" ? `<span class="badge long">LONG${w != null ? " " + pct(Math.abs(w), 0) : ""}</span>`
     : s === "SHORT" ? `<span class="badge short">SHORT${w != null ? " " + pct(Math.abs(w), 0) : ""}</span>` : `<span class="badge flat">Đứng ngoài</span>`;
   const hms = (ms) => { if (ms <= 0) return "0:00:00"; const s = Math.floor(ms / 1000); return `${Math.floor(s / 3600)}:${String(Math.floor(s / 60) % 60).padStart(2, "0")}:${String(s % 60).padStart(2, "0")}`; };
@@ -511,6 +513,9 @@
   function initHistory() {
     if (!histInit) {
       histInit = true;
+      state.h.pipe = planPipe();
+      seg($("hPipe"), PIPES.map((p) => p.v), state.h.pipe, (v) => { state.h.pipe = v; loadHistory(); },
+        (v) => PIPES.find((p) => p.v === v).nm + (v === "v240" ? " ★" : ""));
       seg($("hSymbols"), SYMS, state.h.symbol, (v) => { state.h.symbol = v; store.set("hSym", v); loadHistory(); }, coin);
       seg($("hIntervals"), ["1h", "4h", "1d"], state.h.interval, (v) => { state.h.interval = v; store.set("hIv", v); loadHistory(); }, (x) => IV_LABEL[x]);
       seg($("hRanges"), Object.keys(RANGES), state.h.range, (v) => { state.h.range = v; store.set("hRange", v); applyRange(); });
@@ -569,9 +574,9 @@
     try {
       const [cand, orders, pos, fills] = await Promise.all([
         api(`/api/candles?symbol=${symbol}&interval=${interval}&limit=${FIRST_LOAD[interval]}`),
-        api(`/api/orders?symbol=${symbol}&source=walkforward&limit=30000`),
-        api(`/api/positions?symbol=${symbol}&source=walkforward&limit=30000`),
-        api(`/api/trades?symbol=${symbol}&source=walkforward&limit=30000`),
+        api(`/api/orders?symbol=${symbol}&source=${histSource()}&limit=30000`),
+        api(`/api/positions?symbol=${symbol}&source=${histSource()}&limit=30000`),
+        api(`/api/trades?symbol=${symbol}&source=${histSource()}&limit=30000`),
       ]);
       if (gen !== H.gen) return;
       if (H.chart) { H.chart.remove(); H.chart = null; }
@@ -663,8 +668,9 @@
     H.series.setMarkers(out);
   }
 
-  const KINDVI = { book_fill: "khớp limit", book_stop: "stop-loss", book_tp: "take-profit", rung_fill: "khớp dip", rung_tp: "TP dip",
-                  rung_sl: "SL dip", rung_timeout: "đóng dip" };
+  const KINDVI = { book_fill: "khớp lệnh vào (limit)", book_stop: "chạm stop-loss", book_tp: "chạm take-profit", book_add: "nhồi thêm (limit)",
+                  book_reduce: "chốt bớt (limit)", book_close: "đóng bằng limit", book_partial: "chốt một phần", sl_move: "dời SL",
+                  rung_fill: "khớp dip", rung_tp: "TP dip", rung_sl: "SL dip", rung_timeout: "đóng dip hết giờ" };
   function onCrosshair(p) {
     const { symbol, interval } = state.h;
     let i = H.times.length - 1;
@@ -673,7 +679,7 @@
     if (!k) { $("hLegend").innerHTML = ""; return; }
     const ch = (k.c / k.o - 1) * 100, cls = ch >= 0 ? "up" : "down";
     const ps = H.posAt[i], step = IV_MS[interval];
-    const inBar = H.fills.filter((f) => f.t >= k.t && f.t < k.t + step && (f.kind !== "book_fill" || Math.abs(f.weight) >= 0.002)).slice(0, 4);
+    const inBar = H.fills.filter((f) => f.t >= k.t && f.t < k.t + step && !["order_issue", "order_cancel", "order_expire"].includes(f.kind)).slice(0, 4);
     const fl = inBar.map((f) => `<span class="${f.side === "buy" ? "up" : "down"}">${f.side === "buy" ? "▲ mua" : "▼ bán"}</span> ${KINDVI[f.kind] || f.kind} ${fmtPx(f.price)}` +
       (f.kind === "book_fill" ? ` <span class="muted">(${pct(Math.abs(f.weight))} vốn, ${((f.price / k.o - 1) * 100).toFixed(2)}% so với giá mở)</span>` : "")).join(" · ");
     $("hLegend").innerHTML = `<div class="l1">${coin(symbol)}USDT.P · ${IV_LABEL[interval]} · Binance <span class="muted small">${dt(k.t)}</span></div>
@@ -700,16 +706,17 @@
     const first = list.length ? Math.min(...list.map((o) => o.signal_t)) : null;
     $("oStats").innerHTML = `<span>Lệnh <b>${list.length}</b></span><span>Thắng <b>${done.length ? (100 * wins.length / done.length).toFixed(1) : 0}%</b></span>
       <span>TB lãi <b class="up">+${avg(wins).toFixed(2)}%</b></span><span>TB lỗ <b class="down">${avg(done.filter((o) => o.pnl_pct <= 0)).toFixed(2)}%</b></span>
-      <span>TP/SL <b>${list.filter((o) => o.exit_reason === "TP").length}/${list.filter((o) => o.exit_reason === "SL").length}</b></span>
+      <span>Chạm TP / SL <b>${list.filter((o) => o.exit_reason === "TP").length} / ${list.filter((o) => o.exit_reason === "SL" || o.exit_reason === "SL hoà vốn").length}</b></span>
       <span>Từ <b>${first ? dt(first) : "—"}</b></span>`;
     const rows = list.slice().reverse().slice(0, 800).map((o) => `<tr class="click ${o.id === state.h.selected ? "sel" : ""}" data-id="${o.id}">
-      <td>${dt(o.signal_t)}</td><td>${o.kind === "dip" ? '<span class="badge dip">DIP</span>' : "4h"}</td><td>${sideBadge(o.side)}</td>
-      <td title="khớp lúc ${dt(o.entry_t)}">${fmtPx(o.entry_px)}</td><td>${fmtPx(o.avg_px ?? o.entry_px)}</td><td>${o.fills ?? 1}</td>
+      <td>${dt(o.entry_t)}</td><td>${o.kind === "dip" ? '<span class="badge dip">MUA DIP</span>' : "Lệnh 4h"}</td><td>${sideBadge(o.side)}</td>
+      <td>${fmtPx(o.avg_px ?? o.entry_px)}${(o.fills ?? 1) > 1 ? `<span class="muted small"> (khớp đầu ${fmtPx(o.entry_px)})</span>` : ""}</td>
+      <td>${Math.max(0, (o.fills ?? 1) - 1) || "—"}</td>
       <td class="down">${fmtPx(o.sl)}</td><td class="up">${fmtPx(o.tp)}</td><td>${pct(o.size)}</td>
       <td>${o.exit_t ? dt(o.exit_t) : "—"}</td><td>${fmtPx(o.exit_px)}</td>
       <td>${esc(REASON[o.exit_reason] || o.exit_reason || "")}</td><td>${o.pnl_pct == null ? '<span class="muted">đang mở</span>' : sgn(o.pnl_pct)}</td></tr>`);
-    table($("ordersTbl"), ["Phát lúc (nến 4h)", "Loại", "Hướng", "Khớp đầu", "Giá vào TB", "Số lần khớp", "SL lúc thoát", "TP lúc thoát",
-      "Tỷ trọng max", "Thoát lúc", "Giá thoát", "Lý do", "Kết quả (theo giá TB)"], rows, "Không có lệnh");
+    table($("ordersTbl"), ["Vào lệnh lúc", "Loại", "Hướng", "Giá vào", "Nhồi thêm (lần)", "Stop-loss", "Take-profit",
+      "Vốn dùng", "Thoát lúc", "Giá thoát", "Lý do thoát", "Kết quả (sau phí)"], rows, "Không có lệnh");
     $("ordersTbl").onclick = (e) => { const tr = e.target.closest("tr[data-id]"); if (tr) selectOrder(+tr.dataset.id, true); };
   }
 
@@ -729,11 +736,14 @@
   // ================================================================== PERFORMANCE
   async function loadPerf() {
     try {
-      const [ov, wfEq, fwEq, st] = await Promise.all([api("/api/overview"), api("/api/equity?source=walkforward&points=3000"),
-        api("/api/equity?source=forward&points=3000"), api("/api/orders/stats?source=walkforward")]);
-      const wf = ov.walkforward || {}, fw = ov.forward || {};
+      const pipe = state.perfPipe || planPipe(), src = `tm_${pipe}`, nm = PIPES.find((p) => p.v === pipe).nm;
+      seg($("pPipe"), PIPES.map((p) => p.v), pipe, (v) => { state.perfPipe = v; loadPerf(); },
+        (v) => PIPES.find((p) => p.v === v).nm + " — " + PIPES.find((p) => p.v === v).ds);
+      const [ov, wfEq, st] = await Promise.all([api(`/api/overview?pipeline=${pipe}`), api(`/api/equity?source=${src}&points=3000`),
+        api(`/api/orders/stats?source=${src}`)]);
+      const wf = ov.walkforward || {}, plan = ov.plan || {};
       $("perfKpis").innerHTML = [
-        ["5 năm walk-forward", wf.monthly_5y, "%/tháng (TB hình học)"], ["4 năm đầu (chọn mô hình)", wf.monthly_dev4, "%/tháng"],
+        [`${nm}: 5 năm walk-forward`, wf.monthly_5y, "%/tháng (TB hình học)"], ["4 năm đầu (dùng để chọn)", wf.monthly_dev4, "%/tháng"],
         ["Năm gần nhất (năm giấu)", wf.monthly_last_year, "%/tháng"], ["DD toàn giai đoạn", wf.gate_dd, "% (max 4h / 1 phút)"],
         ["Năm lỗ", wf.losing_years, "năm"],
       ].map(([k, v, s]) => `<div class="kpi"><div class="k">${k}</div><div class="v">${v ?? "—"}</div><div class="s">${s}</div></div>`).join("");
@@ -744,25 +754,23 @@
       for (const r of st) {
         const k = r.symbol + "|" + r.kind; const a = by[k] || (by[k] = { symbol: r.symbol, kind: r.kind, n: 0, w: 0, s: 0, tp: 0, sl: 0, nd: 0 });
         a.n += r.n; if (r.avg_pnl != null) { a.nd += r.n; a.w += r.win * r.n; a.s += r.avg_pnl * r.n; }
-        if (r.exit_reason === "TP") a.tp += r.n; if (r.exit_reason === "SL") a.sl += r.n;
+        if (r.exit_reason === "TP") a.tp += r.n; if (r.exit_reason === "SL" || r.exit_reason === "SL hoà vốn") a.sl += r.n;
       }
-      table($("coinTbl"), ["Coin", "Loại", "Số lệnh", "Tỷ lệ thắng", "TB/lệnh", "TP", "SL"], Object.values(by)
+      table($("coinTbl"), ["Coin", "Loại", "Số lệnh", "Tỷ lệ thắng", "TB/lệnh (sau phí)", "Chạm TP", "Chạm SL"], Object.values(by)
         .sort((a, b) => a.kind.localeCompare(b.kind) || a.symbol.localeCompare(b.symbol))
-        .map((a) => `<tr><td>${coin(a.symbol)}</td><td>${a.kind === "dip" ? '<span class="badge dip">DIP</span>' : "4h"}</td><td>${a.n}</td>
+        .map((a) => `<tr><td>${coin(a.symbol)}</td><td>${a.kind === "dip" ? '<span class="badge dip">MUA DIP</span>' : "Lệnh 4h"}</td><td>${a.n}</td>
           <td>${a.nd ? (100 * a.w / a.nd).toFixed(1) + "%" : "—"}</td><td>${a.nd ? sgn(a.s / a.nd) : "—"}</td><td>${a.tp}</td><td>${a.sl}</td></tr>`));
       drawLine("wf", $("wfChart"), wfEq, "#2962ff", true);
-      drawLine("fw", $("fwChart"), fwEq, "#089981", false);
-      const s = fw.stats || {};
-      $("fwSummary").innerHTML = fw.freeze ? `<dl class="kv">
-        <dt>Đóng băng mô hình</dt><dd>${esc(String(fw.freeze).slice(0, 16))} UTC</dd>
-        <dt>Đã chấm đến</dt><dd>${esc(String(fw.scored_until || "").slice(0, 16))} UTC</dd>
-        <dt>Số nến 4h</dt><dd>${fw.bars} (${fw.days} ngày)</dd>
-        <dt>Lợi nhuận ròng</dt><dd>${sgn(fw.net_return_pct)}</dd>
-        <dt>Quy đổi %/tháng</dt><dd>${fw.monthly_equiv_pct ?? "— (cần ≥ 1 ngày)"}</dd>
-        <dt>DD tối đa (1 phút)</dt><dd>${fw.max_dd_1m_pct}%</dd>
-        <dt>Lệnh 4h khớp / SL / TP</dt><dd>${s.fills ?? 0} / ${s.stops ?? 0} / ${s.tps ?? 0}</dd>
-        <dt>Lệnh dip khớp / SL / TP</dt><dd>${s.rungs ?? 0} / ${s.rung_stops ?? 0} / ${s.rung_tps ?? 0}</dd></dl>
-        <p class="fine">Dữ liệu sau thời điểm đóng băng là bằng chứng sạch duy nhất (mô hình chưa từng thấy).</p>` : `<p class="muted">Chưa có dữ liệu paper trading.</p>`;
+      const curve = (plan.equity_curve || []).map(([t, e]) => ({ t: Date.parse(t) + 4 * 3600 * 1000, equity: e }));
+      drawLine("fw", $("fwChart"), curve, "#089981", false);
+      $("fwSummary").innerHTML = plan.freeze ? `<dl class="kv">
+        <dt>Pipeline</dt><dd>${esc(plan.pipeline || nm)}</dd>
+        <dt>Bắt đầu paper</dt><dd>${esc(String(plan.freeze).slice(0, 16))} UTC</dd>
+        <dt>Cập nhật</dt><dd>${dt(Date.parse(plan.generated_at))}</dd>
+        <dt>Lợi nhuận ròng</dt><dd>${sgn(plan.net_return_pct)}</dd>
+        <dt>Số nến 4h đã chạy</dt><dd>${curve.length}</dd></dl>
+        <p class="fine">Paper trading tiến cứu: dữ liệu sau thời điểm đóng băng mô hình, là bằng chứng sạch duy nhất (mô hình chưa từng thấy).
+          Còn quá ít nến để kết luận.</p>` : `<p class="muted">Chưa có dữ liệu paper trading.</p>`;
     } catch (e) { toast(e.message); }
   }
 

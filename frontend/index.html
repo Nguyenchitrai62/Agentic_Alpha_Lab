@@ -9,11 +9,11 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="styles.css?v=20260929b" />
+  <link rel="stylesheet" href="styles.css?v=20260929d" />
   <script src="config.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/lightweight-charts@4.2.0/dist/lightweight-charts.standalone.production.js" defer></script>
   <script src="https://accounts.google.com/gsi/client" async defer></script>
-  <script src="app.js?v=20260929b" defer></script>
+  <script src="app.js?v=20260929d" defer></script>
 </head>
 <body>
   <header class="topbar">
@@ -79,11 +79,12 @@
     <!-- ===================== history ===================== -->
     <section id="view-history" class="view history" hidden>
       <div class="toolbar">
+        <div class="seg" id="hPipe" title="Pipeline (lịch sử walk-forward ở chế độ lệnh thực thi)"></div>
         <div class="seg" id="hSymbols"></div>
         <div class="seg" id="hIntervals"></div>
         <div class="seg" id="hRanges"></div>
         <span class="sep"></span>
-        <label class="chk"><input type="checkbox" id="tBook" checked /><i class="sw book"></i>Lệnh 4h</label>
+        <label class="chk"><input type="checkbox" id="tBook" checked /><i class="sw book"></i>Lệnh</label>
         <label class="chk"><input type="checkbox" id="tZone" checked /><i class="sw zone"></i>Vùng SL/TP</label>
         <label class="chk"><input type="checkbox" id="tDip" /><i class="sw dip"></i>Dip</label>
         <label class="chk"><input type="checkbox" id="tWeight" checked /><i class="sw w"></i>Tỷ trọng</label>
@@ -111,6 +112,7 @@
 
     <!-- ===================== performance ===================== -->
     <section id="view-perf" class="view page" hidden>
+      <div class="toolbar flat"><div class="seg" id="pPipe"></div></div>
       <div class="kpis" id="perfKpis"></div>
       <div class="panel big"><div class="panel-h"><span>Vốn walk-forward (log, 1 = vốn ban đầu)</span>
         <span class="muted small">Mỗi năm mô hình đóng băng tại mốc 24/09 rồi chạy liên tục qua từng nến 4h của năm sau</span></div>

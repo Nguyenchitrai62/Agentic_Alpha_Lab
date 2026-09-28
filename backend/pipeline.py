@@ -436,6 +436,12 @@ def job_walkforward() -> str:
     return f"walk-forward: {len(bars)} bars, {len(events)} trade events, {len(orders)} orders, 5y {summary['monthly_5y']}%/month, last year {summary['monthly_last_year']}"
 
 
+def job_walkforward_tm() -> str:
+    """Walk-forward history of the executable trade-mode pipelines (D2 / T3 / W2 / O1) for the history and performance pages."""
+    from . import history_tm
+    return " | ".join(history_tm.build(pipe, db) for pipe in history_tm.PIPELINES)
+
+
 def job_cycle() -> str:
     """Scheduled cycle after each 4h close: candles -> prospective log -> trade plan -> live signal -> forward paper trading."""
     out, t0 = [], datetime.now(timezone.utc)

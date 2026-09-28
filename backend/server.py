@@ -128,7 +128,12 @@ def auth_me(user: dict | None = Depends(auth.current_user)):
 
 # ------------------------------------------------------------------ viewer
 @app.get("/api/overview")
-def overview(request: Request, user: dict = Depends(auth.require_viewer)):
+def overview(request: Request, pipeline: str | None = None, user: dict = Depends(auth.require_viewer)):
+    """pipeline=v205/v233/v236/v240: the walk-forward summary of that executable trade-mode pipeline (history_tm)."""
+    if pipeline in ("v205", "v233", "v236", "v240"):
+        return cached(request, f"overview:{pipeline}", 60, lambda: {"walkforward": db.kv_get(f"summary_tm_{pipeline}", {}),
+                                                                   "plan": db.kv_get({"v205": "trade_plan"}.get(pipeline, f"trade_plan_{pipeline}"), {})})
+
     def load():
         latest = db.one("SELECT id, decision_time, created_at, scale, governor, gross, pipeline FROM runs WHERE source = 'live' "
                         "ORDER BY decision_time DESC LIMIT 1")
@@ -283,7 +288,8 @@ def equity(request: Request, source: str = "walkforward", start: str | None = No
 def admin_run(payload: dict = Body(...), user: dict = Depends(auth.require_admin)):
     kind = payload.get("kind", "cycle")
     fns = {"cycle": pipeline.job_cycle, "signal": pipeline.job_signal, "candles": pipeline.job_candles, "trade_plan": pipeline.job_trade_plan, "shadow": pipeline.job_shadow,
-           "forward": pipeline.job_forward, "walkforward": pipeline.job_walkforward}
+           "forward": pipeline.job_forward, "walkforward": pipeline.job_walkforward,
+           "walkforward_tm": pipeline.job_walkforward_tm}
     if kind not in fns:
         raise HTTPException(400, f"kind must be one of {list(fns)}")
 
