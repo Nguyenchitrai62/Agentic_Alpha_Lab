@@ -43,6 +43,18 @@ def keys(prefix: str) -> list[str]:
         marker = k[-1]
 
 
+ORDER_LEVEL = False  # --orders: rebuild taker orders (consecutive aggTrades with the same time and side) before tiering
+
+
+def _orders(ch: pd.DataFrame) -> pd.DataFrame:
+    """Merge consecutive aggTrades with identical transact time and side into one taker order (a market order that swept several
+    price levels is split into one aggTrade per level); notional = sum over its levels."""
+    new = (ch["ts"] != ch["ts"].shift()) | (ch["ibm"] != ch["ibm"].shift())
+    oid = new.cumsum()
+    g = ch.assign(n=ch["price"].astype(float) * ch["qty"].astype(float)).groupby(oid, sort=False)
+    return pd.DataFrame({"ts": g["ts"].first(), "ibm": g["ibm"].first(), "n": g["n"].sum()})
+
+
 def aggregate(raw: bytes) -> pd.DataFrame:
     parts = []
     with zipfile.ZipFile(io.BytesIO(raw)) as z:
@@ -56,10 +68,14 @@ def aggregate(raw: bytes) -> pd.DataFrame:
                 if has_header:
                     ch = ch[["price", "quantity", "transact_time", "is_buyer_maker"]]
                 ch.columns = ["price", "qty", "ts", "ibm"]
+                if ORDER_LEVEL:
+                    ch = _orders(ch)
+                    n = ch["n"]
+                else:
+                    n = ch["price"].astype(float) * ch["qty"].astype(float)
                 ts = pd.to_numeric(ch["ts"])
                 unit = "us" if ts.max() > 1e14 else "ms"
                 t = pd.to_datetime(ts, unit=unit, utc=True).dt.floor("4h")
-                n = ch["price"].astype(float) * ch["qty"].astype(float)
                 sell = ch["ibm"].astype(str).str.lower().isin(("true", "1"))
                 tier = pd.cut(n, TIERS, right=False, labels=TNAME)
                 d = pd.DataFrame({"t": t, "tier": tier, "buy": n.where(~sell, 0.0), "sell": n.where(sell, 0.0), "n": 1})
@@ -104,10 +120,13 @@ def main():
     ap.add_argument("--months", nargs="*", default=None)
     ap.add_argument("--market", choices=["um", "spot"], default="um")
     ap.add_argument("--since", default=None, help="first month YYYY-MM to fetch")
+    ap.add_argument("--orders", action="store_true", help="order-level tiers (rebuild swept taker orders); output *_orders dir")
     a = ap.parse_args()
-    global MARKET, OUT
+    global MARKET, OUT, ORDER_LEVEL
     if a.market == "spot":
         MARKET, OUT = "spot", Path("data/raw/aggflow_spot_20260928")
+    if a.orders:
+        ORDER_LEVEL, OUT = True, Path(str(OUT) + "_orders")
     for s in a.syms:
         run(s, a.months, a.since)
 
