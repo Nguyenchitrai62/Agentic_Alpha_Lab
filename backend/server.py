@@ -102,7 +102,8 @@ def _check_symbol(symbol: str) -> str:
 @app.get("/health")
 def health():
     last = db.one("SELECT kind, status, started_at, finished_at FROM jobs ORDER BY id DESC LIMIT 1")
-    return {"status": "ok", "version": APP_VERSION, "pipeline": pipeline.PIPELINE, "last_job": last,
+    cyc = db.one("SELECT status, started_at, finished_at, triggered_by FROM jobs WHERE kind = 'cycle' ORDER BY id DESC LIMIT 1")
+    return {"status": "ok", "version": APP_VERSION, "pipeline": pipeline.PIPELINE, "last_job": last, "last_cycle": cyc,
             "scheduler": SETTINGS.scheduler_enabled, "next_cycle_utc": _next_cycle["t"]}
 
 

@@ -9,11 +9,11 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="styles.css?v=20260929f" />
+  <link rel="stylesheet" href="styles.css?v=20260929g" />
   <script src="config.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/lightweight-charts@4.2.0/dist/lightweight-charts.standalone.production.js" defer></script>
   <script src="https://accounts.google.com/gsi/client" async defer></script>
-  <script src="app.js?v=20260929f" defer></script>
+  <script src="app.js?v=20260929g" defer></script>
 </head>
 <body>
   <header class="topbar">
@@ -22,10 +22,10 @@
       <span>Alpha Lab</span><span class="tag">paper</span>
     </div>
     <nav class="tabs" id="tabs" hidden>
-      <button data-view="todo" class="active">Việc cần làm</button>
-      <button data-view="live">Thị trường</button>
-      <button data-view="history">Lịch sử lệnh</button>
-      <button data-view="perf">Hiệu suất</button>
+      <button data-view="todo" class="active">Pipeline</button>
+      <button data-view="live">Market</button>
+      <button data-view="history">History</button>
+      <button data-view="perf">Performance</button>
       <button data-view="admin" id="adminTab" hidden>Admin</button>
     </nav>
     <div class="user" id="userBox"></div>
@@ -52,6 +52,7 @@
 
     <!-- ===================== live market ===================== -->
     <section id="view-todo" class="view page todo" hidden>
+      <div class="pipe-status" id="pipeStatus"></div>
       <div class="pipebar" id="pipeBar"></div>
       <div class="panel board-panel">
         <div class="panel-h"><span>Việc cần làm ngay bây giờ</span><span class="muted small" id="boardMeta"></span>
@@ -64,7 +65,7 @@
     </section>
 
     <section id="view-live" class="view live" hidden>
-      <div class="tv-wrap"><div id="tvChart" class="tv"></div></div>
+      <div class="tv-wrap"><div class="tv-iv seg" id="tvIv"></div><div id="tvChart" class="tv"></div></div>
       <aside class="side">
         <div class="panel">
           <div class="panel-h"><span>Danh sách theo dõi</span><span class="muted small" id="wsState">● realtime</span></div>
@@ -93,12 +94,18 @@
         <label class="chk"><input type="checkbox" id="tBook" checked /><i class="sw book"></i>Lệnh</label>
         <label class="chk"><input type="checkbox" id="tZone" checked /><i class="sw zone"></i>Vùng SL/TP</label>
         <label class="chk"><input type="checkbox" id="tDip" /><i class="sw dip"></i>Dip</label>
-        <label class="chk"><input type="checkbox" id="tWeight" checked /><i class="sw w"></i>Tỷ trọng</label>
+        <input type="checkbox" id="tWeight" hidden />
         <span class="sep"></span>
         <div class="seg icons">
           <button id="zOut" title="Thu nhỏ">−</button><button id="zIn" title="Phóng to">+</button>
           <button id="zFit" title="Xem toàn bộ">⤢</button><button id="zNow" title="Về hiện tại">⇥</button>
         </div>
+      </div>
+      <div class="hist-legend">
+        <span><i class="lg tp"></i>vùng chốt lời (giá vào → TP)</span><span><i class="lg sl"></i>vùng cắt lỗ (giá vào → SL)</span>
+        <span class="up">▲</span><span>khớp mua</span><span class="down">▼</span><span>khớp bán</span>
+        <span class="down">✕</span><span>chạm SL</span><span class="up">●</span><span>chạm TP</span>
+        <span class="muted">· bấm một lệnh trong bảng để phóng to lệnh đó · trục giá tự căn cả SL/TP như TradingView</span>
       </div>
       <div class="chart-area">
         <div id="hChart" class="chart"></div>

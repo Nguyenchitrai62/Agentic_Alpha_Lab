@@ -19,7 +19,7 @@
   const state = {
     token: store.get("token", ""), user: null, view: "live",
     live: { symbol: store.get("liveSym", "BTCUSDT"), latest: null, prices: {}, tvSym: null },
-    h: { symbol: store.get("hSym", "BTCUSDT"), interval: store.get("hIv", "4h"), range: store.get("hRange", "1N"),
+    h: { symbol: store.get("hSym", "BTCUSDT"), interval: store.get("hIv", "4h"), range: store.get("hRange2", "3Th"),
          kind: "book", result: "all", selected: null },
   };
 
@@ -170,15 +170,21 @@
       document.head.appendChild(s);
     }));
   }
-  async function mountTv(sym) {
-    if (state.live.tvSym === sym && $("tvChart").childElementCount) return;
-    state.live.tvSym = sym;
+  const TV_IVS = [["5", "5m"], ["15", "15m"], ["60", "1h"], ["240", "4h"], ["1D", "1D"]];
+  function tvInterval() { const v = store.get("tvIv", "240"); return TV_IVS.some(([k]) => k === v) ? v : "240"; }
+  async function mountTv(sym, force = false) {
+    const iv = tvInterval();
+    seg($("tvIv"), TV_IVS.map(([k]) => k), iv, (v) => { store.set("tvIv", v); mountTv(state.live.symbol, true); },
+      (k) => TV_IVS.find(([x]) => x === k)[1]);
+    if (!force && state.live.tvSym === sym && state.live.tvIv === iv && $("tvChart").childElementCount) return;
+    state.live.tvSym = sym; state.live.tvIv = iv;
     try { await loadTvScript(); } catch (e) { $("tvChart").innerHTML = '<p class="muted" style="padding:20px">Không tải được TradingView.</p>'; return; }
     $("tvChart").innerHTML = "";
     new window.TradingView.widget({
-      container_id: "tvChart", autosize: true, symbol: `BINANCE:${sym}.P`, interval: "240", timezone: "Asia/Ho_Chi_Minh",
+      container_id: "tvChart", autosize: true, symbol: `BINANCE:${sym}.P`, interval: iv, timezone: "Asia/Ho_Chi_Minh",
       theme: "dark", style: "1", locale: "vi_VN", toolbar_bg: "#131722", enable_publishing: false, allow_symbol_change: true,
       hide_side_toolbar: false, withdateranges: true, details: false, studies: ["Volume@tv-basicstudies"],
+      favorites: { intervals: TV_IVS.map(([k]) => k) },
       overrides: { "paneProperties.background": "#131722", "paneProperties.backgroundType": "solid" },
     });
   }
@@ -198,8 +204,18 @@
       renderWatchlist(); renderPlan(); renderSignal(); renderDips(); loadRecent(); updateTitle();
     } catch (e) { toast(e.message); }
   }
+  async function renderPipeStatus() {
+    const el = $("pipeStatus"); if (!el) return;
+    try {
+      const h = await api("/health"), c = h.last_cycle, ok = c && c.status === "done";
+      el.innerHTML = `<span><i class="dot ${ok ? "" : "bad"}"></i>Pipeline tự chạy mỗi 4h (1 phút sau khi nến 4h đóng) · lệnh cập nhật lại mỗi 15 phút</span>
+        <span>Lần chạy gần nhất: <b>${c ? dt(c.started_at) : "—"}</b> (${c ? (ok ? "xong" : c.status) : "—"})</span>
+        <span>Lần tới: <b>${h.next_cycle_utc ? dt(Date.parse(h.next_cycle_utc)) : "—"}</b></span>`;
+    } catch (e) { el.textContent = ""; }
+  }
   async function loadTodo() {
     try {
+      renderPipeStatus();
       await loadPlans();
       renderPipeBar(); renderBoard(); renderCards(); updateTitle();
     } catch (e) { toast(e.message); }
@@ -285,12 +301,26 @@
     return body + `<div class="timeline">${evs.map((e) => `<div><span class="muted">${dt(Date.parse(e.t))}</span> ${EVVI[e.kind] || e.kind}
         ${e.kind.startsWith("sl_") ? "" : (e.side === "buy" ? "mua" : "bán")} ${fmtPx(e.price)}${e.why ? ` <span class="muted">(${esc(e.why)})</span>` : ""}</div>`).join("") || '<div class="muted small">Chưa có sự kiện.</div>'}</div>`;
   }
+  function compactPlan(sym) {
+    const c = planOf(sym), px = state.live.prices[sym]?.c;
+    const kv = (k, v, cls = "") => `<span><span class="k">${k}</span> <span class="v ${cls}">${v}</span></span>`;
+    if (!c || c.state === "flat") return `<div class="plan-line"><span class="act-badge flat">ĐỨNG NGOÀI</span></div><div class="muted small">Không có lệnh cho ${coin(sym)}.</div>`;
+    if (c.state === "pending") {
+      const o = c.order, buy = o.side === "BUY";
+      return `<div class="plan-line"><span class="act-badge ${buy ? "wait-long" : "wait-short"}">${buy ? "LONG" : "SHORT"} (chờ khớp)</span>
+          ${kv("Entry", fmtPx(o.price))}${kv("TP", fmtPx(o.tp_if_filled), "up")}${kv("SL", fmtPx(o.sl_if_filled), "down")}</div>
+        <div class="muted small">Limit ${qty(sym, o.weight, o.price)} ${coin(sym)} (≈ ${usdt(o.weight)} USDT) · huỷ lúc ${dt(Date.parse(o.valid_until))}${px ? ` · cách giá ${((o.price / px - 1) * 100).toFixed(2)}%` : ""}</div>`;
+    }
+    const p = c.position, L = p.side === "LONG", u = px ? (L ? 1 : -1) * (px / p.avg_entry - 1) * 100 : p.upnl_pct;
+    return `<div class="plan-line"><span class="act-badge ${L ? "long" : "short"}">${p.side}</span>
+        ${kv("Entry", fmtPx(p.avg_entry))}${kv("TP", fmtPx(p.tp), "up")}${kv("SL", fmtPx(p.sl), "down")}${kv("P/L", sgn(u))}</div>
+      <div class="muted small">Đang giữ ${qty(sym, p.weight, p.avg_entry)} ${coin(sym)} (≈ ${usdt(p.weight)} USDT)${c.order ? ` · lệnh chờ: limit @ ${fmtPx(c.order.price)}` : " · không cần làm gì"}</div>`;
+  }
   function renderPlan() {
     const sym = state.live.symbol, plan = state.live.plan;
-    $("planPanel").innerHTML = `<div class="panel-h"><span>Việc cần làm · ${coin(sym)} · ${PIPE_LABEL[planPipe()] || ""}</span>
-      <span class="muted small">${plan?.next_decision ? "quyết định kế tiếp " + dt(Date.parse(plan.next_decision)) : ""}</span></div>${planHtml(sym)}
-      <p class="fine">Mọi lệnh vào/nhồi/chốt là limit, không khớp trong 5 phút đầu sau khi nến 4h đóng, hiệu lực 8h; SL market, TP limit.
-        Xem đủ 5 coin ở tab <a href="#todo">Việc cần làm</a>.</p>`;
+    $("planPanel").innerHTML = `<div class="panel-h"><span>${coin(sym)} · ${PIPE_LABEL[planPipe()] || ""}</span>
+      <span class="muted small">${plan?.next_decision ? "cập nhật kế tiếp " + dt(Date.parse(plan.next_decision)) : ""}</span></div>${compactPlan(sym)}
+      <p class="fine">Hướng dẫn từng bước cho cả 5 coin ở tab <a href="#todo">Pipeline</a>.</p>`;
   }
   function renderCards() {
     const el = $("todoCards"); if (!el) return;
@@ -475,7 +505,7 @@
   }
 
   // ================================================================== HISTORY
-  const H = { chart: null, series: null, wSeries: null, prim: null, ws: null, candles: [], times: [], orders: [], pos: [],
+  const H = { chart: null, series: null, wSeries: null, prim: null, ws: null, candles: [], times: [], orders: [], pos: [],  // history chart
               posAt: [], fills: [], noOlder: false, loadingOlder: false, gen: 0 };
 
   function idxAt(t) { // last candle index with time <= t (or -1)
@@ -566,7 +596,7 @@
         (v) => PIPES.find((p) => p.v === v).nm + (v === "v240" ? " ★" : ""));
       seg($("hSymbols"), SYMS, state.h.symbol, (v) => { state.h.symbol = v; store.set("hSym", v); loadHistory(); updateTitle(); }, coin);
       seg($("hIntervals"), ["1h", "4h", "1d"], state.h.interval, (v) => { state.h.interval = v; store.set("hIv", v); loadHistory(); }, (x) => IV_LABEL[x]);
-      seg($("hRanges"), Object.keys(RANGES), state.h.range, (v) => { state.h.range = v; store.set("hRange", v); applyRange(); });
+      seg($("hRanges"), Object.keys(RANGES), state.h.range, (v) => { state.h.range = v; store.set("hRange2", v); applyRange(); });
       seg($("oKind"), ["all", "book", "dip"], state.h.kind, (v) => { state.h.kind = v; renderOrders(); },
         (x) => ({ all: "Tất cả", book: "Lệnh 4h", dip: "Dip" })[x]);
       seg($("oResult"), ["all", "win", "loss", "open"], state.h.result, (v) => { state.h.result = v; renderOrders(); },
@@ -632,7 +662,17 @@
       H.candles = cand; H.times = cand.map((c) => c.t); H.orders = orders.slice().reverse(); H.pos = pos; H.fills = fills; H.noOlder = false;
       const c = H.chart = makeChart($("hChart"));
       H.series = c.addCandlestickSeries({ upColor: "#089981", downColor: "#f23645", borderVisible: false, wickUpColor: "#089981",
-        wickDownColor: "#f23645", priceFormat: { type: "custom", formatter: fmtPx, minMove: 0.00001 } });
+        wickDownColor: "#f23645", priceFormat: { type: "custom", formatter: fmtPx, minMove: 0.00001 },
+        autoscaleInfoProvider: (orig) => {  // keep the SL / TP of every position in view inside the price scale
+          const r = orig(); if (!r || !$("tZone").checked || !H.chart) return r;
+          const vr = H.chart.timeScale().getVisibleLogicalRange(); if (!vr) return r;
+          let lo = r.priceRange.minValue, hi = r.priceRange.maxValue;
+          for (let i = Math.max(0, Math.floor(vr.from)); i <= Math.min(H.posAt.length - 1, Math.ceil(vr.to)); i++) {
+            const q = H.posAt[i]; if (!q || !q.held || q.pos_sl == null || q.pos_tp == null) continue;
+            lo = Math.min(lo, q.pos_sl, q.pos_tp); hi = Math.max(hi, q.pos_sl, q.pos_tp);
+          }
+          return { priceRange: { minValue: lo, maxValue: hi }, margins: r.margins };
+        } });
       H.series.setData(cand.map(toBar));
       H.wSeries = c.addHistogramSeries({ priceScaleId: "w", priceFormat: { type: "percent" }, priceLineVisible: false, lastValueVisible: false,
         visible: $("tWeight").checked });
