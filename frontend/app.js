@@ -182,28 +182,39 @@
       // paper results of the three pipelines side by side (prospective evidence)
       state.live.paper = await Promise.all(["v205", "v233", "v236", "v240"].map((v) =>
         api(`/api/trade_plan?pipeline=${v}`).then((pl) => [v, pl]).catch(() => [v, null])));
-      renderWatchlist(); renderPlan(); renderSignal(); renderDips(); loadRecent();
+      renderPipeBar(); renderWatchlist(); renderPlan(); renderSignal(); renderDips(); loadRecent();
     } catch (e) { toast(e.message); }
   }
 
   // ---- executable trade plan (trade mode): what should be on the exchange now
   const planOf = (sym) => state.live.plan?.coins?.[sym];
-  // two paper pipelines: v205 (deployed) and v233 T3 (TradingView-indicator foundation, comparison)
-  function planPipe() { try { return localStorage.getItem("planPipe") || "v205"; } catch { return "v205"; } }
-  async function setPlanPipe(v) {
-    try { localStorage.setItem("planPipe", v); } catch { /* per-viewer convenience only */ }
-    state.live.plan = await api(`/api/trade_plan?pipeline=${v}`).catch(() => null);
-    renderWatchlist(); renderPlan();
+  // paper pipelines (prospective evidence); O1 = the most robust walk-forward foundation, the default view
+  const PIPES = [
+    { v: "v240", nm: "O1", ds: "cá voi theo lệnh thật · vững nhất", star: "khuyên dùng" },
+    { v: "v236", nm: "W2", ds: "dòng tiền cá voi · lãi TB cao nhất" },
+    { v: "v233", nm: "T3", ds: "chỉ báo TradingView" },
+    { v: "v205", nm: "D2", ds: "pipeline cũ" },
+  ];
+  const PIPE_LABEL = Object.fromEntries(PIPES.map((p) => [p.v, p.nm]));
+  function planPipe() {
+    try { const v = localStorage.getItem("planPipe2"); return PIPES.some((p) => p.v === v) ? v : "v240"; } catch { return "v240"; }
   }
-  const PIPE_LABEL = { v205: "D2", v233: "T3", v236: "W2", v240: "O1" };
-  const paperLine = () => {
-    const rows = (state.live.paper || []).filter(([, pl]) => pl && pl.freeze);
-    if (!rows.length) return "";
-    return `<div class="muted small paper-cmp">Paper (tiến cứu) từ ${String(rows[0][1].freeze).slice(0, 10)}: ${rows.map(([v, pl]) =>
-      `<b>${PIPE_LABEL[v]}</b> ${sgn(pl.net_return_pct)}`).join(" · ")}</div>`;
-  };
-  const pipeSwitch = () => `<span class="pipe-switch">${[["v205", "D2 (đang dùng)"], ["v233", "T3 (thử nghiệm)"], ["v236", "W2 (lãi TB cao nhất)"], ["v240", "O1 (vững nhất)"]].map(([v, l]) =>
-    `<button class="chip${planPipe() === v ? " on" : ""}" data-pipe="${v}">${l}</button>`).join("")}</span>`;
+  async function setPlanPipe(v) {
+    try { localStorage.setItem("planPipe2", v); } catch { /* per-viewer convenience only */ }
+    const cached = (state.live.paper || []).find(([k]) => k === v);
+    state.live.plan = cached?.[1] || await api(`/api/trade_plan?pipeline=${v}`).catch(() => null);
+    renderPipeBar(); renderWatchlist(); renderPlan();
+  }
+  function renderPipeBar() {
+    const cur = planPipe(), paper = Object.fromEntries(state.live.paper || []);
+    $("pipeBar").innerHTML = PIPES.map((p) => {
+      const pl = paper[p.v];
+      const pn = pl && pl.freeze ? `paper từ ${String(pl.freeze).slice(5, 10).split("-").reverse().join("/")}: ${sgn(pl.net_return_pct)}` : "paper: chưa có";
+      return `<button class="pipebtn${cur === p.v ? " on" : ""}" data-pipe="${p.v}">
+        <span class="nm">${p.nm}${p.star ? `<span class="star">${p.star}</span>` : ""}</span><span class="ds">${p.ds}</span><span class="pn">${pn}</span></button>`;
+    }).join("");
+    $("pipeBar").onclick = (e) => { const b = e.target.closest("[data-pipe]"); if (b) setPlanPipe(b.dataset.pipe); };
+  }
   function planBadge(c) {
     if (!c) return "";
     if (c.state === "position") return `<span class="badge ${c.position.side === "LONG" ? "long" : "short"}">GIỮ ${c.position.side}</span>`;
@@ -215,8 +226,7 @@
                  book_tp: "Chạm TP (limit)", book_partial: "Chốt một phần", sl_move: "Dời SL" };
   function renderPlan() {
     const sym = state.live.symbol, plan = state.live.plan, c = planOf(sym), el = $("planPanel");
-    el.onclick = (ev) => { const b = ev.target.closest("[data-pipe]"); if (b) setPlanPipe(b.dataset.pipe); };
-    if (!plan || !c) { el.innerHTML = `<div class="panel-h"><span>Kế hoạch lệnh</span>${pipeSwitch()}</div><p class="muted">Chưa có kế hoạch lệnh.</p>`; return; }
+    if (!plan || !c) { el.innerHTML = `<div class="panel-h"><span>Kế hoạch lệnh</span></div><p class="muted">Chưa có kế hoạch lệnh.</p>`; return; }
     let body;
     if (c.state === "pending") {
       const o = c.order, buy = o.side === "BUY";
@@ -244,8 +254,7 @@
         : `<div class="act flat">KHÔNG LÀM GÌ</div><p class="muted small">Chưa có tín hiệu đủ mạnh (cần ≥ ${pct(plan.policy?.theta_open ?? 0.05, 0)} vốn theo pipeline).</p>`;
     }
     const evs = (plan.events || []).filter((e) => e.symbol === sym).slice(-8).reverse();
-    el.innerHTML = `<div class="panel-h"><span>Kế hoạch lệnh · ${coin(sym)}</span><span class="muted small">paper từ ${String(plan.freeze).slice(0, 10)}: ${sgn(plan.net_return_pct)}</span></div>
-      <div class="pipe-row">${pipeSwitch()}<span class="muted small">${esc(plan.pipeline || "")}</span></div>${paperLine()}
+    el.innerHTML = `<div class="panel-h"><span>Chi tiết · ${coin(sym)} · ${PIPE_LABEL[planPipe()] || ""}</span><span class="muted small">quyết định kế tiếp ${dt(Date.parse(plan.next_decision))}</span></div>
       ${body}
       <div class="timeline">${evs.map((e) => `<div><span class="muted">${dt(Date.parse(e.t))}</span> ${EVVI[e.kind] || e.kind}
         ${e.kind.startsWith("sl_") ? "" : (e.side === "buy" ? "mua" : "bán")} ${fmtPx(e.price)}${e.why ? ` <span class="muted">(${esc(e.why)})</span>` : ""}</div>`).join("") || '<div class="muted small">Chưa có sự kiện.</div>'}</div>
@@ -260,14 +269,33 @@
 
   function bookOf(sym) { return (state.live.latest?.books || []).find((b) => b.symbol === sym); }
 
+  function boardCells(s) {
+    const c = planOf(s), px = state.live.prices[s]?.c;
+    if (!c || c.state === "flat") return { act: `<span class="act-badge flat">ĐỨNG NGOÀI</span>`, px: "—", sl: "—", tp: "—", pl: "", w: "" };
+    if (c.state === "pending") {
+      const o = c.order, buy = o.side === "BUY";
+      const dist = px ? `<span class="note">cách giá ${((o.price / px - 1) * 100).toFixed(2)}%</span>` : "";
+      return { act: `<span class="act-badge ${buy ? "wait-long" : "wait-short"}">CHỜ ${buy ? "MUA" : "BÁN"} (limit)</span>`,
+               px: `${fmtPx(o.price)}${dist}`, sl: fmtPx(o.sl_if_filled), tp: fmtPx(o.tp_if_filled), pl: `<span class="muted">chưa khớp</span>`, w: pct(o.weight) };
+    }
+    const p = c.position, L = p.side === "LONG", k = L ? 1 : -1;
+    const u = px ? k * (px / p.avg_entry - 1) * 100 : p.upnl_pct;
+    const pend = c.order ? `<span class="note">lệnh chờ: ${{ add: "nhồi", reduce: "chốt bớt", close: "đóng" }[c.order.kind] || c.order.kind} @ ${fmtPx(c.order.price)}</span>` : "";
+    return { act: `<span class="act-badge ${L ? "long" : "short"}">GIỮ ${p.side}</span>${pend}`, px: fmtPx(p.avg_entry),
+             sl: `${fmtPx(p.sl)}${p.break_even ? '<span class="note up">đã về hoà vốn</span>' : ""}`, tp: fmtPx(p.tp), pl: sgn(u), w: pct(p.weight) };
+  }
   function renderWatchlist() {
     const rows = SYMS.map((s) => {
-      const b = bookOf(s), p = state.live.prices[s];
-      return `<tr data-sym="${s}" class="${s === state.live.symbol ? "sel" : ""}"><td class="sym">${coin(s)}<span class="muted small"> USDT.P</span></td>
+      const p = state.live.prices[s], b = boardCells(s);
+      return `<tr data-sym="${s}" class="${s === state.live.symbol ? "sel" : ""}"><td class="sym">${coin(s)}</td>
         <td class="px" id="px-${s}">${p ? fmtPx(p.c) : "…"}</td><td id="ch-${s}">${p ? sgn((p.c / p.o - 1) * 100) : ""}</td>
-        <td>${planOf(s) ? planBadge(planOf(s)) : b ? sideBadge(b.side, b.side === "FLAT" ? null : b.weight) : ""}</td></tr>`;
+        <td>${b.act}</td><td class="m" id="en-${s}">${b.px}</td><td class="m down">${b.sl}</td><td class="m up">${b.tp}</td>
+        <td id="pl-${s}">${b.pl}</td><td>${b.w}</td></tr>`;
     });
-    $("watchlist").innerHTML = `<thead><tr><th style="text-align:left">Coin</th><th>Giá</th><th>24h</th><th>Lệnh</th></tr></thead><tbody>${rows.join("")}</tbody>`;
+    $("watchlist").innerHTML = `<thead><tr><th>Coin</th><th>Giá</th><th>24h</th><th>Hành động</th><th>Giá vào / limit</th><th>Stop-loss</th>
+      <th>Take-profit</th><th>Lãi/lỗ</th><th>Vốn</th></tr></thead><tbody>${rows.join("")}</tbody>`;
+    const plan = state.live.plan;
+    $("boardMeta").textContent = !plan?.coins ? `${PIPE_LABEL[planPipe()]} · chưa có kế hoạch lệnh (chờ chu kỳ 4h kế tiếp)` : `${PIPE_LABEL[planPipe()]} · cập nhật ${dt(Date.parse(plan.generated_at))} · quyết định kế tiếp ${dt(Date.parse(plan.next_decision))}`;
     $("watchlist").onclick = (e) => {
       const tr = e.target.closest("tr[data-sym]"); if (!tr) return;
       state.live.symbol = tr.dataset.sym; store.set("liveSym", tr.dataset.sym);
@@ -282,6 +310,9 @@
       el.textContent = fmtPx(p.c);
       if (prev != null && prev !== p.c) { el.classList.remove("flash-up", "flash-down"); void el.offsetWidth; el.classList.add(p.c > prev ? "flash-up" : "flash-down"); }
       $("ch-" + sym).innerHTML = sgn((p.c / p.o - 1) * 100);
+      const b = boardCells(sym);
+      if ($("pl-" + sym)) $("pl-" + sym).innerHTML = b.pl;
+      if ($("en-" + sym)) $("en-" + sym).innerHTML = b.px;
     }
     if (sym === state.live.symbol) updateLiveDistances();
   }

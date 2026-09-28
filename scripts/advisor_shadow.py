@@ -33,6 +33,18 @@ LOG = Path("artifacts/research/advisor_shadow/shadow.jsonl")
 PROSPECTIVE_MAX_LAG = timedelta(hours=6)
 
 
+def _retry(fn, wait=45):
+    """One retry after a pause when Binance rate-limits the IP (HTTP 429/418), so a busy minute does not lose a prospective row."""
+    try:
+        return fn()
+    except Exception as exc:
+        if "429" not in repr(exc) and "418" not in repr(exc):
+            raise
+        import time as _t
+        _t.sleep(wait)
+        return fn()
+
+
 def main() -> int:
     now = datetime.now(timezone.utc)
     s = requests.Session()
@@ -90,7 +102,7 @@ def main() -> int:
     try:
         _spec = _u.spec_from_file_location("v151_advisor", Path(__file__).parent / "v151_advisor.py")
         _m = _u.module_from_spec(_spec); _spec.loader.exec_module(_m)
-        extra.append(_m.advise())
+        extra.append(_retry(_m.advise))
     except Exception as exc:  # logged, never silently skipped
         extra.append(dict(candidate="v151_deploy_v4", decision_bar_close=str(bars4h["close_time"].iloc[-1]), error=repr(exc)[:300]))
     try:
@@ -102,19 +114,19 @@ def main() -> int:
     try:
         _spec = _u.spec_from_file_location("v233_advisor", Path(__file__).parent / "v233_advisor.py")
         _m = _u.module_from_spec(_spec); _spec.loader.exec_module(_m)
-        extra.append(_m.advise())
+        extra.append(_retry(_m.advise))
     except Exception as exc:  # logged, never silently skipped
         extra.append(dict(candidate="v233_T3", decision_bar_close=str(bars4h["close_time"].iloc[-1]), error=repr(exc)[:300]))
     try:
         _spec = _u.spec_from_file_location("v236_advisor", Path(__file__).parent / "v236_advisor.py")
         _m = _u.module_from_spec(_spec); _spec.loader.exec_module(_m)
-        extra.append(_m.advise())
+        extra.append(_retry(_m.advise))
     except Exception as exc:  # logged, never silently skipped
         extra.append(dict(candidate="v236_W2", decision_bar_close=str(bars4h["close_time"].iloc[-1]), error=repr(exc)[:300]))
     try:
         _spec = _u.spec_from_file_location("v240_advisor", Path(__file__).parent / "v240_advisor.py")
         _m = _u.module_from_spec(_spec); _spec.loader.exec_module(_m)
-        extra.append(_m.advise())
+        extra.append(_retry(_m.advise))
     except Exception as exc:  # logged, never silently skipped
         extra.append(dict(candidate="v240_O1", decision_bar_close=str(bars4h["close_time"].iloc[-1]), error=repr(exc)[:300]))
     try:

@@ -9,17 +9,17 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="styles.css" />
+  <link rel="stylesheet" href="styles.css?v=20260929a" />
   <script src="config.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/lightweight-charts@4.2.0/dist/lightweight-charts.standalone.production.js" defer></script>
   <script src="https://accounts.google.com/gsi/client" async defer></script>
-  <script src="app.js" defer></script>
+  <script src="app.js?v=20260929a" defer></script>
 </head>
 <body>
   <header class="topbar">
     <div class="brand">
       <svg viewBox="0 0 32 32" width="22" height="22" aria-hidden="true"><rect width="32" height="32" rx="7" fill="var(--panel-2)"/><path d="M6 22l6-7 5 4 9-11" stroke="var(--up)" stroke-width="3" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
-      <span>Alpha Lab</span><span class="tag">v205</span>
+      <span>Alpha Lab</span><span class="tag">paper</span>
     </div>
     <nav class="tabs" id="tabs" hidden>
       <button data-view="live" class="active">Thị trường</button>
@@ -50,24 +50,29 @@
     </section>
 
     <!-- ===================== live market ===================== -->
-    <section id="view-live" class="view live" hidden>
-      <div class="tv-wrap"><div id="tvChart" class="tv"></div></div>
-      <aside class="side">
-        <div class="panel">
-          <div class="panel-h"><span>Danh sách theo dõi</span><span class="muted small" id="wsState">● realtime</span></div>
-          <table class="wl" id="watchlist"></table>
-        </div>
-        <div class="panel plan" id="planPanel"></div>
-        <div class="panel" id="sigPanel"></div>
-        <div class="panel">
-          <div class="panel-h"><span>Lệnh chờ mua dip</span><span class="muted small">limit, TP limit, SL market</span></div>
-          <table class="tbl compact" id="dipTbl"></table>
-        </div>
-        <div class="panel">
-          <div class="panel-h"><span>Gợi ý đã phát gần đây</span><span class="muted small" id="recentSym"></span></div>
-          <table class="tbl compact" id="recentTbl"></table>
-        </div>
-      </aside>
+    <section id="view-live" class="view live2" hidden>
+      <div class="pipebar" id="pipeBar"></div>
+      <div class="panel board-panel">
+        <div class="panel-h"><span>Hành động ngay bây giờ</span><span class="muted small" id="boardMeta"></span>
+          <span class="muted small" id="wsState">● realtime</span></div>
+        <div class="table-wrap"><table class="board" id="watchlist"></table></div>
+        <p class="fine">Bấm một dòng để xem biểu đồ và chi tiết. Mọi lệnh vào / nhồi / chốt là limit (không khớp trong 5 phút đầu sau khi nến 4h
+          đóng, hiệu lực 8h); SL là market, TP là limit. Kết quả nghiên cứu, không phải lời khuyên đầu tư.</p>
+      </div>
+      <div class="live-main">
+        <div class="tv-wrap"><div id="tvChart" class="tv"></div></div>
+        <aside class="side">
+          <div class="panel plan" id="planPanel"></div>
+          <details class="panel adv">
+            <summary>Chi tiết nâng cao <span class="muted small">tín hiệu liên tục, lệnh mua dip, gợi ý gần đây</span></summary>
+            <div id="sigPanel"></div>
+            <div class="panel-h sub"><span>Lệnh chờ mua dip</span><span class="muted small">limit, TP limit, SL market</span></div>
+            <table class="tbl compact" id="dipTbl"></table>
+            <div class="panel-h sub"><span>Gợi ý đã phát gần đây</span><span class="muted small" id="recentSym"></span></div>
+            <table class="tbl compact" id="recentTbl"></table>
+          </details>
+        </aside>
+      </div>
     </section>
 
     <!-- ===================== history ===================== -->

@@ -81,7 +81,7 @@ def research_books_o1(eu):
 
 def live_books(candidate="v151_deploy_v4"):
     rows = [json.loads(l) for l in open(ROOT / "artifacts/research/advisor_shadow/shadow.jsonl", encoding="utf-8") if l.strip()]
-    rows = [r for r in rows if r.get("candidate") == candidate and r.get("mode") == "prospective"]
+    rows = [r for r in rows if r.get("candidate") == candidate and r.get("mode") == "prospective" and "perp_weight" in r]  # skip error rows
     out = {}
     for r in rows:
         t = pd.Timestamp(r["decision_bar_close"]) + pd.Timedelta(milliseconds=1) - pd.Timedelta(hours=4)

@@ -28,7 +28,8 @@ SYMS = ("BTCUSDT", "ETHUSDT", "SOLUSDT", "BNBUSDT", "XRPUSDT")
 TIERS = (0.0, 1e4, 1e5, 1e6, np.inf)
 TNAME = ("lt10k", "10k_100k", "100k_1m", "ge1m")
 COLS = [f"{a}_{b}" for a in ("buy", "sell", "n") for b in TNAME]
-MAX_CALLS = 1500  # per symbol per run (weight 20 each; the one-time backlog continues on the next run)
+MAX_CALLS = 400  # per symbol per run (weight 20 each; a backlog continues on the next run)
+WEIGHT_PAUSE = 1200  # pause until the next minute when the IP's used weight (limit 2400/min) passes this, so the advisors never hit 429
 
 
 def _base_url() -> str:
@@ -75,6 +76,8 @@ def update(sym: str, session: requests.Session, orders: bool = False) -> str:
         if r.status_code == 429 or r.status_code == 418:
             time.sleep(60)
             continue
+        if int(r.headers.get("X-MBX-USED-WEIGHT-1M", 0) or 0) > WEIGHT_PAUSE:
+            time.sleep(61 - time.time() % 60)
         j = r.json()
         if not j:
             break
