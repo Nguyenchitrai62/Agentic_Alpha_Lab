@@ -62,12 +62,17 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--policy", default=None, help="JSON with the policy parameters (default: v216 grid G2)")
     ap.add_argument("--from", dest="start", default=None, help="first traded holding bar (default FREEZE)")
+    ap.add_argument("--candidate", default="v151_deploy_v4", choices=["v151_deploy_v4", "v233_T3"],
+                    help="books: v205 (v151_deploy_v4 live rows, default) or the v233 T3 foundation (v233_T3 live rows)")
     args = ap.parse_args()
+    t3 = args.candidate == "v233_T3"
+    out_path = OUT.with_name("trade_plan_v233.json") if t3 else OUT
+    pipe_name = "v233 T3 books + trade mode" if t3 else "v205 books + trade mode"
     p = dict(DEFAULT, **(json.loads(Path(args.policy).read_text()) if args.policy else {}))
     start = pd.Timestamp(args.start, tz="UTC") if args.start else FREEZE
     now = pd.Timestamp(datetime.now(timezone.utc))
     if now < start:  # before the first traded bar: publish an empty plan that says when trading starts
-        OUT.write_text(json.dumps({"pipeline": "v205 books + trade mode", "policy": p, "freeze": str(start), "generated_at": now.isoformat(),
+        out_path.write_text(json.dumps({"pipeline": pipe_name, "policy": p, "freeze": str(start), "generated_at": now.isoformat(),
                                    "decision_bar": str(start), "next_decision": str(start + pd.Timedelta(minutes=5)), "net_return_pct": 0.0,
                                    "coins": {s: {"symbol": s, "state": "flat", "note": "chưa tới giờ bắt đầu"} for s in SYMS},
                                    "events": [], "equity_curve": []}, indent=1))
@@ -76,8 +81,8 @@ def main():
     fw = _load("forward_v205_tm", ROOT / "scripts/forward_v205.py")
     eu = _load("engine_user_tm", RD / "engine_user/engine_user.py")
     v212 = _load("v212_tm", RD / "v212/v212_trade_scaling.py")
-    books = fw.research_books(eu)
-    lb = fw.live_books()
+    books = fw.research_books_t3(eu) if t3 else fw.research_books(eu)
+    lb = fw.live_books(args.candidate)
     books = pd.concat([books[books.index < lb.index.min()] if len(lb) else books, lb]).sort_index()
     opens, k1 = fw.market(start, now)
     cur_bar = now.floor("4h")                   # holding bar in progress
@@ -134,7 +139,7 @@ def main():
             c["state"] = "flat"
         coins[s] = c
     ret = float(eq[-1] - 1) if len(eq) else 0.0
-    out = {"pipeline": "v205 books + trade mode", "policy": p, "freeze": str(start), "generated_at": now.isoformat(),
+    out = {"pipeline": pipe_name, "policy": p, "freeze": str(start), "generated_at": now.isoformat(),
            "decision_bar": str(cur_bar), "next_decision": str(cur_bar + pd.Timedelta(hours=4, minutes=5)),
            "net_return_pct": round(100 * ret, 3), "coins": coins,
            "events": [dict(t=str(e["t"]), symbol=e["symbol"], kind=e["kind"], side=e["side"], price=round(e["price"], 6),
@@ -142,7 +147,7 @@ def main():
            "equity_curve": [(str(t + pd.Timedelta(hours=8)), round(float(v), 6)) for t, v in zip(grid[live], eq)],
            "rules": "limit entries/adjustments/exits valid 8h, no fill in the first 5 minutes after the 4h close, SL market / TP limit "
                     "on every position, break-even at +2 sigma_d, Bybit fees, adverse funding. Research output only."}
-    OUT.write_text(json.dumps(out, indent=1, default=str))
+    out_path.write_text(json.dumps(out, indent=1, default=str))
     print(f"trade plan {now:%Y-%m-%d %H:%M} UTC:", {s: c["state"] for s, c in coins.items()}, f"paper net {out['net_return_pct']}%")
 
 

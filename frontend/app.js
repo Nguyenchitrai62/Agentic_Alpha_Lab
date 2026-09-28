@@ -177,7 +177,7 @@
     mountTv(state.live.symbol);
     try {
       [state.live.latest, state.live.plan] = await Promise.all([api("/api/signals/latest?source=live"),
-        api("/api/trade_plan").catch(() => null)]);
+        api(`/api/trade_plan?pipeline=${planPipe()}`).catch(() => null)]);
       if (!state.live.conf) state.live.conf = await api("/api/confidence").catch(() => null);
       renderWatchlist(); renderPlan(); renderSignal(); renderDips(); loadRecent();
     } catch (e) { toast(e.message); }
@@ -185,6 +185,15 @@
 
   // ---- executable trade plan (trade mode): what should be on the exchange now
   const planOf = (sym) => state.live.plan?.coins?.[sym];
+  // two paper pipelines: v205 (deployed) and v233 T3 (TradingView-indicator foundation, comparison)
+  function planPipe() { try { return localStorage.getItem("planPipe") || "v205"; } catch { return "v205"; } }
+  async function setPlanPipe(v) {
+    try { localStorage.setItem("planPipe", v); } catch { /* per-viewer convenience only */ }
+    state.live.plan = await api(`/api/trade_plan?pipeline=${v}`).catch(() => null);
+    renderWatchlist(); renderPlan();
+  }
+  const pipeSwitch = () => `<span class="pipe-switch">${[["v205", "D2 (đang dùng)"], ["v233", "T3 (thử nghiệm)"]].map(([v, l]) =>
+    `<button class="chip${planPipe() === v ? " on" : ""}" data-pipe="${v}">${l}</button>`).join("")}</span>`;
   function planBadge(c) {
     if (!c) return "";
     if (c.state === "position") return `<span class="badge ${c.position.side === "LONG" ? "long" : "short"}">GIỮ ${c.position.side}</span>`;
@@ -196,7 +205,8 @@
                  book_tp: "Chạm TP (limit)", book_partial: "Chốt một phần", sl_move: "Dời SL" };
   function renderPlan() {
     const sym = state.live.symbol, plan = state.live.plan, c = planOf(sym), el = $("planPanel");
-    if (!plan || !c) { el.innerHTML = `<div class="panel-h"><span>Kế hoạch lệnh</span></div><p class="muted">Chưa có kế hoạch lệnh.</p>`; return; }
+    el.onclick = (ev) => { const b = ev.target.closest("[data-pipe]"); if (b) setPlanPipe(b.dataset.pipe); };
+    if (!plan || !c) { el.innerHTML = `<div class="panel-h"><span>Kế hoạch lệnh</span>${pipeSwitch()}</div><p class="muted">Chưa có kế hoạch lệnh.</p>`; return; }
     let body;
     if (c.state === "pending") {
       const o = c.order, buy = o.side === "BUY";
@@ -225,6 +235,7 @@
     }
     const evs = (plan.events || []).filter((e) => e.symbol === sym).slice(-8).reverse();
     el.innerHTML = `<div class="panel-h"><span>Kế hoạch lệnh · ${coin(sym)}</span><span class="muted small">paper từ ${String(plan.freeze).slice(0, 10)}: ${sgn(plan.net_return_pct)}</span></div>
+      <div class="pipe-row">${pipeSwitch()}<span class="muted small">${esc(plan.pipeline || "")}</span></div>
       ${body}
       <div class="timeline">${evs.map((e) => `<div><span class="muted">${dt(Date.parse(e.t))}</span> ${EVVI[e.kind] || e.kind}
         ${e.kind.startsWith("sl_") ? "" : (e.side === "buy" ? "mua" : "bán")} ${fmtPx(e.price)}${e.why ? ` <span class="muted">(${esc(e.why)})</span>` : ""}</div>`).join("") || '<div class="muted small">Chưa có sự kiện.</div>'}</div>

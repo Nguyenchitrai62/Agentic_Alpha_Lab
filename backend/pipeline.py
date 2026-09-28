@@ -133,6 +133,29 @@ def job_signal() -> str:
     return f"live run {run_id} for bar {decision}"
 
 
+# ---------------------------------------------------------------- prospective log (all frozen advisors)
+def job_shadow() -> str:
+    """Append this bar's rows of every frozen advisor (v151 / v233 T3 / ...) to the prospective log shadow.jsonl.
+
+    The trade plan reads its live books from that log, so it must run inside the cycle (before the trade plan), not in a
+    session-scoped loop. advisor_shadow.py holds a lock file and skips rows already logged, so a duplicate run is harmless."""
+    p = subprocess.run([SETTINGS.python_exe, str(ROOT / "scripts/advisor_shadow.py")], cwd=str(ROOT), capture_output=True,
+                       text=True, encoding="utf-8", errors="replace", env={**__import__("os").environ, "PYTHONUTF8": "1"}, timeout=1800)
+    if p.returncode != 0:
+        raise RuntimeError(f"shadow log failed ({p.returncode}): {p.stderr[-1500:]}")
+    n = p.stdout.count('"logged_at"')
+    return f"shadow log: {n} new rows"
+
+
+def job_dip_log() -> str:
+    """Prospective log of the dip-sleeve rules (scripts/dip_sleeve_forward.py); runs last in the cycle (not needed for the plan)."""
+    p = subprocess.run([SETTINGS.python_exe, str(ROOT / "scripts/dip_sleeve_forward.py")], cwd=str(ROOT), capture_output=True,
+                       text=True, encoding="utf-8", errors="replace", env={**__import__("os").environ, "PYTHONUTF8": "1"}, timeout=1800)
+    if p.returncode != 0:
+        raise RuntimeError(f"dip log failed ({p.returncode}): {p.stderr[-1500:]}")
+    return "dip log: " + (p.stdout.strip().splitlines() or ["ok"])[-1][:200]
+
+
 # ---------------------------------------------------------------- forward paper trading
 def job_forward() -> str:
     p = subprocess.run([SETTINGS.python_exe, str(ROOT / "scripts/forward_v205.py")], cwd=str(ROOT), capture_output=True,
@@ -152,18 +175,27 @@ def job_forward() -> str:
 
 # ---------------------------------------------------------------- executable trade plan (trade mode)
 def job_trade_plan() -> str:
-    """Current orders / positions / SL-TP of the executable trade-mode pipeline and its paper log since its freeze."""
-    cmd = [SETTINGS.python_exe, str(ROOT / "scripts/forward_trade.py")]
-    cfg = ROOT / "configs/trade_policy.json"
-    if cfg.exists():
-        cmd += ["--policy", str(cfg)]
-    p = subprocess.run(cmd, cwd=str(ROOT), capture_output=True, text=True, encoding="utf-8", errors="replace",
-                       env={**__import__("os").environ, "PYTHONUTF8": "1"}, timeout=1800)
-    if p.returncode != 0:
-        raise RuntimeError(f"trade plan failed ({p.returncode}): {p.stderr[-1500:]}")
-    plan = json.loads((ROOT / "artifacts/research/advisor_shadow/trade_plan.json").read_text(encoding="utf-8"))
-    db.kv_set("trade_plan", plan)
-    return "trade plan: " + ", ".join(f"{c['symbol'][:-4]} {c['state']}" for c in plan["coins"].values()) + f"; paper {plan['net_return_pct']}%"
+    """Current orders / positions / SL-TP of the executable trade-mode pipeline and its paper log since its freeze.
+
+    Two plans: the deployed v205 books (kv 'trade_plan') and the v233 T3 foundation (kv 'trade_plan_v233', paper comparison)."""
+    msgs = []
+    for cand, key, fname in (("v151_deploy_v4", "trade_plan", "trade_plan.json"), ("v233_T3", "trade_plan_v233", "trade_plan_v233.json")):
+        cmd = [SETTINGS.python_exe, str(ROOT / "scripts/forward_trade.py"), "--candidate", cand]
+        cfg = ROOT / "configs/trade_policy.json"
+        if cfg.exists():
+            cmd += ["--policy", str(cfg)]
+        p = subprocess.run(cmd, cwd=str(ROOT), capture_output=True, text=True, encoding="utf-8", errors="replace",
+                           env={**__import__("os").environ, "PYTHONUTF8": "1"}, timeout=1800)
+        if p.returncode != 0:
+            if key == "trade_plan":
+                raise RuntimeError(f"trade plan failed ({p.returncode}): {p.stderr[-1500:]}")
+            msgs.append(f"{key} FAILED: {p.stderr[-300:]}")
+            continue
+        plan = json.loads((ROOT / "artifacts/research/advisor_shadow" / fname).read_text(encoding="utf-8"))
+        db.kv_set(key, plan)
+        msgs.append(f"{key}: " + ", ".join(f"{c['symbol'][:-4]} {c['state']}" for c in plan["coins"].values())
+                    + f"; paper {plan['net_return_pct']}%")
+    return " | ".join(msgs)
 
 
 # ---------------------------------------------------------------- walk-forward history (one-off, heavy)
@@ -375,9 +407,10 @@ def job_walkforward() -> str:
 
 
 def job_cycle() -> str:
-    """Scheduled cycle after each 4h close: candles -> live signal -> trade plan -> forward paper trading."""
+    """Scheduled cycle after each 4h close: candles -> prospective log -> trade plan -> live signal -> forward paper trading."""
     out = []
-    for name, fn in (("candles", job_candles), ("signal", job_signal), ("trade_plan", job_trade_plan), ("forward", job_forward)):
+    for name, fn in (("candles", job_candles), ("shadow", job_shadow), ("trade_plan", job_trade_plan), ("signal", job_signal),
+                     ("forward", job_forward), ("dip_log", job_dip_log)):
         try:
             out.append(fn())
         except Exception as exc:

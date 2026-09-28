@@ -188,3 +188,10 @@ dl.kv dt { color: var(--muted); } dl.kv dd { margin: 0; text-align: right; font-
 .plan .act.flat { background: var(--panel-2); color: var(--muted); }
 .plan .subact { margin-top: 8px; padding: 6px 8px; border-left: 3px solid var(--dip); background: var(--bg); font-size: 12.5px; }
 .plan .timeline { margin-top: 10px; font-size: 12px; line-height: 1.7; border-top: 1px solid var(--line); padding-top: 6px; }
+
+/* trade-plan pipeline switch (D2 deployed / T3 comparison) */
+.pipe-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: 2px 0 8px; }
+.pipe-switch { display: inline-flex; gap: 4px; }
+.pipe-switch .chip { font: inherit; font-size: 12px; padding: 2px 8px; border-radius: 999px; border: 1px solid var(--border, #2a2e39);
+  background: transparent; color: var(--muted, #9aa0aa); cursor: pointer; }
+.pipe-switch .chip.on { background: var(--accent, #2962ff); border-color: var(--accent, #2962ff); color: #fff; }

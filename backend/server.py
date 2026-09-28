@@ -141,9 +141,12 @@ def overview(request: Request, user: dict = Depends(auth.require_viewer)):
 
 
 @app.get("/api/trade_plan")
-def trade_plan(request: Request, user: dict = Depends(auth.require_viewer)):
-    """What a trader / bot should have on the exchange now (resting orders, positions with SL/TP) + the event log."""
-    return cached(request, "trade_plan", 20, lambda: db.kv_get("trade_plan", {}))
+def trade_plan(request: Request, pipeline: str = "v205", user: dict = Depends(auth.require_viewer)):
+    """What a trader / bot should have on the exchange now (resting orders, positions with SL/TP) + the event log.
+
+    pipeline=v205 (deployed, default) or v233 (T3 foundation with TradingView indicator features, paper comparison)."""
+    key = "trade_plan_v233" if pipeline == "v233" else "trade_plan"
+    return cached(request, key, 20, lambda: db.kv_get(key, {}))
 
 
 @app.get("/api/signals/latest")
@@ -279,7 +282,7 @@ def equity(request: Request, source: str = "walkforward", start: str | None = No
 @app.post("/api/admin/run")
 def admin_run(payload: dict = Body(...), user: dict = Depends(auth.require_admin)):
     kind = payload.get("kind", "cycle")
-    fns = {"cycle": pipeline.job_cycle, "signal": pipeline.job_signal, "candles": pipeline.job_candles, "trade_plan": pipeline.job_trade_plan,
+    fns = {"cycle": pipeline.job_cycle, "signal": pipeline.job_signal, "candles": pipeline.job_candles, "trade_plan": pipeline.job_trade_plan, "shadow": pipeline.job_shadow,
            "forward": pipeline.job_forward, "walkforward": pipeline.job_walkforward}
     if kind not in fns:
         raise HTTPException(400, f"kind must be one of {list(fns)}")

@@ -49,9 +49,19 @@ def research_books(eu):
     return 0.5 * (f(A) + f(B)) / 2 + 0.5 * (f(Aq) + f(Bq)) / 2
 
 
-def live_books():
+def research_books_t3(eu):
+    """v233 T3 research books (TradingView indicator features in all four members), same units as research_books."""
+    cols, C = SYMS, eu.er.CACHE
+    m = {k: pd.read_parquet(C / f)[cols] for k, f in (("A", "member_A_tv_annual.parquet"), ("Aq", "member_Aq_tv.parquet"),
+                                                       ("B", "member_B_tv.parquet"), ("Bq", "member_Bq_tv.parquet"))}
+    idx = m["A"].index.union(m["Aq"].index)
+    f = lambda X: X.reindex(idx).fillna(0.0)
+    return 0.5 * (f(m["A"]) + f(m["B"])) / 2 + 0.5 * (f(m["Aq"]) + f(m["Bq"])) / 2
+
+
+def live_books(candidate="v151_deploy_v4"):
     rows = [json.loads(l) for l in open(ROOT / "artifacts/research/advisor_shadow/shadow.jsonl", encoding="utf-8") if l.strip()]
-    rows = [r for r in rows if r.get("candidate") == "v151_deploy_v4" and r.get("mode") == "prospective"]
+    rows = [r for r in rows if r.get("candidate") == candidate and r.get("mode") == "prospective"]
     out = {}
     for r in rows:
         t = pd.Timestamp(r["decision_bar_close"]) + pd.Timedelta(milliseconds=1) - pd.Timedelta(hours=4)
