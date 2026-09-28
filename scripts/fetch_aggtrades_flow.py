@@ -6,7 +6,8 @@ script keeps the taker-buy notional, taker-sell notional and the count, so large
 flow. The raw zip is processed in chunks and discarded (no raw data kept). Resumable: finished months are listed in the output.
 Output: data/raw/aggflow_20260928/{SYM}_flow_4h.parquet (index bar open UTC; columns {buy,sell,n}_{tier}), manifest.json.
 
-  python scripts/fetch_aggtrades_flow.py [SYM ...] [--months 2024-03]
+  python scripts/fetch_aggtrades_flow.py [SYM ...] [--months 2024-03] [--market spot]
+(--market spot: Binance SPOT aggTrades from data/spot/..., output data/raw/aggflow_spot_20260928)
 """
 
 from __future__ import annotations
@@ -68,18 +69,23 @@ def aggregate(raw: bytes) -> pd.DataFrame:
     return g
 
 
-def run(sym: str, only=None):
+MARKET = "futures/um"
+
+
+def run(sym: str, only=None, since=None):
     OUT.mkdir(parents=True, exist_ok=True)
     path, man_p = OUT / f"{sym}_flow_4h.parquet", OUT / f"manifest_{sym}.json"  # one manifest per symbol (parallel runs)
     man = json.loads(man_p.read_text()) if man_p.exists() else {"source": BASE, "tiers_usdt": list(TNAME), "done": {}}
     done = set(man["done"].get(sym, []))
-    monthly = [k for k in keys(f"data/futures/um/monthly/aggTrades/{sym}/") if re.search(r"-\d{4}-\d{2}\.zip$", k)]
+    monthly = [k for k in keys(f"data/{MARKET}/monthly/aggTrades/{sym}/") if re.search(r"-\d{4}-\d{2}\.zip$", k)]
     last = max(re.search(r"(\d{4}-\d{2})\.zip", k).group(1) for k in monthly)
-    daily = [k for k in keys(f"data/futures/um/daily/aggTrades/{sym}/")
+    daily = [k for k in keys(f"data/{MARKET}/daily/aggTrades/{sym}/")
              if re.search(r"-(\d{4}-\d{2})-\d{2}\.zip$", k) and re.search(r"-(\d{4}-\d{2})-\d{2}\.zip$", k).group(1) > last]
     todo = [k for k in monthly + daily if k.rsplit("/", 1)[-1] not in done]
     if only:
         todo = [k for k in todo if any(m in k for m in only)]
+    if since:
+        todo = [k for k in todo if re.search(r"-(\d{4}-\d{2})(-\d{2})?\.zip$", k).group(1) >= since]
     acc = pd.read_parquet(path) if path.exists() else None
     for k in todo:
         t0 = time.time()
@@ -96,9 +102,14 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("syms", nargs="*", default=list(SYMS))
     ap.add_argument("--months", nargs="*", default=None)
+    ap.add_argument("--market", choices=["um", "spot"], default="um")
+    ap.add_argument("--since", default=None, help="first month YYYY-MM to fetch")
     a = ap.parse_args()
+    global MARKET, OUT
+    if a.market == "spot":
+        MARKET, OUT = "spot", Path("data/raw/aggflow_spot_20260928")
     for s in a.syms:
-        run(s, a.months)
+        run(s, a.months, a.since)
 
 
 if __name__ == "__main__":
