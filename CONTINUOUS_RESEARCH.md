@@ -1,5 +1,7 @@
 # Continuous BTC research — active
 
+LEADER 2026-09-28 (v231-v236, quality data): TradingView indicators (v231/v233) and whale-vs-retail taker flow from Binance aggTrades (v236) are the first foundation gains in a long time. Best: v236 W2 (T3 + whale flow in the A members) dev4 5.774, worst dev year 2.491, DD 19.51, 5y 5.442, most recent year 4.123 (scored once) - the gate still fails on the most recent year. Exact 1m premium / predicted funding and Fear & Greed dilute; daily/weekly indicators and RL / bandit trade management (v232, v235) do not transfer. T3 runs as a second paper pipeline next to D2 (prospective log now inside the backend cycle).
+
 LEADER 2026-09-28 (v227-v230): causal coin bandit for dip bids (v227, DD > 20), deeper limit offsets (v228, noise), an hourly dip ladder in trade mode (v229, DD 42%) and a new Korean (Upbit kimchi) premium member (v230, alone dev4 3.69, dilutes) are all rejected; v227-v229 blind audits PASS bit-exact. Dev-only drawdown decomposition: the dip sleeve earns most of the return and causes the worst drawdown (2023-04..06), but its losses are not serially dependent. D2 remains the deployed pipeline (dev4 5.26, worst year 2.18, DD 19.1, trade win 51%; most recent year 3.82 scored once).
 
 LEADER 2026-09-28 (v221-v226, foundation for the trade mode): exit hysteresis (v221) and sub-account bot ensembles (v222) ~equal
