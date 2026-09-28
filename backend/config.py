@@ -39,7 +39,7 @@ class Settings:
     cors_origin_regex: str = os.getenv("CORS_ALLOW_ORIGIN_REGEX", r"https://([a-z0-9-]+\.)*(vercel\.app|nguyenchitrai\.id\.vn)")
     db_path: Path = Path(os.getenv("WEB_DB_PATH", str(ROOT / "artifacts/web/app.db")))
     scheduler_enabled: bool = _bool("WEB_SCHEDULER_ENABLED", True)
-    schedule_offset_minutes: int = int(os.getenv("WEB_SCHEDULE_OFFSET_MINUTES", "8"))
+    schedule_offset_minutes: int = int(os.getenv("WEB_SCHEDULE_OFFSET_MINUTES", "1"))
     default_equity_usdt: float = float(os.getenv("WEB_DEFAULT_EQUITY_USDT", "10000"))
     python_exe: str = os.getenv("WEB_PYTHON_EXE", str(ROOT / ".venv/Scripts/python.exe"))
     # requests made on this machine (not through the Cloudflare tunnel) are treated as the admin without Google sign-in
