@@ -192,7 +192,7 @@
     state.live.plan = await api(`/api/trade_plan?pipeline=${v}`).catch(() => null);
     renderWatchlist(); renderPlan();
   }
-  const pipeSwitch = () => `<span class="pipe-switch">${[["v205", "D2 (đang dùng)"], ["v233", "T3 (thử nghiệm)"]].map(([v, l]) =>
+  const pipeSwitch = () => `<span class="pipe-switch">${[["v205", "D2 (đang dùng)"], ["v233", "T3 (thử nghiệm)"], ["v236", "W2 (tốt nhất)"]].map(([v, l]) =>
     `<button class="chip${planPipe() === v ? " on" : ""}" data-pipe="${v}">${l}</button>`).join("")}</span>`;
   function planBadge(c) {
     if (!c) return "";

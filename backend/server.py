@@ -144,8 +144,8 @@ def overview(request: Request, user: dict = Depends(auth.require_viewer)):
 def trade_plan(request: Request, pipeline: str = "v205", user: dict = Depends(auth.require_viewer)):
     """What a trader / bot should have on the exchange now (resting orders, positions with SL/TP) + the event log.
 
-    pipeline=v205 (deployed, default) or v233 (T3 foundation with TradingView indicator features, paper comparison)."""
-    key = "trade_plan_v233" if pipeline == "v233" else "trade_plan"
+    pipeline=v205 (deployed, default), v233 (T3: TradingView indicator features) or v236 (W2: T3 + whale flow); paper comparison."""
+    key = {"v233": "trade_plan_v233", "v236": "trade_plan_v236"}.get(pipeline, "trade_plan")
     return cached(request, key, 20, lambda: db.kv_get(key, {}))
 
 

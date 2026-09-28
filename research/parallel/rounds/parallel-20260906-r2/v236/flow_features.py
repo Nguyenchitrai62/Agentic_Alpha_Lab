@@ -24,8 +24,9 @@ D = Path("data/raw/aggflow_20260928")
 BIG = ("100k_1m", "ge1m")
 
 
-def flow_features(sym: str, bar_open: pd.DatetimeIndex) -> pd.DataFrame:
-    f = pd.read_parquet(D / f"{sym}_flow_4h.parquet").sort_index()
+def flow_features(sym: str, bar_open: pd.DatetimeIndex, frame: pd.DataFrame | None = None) -> pd.DataFrame:
+    """frame: optional aggregate table (e.g. archive + live buckets from scripts/aggflow_live.combined_flow); default = the archive."""
+    f = (pd.read_parquet(D / f"{sym}_flow_4h.parquet") if frame is None else frame).sort_index()
     f = f.reindex(pd.date_range(f.index[0], f.index[-1], freq="4h", tz="UTC")).fillna(0.0)
     tiers = ("lt10k", "10k_100k", "100k_1m", "ge1m")
     tot = sum(f.get(f"buy_{k}", 0.0) + f.get(f"sell_{k}", 0.0) for k in tiers)

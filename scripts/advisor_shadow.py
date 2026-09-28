@@ -106,6 +106,12 @@ def main() -> int:
     except Exception as exc:  # logged, never silently skipped
         extra.append(dict(candidate="v233_T3", decision_bar_close=str(bars4h["close_time"].iloc[-1]), error=repr(exc)[:300]))
     try:
+        _spec = _u.spec_from_file_location("v236_advisor", Path(__file__).parent / "v236_advisor.py")
+        _m = _u.module_from_spec(_spec); _spec.loader.exec_module(_m)
+        extra.append(_m.advise())
+    except Exception as exc:  # logged, never silently skipped
+        extra.append(dict(candidate="v236_W2", decision_bar_close=str(bars4h["close_time"].iloc[-1]), error=repr(exc)[:300]))
+    try:
         extra.append(portfolio_row(s, now))
     except Exception as exc:  # logged, never silently skipped
         extra.append(dict(candidate="portfolio_v1_3book", decision_bar_close=str(bars4h["close_time"].iloc[-1]), error=repr(exc)[:300]))

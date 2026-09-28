@@ -94,12 +94,12 @@ def job_candles() -> str:
     return f"candles upserted: {total}"
 
 
-def job_aggflow() -> str:
+def job_aggflow(archive: bool = True) -> str:
     """Large-order flow feed (v236 whale-flow features): the live REST collector every run, the public daily archive once a day."""
     env = {**__import__("os").environ, "PYTHONUTF8": "1"}
     msgs = []
     today = pd.Timestamp.now(tz="UTC")
-    if today.hour >= 3 and db.kv_get("aggflow_archive_day", "") != str(today.date()):
+    if archive and today.hour >= 3 and db.kv_get("aggflow_archive_day", "") != str(today.date()):
         p = subprocess.run([SETTINGS.python_exe, str(ROOT / "scripts/fetch_aggtrades_flow.py")], cwd=str(ROOT), capture_output=True,
                            text=True, encoding="utf-8", errors="replace", env=env, timeout=3600)
         if p.returncode == 0:
@@ -200,7 +200,8 @@ def job_trade_plan() -> str:
 
     Two plans: the deployed v205 books (kv 'trade_plan') and the v233 T3 foundation (kv 'trade_plan_v233', paper comparison)."""
     msgs = []
-    for cand, key, fname in (("v151_deploy_v4", "trade_plan", "trade_plan.json"), ("v233_T3", "trade_plan_v233", "trade_plan_v233.json")):
+    for cand, key, fname in (("v151_deploy_v4", "trade_plan", "trade_plan.json"), ("v233_T3", "trade_plan_v233", "trade_plan_v233.json"),
+                             ("v236_W2", "trade_plan_v236", "trade_plan_v236.json")):
         cmd = [SETTINGS.python_exe, str(ROOT / "scripts/forward_trade.py"), "--candidate", cand]
         cfg = ROOT / "configs/trade_policy.json"
         if cfg.exists():
@@ -430,7 +431,7 @@ def job_walkforward() -> str:
 def job_cycle() -> str:
     """Scheduled cycle after each 4h close: candles -> prospective log -> trade plan -> live signal -> forward paper trading."""
     out = []
-    for name, fn in (("candles", job_candles), ("shadow", job_shadow), ("trade_plan", job_trade_plan), ("signal", job_signal),
+    for name, fn in (("candles", job_candles), ("aggflow", lambda: job_aggflow(archive=False)), ("shadow", job_shadow), ("trade_plan", job_trade_plan), ("signal", job_signal),
                      ("forward", job_forward), ("dip_log", job_dip_log)):
         try:
             out.append(fn())

@@ -62,12 +62,13 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--policy", default=None, help="JSON with the policy parameters (default: v216 grid G2)")
     ap.add_argument("--from", dest="start", default=None, help="first traded holding bar (default FREEZE)")
-    ap.add_argument("--candidate", default="v151_deploy_v4", choices=["v151_deploy_v4", "v233_T3"],
-                    help="books: v205 (v151_deploy_v4 live rows, default) or the v233 T3 foundation (v233_T3 live rows)")
+    ap.add_argument("--candidate", default="v151_deploy_v4", choices=["v151_deploy_v4", "v233_T3", "v236_W2"],
+                    help="books: v205 (v151_deploy_v4 live rows, default), the v233 T3 or the v236 W2 foundation (their live rows)")
     args = ap.parse_args()
-    t3 = args.candidate == "v233_T3"
-    out_path = OUT.with_name("trade_plan_v233.json") if t3 else OUT
-    pipe_name = "v233 T3 books + trade mode" if t3 else "v205 books + trade mode"
+    cand = {"v151_deploy_v4": ("research_books", OUT, "v205 books + trade mode"),
+            "v233_T3": ("research_books_t3", OUT.with_name("trade_plan_v233.json"), "v233 T3 books + trade mode"),
+            "v236_W2": ("research_books_w2", OUT.with_name("trade_plan_v236.json"), "v236 W2 books (T3 + whale flow) + trade mode")}
+    rb_name, out_path, pipe_name = cand[args.candidate]
     p = dict(DEFAULT, **(json.loads(Path(args.policy).read_text()) if args.policy else {}))
     start = pd.Timestamp(args.start, tz="UTC") if args.start else FREEZE
     now = pd.Timestamp(datetime.now(timezone.utc))
@@ -81,7 +82,7 @@ def main():
     fw = _load("forward_v205_tm", ROOT / "scripts/forward_v205.py")
     eu = _load("engine_user_tm", RD / "engine_user/engine_user.py")
     v212 = _load("v212_tm", RD / "v212/v212_trade_scaling.py")
-    books = fw.research_books_t3(eu) if t3 else fw.research_books(eu)
+    books = getattr(fw, rb_name)(eu)
     lb = fw.live_books(args.candidate)
     books = pd.concat([books[books.index < lb.index.min()] if len(lb) else books, lb]).sort_index()
     opens, k1 = fw.market(start, now)
