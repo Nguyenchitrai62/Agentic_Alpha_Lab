@@ -51,6 +51,18 @@ modified from this project.
   funding income, so it earns nothing under this rule. Actual signed funding may be reported only as a labelled
   side row.
 
+- Executable trade structure (user rules 2026-09-28): suggestions must be followable by a human or a bot that reacts a
+  few minutes late. (1) A new order may not fill in the first 5 minutes after the 4h close (the pipeline needs that time);
+  from minute 5 a limit fills on a 1m trade-through. (2) No position -> ONE resting limit order at a distance from the price,
+  valid for a few hours, cancelled when its signal disappears. (3) In a position -> no continuous rebalancing / flip churn;
+  trader actions only: move or tighten SL/TP, break-even, discrete limit adds / partial or full limit exits. Market orders only
+  for stop-losses. Implemented as engine_user trade mode (`trade=...`, tests/test_engine_trade_mode.py) with an agent hook
+  (`trade["policy"]`).
+- Research goal (user, 2026-09-28): the pipeline is the foundation; a reinforcement-learned trader agent on top of it should
+  act like a real trader and push monthly return, win rate and low DD further. First milestone: >= 5%/month, DD <= 20%,
+  trade win rate > 50% (after fees), general and leakage-free (walk-forward RL: a model for year Y learns only from data before
+  Y minus an embargo).
+
 ## Current execution assumptions (research engine `research/parallel/rounds/parallel-20260906-r2/engine_real`)
 
 - Binance USD-M perps BTCUSDT, ETHUSDT, SOLUSDT, BNBUSDT, XRPUSDT; decisions at closed 4h bars; execution and
