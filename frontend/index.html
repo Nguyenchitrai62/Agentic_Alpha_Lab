@@ -9,11 +9,11 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="styles.css?v=20260929h" />
+  <link rel="stylesheet" href="styles.css?v=20260929i" />
   <script src="config.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/lightweight-charts@4.2.0/dist/lightweight-charts.standalone.production.js" defer></script>
   <script src="https://accounts.google.com/gsi/client" async defer></script>
-  <script src="app.js?v=20260929h" defer></script>
+  <script src="app.js?v=20260929i" defer></script>
 </head>
 <body>
   <header class="topbar">
@@ -52,16 +52,16 @@
 
     <!-- ===================== live market ===================== -->
     <section id="view-todo" class="view page todo" hidden>
-      <div class="pipe-status" id="pipeStatus"></div>
-      <div class="pipebar" id="pipeBar"></div>
-      <div class="panel board-panel">
-        <div class="panel-h"><span>Việc cần làm ngay bây giờ</span><span class="muted small" id="boardMeta"></span>
-          <label class="eq-in small">Vốn của bạn <input type="number" id="eqInput" min="10" step="100" /> USDT</label></div>
-        <div class="table-wrap"><table class="board" id="board"></table></div>
-        <p class="fine">Mọi lệnh vào / nhồi / chốt là limit (không khớp trong 5 phút đầu sau khi nến 4h đóng, hiệu lực 8h); SL là market, TP là limit.
-          Bấm một dòng để tới thẻ chi tiết của coin đó. Kết quả nghiên cứu, không phải lời khuyên đầu tư.</p>
+      <div class="todo-top">
+        <div class="pipe-status" id="pipeStatus"></div>
+        <label class="eq-in">Vốn của bạn <input type="number" id="eqInput" min="10" step="100" /> USDT</label>
       </div>
+      <div class="pipebar" id="pipeBar"></div>
+      <div class="muted small" id="boardMeta"></div>
       <div class="cards" id="todoCards"></div>
+      <table id="board" hidden></table>
+      <p class="fine">Mọi lệnh vào / nhồi / chốt là limit (không khớp trong 5 phút đầu sau khi nến 4h đóng, hiệu lực 8h); Stop-loss là lệnh
+        Stop Market, Take-profit là lệnh Limit. Khối lượng tính theo "Vốn của bạn". Kết quả nghiên cứu, không phải lời khuyên đầu tư.</p>
     </section>
 
     <section id="view-live" class="view live" hidden>

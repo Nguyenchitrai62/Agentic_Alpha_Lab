@@ -334,10 +334,14 @@
     const el = $("todoCards"); if (!el) return;
     el.innerHTML = SYMS.map((s) => {
       const p = state.live.prices[s];
-      return `<div class="panel card" id="card-${s}"><div class="panel-h"><span class="card-coin">${coin(s)}</span>
-        <span class="px" id="cpx-${s}">${p ? fmtPx(p.c) : ""}</span></div>${planHtml(s)}</div>`;
+      return `<div class="panel card" id="card-${s}">
+        <div class="card-h"><span class="card-coin">${coin(s)}</span><span class="card-px"><span class="px" id="cpx-${s}">${p ? fmtPx(p.c) : ""}</span>
+          <span id="cch-${s}">${p ? sgn((p.c / p.o - 1) * 100) : ""}</span></span></div>
+        <div id="cbox-${s}">${compactPlan(s)}</div>
+        <details class="steps-d"><summary>Hướng dẫn từng bước</summary>${planHtml(s)}</details></div>`;
     }).join("");
   }
+
 
   function bookOf(sym) { return (state.live.latest?.books || []).find((b) => b.symbol === sym); }
 
@@ -382,6 +386,12 @@
   function renderBoard() {
     const el = $("board"); if (!el) return;
     wireEquity();
+    if (el.hidden) {  // the pipeline tab shows cards only; keep the meta line
+      const plan = state.live.plan;
+      $("boardMeta").textContent = !plan?.coins ? `${PIPE_LABEL[planPipe()]} · chưa có kế hoạch lệnh (chờ chu kỳ 4h kế tiếp)`
+        : `${PIPE_LABEL[planPipe()]} · kế hoạch cập nhật ${dt(Date.parse(plan.generated_at))} · quyết định kế tiếp ${dt(Date.parse(plan.next_decision))}`;
+      return;
+    }
     const rows = SYMS.map((s) => {
       const p = state.live.prices[s], b = boardCells(s);
       return `<tr data-sym="${s}"><td class="sym">${coin(s)}</td>
@@ -429,10 +439,19 @@
       const el = $(pxId + sym);
       if (el) { el.textContent = fmtPx(p.c); flash(el); const ch = $(chId + sym); if (ch) ch.innerHTML = sgn((p.c / p.o - 1) * 100); }
     }
-    if ($("cpx-" + sym)) $("cpx-" + sym).textContent = fmtPx(p.c);
+    if ($("cpx-" + sym)) {
+      $("cpx-" + sym).textContent = fmtPx(p.c); $("cch-" + sym).innerHTML = sgn((p.c / p.o - 1) * 100);
+      const box = $("cbox-" + sym); if (box && !(state.live.boxT?.[sym] > Date.now() - 2000)) {  // at most every 2 s
+        box.innerHTML = compactPlan(sym); (state.live.boxT ||= {})[sym] = Date.now();
+      }
+    }
     if ($("b-pl-" + sym)) { const b = boardCells(sym); $("b-pl-" + sym).innerHTML = b.pl; $("b-en-" + sym).innerHTML = b.px; }
     if (sym === (state.view === "history" ? state.h.symbol : state.live.symbol)) updateTitle();
-    if (sym === state.live.symbol) updateLiveDistances();
+    if (sym === state.live.symbol) {
+      updateLiveDistances();
+      const pb = document.querySelector("#planPanel .plan-box");
+      if (pb && state.view === "live" && !(state.live.pbT > Date.now() - 2000)) { renderPlan(); state.live.pbT = Date.now(); }
+    }
   }
 
   function renderSignal() {
