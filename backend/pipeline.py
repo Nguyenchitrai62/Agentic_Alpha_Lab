@@ -438,11 +438,13 @@ def job_walkforward() -> str:
 
 def job_cycle() -> str:
     """Scheduled cycle after each 4h close: candles -> prospective log -> trade plan -> live signal -> forward paper trading."""
-    out = []
+    out, t0 = [], datetime.now(timezone.utc)
     for name, fn in (("candles", job_candles), ("aggflow", lambda: job_aggflow(archive=False)), ("shadow", job_shadow), ("trade_plan", job_trade_plan), ("signal", job_signal),
                      ("forward", job_forward), ("dip_log", job_dip_log)):
         try:
             out.append(fn())
         except Exception as exc:
             out.append(f"{name} FAILED: {type(exc).__name__}: {exc}")
+        # minute of the bar at which the step finished (the trade plan must be out before minute 5)
+        out[-1] += f" [{name} done at +{(datetime.now(timezone.utc) - t0).total_seconds() + (t0.hour % 4) * 3600 + t0.minute * 60 + t0.second:.0f}s into the bar]"
     return " | ".join(out)
