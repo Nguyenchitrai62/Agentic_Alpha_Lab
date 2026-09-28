@@ -274,3 +274,15 @@ ol.steps li::marker { color: var(--accent); font-weight: 700; }
 .plan-line { font-size: 14px; font-weight: 600; display: flex; flex-wrap: wrap; gap: 4px 12px; align-items: baseline; margin: 4px 0 6px; }
 .plan-line .k { color: var(--muted); font-weight: 500; font-size: 12px; }
 .plan-line .v { font-family: var(--mono); }
+
+/* market side: Entry / TP / SL block */
+.plan-box { border: 1px solid var(--line-2); border-radius: 8px; padding: 10px 12px; display: flex; flex-direction: column; gap: 6px;
+  background: var(--panel-2); }
+.plan-box.long { border-left: 3px solid var(--up); } .plan-box.short { border-left: 3px solid var(--down); }
+.pb-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 2px; }
+.pb-row { display: grid; grid-template-columns: 90px 1fr auto; align-items: baseline; padding: 5px 0; border-top: 1px solid var(--line); }
+.pb-row .k { color: var(--muted); font-size: 12px; }
+.pb-row .v { font-family: var(--mono); font-size: 16px; font-weight: 600; color: var(--text-hi); }
+.pb-row .d { font-size: 12px; color: var(--muted); text-align: right; }
+.pb-row.tp .v, .pb-row.tp .d { color: var(--up); }
+.pb-row.sl .v, .pb-row.sl .d { color: var(--down); }

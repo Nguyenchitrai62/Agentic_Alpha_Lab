@@ -174,8 +174,6 @@
   function tvInterval() { const v = store.get("tvIv", "240"); return TV_IVS.some(([k]) => k === v) ? v : "240"; }
   async function mountTv(sym, force = false) {
     const iv = tvInterval();
-    seg($("tvIv"), TV_IVS.map(([k]) => k), iv, (v) => { store.set("tvIv", v); mountTv(state.live.symbol, true); },
-      (k) => TV_IVS.find(([x]) => x === k)[1]);
     if (!force && state.live.tvSym === sym && state.live.tvIv === iv && $("tvChart").childElementCount) return;
     state.live.tvSym = sym; state.live.tvIv = iv;
     try { await loadTvScript(); } catch (e) { $("tvChart").innerHTML = '<p class="muted" style="padding:20px">Không tải được TradingView.</p>'; return; }
@@ -303,18 +301,28 @@
   }
   function compactPlan(sym) {
     const c = planOf(sym), px = state.live.prices[sym]?.c;
-    const kv = (k, v, cls = "") => `<span><span class="k">${k}</span> <span class="v ${cls}">${v}</span></span>`;
-    if (!c || c.state === "flat") return `<div class="plan-line"><span class="act-badge flat">ĐỨNG NGOÀI</span></div><div class="muted small">Không có lệnh cho ${coin(sym)}.</div>`;
+    const row = (k, v, d = "", cls = "") => `<div class="pb-row ${cls}"><span class="k">${k}</span><span class="v">${v}</span><span class="d">${d}</span></div>`;
+    const rel = (x, base) => (base ? `${x >= base ? "+" : ""}${((x / base - 1) * 100).toFixed(2)}%` : "");
+    if (!c || c.state === "flat") {
+      return `<div class="plan-box flat"><div class="pb-head"><span class="act-badge flat">ĐỨNG NGOÀI</span></div>
+        <div class="muted small">Không có lệnh cho ${coin(sym)} — không cần làm gì.</div></div>`;
+    }
     if (c.state === "pending") {
       const o = c.order, buy = o.side === "BUY";
-      return `<div class="plan-line"><span class="act-badge ${buy ? "wait-long" : "wait-short"}">${buy ? "LONG" : "SHORT"} (chờ khớp)</span>
-          ${kv("Entry", fmtPx(o.price))}${kv("TP", fmtPx(o.tp_if_filled), "up")}${kv("SL", fmtPx(o.sl_if_filled), "down")}</div>
-        <div class="muted small">Limit ${qty(sym, o.weight, o.price)} ${coin(sym)} (≈ ${usdt(o.weight)} USDT) · huỷ lúc ${dt(Date.parse(o.valid_until))}${px ? ` · cách giá ${((o.price / px - 1) * 100).toFixed(2)}%` : ""}</div>`;
+      return `<div class="plan-box ${buy ? "long" : "short"}"><div class="pb-head"><span class="act-badge ${buy ? "wait-long" : "wait-short"}">${buy ? "LONG" : "SHORT"}</span>
+          <span class="muted small">lệnh limit chờ khớp · ${qty(sym, o.weight, o.price)} ${coin(sym)} (≈ ${usdt(o.weight)} USDT)</span></div>
+        ${row("Entry", fmtPx(o.price), px ? `cách giá ${((o.price / px - 1) * 100).toFixed(2)}%` : "")}
+        ${row("Take-profit", fmtPx(o.tp_if_filled), rel(o.tp_if_filled, o.price), "tp")}
+        ${row("Stop-loss", fmtPx(o.sl_if_filled), rel(o.sl_if_filled, o.price), "sl")}
+        <div class="muted small">Huỷ nếu chưa khớp lúc ${dt(Date.parse(o.valid_until))}</div></div>`;
     }
     const p = c.position, L = p.side === "LONG", u = px ? (L ? 1 : -1) * (px / p.avg_entry - 1) * 100 : p.upnl_pct;
-    return `<div class="plan-line"><span class="act-badge ${L ? "long" : "short"}">${p.side}</span>
-        ${kv("Entry", fmtPx(p.avg_entry))}${kv("TP", fmtPx(p.tp), "up")}${kv("SL", fmtPx(p.sl), "down")}${kv("P/L", sgn(u))}</div>
-      <div class="muted small">Đang giữ ${qty(sym, p.weight, p.avg_entry)} ${coin(sym)} (≈ ${usdt(p.weight)} USDT)${c.order ? ` · lệnh chờ: limit @ ${fmtPx(c.order.price)}` : " · không cần làm gì"}</div>`;
+    return `<div class="plan-box ${L ? "long" : "short"}"><div class="pb-head"><span class="act-badge ${L ? "long" : "short"}">${p.side}</span>
+        <span class="muted small">đang giữ ${qty(sym, p.weight, p.avg_entry)} ${coin(sym)} (≈ ${usdt(p.weight)} USDT) · P/L ${sgn(u)}</span></div>
+      ${row("Entry", fmtPx(p.avg_entry))}
+      ${row("Take-profit", fmtPx(p.tp), rel(p.tp, p.avg_entry), "tp")}
+      ${row("Stop-loss", fmtPx(p.sl), rel(p.sl, p.avg_entry) + (p.break_even ? " · hoà vốn" : ""), "sl")}
+      <div class="muted small">${c.order ? `Lệnh chờ: limit ${c.order.side === "BUY" ? "mua" : "bán"} @ ${fmtPx(c.order.price)}` : "Không cần làm gì thêm"}</div></div>`;
   }
   function renderPlan() {
     const sym = state.live.symbol, plan = state.live.plan;
