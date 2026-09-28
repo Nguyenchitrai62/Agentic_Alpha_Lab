@@ -123,6 +123,10 @@ def refresh_candles_quietly() -> None:
         log.info("%s", job_aggflow())
     except Exception as exc:
         log.warning("aggflow refresh failed (retry in 15 min): %s", exc)
+    try:  # replay the trade plans to now so stops / take-profits hit between cycles show up on the site
+        log.info("trade plans refreshed: %s", job_trade_plan())
+    except Exception as exc:
+        log.warning("trade plan refresh failed (retry in 15 min): %s", exc)
     finally:
         _job_lock.release()
 
