@@ -1,5 +1,12 @@
 # Continuous BTC research — active
 
+LEADER 2026-09-28 (v221-v226, foundation for the trade mode): exit hysteresis (v221) and sub-account bot ensembles (v222) ~equal
+to D2; the foundation components were rebuilt from the audited pipelines (sums exact): slower (v223) or faster (v224) mixes than
+0.25 long-only / 0.25 multi-horizon / 0.50 flow are worse (local optimum); no long-only + book x0.9 (v225 T2) has the best worst
+year (2.47%/mo, DD 19.95, win 52%) but dev4 4.97 < D2 5.26; member D / monthly schedule (v226) worse. Dev-only diagnostics
+(not registered): open-interest flush at dip fills Spearman ~0; holding timed-out dip bids one more bar -0.40% vs -0.51% with fatter
+tails; rip-selling shorts lose in every book regime. D2 remains the deployed executable pipeline.
+
 LEADER 2026-09-28 (v212-v220, user goal: RL trader on the pipeline, executable orders): trade-mode agent hook (rule policy
 reproduces v212 S3 exactly). Rules: S3 (one limit add/reduce) dev4 4.83 DD 20.7; E1 (+limit exit on signal loss) 4.22 DD 19.3;
 v216 G2 grid trader (limit adjustments at most once a day, band max(3%,40%)) 4.84 / worst 1.65 / DD 18.0. RL: v214 fitted-Q /
