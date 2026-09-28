@@ -18,6 +18,7 @@ import json
 import re
 import sys
 import time
+import urllib.error
 import urllib.request
 from pathlib import Path
 
@@ -30,8 +31,29 @@ TIERS = (0.0, 1e4, 1e5, 1e6, np.inf)
 TNAME = ("lt10k", "10k_100k", "100k_1m", "ge1m")
 
 
+PAUSE_S = 2.0          # polite pause between files (the CDN answers 403 to bursts)
+BLOCK_WAIT_S = 600     # wait after a 403 before retrying
+BLOCK_RETRIES = 12
+
+
+def _get(url: str, timeout: int) -> bytes:
+    for attempt in range(BLOCK_RETRIES + 1):
+        try:
+            return urllib.request.urlopen(url, timeout=timeout).read()
+        except urllib.error.HTTPError as e:
+            if e.code not in (403, 429) or attempt == BLOCK_RETRIES:
+                raise
+            print(f"HTTP {e.code} (rate limited) - waiting {BLOCK_WAIT_S}s", flush=True)
+            time.sleep(BLOCK_WAIT_S)
+        except Exception:
+            if attempt >= 2:
+                raise
+            time.sleep(10)
+    raise RuntimeError(url)
+
+
 def day_files(sym: str) -> list[str]:
-    html = urllib.request.urlopen(BASE + sym + "/", timeout=60).read().decode()
+    html = _get(BASE + sym + "/", 60).decode()
     return sorted(set(re.findall(rf'href="({sym}\d{{4}}-\d{{2}}-\d{{2}}\.csv\.gz)"', html)))
 
 
@@ -59,14 +81,8 @@ def run(sym: str):
     acc = pd.read_parquet(path) if path.exists() else None
     for f in [f for f in day_files(sym) if f not in done]:
         t0 = time.time()
-        for attempt in range(3):
-            try:
-                raw = urllib.request.urlopen(BASE + sym + "/" + f, timeout=600).read()
-                break
-            except Exception:
-                if attempt == 2:
-                    raise
-                time.sleep(10)
+        raw = _get(BASE + sym + "/" + f, 600)
+        time.sleep(PAUSE_S)
         g = aggregate(raw)
         acc = g if acc is None else pd.concat([acc, g]).groupby(level=0).sum()
         acc.sort_index().to_parquet(path)
