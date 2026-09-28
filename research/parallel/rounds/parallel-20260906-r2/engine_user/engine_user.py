@@ -114,7 +114,7 @@ def simulate(books, opens, prep, m_sl=3.0, m_sleeve_sl=2.0, sleeve=True, target=
              psd=np.full(na, np.nan), issued=np.full(na, -1), risk=np.zeros(na),
              # in-position order: ak +1 add / -1 reduce, price, add weight or reduce fraction, expiry, issue bar
              ak=np.zeros(na, int), apx=np.full(na, np.nan), aw=np.zeros(na), aexp=np.full(na, -1), aiss=np.full(na, -1),
-             nadd=np.zeros(na, int), nred=np.zeros(na, int), open_i=np.full(na, -1))
+             nadd=np.zeros(na, int), nred=np.zeros(na, int), open_i=np.full(na, -1), last_adj=np.full(na, -10**6))
     # trade["policy"](i, a, state) -> action; flat: "wait" | "open" | "open_deep"; in a position: "hold" | "reduce" | "close" |
     # "add" | "tighten". The break-even rule, SL/TP, resting-order expiry and signal-loss cancel stay mechanical.
     policy = trade.get("policy") if trade is not None else None
@@ -186,7 +186,7 @@ def simulate(books, opens, prep, m_sl=3.0, m_sleeve_sl=2.0, sleeve=True, target=
             T["be"][a] = T["part"][a] = False
             T["side"][a] = 0
             T["ak"][a], T["nadd"][a], T["nred"][a] = 0, 0, 0
-            T["open_i"][a] = i
+            T["open_i"][a] = T["last_adj"][a] = i
             _ev(i, a, m0, "book_fill", "buy" if ps > 0 else "sell", px, ps * T["w"][a], entry_type="limit", sl=float(T["sl"][a]),
                 tp=float(T["tp"][a]), issued_bars_ago=int(i - T["issued"][a]))
         elif policy is not None:
@@ -204,9 +204,11 @@ def simulate(books, opens, prep, m_sl=3.0, m_sleeve_sl=2.0, sleeve=True, target=
                           upnl=(Oa[0] / cur_e - 1) * side / sde if sde > 0 else 0.0, bars=i - T["open_i"][a], be=bool(T["be"][a]),
                           nadd=int(T["nadd"][a]), nred=int(T["nred"][a]),
                           dsl=(Oa[0] / T["sl"][a] - 1) * side / sde if sde > 0 else 0.0,
-                          dtp=(T["tp"][a] / Oa[0] - 1) * side / sde if sde > 0 else 0.0, valid=valid)
+                          dtp=(T["tp"][a] / Oa[0] - 1) * side / sde if sde > 0 else 0.0, valid=valid,
+                          since_adj=i - T["last_adj"][a])
                 act = policy(i, a, st)
                 acts = {act} if isinstance(act, str) else set(act)  # several actions may be combined, e.g. {"tighten", "reduce"}
+                amt = act if isinstance(act, dict) else {}  # optional sizes: {"reduce": fraction} / {"add": weight}
                 off = max(trade.get("min_off", 0.001), trade.get("k_off", 0.25) * s4_a)
                 if "tighten" in acts and np.isfinite(sd_a):
                     new = Oa[0] * (1 - side * trade.get("tighten", 1.5) * sd_a)
@@ -216,9 +218,11 @@ def simulate(books, opens, prep, m_sl=3.0, m_sleeve_sl=2.0, sleeve=True, target=
                         _ev(i, a, 0, "sl_move", "sell" if side > 0 else "buy", new, 0.0, why="agent tighten")
                 if slot_free and (acts & {"reduce", "close"} or ("add" in acts and can_add)):
                     if "add" in acts and can_add:
-                        T["ak"][a], T["apx"][a], T["aw"][a] = 1, Oa[0] * (1 - side * off), abs(tg) - cur_w
+                        T["ak"][a], T["apx"][a], T["aw"][a] = 1, Oa[0] * (1 - side * off), amt.get("add") or abs(tg) - cur_w
                     else:
-                        T["ak"][a], T["apx"][a], T["aw"][a] = -1, Oa[0] * (1 + side * off), 1.0 if "close" in acts else trade.get("reduce_frac", 0.5)
+                        T["ak"][a], T["apx"][a], T["aw"][a] = -1, Oa[0] * (1 + side * off), 1.0 if "close" in acts else (
+                            amt.get("reduce") or trade.get("reduce_frac", 0.5))
+                    T["last_adj"][a] = i
                     T["aexp"][a], T["aiss"][a] = i + trade.get("n_valid", 2), i
                     stats["scale_orders"] += 1
                     _ev(i, a, 0, "order_issue", "buy" if T["ak"][a] * side > 0 else "sell", T["apx"][a],
