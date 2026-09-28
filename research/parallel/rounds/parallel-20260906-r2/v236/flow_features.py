@@ -1,4 +1,4 @@
-"""Large-order ("whale") vs retail taker-flow features from Binance aggTrades 4h aggregates (registry v235, fixed before evaluation).
+"""Large-order ("whale") vs retail taker-flow features from Binance aggTrades 4h aggregates (registry v236, fixed before evaluation).
 
 Input: data/raw/aggflow_20260928/{SYM}_flow_4h.parquet (scripts/fetch_aggtrades_flow.py): per UTC 4h bar and notional tier
 (lt10k, 10k_100k, 100k_1m, ge1m USDT) the taker-buy notional, taker-sell notional and count. A bar's aggregate uses only trades
