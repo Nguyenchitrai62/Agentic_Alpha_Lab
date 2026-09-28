@@ -70,7 +70,7 @@ def aggregate(raw: bytes) -> pd.DataFrame:
 
 def run(sym: str, only=None):
     OUT.mkdir(parents=True, exist_ok=True)
-    path, man_p = OUT / f"{sym}_flow_4h.parquet", OUT / "manifest.json"
+    path, man_p = OUT / f"{sym}_flow_4h.parquet", OUT / f"manifest_{sym}.json"  # one manifest per symbol (parallel runs)
     man = json.loads(man_p.read_text()) if man_p.exists() else {"source": BASE, "tiers_usdt": list(TNAME), "done": {}}
     done = set(man["done"].get(sym, []))
     monthly = [k for k in keys(f"data/futures/um/monthly/aggTrades/{sym}/") if re.search(r"-\d{4}-\d{2}\.zip$", k)]
