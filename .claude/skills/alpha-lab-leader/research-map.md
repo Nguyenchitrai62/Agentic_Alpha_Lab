@@ -1,8 +1,23 @@
 # Research map (update after every rotation)
 
-Last update: 2026-09-26 (after v179).
+Last update: 2026-09-28 (after v222).
 
 ## Honest status
+
+EXECUTABLE TRADE MODE (user rules 2026-09-28: one resting limit order, no fill in the first 5 minutes after the 4h close, in a
+position only SL/TP edits and discrete limit adds/reduces/exits, market only for stops; engine_user `trade=` + `trade["policy"]`):
+best = v218 D2 = v216 G2 grid trader (limit size adjustments at most once/day when |target - w| > max(3%, 40% target), limit exit on
+signal loss, break-even +2 sigma_d) + dip sleeve budget 0.15 / rung x1.75: dev4 5.26, worst year 2.18%/mo, DD 19.1, win 51%, final
+5y 4.97, last year 3.82 (scored once). Deployed: scripts/forward_trade.py (FREEZE 2026-09-28 08:00 UTC) -> web trade plan.
+Tried in this family (all audited): v208 execution policy (vol limit / market / band) DD > 20; v209 luck tests (alpha t 3.5, placebo
+0/40, beta 0.08) + discrete fixed SL/TP 4.1-4.4; v210 trade mode T1-T3 (T2 4.47/DD 25.5); v211 risk sizing worse; v212 scale in/out
+S3 4.83/DD 20.7; v213 limit exit on signal loss E1 4.22/DD 19.3; v214 value RL (fitted Q / MC) 3.3-3.8; v215 one-step improvement
+cross-fitted 3.2-3.6 (value estimates favour early exits); v216 grid G1-G3; v217 ES policy search 4.0-4.6 (does not transfer);
+v218 DD budget -> sleeve best; v219 sleeve budget 0.18-0.21 DD > 20; v220 learned dip-bid filter hurts; v221 exit hysteresis ~equal;
+v222 sub-account bot ensembles ~equal. Diagnostic (dev only, not registered): dip-bid outcome vs open-interest drop at the fill
+(5m metrics) - Spearman ~0, sign flips by year -> no liquidation-flush edge.
+PLATEAU: every management layer lands at dev4 ~5.1-5.3 and last year ~3.8-4.0 at DD ~19 -> the foundation signal is the limit.
+
 
 USER-RULE ENGINE (engine_user, 2026-09-27; limit entry + SL market + TP limit per position, maker 0.02% / taker 0.055%, adverse funding, no carry; selection on first four years): v188 v154+sleeve SL m=4: 5y 3.53, last year 3.55, DD 19.0; v189 comparison selects v151+sleeve (dev4 3.90) -> 5y 3.58, last year 2.34, DD 19.4. Gate needs 5y >= 5, last year >= 5, no losing year, DD <= 20. Then: v190 bracket (triple-barrier) targets rejected (2022 IC ~0); v191 sleeve rung stop 5 sigma best (dev4 4.05); v192 book limits resting the whole bar (4.07); v193 STOP-RISK sleeve budget X=0.08: dev4 5.046 (first >= 5), DD 19.3, 5y 4.60, last year 2.85 (+40%) -> fails on last year; v194 sleeve TP 1 sigma stays best; v195/v196 books-vs-sleeve allocation: keep books at 0.25 (sleeve is capacity-limited by rung size); v197 rung size x1.5 with budget 0.12: dev4 5.562, DD 19.32, 5y 4.996, last year 2.761 (+38.7%) -> BEST under user rules; fails only on the most recent year. v198 TSMOM blend hurts every year. v188 audit -> engine fix: 1m DD peaks include intrabar highs, stop wins same-minute ties; v197 re-scored DD 19.72 (v199). v199 ladder to 6 sigma: dev4 5.71 but DD 20.27 (excluded). v200 closer book SL/TP (user range) hurts (DD > 20); v201 hourly ladder fails (DD 39.7); v202 quarterly retrain helps weak years but DD 22.5; v203 annual+quarterly ensemble dev4 5.52 (better worst year, not selected under the mean criterion). ROBUST CRITERION from v204 (worst dev year). v204 sleeve aligned with book direction (x1.5 long-book / x0.5 otherwise): dev4 5.87, 5y 5.33, last year 3.21, DD 19.46 (gain carries to the unused last year). v205 annual+quarterly book ensemble + aligned sleeve: dev4 5.82, worst dev year 3.41, 5y 5.49, LAST YEAR 4.15 (+63%), DD 19.76 = NEW BEST (fails only on the last year; audited). v206 +member D and v207 +monthly schedule both worse (DD > 20). OVERFIT WARNING: dev4 rose 3.90 -> 5.56 across v189-v197 while the untouched last year only moved 2.34 -> 2.76.
 
