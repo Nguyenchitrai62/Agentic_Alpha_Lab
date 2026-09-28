@@ -73,7 +73,7 @@ def prepare(books, opens):
                 settle=settle_at_end, sig1h=sig1h)
 
 
-def simulate(books, opens, prep, m_sl=3.0, m_sleeve_sl=2.0, sleeve=True, target=0.25, cap=2.0, d_limit=D_LIMIT, win_end=60, sleeve_risk_budget=None, gap=0.02, m_sleeve_tp=1.0, rung_scale_fixed=None, size_mult=1.0, rungs=RUNGS, m_tp=None, hourly=False, align=None, events=None, bars=None, exec_policy=None, fixed_levels=False, attrib=None, trade=None, win_start=2, state_out=None):
+def simulate(books, opens, prep, m_sl=3.0, m_sleeve_sl=2.0, sleeve=True, target=0.25, cap=2.0, d_limit=D_LIMIT, win_end=60, sleeve_risk_budget=None, gap=0.02, m_sleeve_tp=1.0, rung_scale_fixed=None, size_mult=1.0, rungs=RUNGS, m_tp=None, hourly=False, align=None, events=None, bars=None, exec_policy=None, fixed_levels=False, attrib=None, trade=None, win_start=2, state_out=None, sleeve_filter=None):
     # events: optional list; when given, every fill / stop / take-profit / sleeve rung is appended as a dict (no effect on results)
     # exec_policy: optional callable (i, a, dw, w_a, tgt_a, sig4_ia) -> ("limit", offset[, weight]) | ("market", 0[, weight]) | ("skip", 0)
     #   deciding how (and, with the optional weight, to which weight instead of the target)
@@ -85,6 +85,8 @@ def simulate(books, opens, prep, m_sl=3.0, m_sleeve_sl=2.0, sleeve=True, target=
     # win_start: first minute of the holding bar at which a new book limit may fill (2 = audited default; 5 = user rule
     #   2026-09-28: the pipeline needs ~5 minutes after the close, no fill is allowed before).
     # state_out: optional dict; filled at the end with the trade-mode state (orders, SL/TP, quantities, entries) and the last equity.
+    # sleeve_filter: optional callable (i, a, rung_index) -> size multiplier for that dip-sleeve bid, decided when the ladder is placed
+    #   (0 = do not place it); it may use only information known at the decision of bar i.
     # trade: optional dict -> discrete TRADE MODE for the book (see _trade_bar): one position per asset, opened by a resting
     #   limit order issued at a decision and valid `n_valid` bars, never re-sized; while in a position only the SL/TP may be
     #   changed (break-even, partial take-profit, tighten on an opposite signal); exits only by SL (market) or TP (limit).
@@ -522,8 +524,13 @@ def simulate(books, opens, prep, m_sl=3.0, m_sleeve_sl=2.0, sleeve=True, target=
             fills.sort(key=lambda t: t[:4])
             taken = []
             rn_base = rn
+            smult = {}
             for f, lad, r, a, lv, sg, end_m in fills:
                 rn = rn_base if align is None else rn_base * (align[0] if tgt[a] > 0 else align[1])
+                if sleeve_filter is not None:
+                    if (a, r) not in smult:
+                        smult[(a, r)] = float(sleeve_filter(i, a, r))
+                    rn *= smult[(a, r)]
                 if rn <= 0:
                     continue
                 if sleeve_risk_budget is None:

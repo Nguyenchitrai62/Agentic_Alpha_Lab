@@ -1,5 +1,14 @@
 # Continuous BTC research — active
 
+LEADER 2026-09-28 (v212-v220, user goal: RL trader on the pipeline, executable orders): trade-mode agent hook (rule policy
+reproduces v212 S3 exactly). Rules: S3 (one limit add/reduce) dev4 4.83 DD 20.7; E1 (+limit exit on signal loss) 4.22 DD 19.3;
+v216 G2 grid trader (limit adjustments at most once a day, band max(3%,40%)) 4.84 / worst 1.65 / DD 18.0. RL: v214 fitted-Q /
+Monte Carlo per-action boosted trees 3.3-3.8; v215 sparse-exploration one-step improvement with cross-fitting 3.2-3.6 (value
+estimates favour early exits on fat-tailed trend payoffs); v217 evolution-strategy policy search 4.0-4.6 (in-sample gains do not
+transfer across years). v218 D2 = G2 + dip-sleeve budget 0.15 / rung x1.75: dev4 5.26, worst 2.18, DD 19.1, final 5y 4.97,
+last year 3.82 = BEST EXECUTABLE (deployed: scripts/forward_trade.py FREEZE 2026-09-28 08:00 UTC, web trade plan). v219
+sleeve budget 0.18-0.21 breaches DD; v220 learned dip-bid filter hurts (bid outcomes not predictable at placement).
+
 LEADER 2026-09-28 (v210/v211, user: suggestions must be executable - one resting limit order, no fill in the first 5
 minutes after the close, in a position only SL/TP may change): engine_user trade mode (tests/test_engine_trade_mode.py).
 5-minute rule alone on continuous v205: dev4 5.58 / DD 19.88. Trade mode, full-target size: no management dev4 3.06
