@@ -1,5 +1,7 @@
 # Continuous BTC research — active
 
+LEADER 2026-09-28 (v227-v230): causal coin bandit for dip bids (v227, DD > 20), deeper limit offsets (v228, noise), an hourly dip ladder in trade mode (v229, DD 42%) and a new Korean (Upbit kimchi) premium member (v230, alone dev4 3.69, dilutes) are all rejected; v227-v229 blind audits PASS bit-exact. Dev-only drawdown decomposition: the dip sleeve earns most of the return and causes the worst drawdown (2023-04..06), but its losses are not serially dependent. D2 remains the deployed pipeline (dev4 5.26, worst year 2.18, DD 19.1, trade win 51%; most recent year 3.82 scored once).
+
 LEADER 2026-09-28 (v221-v226, foundation for the trade mode): exit hysteresis (v221) and sub-account bot ensembles (v222) ~equal
 to D2; the foundation components were rebuilt from the audited pipelines (sums exact): slower (v223) or faster (v224) mixes than
 0.25 long-only / 0.25 multi-horizon / 0.50 flow are worse (local optimum); no long-only + book x0.9 (v225 T2) has the best worst

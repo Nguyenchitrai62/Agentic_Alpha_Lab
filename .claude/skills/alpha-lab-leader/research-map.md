@@ -16,6 +16,7 @@ cross-fitted 3.2-3.6 (value estimates favour early exits); v216 grid G1-G3; v217
 v218 DD budget -> sleeve best; v219 sleeve budget 0.18-0.21 DD > 20; v220 learned dip-bid filter hurts; v221 exit hysteresis ~equal;
 v222 sub-account bot ensembles ~equal. Diagnostic (dev only, not registered): dip-bid outcome vs open-interest drop at the fill
 (5m metrics) - Spearman ~0, sign flips by year -> no liquidation-flush edge.
+v229 hourly dip ladder in trade mode (bids x4, 2022 -30%, DD 42-44: rejected). v230 Korean (Upbit) premium member K (USDKRW lagged 2 days; K alone dev4 3.69 -> dilutes like DVOL/macro/COT; best K3 replace A 4.98 DD 20.09: rejected). Dev-only diagnostics (not registered): D2 DD episodes - worst (2023-04..06, 17.2%) is 11pp dip sleeve; the sleeve earns most of the return (2021-24: +27.5/+5.5/+54.7/+44.6% of equity vs books ~+1/+32/+37/+59) and is uncorrelated with the book; sleeve losses are NOT serially dependent (daily autocorr 0.03-0.06, next-week return after a sleeve drawdown equal or better) -> equity-curve throttles would hurt. Untested data left: none of note (on-chain / stablecoins / OI / options / Coinbase / Korea / macro / COT / F&G / DVOL all tried).
 PLATEAU: every management layer lands at dev4 ~5.1-5.3 and last year ~3.8-4.0 at DD ~19 -> the foundation signal is the limit.
 v223-v228 (all rejected, D2 stays): foundation component mixes slower/faster (0.25/0.25/0.5 local optimum), no long-only + trim
 (best worst year 2.47 but dev4 4.97), member D / monthly schedule, causal coin bandit for the sleeve (DD > 20), deeper limit
