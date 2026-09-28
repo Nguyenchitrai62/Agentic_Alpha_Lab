@@ -199,7 +199,7 @@
     mountTv(state.live.symbol);
     try {
       await loadPlans();
-      renderWatchlist(); renderPlan(); renderSignal(); renderDips(); loadRecent(); updateTitle();
+      renderWatchlist(); renderPlan(); renderDips(); loadRecent(); updateTitle();
     } catch (e) { toast(e.message); }
   }
   async function renderPipeStatus() {
@@ -332,15 +332,17 @@
   }
   function renderCards() {
     const el = $("todoCards"); if (!el) return;
+    const plan = state.live.plan, nm = PIPE_LABEL[planPipe()] || "";
     el.innerHTML = SYMS.map((s) => {
       const p = state.live.prices[s];
-      return `<div class="panel card" id="card-${s}">
-        <div class="card-h"><span class="card-coin">${coin(s)}</span><span class="card-px"><span class="px" id="cpx-${s}">${p ? fmtPx(p.c) : ""}</span>
-          <span id="cch-${s}">${p ? sgn((p.c / p.o - 1) * 100) : ""}</span></span></div>
+      return `<div class="panel plan card" id="card-${s}">
+        <div class="panel-h"><span>${coin(s)} · ${nm}</span>
+          <span class="card-price"><span class="px card-px" id="cpx-${s}">${p ? fmtPx(p.c) : ""}</span> <span class="small" id="cch-${s}">${p ? sgn((p.c / p.o - 1) * 100) : ""}</span></span></div>
         <div id="cbox-${s}">${compactPlan(s)}</div>
         <details class="steps-d"><summary>Hướng dẫn từng bước</summary>${planHtml(s)}</details></div>`;
     }).join("");
   }
+
 
 
   function bookOf(sym) { return (state.live.latest?.books || []).find((b) => b.symbol === sym); }
@@ -422,7 +424,7 @@
     $("watchlist").onclick = (e) => {
       const tr = e.target.closest("tr[data-sym]"); if (!tr) return;
       state.live.symbol = tr.dataset.sym; store.set("liveSym", tr.dataset.sym);
-      renderWatchlist(); renderPlan(); renderSignal(); renderDips(); loadRecent(); mountTv(tr.dataset.sym); updateTitle();
+      renderWatchlist(); renderPlan(); renderDips(); loadRecent(); mountTv(tr.dataset.sym); updateTitle();
     };
   }
   // browser-tab title = live price of the coin being viewed (market / history page), e.g. "83,874.6"

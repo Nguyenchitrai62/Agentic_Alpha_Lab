@@ -9,11 +9,11 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="styles.css?v=20260929i" />
+  <link rel="stylesheet" href="styles.css?v=20260929k" />
   <script src="config.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/lightweight-charts@4.2.0/dist/lightweight-charts.standalone.production.js" defer></script>
   <script src="https://accounts.google.com/gsi/client" async defer></script>
-  <script src="app.js?v=20260929i" defer></script>
+  <script src="app.js?v=20260929k" defer></script>
 </head>
 <body>
   <header class="topbar">
@@ -73,12 +73,12 @@
         </div>
         <div class="panel plan" id="planPanel"></div>
         <details class="panel adv">
-          <summary>Chi tiết nâng cao <span class="muted small">tín hiệu liên tục, lệnh mua dip, gợi ý gần đây</span></summary>
-          <div id="sigPanel"></div>
-          <div class="panel-h sub"><span>Lệnh chờ mua dip</span><span class="muted small">limit, TP limit, SL market</span></div>
-          <table class="tbl compact" id="dipTbl"></table>
+          <summary>Chi tiết nâng cao<span class="muted small sub-line">lệnh mua dip đang chờ, gợi ý gần đây</span></summary>
+          <div id="sigPanel" hidden></div>
+          <div class="panel-h sub"><span>Lệnh chờ mua dip</span><span class="muted small">limit · TP limit · SL market</span></div>
+          <div class="tbl-scroll"><table class="tbl compact" id="dipTbl"></table></div>
           <div class="panel-h sub"><span>Gợi ý đã phát gần đây</span><span class="muted small" id="recentSym"></span></div>
-          <table class="tbl compact" id="recentTbl"></table>
+          <div class="tbl-scroll"><table class="tbl compact" id="recentTbl"></table></div>
         </details>
       </aside>
     </section>

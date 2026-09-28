@@ -292,13 +292,11 @@ ol.steps li::marker { color: var(--accent); font-weight: 700; }
 .todo-top { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
 .todo-top .eq-in { font-size: 12.5px; }
 .cards { grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 12px; }
-@media (min-width: 1500px) { .cards { grid-template-columns: repeat(5, minmax(0, 1fr)); } }
 .card { display: flex; flex-direction: column; gap: 10px; padding: 12px; }
 .card-h { display: flex; justify-content: space-between; align-items: baseline; }
 .card-h .card-coin { font-size: 18px; font-weight: 700; color: var(--text-hi); }
 .card-px { display: flex; gap: 8px; align-items: baseline; font-size: 12px; }
 .card-px .px { font-family: var(--mono); font-size: 15px; color: var(--text-hi); }
-.card .plan-box { background: var(--bg); }
 details.steps-d summary { cursor: pointer; color: var(--accent); font-size: 12.5px; list-style: none; }
 details.steps-d summary::-webkit-details-marker { display: none; }
 details.steps-d summary::before { content: "▸ "; }
@@ -307,3 +305,16 @@ details.steps-d .act { display: none; }
 details.steps-d ol.steps { font-size: 12.5px; }
 .pipebtn .pn { font-size: 12.5px; }
 @media (max-width: 700px) { .cards { grid-template-columns: 1fr; } .todo-top { flex-direction: column; align-items: flex-start; } }
+
+/* ---------- round 6 ---------- */
+.card .card-px { font-family: var(--mono); font-weight: 500; color: var(--text); margin-left: 6px; font-size: 12.5px; }
+.card .panel-h { flex-wrap: wrap; row-gap: 2px; }
+details.adv { overflow: hidden; }
+details.adv summary .sub-line { display: block; margin: 2px 0 0 14px; font-weight: 400; }
+.tbl-scroll { overflow-x: auto; max-width: 100%; }
+.tbl-scroll .tbl.compact td, .tbl-scroll .tbl.compact th { white-space: nowrap; }
+.live .side { overflow-x: hidden; }
+
+.cards { grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); }
+.card .card-price { white-space: nowrap; }
+.card .card-px { font-size: 14px; margin-left: 0; color: var(--text-hi); }
