@@ -23,10 +23,11 @@ import pandas as pd
 
 ROOT = Path(__file__).resolve().parents[1]
 RD = ROOT / "research/parallel/rounds/parallel-20260906-r2"
-FREEZE = pd.Timestamp("2026-09-28T00:00:00Z")  # first traded holding bar of the trade-mode rules (v216, frozen 2026-09-28)
+FREEZE = pd.Timestamp("2026-09-28T08:00:00Z")  # first traded holding bar of the deployed rules (v218 D2, frozen 2026-09-28 ~05 UTC)
 OUT = ROOT / "artifacts/research/advisor_shadow/trade_plan.json"
 SYMS = ["BNBUSDT", "BTCUSDT", "ETHUSDT", "SOLUSDT", "XRPUSDT"]
-DEFAULT = dict(name="v216_grid_G2", theta_open=0.05, k_off=0.25, b_abs=0.03, b_rel=0.40, cool=6, be_k=2.0, book_mult=1.0)
+DEFAULT = dict(name="v218_D2 (v216 grid trader + dip sleeve budget 0.15, rung x1.75)", theta_open=0.05, k_off=0.25, b_abs=0.03,
+               b_rel=0.40, cool=6, be_k=2.0, book_mult=1.0, sleeve_risk_budget=0.15, size_mult=1.75)
 
 
 def _load(name, path):
@@ -65,6 +66,13 @@ def main():
     p = dict(DEFAULT, **(json.loads(Path(args.policy).read_text()) if args.policy else {}))
     start = pd.Timestamp(args.start, tz="UTC") if args.start else FREEZE
     now = pd.Timestamp(datetime.now(timezone.utc))
+    if now < start:  # before the first traded bar: publish an empty plan that says when trading starts
+        OUT.write_text(json.dumps({"pipeline": "v205 books + trade mode", "policy": p, "freeze": str(start), "generated_at": now.isoformat(),
+                                   "decision_bar": str(start), "next_decision": str(start + pd.Timedelta(minutes=5)), "net_return_pct": 0.0,
+                                   "coins": {s: {"symbol": s, "state": "flat", "note": "chưa tới giờ bắt đầu"} for s in SYMS},
+                                   "events": [], "equity_curve": []}, indent=1))
+        print("trade plan: trading starts at", start)
+        return
     fw = _load("forward_v205_tm", ROOT / "scripts/forward_v205.py")
     eu = _load("engine_user_tm", RD / "engine_user/engine_user.py")
     v212 = _load("v212_tm", RD / "v212/v212_trade_scaling.py")
@@ -94,7 +102,8 @@ def main():
         cap.update(eq=eq, stats=stats)
         return {}
     eu.summarize = grab
-    eu.simulate(books, opens.reindex(grid), prep, trade=trade, win_start=5, events=events, bars=bars, state_out=state, **fw.KW)
+    kw = dict(fw.KW, sleeve_risk_budget=p["sleeve_risk_budget"], size_mult=p["size_mult"])
+    eu.simulate(books, opens.reindex(grid), prep, trade=trade, win_start=5, events=events, bars=bars, state_out=state, **kw)
     events = [e for e in events if e["t"] <= now]
     live = np.asarray(grid >= start - pd.Timedelta(hours=4))
     eq = cap["eq"][live]

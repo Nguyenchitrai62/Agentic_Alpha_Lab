@@ -220,7 +220,8 @@
         ${c.order ? `<div class="subact">LỆNH CHỜ: ${{ add: "nhồi thêm", reduce: "chốt bớt " + pct(c.order.amount, 0), close: "đóng toàn bộ" }[c.order.kind] || c.order.kind}
           — limit ${c.order.side === "BUY" ? "mua" : "bán"} tại <b>${fmtPx(c.order.price)}</b>, hiệu lực đến ${dt(Date.parse(c.order.valid_until))}</div>` : `<div class="muted small">Không có lệnh chờ — giữ nguyên SL/TP.</div>`}`;
     } else {
-      body = `<div class="act flat">KHÔNG LÀM GÌ</div><p class="muted small">Chưa có tín hiệu đủ mạnh (cần ≥ ${pct(plan.policy?.theta_open ?? 0.05, 0)} vốn theo pipeline).</p>`;
+      body = c.note ? `<div class="act flat">CHƯA BẮT ĐẦU</div><p class="muted small">Kế hoạch lệnh (${esc(plan.policy?.name || "")}) bắt đầu từ nến ${dt(Date.parse(plan.freeze))}.</p>`
+        : `<div class="act flat">KHÔNG LÀM GÌ</div><p class="muted small">Chưa có tín hiệu đủ mạnh (cần ≥ ${pct(plan.policy?.theta_open ?? 0.05, 0)} vốn theo pipeline).</p>`;
     }
     const evs = (plan.events || []).filter((e) => e.symbol === sym).slice(-8).reverse();
     el.innerHTML = `<div class="panel-h"><span>Kế hoạch lệnh · ${coin(sym)}</span><span class="muted small">paper từ ${String(plan.freeze).slice(0, 10)}: ${sgn(plan.net_return_pct)}</span></div>

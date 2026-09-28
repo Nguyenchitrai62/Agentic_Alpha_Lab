@@ -18,7 +18,7 @@ What it prints for the CURRENT 4h bar (the bar that opened after the last closed
 2. Dip sleeve: for each major, four resting buy limits at open * (1 - k sigma_4h), k = 2.5/3/3.5/4, live from 16
    minutes after the bar open until 2 minutes before it closes; each filled rung gets a take-profit sell limit at
    L (1 + sigma_4h) and a stop at L (1 - 5 sigma_4h); if neither is hit, close it at the next 4h open.
-   Rung size = s * g * 1.5 * 0.25/4 / 1.657 of equity; keep sum over OPEN rungs of size * (5 sigma_4h + 2%) <= 12%.
+   Rung size = s * g * 1.75 * 0.25/4 / 1.657 of equity; keep sum over OPEN rungs of size * (5 sigma_4h + 2%) <= 15% (v218 D2).
 3. Confidence per asset: whether the two member models agree on the direction and how large the signal is relative to
    the pipeline's maximum per-asset weight.
 
@@ -46,8 +46,8 @@ RUNGS = (2.5, 3.0, 3.5, 4.0)
 M_SL_BOOK, M_TP_BOOK = 4.0, 8.0
 M_SL_RUNG, M_TP_RUNG = 5.0, 1.0
 D_LIMIT = 0.001
-RUNG_SIZE = 1.5 * 0.25 / 4 / 1.657
-RISK_BUDGET, GAP = 0.12, 0.02
+RUNG_SIZE = 1.75 * 0.25 / 4 / 1.657  # v218 D2: rung size x1.75 (was x1.5)
+RISK_BUDGET, GAP = 0.15, 0.02  # v218 D2: stop-risk budget 0.15 (was 0.12)
 
 
 def _load(name, path):
