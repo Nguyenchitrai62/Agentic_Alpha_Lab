@@ -73,7 +73,7 @@ def prepare(books, opens):
                 settle=settle_at_end, sig1h=sig1h)
 
 
-def simulate(books, opens, prep, m_sl=3.0, m_sleeve_sl=2.0, sleeve=True, target=0.25, cap=2.0, d_limit=D_LIMIT, win_end=60, sleeve_risk_budget=None, gap=0.02, m_sleeve_tp=1.0, rung_scale_fixed=None, size_mult=1.0, rungs=RUNGS, m_tp=None, hourly=False, align=None, events=None, bars=None, exec_policy=None, fixed_levels=False, attrib=None, trade=None, win_start=2):
+def simulate(books, opens, prep, m_sl=3.0, m_sleeve_sl=2.0, sleeve=True, target=0.25, cap=2.0, d_limit=D_LIMIT, win_end=60, sleeve_risk_budget=None, gap=0.02, m_sleeve_tp=1.0, rung_scale_fixed=None, size_mult=1.0, rungs=RUNGS, m_tp=None, hourly=False, align=None, events=None, bars=None, exec_policy=None, fixed_levels=False, attrib=None, trade=None, win_start=2, state_out=None):
     # events: optional list; when given, every fill / stop / take-profit / sleeve rung is appended as a dict (no effect on results)
     # exec_policy: optional callable (i, a, dw, w_a, tgt_a, sig4_ia) -> ("limit", offset[, weight]) | ("market", 0[, weight]) | ("skip", 0)
     #   deciding how (and, with the optional weight, to which weight instead of the target)
@@ -84,6 +84,7 @@ def simulate(books, opens, prep, m_sl=3.0, m_sleeve_sl=2.0, sleeve=True, target=
     # attrib: optional list; per live bar appends (t, per-asset book PnL array, sleeve PnL), fractions of bar-start equity.
     # win_start: first minute of the holding bar at which a new book limit may fill (2 = audited default; 5 = user rule
     #   2026-09-28: the pipeline needs ~5 minutes after the close, no fill is allowed before).
+    # state_out: optional dict; filled at the end with the trade-mode state (orders, SL/TP, quantities, entries) and the last equity.
     # trade: optional dict -> discrete TRADE MODE for the book (see _trade_bar): one position per asset, opened by a resting
     #   limit order issued at a decision and valid `n_valid` bars, never re-sized; while in a position only the SL/TP may be
     #   changed (break-even, partial take-profit, tighten on an opposite signal); exits only by SL (market) or TP (limit).
@@ -126,10 +127,13 @@ def simulate(books, opens, prep, m_sl=3.0, m_sleeve_sl=2.0, sleeve=True, target=
 
     def _trade_bar(i, a, Oa, Ha, La, qa, ea, tg, prev_eq, sd_a, s4_a, g_i=1.0):
         """Trade mode for one asset and one holding bar -> (cash path, quantity path, end quantity, entry)."""
+        # per-decision parameters (e.g. a walk-forward schedule learned on earlier years) override the static ones
+        P = {**trade, **trade["params_at"](i)} if "params_at" in trade else trade
         carr, qarr = np.zeros(240), np.full(240, qa)
         cur_q, cur_e = qa, ea
-        th = trade.get("theta", 0.05)
+        th = P.get("theta", 0.05)
         sgn = int(np.sign(tg)) if abs(tg) >= th else 0
+        tg = tg * P.get("book_mult", 1.0)  # position size multiplier (the signal threshold uses the unscaled target)
         m0 = 0
         if cur_q == 0:
             ps = int(T["side"][a])
@@ -145,25 +149,25 @@ def simulate(books, opens, prep, m_sl=3.0, m_sleeve_sl=2.0, sleeve=True, target=
                 T["risk"][a] = 0.0
             start = 0  # an order resting from an earlier bar may fill from minute 0
             size, r_new = abs(tg), 0.0
-            if trade.get("risk") and np.isfinite(sd_a) and sd_a > 0:
+            if P.get("risk") and np.isfinite(sd_a) and sd_a > 0:
                 # risk sizing: the loss at the initial stop = risk * governor (fraction of equity), capped weight
-                r_new = trade["risk"] * g_i
-                size = min(r_new / (m_sl * sd_a), trade.get("max_w", 1.0))
-                if trade.get("risk_cap") and ps == 0 and sgn != 0 and T["risk"].sum() + r_new > trade["risk_cap"] + 1e-12:
+                r_new = P["risk"] * g_i
+                size = min(r_new / (m_sl * sd_a), P.get("max_w", 1.0))
+                if P.get("risk_cap") and ps == 0 and sgn != 0 and T["risk"].sum() + r_new > P["risk_cap"] + 1e-12:
                     stats["risk_skipped"] += 1
                     size = 0.0
-            k_off = trade.get("k_off", 0.25)
+            k_off = P.get("k_off", 0.25)
             if policy is not None and ps == 0 and sgn != 0:
                 act = policy(i, a, dict(pos=0, tg=tg, sgn=sgn, sd=sd_a, s4=s4_a, g=g_i, open=Oa[0], valid=("wait", "open", "open_deep")))
                 if act == "wait":
                     size = 0.0
                 elif act == "open_deep":
-                    k_off = trade.get("k_off_deep", 0.75)
+                    k_off = P.get("k_off_deep", 0.75)
             if ps == 0 and sgn != 0 and size > 0 and size * prev_eq * ACCOUNT >= mins[a] and np.isfinite(sd_a) and np.isfinite(s4_a):
-                off = max(trade.get("min_off", 0.001), k_off * s4_a)
+                off = max(P.get("min_off", 0.001), k_off * s4_a)
                 T["side"][a], T["px"][a], T["w"][a] = sgn, Oa[0] * (1 - sgn * off), size
                 T["risk"][a] = r_new
-                T["exp"][a], T["psd"][a], T["issued"][a] = i + trade.get("n_valid", 2), sd_a, i
+                T["exp"][a], T["psd"][a], T["issued"][a] = i + P.get("n_valid", 2), sd_a, i
                 stats["issued"] += 1
                 _ev(i, a, 0, "order_issue", "buy" if sgn > 0 else "sell", T["px"][a], sgn * size, offset=float(off))
                 ps, start = sgn, win_start  # a new order: no fill in the first minutes (pipeline run time)
@@ -198,7 +202,7 @@ def simulate(books, opens, prep, m_sl=3.0, m_sleeve_sl=2.0, sleeve=True, target=
                 cur_w = abs(cur_q) * Oa[0]
                 sde = T["sd"][a]
                 slot_free = T["ak"][a] == 0  # one resting in-position order at a time
-                can_add = slot_free and sgn == side and T["nadd"][a] < trade.get("max_adds", 1) and (abs(tg) - cur_w) * prev_eq * ACCOUNT >= mins[a]
+                can_add = slot_free and sgn == side and T["nadd"][a] < P.get("max_adds", 1) and (abs(tg) - cur_w) * prev_eq * ACCOUNT >= mins[a]
                 valid = ("hold", "tighten") + (("reduce", "close") if slot_free else ()) + (("add",) if can_add else ())
                 st = dict(pos=side, w=cur_w, tg=tg, sgn=sgn, sd=sd_a, s4=s4_a, g=g_i, open=Oa[0],
                           upnl=(Oa[0] / cur_e - 1) * side / sde if sde > 0 else 0.0, bars=i - T["open_i"][a], be=bool(T["be"][a]),
@@ -209,9 +213,9 @@ def simulate(books, opens, prep, m_sl=3.0, m_sleeve_sl=2.0, sleeve=True, target=
                 act = policy(i, a, st)
                 acts = {act} if isinstance(act, str) else set(act)  # several actions may be combined, e.g. {"tighten", "reduce"}
                 amt = act if isinstance(act, dict) else {}  # optional sizes: {"reduce": fraction} / {"add": weight}
-                off = max(trade.get("min_off", 0.001), trade.get("k_off", 0.25) * s4_a)
+                off = max(P.get("min_off", 0.001), P.get("k_off", 0.25) * s4_a)
                 if "tighten" in acts and np.isfinite(sd_a):
-                    new = Oa[0] * (1 - side * trade.get("tighten", 1.5) * sd_a)
+                    new = Oa[0] * (1 - side * P.get("tighten", 1.5) * sd_a)
                     if (new - T["sl"][a]) * side > 0 and (Oa[0] - new) * side > 0:
                         T["sl"][a] = new
                         stats["tightened"] += 1
@@ -221,15 +225,15 @@ def simulate(books, opens, prep, m_sl=3.0, m_sleeve_sl=2.0, sleeve=True, target=
                         T["ak"][a], T["apx"][a], T["aw"][a] = 1, Oa[0] * (1 - side * off), amt.get("add") or abs(tg) - cur_w
                     else:
                         T["ak"][a], T["apx"][a], T["aw"][a] = -1, Oa[0] * (1 + side * off), 1.0 if "close" in acts else (
-                            amt.get("reduce") or trade.get("reduce_frac", 0.5))
+                            amt.get("reduce") or P.get("reduce_frac", 0.5))
                     T["last_adj"][a] = i
-                    T["aexp"][a], T["aiss"][a] = i + trade.get("n_valid", 2), i
+                    T["aexp"][a], T["aiss"][a] = i + P.get("n_valid", 2), i
                     stats["scale_orders"] += 1
                     _ev(i, a, 0, "order_issue", "buy" if T["ak"][a] * side > 0 else "sell", T["apx"][a],
                         side * T["aw"][a] if T["ak"][a] > 0 else 0.0, scale=int(T["ak"][a]), offset=float(off), agent="+".join(sorted(acts)))
         else:
             side = 1 if cur_q > 0 else -1
-            k_t = trade.get("tighten")
+            k_t = P.get("tighten")
             if k_t and sgn == -side and np.isfinite(sd_a):
                 new = Oa[0] * (1 - side * k_t * sd_a)
                 if (new - T["sl"][a]) * side > 0 and (Oa[0] - new) * side > 0:
@@ -241,20 +245,20 @@ def simulate(books, opens, prep, m_sl=3.0, m_sleeve_sl=2.0, sleeve=True, target=
                 T["ak"][a] = 0
             cur_w = abs(cur_q) * Oa[0]  # current weight (fraction of equity at the bar start)
             if T["ak"][a] == 0 and np.isfinite(s4_a):
-                off = max(trade.get("min_off", 0.001), trade.get("k_off", 0.25) * s4_a)
+                off = max(P.get("min_off", 0.001), P.get("k_off", 0.25) * s4_a)
                 in_profit = (Oa[0] - cur_e) * side > 0
-                add_k, red_k = trade.get("add_k"), trade.get("reduce_k")
-                if (add_k and sgn == side and T["nadd"][a] < trade.get("max_adds", 1) and abs(tg) >= add_k * cur_w
-                        and (in_profit or not trade.get("add_in_profit", True))
+                add_k, red_k = P.get("add_k"), P.get("reduce_k")
+                if (add_k and sgn == side and T["nadd"][a] < P.get("max_adds", 1) and abs(tg) >= add_k * cur_w
+                        and (in_profit or not P.get("add_in_profit", True))
                         and (abs(tg) - cur_w) * prev_eq * ACCOUNT >= mins[a]):
                     T["ak"][a], T["apx"][a], T["aw"][a] = 1, Oa[0] * (1 - side * off), abs(tg) - cur_w
-                elif trade.get("exit_on_signal_loss") and sgn != side:
+                elif P.get("exit_on_signal_loss") and sgn != side:
                     # the signal is gone or reversed: close the whole position with a limit on the favourable side
                     T["ak"][a], T["apx"][a], T["aw"][a] = -1, Oa[0] * (1 + side * off), 1.0
-                elif red_k and T["nred"][a] < trade.get("max_reduces", 1) and (sgn != side or abs(tg) <= red_k * cur_w):
-                    T["ak"][a], T["apx"][a], T["aw"][a] = -1, Oa[0] * (1 + side * off), trade.get("reduce_frac", 0.5)
+                elif red_k and T["nred"][a] < P.get("max_reduces", 1) and (sgn != side or abs(tg) <= red_k * cur_w):
+                    T["ak"][a], T["apx"][a], T["aw"][a] = -1, Oa[0] * (1 + side * off), P.get("reduce_frac", 0.5)
                 if T["ak"][a] != 0:
-                    T["aexp"][a], T["aiss"][a] = i + trade.get("n_valid", 2), i
+                    T["aexp"][a], T["aiss"][a] = i + P.get("n_valid", 2), i
                     stats["scale_orders"] += 1
                     _ev(i, a, 0, "order_issue", "buy" if T["ak"][a] * side > 0 else "sell", T["apx"][a],
                         side * T["aw"][a] if T["ak"][a] > 0 else 0.0, scale=int(T["ak"][a]), offset=float(off))
@@ -266,9 +270,9 @@ def simulate(books, opens, prep, m_sl=3.0, m_sleeve_sl=2.0, sleeve=True, target=
             hs = Ls <= sl if side > 0 else Hs >= sl
             ht = Hs > tp if side > 0 else Ls < tp
             none = np.zeros(len(Ls), bool)
-            tp1 = ent * (1 + side * trade["partial_k"] * sdv) if trade.get("partial_k") and not T["part"][a] else None
+            tp1 = ent * (1 + side * P["partial_k"] * sdv) if P.get("partial_k") and not T["part"][a] else None
             hp = none if tp1 is None else (Hs > tp1 if side > 0 else Ls < tp1)
-            trig = ent * (1 + side * trade["be_k"] * sdv) if trade.get("be_k") and not T["be"][a] else None
+            trig = ent * (1 + side * P["be_k"] * sdv) if P.get("be_k") and not T["be"][a] else None
             hb = none if trig is None else (Hs >= trig if side > 0 else Ls <= trig)
             hx = none
             if T["ak"][a] != 0:
@@ -330,7 +334,7 @@ def simulate(books, opens, prep, m_sl=3.0, m_sleeve_sl=2.0, sleeve=True, target=
                 T["ak"][a] = 0
                 m = mm + 1
             elif hp[k]:
-                f = trade.get("partial_frac", 0.5)
+                f = P.get("partial_frac", 0.5)
                 dq = cur_q * f
                 carr[mm:] += dq * tp1 - abs(dq) * tp1 * MAKER
                 stats["fees"] += abs(dq) * tp1 * MAKER
@@ -339,7 +343,7 @@ def simulate(books, opens, prep, m_sl=3.0, m_sleeve_sl=2.0, sleeve=True, target=
                 qarr[mm:] = cur_q
                 T["part"][a] = True
                 _ev(i, a, mm, "book_partial", "sell" if side > 0 else "buy", tp1, -dq * tp1 / (prev_eq if prev_eq else 1.0))
-                be_px = ent * (1 + side * trade.get("be_off", 0.001))
+                be_px = ent * (1 + side * P.get("be_off", 0.001))
                 if (be_px - T["sl"][a]) * side > 0:
                     T["sl"][a] = be_px
                     T["risk"][a] = 0.0
@@ -347,7 +351,7 @@ def simulate(books, opens, prep, m_sl=3.0, m_sleeve_sl=2.0, sleeve=True, target=
                 T["be"][a] = True
                 m = mm + 1
             else:
-                be_px = ent * (1 + side * trade.get("be_off", 0.001))
+                be_px = ent * (1 + side * P.get("be_off", 0.001))
                 if (be_px - T["sl"][a]) * side > 0:
                     T["sl"][a] = be_px
                     stats["be_moves"] += 1
@@ -592,6 +596,9 @@ def simulate(books, opens, prep, m_sl=3.0, m_sleeve_sl=2.0, sleeve=True, target=
                              entry=[float(x) for x in entry], qty=[float(x) for x in q],
                              sl=[float(x) for x in T["sl"]], tp=[float(x) for x in T["tp"]],
                              pending=[float(T["px"][k]) if T["side"][k] else float("nan") for k in range(na)]))
+    if state_out is not None:
+        state_out.update({k: v.copy() for k, v in T.items()}, qty=q.copy(), entry=entry.copy(), equity=float(eq[-1]),
+                         governor=float(g[-1]), last_i=int(n - 1))
     return summarize(idx, net, eq, eq_min, g, stats, eq_max)
 
 

@@ -179,3 +179,12 @@ dl.kv dt { color: var(--muted); } dl.kv dd { margin: 0; text-align: right; font-
   .bottom { height: 240px; }
   .ostats { margin-left: 0; }
 }
+
+/* trade plan card */
+.plan { border-color: var(--accent); }
+.plan .act { font-size: 15px; font-weight: 700; padding: 6px 10px; border-radius: var(--radius); margin-bottom: 8px; }
+.plan .act.long { background: rgba(8, 153, 129, .16); color: var(--up); }
+.plan .act.short { background: rgba(242, 54, 69, .16); color: var(--down); }
+.plan .act.flat { background: var(--panel-2); color: var(--muted); }
+.plan .subact { margin-top: 8px; padding: 6px 8px; border-left: 3px solid var(--dip); background: var(--bg); font-size: 12.5px; }
+.plan .timeline { margin-top: 10px; font-size: 12px; line-height: 1.7; border-top: 1px solid var(--line); padding-top: 6px; }

@@ -176,10 +176,64 @@
   async function loadLive() {
     mountTv(state.live.symbol);
     try {
-      state.live.latest = await api("/api/signals/latest?source=live");
+      [state.live.latest, state.live.plan] = await Promise.all([api("/api/signals/latest?source=live"),
+        api("/api/trade_plan").catch(() => null)]);
       if (!state.live.conf) state.live.conf = await api("/api/confidence").catch(() => null);
-      renderWatchlist(); renderSignal(); renderDips(); loadRecent();
+      renderWatchlist(); renderPlan(); renderSignal(); renderDips(); loadRecent();
     } catch (e) { toast(e.message); }
+  }
+
+  // ---- executable trade plan (trade mode): what should be on the exchange now
+  const planOf = (sym) => state.live.plan?.coins?.[sym];
+  function planBadge(c) {
+    if (!c) return "";
+    if (c.state === "position") return `<span class="badge ${c.position.side === "LONG" ? "long" : "short"}">GIỮ ${c.position.side}</span>`;
+    if (c.state === "pending") return `<span class="badge ${c.order.side === "BUY" ? "long" : "short"}">CHỜ ${c.order.side === "BUY" ? "MUA" : "BÁN"}</span>`;
+    return `<span class="badge flat">—</span>`;
+  }
+  const EVVI = { order_issue: "Đặt lệnh limit", order_cancel: "Huỷ lệnh", order_expire: "Lệnh hết hạn", book_fill: "Khớp vào lệnh",
+                 book_add: "Khớp nhồi thêm", book_reduce: "Khớp chốt bớt", book_close: "Đóng bằng limit", book_stop: "Chạm SL (market)",
+                 book_tp: "Chạm TP (limit)", book_partial: "Chốt một phần", sl_move: "Dời SL" };
+  function renderPlan() {
+    const sym = state.live.symbol, plan = state.live.plan, c = planOf(sym), el = $("planPanel");
+    if (!plan || !c) { el.innerHTML = `<div class="panel-h"><span>Kế hoạch lệnh</span></div><p class="muted">Chưa có kế hoạch lệnh.</p>`; return; }
+    let body;
+    if (c.state === "pending") {
+      const o = c.order, buy = o.side === "BUY";
+      body = `<div class="act ${buy ? "long" : "short"}">ĐẶT LIMIT ${buy ? "MUA (LONG)" : "BÁN (SHORT)"} ${coin(sym)}</div>
+        <div class="sig-grid">
+          <span class="k">Giá limit</span><span class="v">${fmtPx(o.price)}</span><span class="d" id="plDist"></span>
+          <span class="k">Vốn dùng</span><span class="v">${pct(o.weight)}</span><span class="d muted">≈ ${Math.round(o.weight * 10000).toLocaleString("en-US")} / 10k</span>
+          <span class="k">SL nếu khớp (market)</span><span class="v down">${fmtPx(o.sl_if_filled)}</span><span class="d down">${((o.sl_if_filled / o.price - 1) * 100).toFixed(2)}%</span>
+          <span class="k">TP nếu khớp (limit)</span><span class="v up">${fmtPx(o.tp_if_filled)}</span><span class="d up">${((o.tp_if_filled / o.price - 1) * 100).toFixed(2)}%</span>
+        </div>
+        <div class="meta"><span>Đặt lúc <b>${dt(Date.parse(o.issued))}</b></span><span>Hiệu lực đến <b>${dt(Date.parse(o.valid_until))}</b> — không khớp thì huỷ</span></div>`;
+    } else if (c.state === "position") {
+      const p = c.position, L = p.side === "LONG";
+      body = `<div class="act ${L ? "long" : "short"}">ĐANG GIỮ ${p.side} ${coin(sym)}</div>
+        <div class="sig-grid">
+          <span class="k">Giá vào TB</span><span class="v">${fmtPx(p.avg_entry)}</span><span class="d">${sgn(p.upnl_pct)}</span>
+          <span class="k">Vốn đang dùng</span><span class="v">${pct(p.weight)}</span><span class="d"></span>
+          <span class="k">Stop-loss (market)</span><span class="v down">${fmtPx(p.sl)}</span><span class="d ${p.break_even ? "up" : "down"}">${p.break_even ? "đã về hoà vốn" : ((p.sl / p.avg_entry - 1) * 100).toFixed(2) + "%"}</span>
+          <span class="k">Take-profit (limit)</span><span class="v up">${fmtPx(p.tp)}</span><span class="d up">${((p.tp / p.avg_entry - 1) * 100).toFixed(2)}%</span>
+        </div>
+        ${c.order ? `<div class="subact">LỆNH CHỜ: ${{ add: "nhồi thêm", reduce: "chốt bớt " + pct(c.order.amount, 0), close: "đóng toàn bộ" }[c.order.kind] || c.order.kind}
+          — limit ${c.order.side === "BUY" ? "mua" : "bán"} tại <b>${fmtPx(c.order.price)}</b>, hiệu lực đến ${dt(Date.parse(c.order.valid_until))}</div>` : `<div class="muted small">Không có lệnh chờ — giữ nguyên SL/TP.</div>`}`;
+    } else {
+      body = `<div class="act flat">KHÔNG LÀM GÌ</div><p class="muted small">Chưa có tín hiệu đủ mạnh (cần ≥ ${pct(plan.policy?.theta_open ?? 0.05, 0)} vốn theo pipeline).</p>`;
+    }
+    const evs = (plan.events || []).filter((e) => e.symbol === sym).slice(-8).reverse();
+    el.innerHTML = `<div class="panel-h"><span>Kế hoạch lệnh · ${coin(sym)}</span><span class="muted small">paper từ ${String(plan.freeze).slice(0, 10)}: ${sgn(plan.net_return_pct)}</span></div>
+      ${body}
+      <div class="timeline">${evs.map((e) => `<div><span class="muted">${dt(Date.parse(e.t))}</span> ${EVVI[e.kind] || e.kind}
+        ${e.kind.startsWith("sl_") ? "" : (e.side === "buy" ? "mua" : "bán")} ${fmtPx(e.price)}${e.why ? ` <span class="muted">(${esc(e.why)})</span>` : ""}</div>`).join("") || '<div class="muted small">Chưa có sự kiện.</div>'}</div>
+      <p class="fine">Mọi lệnh vào/nhồi/chốt là limit, không khớp trong 5 phút đầu sau khi nến 4h đóng, hiệu lực 8h; SL market, TP limit.
+        Quyết định kế tiếp: ${dt(Date.parse(plan.next_decision))}.</p>`;
+    const o = c.order;
+    if (o && c.state === "pending") {
+      const px = state.live.prices[sym]?.c;
+      if (px && $("plDist")) $("plDist").innerHTML = `<span class="muted">cách giá ${((o.price / px - 1) * 100).toFixed(2)}%</span>`;
+    }
   }
 
   function bookOf(sym) { return (state.live.latest?.books || []).find((b) => b.symbol === sym); }
@@ -189,13 +243,13 @@
       const b = bookOf(s), p = state.live.prices[s];
       return `<tr data-sym="${s}" class="${s === state.live.symbol ? "sel" : ""}"><td class="sym">${coin(s)}<span class="muted small"> USDT.P</span></td>
         <td class="px" id="px-${s}">${p ? fmtPx(p.c) : "…"}</td><td id="ch-${s}">${p ? sgn((p.c / p.o - 1) * 100) : ""}</td>
-        <td>${b ? sideBadge(b.side, b.side === "FLAT" ? null : b.weight) : ""}</td></tr>`;
+        <td>${planOf(s) ? planBadge(planOf(s)) : b ? sideBadge(b.side, b.side === "FLAT" ? null : b.weight) : ""}</td></tr>`;
     });
-    $("watchlist").innerHTML = `<thead><tr><th style="text-align:left">Coin</th><th>Giá</th><th>24h</th><th>Gợi ý</th></tr></thead><tbody>${rows.join("")}</tbody>`;
+    $("watchlist").innerHTML = `<thead><tr><th style="text-align:left">Coin</th><th>Giá</th><th>24h</th><th>Lệnh</th></tr></thead><tbody>${rows.join("")}</tbody>`;
     $("watchlist").onclick = (e) => {
       const tr = e.target.closest("tr[data-sym]"); if (!tr) return;
       state.live.symbol = tr.dataset.sym; store.set("liveSym", tr.dataset.sym);
-      renderWatchlist(); renderSignal(); renderDips(); loadRecent(); mountTv(tr.dataset.sym);
+      renderWatchlist(); renderPlan(); renderSignal(); renderDips(); loadRecent(); mountTv(tr.dataset.sym);
     };
   }
 
@@ -218,7 +272,7 @@
     const slP = flat ? null : k * (b.sl / b.entry - 1), tpP = flat ? null : k * (b.tp / b.entry - 1);
     const until = run.decision_time + IV_MS["4h"];
     $("sigPanel").innerHTML = `
-      <div class="sig-head"><div><div class="title">${coin(sym)}/USDT</div><div class="muted small">Binance USD-M · pipeline ${esc(run.pipeline)}</div></div>
+      <div class="sig-head"><div><div class="title">Tín hiệu pipeline · ${coin(sym)}</div><div class="muted small">vị thế mục tiêu (bản chỉnh liên tục ${esc(run.pipeline)}), để tham khảo</div></div>
         <div>${sideBadge(b.side, flat ? null : b.weight)}</div></div>
       <div class="sig-grid">
         <span class="k">Giá hiện tại</span><span class="v" id="sgPx">${fmtPx(state.live.prices[sym]?.c)}</span><span class="d"></span>

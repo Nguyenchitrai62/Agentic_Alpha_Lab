@@ -140,6 +140,12 @@ def overview(request: Request, user: dict = Depends(auth.require_viewer)):
     return cached(request, "overview", 20, load)
 
 
+@app.get("/api/trade_plan")
+def trade_plan(request: Request, user: dict = Depends(auth.require_viewer)):
+    """What a trader / bot should have on the exchange now (resting orders, positions with SL/TP) + the event log."""
+    return cached(request, "trade_plan", 20, lambda: db.kv_get("trade_plan", {}))
+
+
 @app.get("/api/signals/latest")
 def signal_latest(request: Request, source: str = "live", user: dict = Depends(auth.require_viewer)):
     def load():
@@ -273,7 +279,7 @@ def equity(request: Request, source: str = "walkforward", start: str | None = No
 @app.post("/api/admin/run")
 def admin_run(payload: dict = Body(...), user: dict = Depends(auth.require_admin)):
     kind = payload.get("kind", "cycle")
-    fns = {"cycle": pipeline.job_cycle, "signal": pipeline.job_signal, "candles": pipeline.job_candles,
+    fns = {"cycle": pipeline.job_cycle, "signal": pipeline.job_signal, "candles": pipeline.job_candles, "trade_plan": pipeline.job_trade_plan,
            "forward": pipeline.job_forward, "walkforward": pipeline.job_walkforward}
     if kind not in fns:
         raise HTTPException(400, f"kind must be one of {list(fns)}")

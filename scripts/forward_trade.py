@@ -1,0 +1,141 @@
+"""Live trade plan + prospective paper trading of the executable TRADE MODE pipeline (research output only - no orders).
+
+The v205 books (research books until the first prospective advisor row, then the logged live rows) drive the engine_user trade
+mode with a trader policy (default: the v216 grid trader; `--policy configs/trade_policy.json` for a learned parameter set).
+The engine replays every holding bar from FREEZE up to the bar in progress (its missing minutes are held at the last price, so
+nothing after `now` can fill), which gives, per coin, the resting order, the open position with its current SL/TP and any resting
+add / reduce / exit order - i.e. exactly what a trader or a bot should have on the exchange right now - plus the event log and the
+paper equity since FREEZE.
+
+  python scripts/forward_trade.py                # -> artifacts/research/advisor_shadow/trade_plan.json
+"""
+
+from __future__ import annotations
+
+import argparse
+import importlib.util
+import json
+from datetime import datetime, timezone
+from pathlib import Path
+
+import numpy as np
+import pandas as pd
+
+ROOT = Path(__file__).resolve().parents[1]
+RD = ROOT / "research/parallel/rounds/parallel-20260906-r2"
+FREEZE = pd.Timestamp("2026-09-28T00:00:00Z")  # first traded holding bar of the trade-mode rules (v216, frozen 2026-09-28)
+OUT = ROOT / "artifacts/research/advisor_shadow/trade_plan.json"
+SYMS = ["BNBUSDT", "BTCUSDT", "ETHUSDT", "SOLUSDT", "XRPUSDT"]
+DEFAULT = dict(name="v216_grid_G2", theta_open=0.05, k_off=0.25, b_abs=0.03, b_rel=0.40, cool=6, be_k=2.0, book_mult=1.0)
+
+
+def _load(name, path):
+    spec = importlib.util.spec_from_file_location(name, path)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
+
+
+def grid_policy(p):
+    def pol(i, a, st):
+        if st["pos"] == 0:
+            return "open"
+        side, tg, w, valid = st["pos"], st["tg"], st["w"], st["valid"]
+        if st["sgn"] == -side:
+            return {"tighten": 1, "close": 1} if "close" in valid else "tighten"
+        if st["sgn"] == 0:
+            return "close" if "close" in valid else "hold"
+        if st["since_adj"] < p["cool"]:
+            return "hold"
+        band = max(p["b_abs"], p["b_rel"] * abs(tg))
+        diff = abs(tg) - w
+        if diff > band and "add" in valid:
+            return {"add": diff}
+        if -diff > band and "reduce" in valid and w > 0:
+            return {"reduce": min(1.0, -diff / w)}
+        return "hold"
+    return pol
+
+
+def main():
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--policy", default=None, help="JSON with the policy parameters (default: v216 grid G2)")
+    ap.add_argument("--from", dest="start", default=None, help="first traded holding bar (default FREEZE)")
+    args = ap.parse_args()
+    p = dict(DEFAULT, **(json.loads(Path(args.policy).read_text()) if args.policy else {}))
+    start = pd.Timestamp(args.start, tz="UTC") if args.start else FREEZE
+    now = pd.Timestamp(datetime.now(timezone.utc))
+    fw = _load("forward_v205_tm", ROOT / "scripts/forward_v205.py")
+    eu = _load("engine_user_tm", RD / "engine_user/engine_user.py")
+    v212 = _load("v212_tm", RD / "v212/v212_trade_scaling.py")
+    books = fw.research_books(eu)
+    lb = fw.live_books()
+    books = pd.concat([books[books.index < lb.index.min()] if len(lb) else books, lb]).sort_index()
+    opens, k1 = fw.market(start, now)
+    cur_bar = now.floor("4h")                   # holding bar in progress
+    last_t = cur_bar - pd.Timedelta(hours=4)    # its decision row
+    grid = pd.date_range(start - pd.Timedelta(days=90), last_t, freq="4h")
+    books = books.reindex(grid).ffill().fillna(0.0)
+    prep = fw.build_prep(opens, k1, grid)
+    last_px = np.array([k1[s]["close"].iloc[-1] for s in SYMS])
+    # the bar in progress: its open is the first 1m open (4h klines only list closed bars); it ends "now" at the last price,
+    # and its missing minutes hold that price, so no order can fill after now
+    prep["o1"][-1] = prep["O"][-1, 0]
+    if len(grid) > 1:
+        prep["o2"][-2] = prep["O"][-1, 0]
+    prep["o2"][-1] = last_px
+    eu.v110.START, eu.v110.END = start - pd.Timedelta(hours=4), pd.Timestamp("2100-01-01", tz="UTC")
+    trade = dict(v212.T2, max_adds=99, theta=p["theta_open"], k_off=p["k_off"], be_k=p["be_k"], book_mult=p["book_mult"],
+                 policy=grid_policy(p))
+    events, state, bars = [], {}, []
+    cap = {}
+
+    def grab(idx, net, eq, eq_min, g, stats, eq_max=None):
+        cap.update(eq=eq, stats=stats)
+        return {}
+    eu.summarize = grab
+    eu.simulate(books, opens.reindex(grid), prep, trade=trade, win_start=5, events=events, bars=bars, state_out=state, **fw.KW)
+    events = [e for e in events if e["t"] <= now]
+    live = np.asarray(grid >= start - pd.Timedelta(hours=4))
+    eq = cap["eq"][live]
+    coins = {}
+    for j, s in enumerate(SYMS):
+        c = {"symbol": s, "price": float(last_px[j]), "target_weight": float(books[s].iloc[-1])}
+        q = float(state["qty"][j])
+        if q != 0:
+            side = 1 if q > 0 else -1
+            c["state"] = "position"
+            c["position"] = {"side": "LONG" if side > 0 else "SHORT", "weight": abs(q) * float(last_px[j]),
+                             "avg_entry": float(state["entry"][j]), "sl": float(state["sl"][j]), "tp": float(state["tp"][j]),
+                             "break_even": bool(state["be"][j]), "opened": str(grid[int(state["open_i"][j])] + pd.Timedelta(hours=4))
+                             if state["open_i"][j] >= 0 else None,
+                             "upnl_pct": 100 * side * (float(last_px[j]) / float(state["entry"][j]) - 1)}
+            if state["ak"][j] != 0:
+                kind = "add" if state["ak"][j] > 0 else ("close" if state["aw"][j] >= 1.0 else "reduce")
+                c["order"] = {"kind": kind, "side": "BUY" if state["ak"][j] * side > 0 else "SELL", "price": float(state["apx"][j]),
+                              "amount": float(state["aw"][j]), "valid_until": str(grid[min(int(state["aexp"][j]) - 1, len(grid) - 1)] + pd.Timedelta(hours=8))}
+        elif state["side"][j] != 0:
+            c["state"] = "pending"
+            c["order"] = {"kind": "open", "side": "BUY" if state["side"][j] > 0 else "SELL", "price": float(state["px"][j]),
+                          "weight": float(state["w"][j]), "issued": str(grid[int(state["issued"][j])] + pd.Timedelta(hours=4)),
+                          "valid_until": str(grid[min(int(state["exp"][j]) - 1, len(grid) - 1)] + pd.Timedelta(hours=8)),
+                          "sl_if_filled": float(state["px"][j] * (1 - np.sign(state["side"][j]) * 4 * state["psd"][j])),
+                          "tp_if_filled": float(state["px"][j] * (1 + np.sign(state["side"][j]) * 8 * state["psd"][j]))}
+        else:
+            c["state"] = "flat"
+        coins[s] = c
+    ret = float(eq[-1] - 1) if len(eq) else 0.0
+    out = {"pipeline": "v205 books + trade mode", "policy": p, "freeze": str(start), "generated_at": now.isoformat(),
+           "decision_bar": str(cur_bar), "next_decision": str(cur_bar + pd.Timedelta(hours=4, minutes=5)),
+           "net_return_pct": round(100 * ret, 3), "coins": coins,
+           "events": [dict(t=str(e["t"]), symbol=e["symbol"], kind=e["kind"], side=e["side"], price=round(e["price"], 6),
+                           weight=round(e.get("weight", 0.0), 5), why=e.get("why"), agent=e.get("agent")) for e in events if e["t"] >= start],
+           "equity_curve": [(str(t + pd.Timedelta(hours=8)), round(float(v), 6)) for t, v in zip(grid[live], eq)],
+           "rules": "limit entries/adjustments/exits valid 8h, no fill in the first 5 minutes after the 4h close, SL market / TP limit "
+                    "on every position, break-even at +2 sigma_d, Bybit fees, adverse funding. Research output only."}
+    OUT.write_text(json.dumps(out, indent=1, default=str))
+    print(f"trade plan {now:%Y-%m-%d %H:%M} UTC:", {s: c["state"] for s, c in coins.items()}, f"paper net {out['net_return_pct']}%")
+
+
+if __name__ == "__main__":
+    main()

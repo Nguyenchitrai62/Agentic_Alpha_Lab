@@ -150,6 +150,22 @@ def job_forward() -> str:
     return f"forward: {fw.get('bars', 0)} bars, net {fw.get('net_return_pct')}%"
 
 
+# ---------------------------------------------------------------- executable trade plan (trade mode)
+def job_trade_plan() -> str:
+    """Current orders / positions / SL-TP of the executable trade-mode pipeline and its paper log since its freeze."""
+    cmd = [SETTINGS.python_exe, str(ROOT / "scripts/forward_trade.py")]
+    cfg = ROOT / "configs/trade_policy.json"
+    if cfg.exists():
+        cmd += ["--policy", str(cfg)]
+    p = subprocess.run(cmd, cwd=str(ROOT), capture_output=True, text=True, encoding="utf-8", errors="replace",
+                       env={**__import__("os").environ, "PYTHONUTF8": "1"}, timeout=1800)
+    if p.returncode != 0:
+        raise RuntimeError(f"trade plan failed ({p.returncode}): {p.stderr[-1500:]}")
+    plan = json.loads((ROOT / "artifacts/research/advisor_shadow/trade_plan.json").read_text(encoding="utf-8"))
+    db.kv_set("trade_plan", plan)
+    return "trade plan: " + ", ".join(f"{c['symbol'][:-4]} {c['state']}" for c in plan["coins"].values()) + f"; paper {plan['net_return_pct']}%"
+
+
 # ---------------------------------------------------------------- walk-forward history (one-off, heavy)
 def _load(name, path):
     spec = importlib.util.spec_from_file_location(name, path)
@@ -359,9 +375,9 @@ def job_walkforward() -> str:
 
 
 def job_cycle() -> str:
-    """Scheduled cycle after each 4h close: candles -> live signal -> forward paper trading."""
+    """Scheduled cycle after each 4h close: candles -> live signal -> trade plan -> forward paper trading."""
     out = []
-    for name, fn in (("candles", job_candles), ("signal", job_signal), ("forward", job_forward)):
+    for name, fn in (("candles", job_candles), ("signal", job_signal), ("trade_plan", job_trade_plan), ("forward", job_forward)):
         try:
             out.append(fn())
         except Exception as exc:
