@@ -249,3 +249,12 @@ ol.steps li::marker { color: var(--accent); font-weight: 700; }
 .warn { color: var(--dip); font-weight: 600; }
 .eq-in { display: inline-flex; align-items: center; gap: 6px; color: var(--muted); font-weight: 500; }
 .eq-in input { width: 90px; background: var(--panel-2); border: 1px solid var(--line-2); border-radius: 4px; padding: 3px 6px; color: var(--text-hi); }
+
+/* ---------- to-do tab ---------- */
+.todo { display: flex; flex-direction: column; gap: 10px; }
+.todo .panel { margin-bottom: 0; }
+.cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 10px; }
+.card .card-coin { font-size: 16px; font-weight: 700; color: var(--text-hi); }
+.card .px { font-family: var(--mono); color: var(--text-hi); }
+.card { scroll-margin-top: 60px; }
+.wl td .act-badge { font-size: 11px; padding: 2px 7px; }

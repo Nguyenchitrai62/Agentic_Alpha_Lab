@@ -222,7 +222,13 @@ def job_trade_plan() -> str:
             msgs.append(f"{key} FAILED: {p.stderr[-300:]}")
             continue
         plan = json.loads((ROOT / "artifacts/research/advisor_shadow" / fname).read_text(encoding="utf-8"))
+        bars = plan.pop("bars", [])  # per-bar paper state goes to the history tables, not to the cached plan
         db.kv_set(key, plan)
+        try:
+            from . import history_tm
+            history_tm.store_paper({"v151_deploy_v4": "v205"}.get(cand, cand.split("_")[0]), dict(plan, bars=bars), db)
+        except Exception as exc:  # the plan itself is stored; the history copy is best effort
+            log.warning("paper history for %s failed: %s", cand, exc)
         msgs.append(f"{key}: " + ", ".join(f"{c['symbol'][:-4]} {c['state']}" for c in plan["coins"].values())
                     + f"; paper {plan['net_return_pct']}%")
     return " | ".join(msgs)

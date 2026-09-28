@@ -145,7 +145,12 @@ def main():
            "decision_bar": str(cur_bar), "next_decision": str(cur_bar + pd.Timedelta(hours=4, minutes=5)),
            "net_return_pct": round(100 * ret, 3), "coins": coins,
            "events": [dict(t=str(e["t"]), symbol=e["symbol"], kind=e["kind"], side=e["side"], price=round(e["price"], 6),
-                           weight=round(e.get("weight", 0.0), 5), why=e.get("why"), agent=e.get("agent")) for e in events if e["t"] >= start],
+                           weight=round(e.get("weight", 0.0), 5), why=e.get("why"), agent=e.get("agent"),
+                           **{k: e[k] for k in ("sl", "tp", "issued_bars_ago", "ret", "rung") if k in e}) for e in events if e["t"] >= start],
+           # per-bar state of the paper window (history page: held position, average entry, live SL / TP, resting order)
+           "bars": [dict(t=str(b["t"]), **{k: [None if not np.isfinite(x) else round(float(x), 8) for x in b[k]]
+                                          for k in ("target", "open", "qty", "entry", "sl", "tp", "pending")})
+                    for b in bars if b["t"] >= start],
            "equity_curve": [(str(t + pd.Timedelta(hours=8)), round(float(v), 6)) for t, v in zip(grid[live], eq)],
            "rules": "limit entries/adjustments/exits valid 8h, no fill in the first 5 minutes after the 4h close, SL market / TP limit "
                     "on every position, break-even at +2 sigma_d, Bybit fees, adverse funding. Research output only."}
