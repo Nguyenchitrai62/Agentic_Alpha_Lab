@@ -311,6 +311,7 @@
       const o = c.order, buy = o.side === "BUY";
       return `<div class="plan-box ${buy ? "long" : "short"}"><div class="pb-head"><span class="act-badge ${buy ? "wait-long" : "wait-short"}">${buy ? "LONG" : "SHORT"}</span>
           <span class="muted small">lệnh limit chờ khớp · ${qty(sym, o.weight, o.price)} ${coin(sym)} (≈ ${usdt(o.weight)} USDT)</span></div>
+        ${lotWarn(sym, o.weight, o.price)}
         ${row("Entry", fmtPx(o.price), px ? `cách giá ${((o.price / px - 1) * 100).toFixed(2)}%` : "")}
         ${row("Take-profit", fmtPx(o.tp_if_filled), rel(o.tp_if_filled, o.price), "tp")}
         ${row("Stop-loss", fmtPx(o.sl_if_filled), rel(o.sl_if_filled, o.price), "sl")}
@@ -319,6 +320,7 @@
     const p = c.position, L = p.side === "LONG", u = px ? (L ? 1 : -1) * (px / p.avg_entry - 1) * 100 : p.upnl_pct;
     return `<div class="plan-box ${L ? "long" : "short"}"><div class="pb-head"><span class="act-badge ${L ? "long" : "short"}">${p.side}</span>
         <span class="muted small">đang giữ ${qty(sym, p.weight, p.avg_entry)} ${coin(sym)} (≈ ${usdt(p.weight)} USDT) · P/L ${sgn(u)}</span></div>
+      ${lotWarn(sym, p.weight, p.avg_entry)}
       ${row("Entry", fmtPx(p.avg_entry))}
       ${row("Take-profit", fmtPx(p.tp), rel(p.tp, p.avg_entry), "tp")}
       ${row("Stop-loss", fmtPx(p.sl), rel(p.sl, p.avg_entry) + (p.break_even ? " · hoà vốn" : ""), "sl")}
@@ -349,8 +351,17 @@
 
   // account size (per viewer): turns the pipeline's fraction-of-equity weights into coin quantities
   function equity() { try { return Math.max(10, Number(localStorage.getItem("equityUsdt")) || 1000); } catch { return 1000; } }
-  const QTY_DEC = { BTCUSDT: 4, ETHUSDT: 3, SOLUSDT: 2, BNBUSDT: 3, XRPUSDT: 1 };
-  const qty = (s, w, px) => (w * equity() / px).toFixed(QTY_DEC[s] ?? 3);
+  // Bybit USDT-perp lot rules (public instruments-info, 2026-09-29): minimum order qty = qty step; minimum notional 5 USDT
+  const LOT = { BTCUSDT: [0.001, 3], ETHUSDT: [0.01, 2], SOLUSDT: [0.1, 1], BNBUSDT: [0.01, 2], XRPUSDT: [0.1, 1] };
+  function lot(s, w, px) {  // quantity rounded down to the exchange step; ok = the exchange accepts it
+    const [step, dec] = LOT[s] || [0.001, 3], want = w * equity() / px, q = Math.floor(want / step + 1e-9) * step;
+    return { q, txt: q.toFixed(dec), ok: q >= step && q * px >= 5, min: step, minUsd: Math.max(5, step * px), dec };
+  }
+  const qty = (s, w, px) => lot(s, w, px).txt;
+  function lotWarn(s, w, px) {
+    const l = lot(s, w, px);
+    return l.ok ? "" : `<div class="lot-warn">⚠ Vốn ${equity().toLocaleString("en-US")} USDT quá nhỏ cho lệnh này: sàn yêu cầu tối thiểu ${l.min} ${coin(s)} (≈ ${Math.ceil(l.minUsd)} USDT) — bỏ qua coin này hoặc tăng vốn.</div>`;
+  }
   const usdt = (w) => Math.round(w * equity()).toLocaleString("en-US");
   function lastEvent(sym, kinds) { return (state.live.plan?.events || []).filter((e) => e.symbol === sym && kinds.includes(e.kind)).slice(-1)[0]; }
   const recent = (e) => e && Date.now() - Date.parse(e.t) < 4 * 3600 * 1000;
@@ -364,7 +375,7 @@
     if (c.state === "pending") {
       const o = c.order, buy = o.side === "BUY";
       const dist = px ? `<span class="note">cách giá ${((o.price / px - 1) * 100).toFixed(2)}%</span>` : "";
-      return { act: `<span class="act-badge ${buy ? "wait-long" : "wait-short"}">ĐẶT LIMIT ${buy ? "MUA" : "BÁN"} ${qty(s, o.weight, o.price)} ${coin(s)}</span>
+      return { act: `<span class="act-badge ${buy ? "wait-long" : "wait-short"}">ĐẶT LIMIT ${buy ? "MUA" : "BÁN"} ${qty(s, o.weight, o.price)} ${coin(s)}</span>${lot(s, o.weight, o.price).ok ? "" : '<span class="note warn">dưới mức tối thiểu của sàn</span>'}
                  <span class="note">kèm SL + TP, huỷ lúc ${dt(Date.parse(o.valid_until))} nếu chưa khớp</span>`,
                px: `${fmtPx(o.price)}${dist}`, sl: fmtPx(o.sl_if_filled), tp: fmtPx(o.tp_if_filled), pl: `<span class="muted">chưa khớp</span>`,
                w: `${usdt(o.weight)} USDT` };
@@ -375,7 +386,7 @@
     let todo = "không cần làm gì";
     if (c.order) todo = `đặt LIMIT ${c.order.side === "BUY" ? "MUA" : "BÁN"} @ ${fmtPx(c.order.price)} (${{ add: "nhồi thêm", reduce: "chốt bớt", close: "đóng hết" }[c.order.kind] || c.order.kind})`;
     else if (recent(slm)) todo = `sửa SL thành ${fmtPx(p.sl)}`;
-    return { act: `<span class="act-badge ${L ? "long" : "short"}">GIỮ ${p.side} ${qty(s, p.weight, p.avg_entry)} ${coin(s)}</span><span class="note">${todo}</span>`,
+    return { act: `<span class="act-badge ${L ? "long" : "short"}">GIỮ ${p.side} ${qty(s, p.weight, p.avg_entry)} ${coin(s)}</span><span class="note">${todo}</span>${lot(s, p.weight, p.avg_entry).ok ? "" : '<span class="note warn">dưới mức tối thiểu của sàn</span>'}`,
              px: fmtPx(p.avg_entry), sl: `${fmtPx(p.sl)}${p.break_even ? '<span class="note up">đã về hoà vốn</span>' : ""}`, tp: fmtPx(p.tp),
              pl: sgn(u), w: `${usdt(p.weight)} USDT` };
   }
