@@ -243,3 +243,9 @@ details.adv[open] summary { margin-bottom: 8px; }
   .board td { padding: 8px 5px; font-size: 12.5px; }
   .pipebtn { flex: 1 1 45%; }
 }
+
+ol.steps { margin: 8px 0 10px; padding-left: 20px; display: flex; flex-direction: column; gap: 7px; line-height: 1.5; }
+ol.steps li::marker { color: var(--accent); font-weight: 700; }
+.warn { color: var(--dip); font-weight: 600; }
+.eq-in { display: inline-flex; align-items: center; gap: 6px; color: var(--muted); font-weight: 500; }
+.eq-in input { width: 90px; background: var(--panel-2); border: 1px solid var(--line-2); border-radius: 4px; padding: 3px 6px; color: var(--text-hi); }
