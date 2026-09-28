@@ -7,6 +7,7 @@ after their bar closed are marked backfill and are not forward evidence.
 from __future__ import annotations
 
 import json
+import os
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
@@ -54,6 +55,19 @@ def main() -> int:
     if LOG.exists():
         logged = {f'{r.get("candidate")}|{r["decision_bar_close"]}' for r in map(json.loads, filter(str.strip, LOG.read_text().splitlines()))}
     LOG.parent.mkdir(parents=True, exist_ok=True)
+    if os.environ.get("ADVISOR_SHADOW_FAST") == "1":  # only the advisors the trade plans read (backend cycle, before its plans)
+        import importlib.util as _u
+        rows = []
+        for mod, cand in (("v151_advisor", "v151_deploy_v4"), ("v233_advisor", "v233_T3"), ("v236_advisor", "v236_W2"),
+                          ("v240_advisor", "v240_O1")):
+            try:
+                _spec = _u.spec_from_file_location(mod, Path(__file__).parent / f"{mod}.py")
+                _m = _u.module_from_spec(_spec); _spec.loader.exec_module(_m)
+                rows.append(_retry(_m.advise))
+            except Exception as exc:  # logged, never silently skipped
+                rows.append(dict(candidate=cand, decision_bar_close=str(bars4h["close_time"].iloc[-1]), error=repr(exc)[:300]))
+        _append(rows, logged, now)
+        return 0
     funding = pd.DataFrame(s.get("https://fapi.binance.com/fapi/v1/fundingRate", params={"symbol": "BTCUSDT", "limit": 1000}, timeout=60).json())
     funding["fundingRate"] = funding["fundingRate"].astype(float)
     funding["fundingTime"] = pd.to_datetime(funding["fundingTime"], unit="ms", utc=True)
@@ -133,7 +147,12 @@ def main() -> int:
         extra.append(portfolio_row(s, now))
     except Exception as exc:  # logged, never silently skipped
         extra.append(dict(candidate="portfolio_v1_3book", decision_bar_close=str(bars4h["close_time"].iloc[-1]), error=repr(exc)[:300]))
-    for rec in (advice(bars4h, daily), combo_advice(bars4h, daily), *tournament_rows(bars4h, daily, funding), *extra):
+    _append((advice(bars4h, daily), combo_advice(bars4h, daily), *tournament_rows(bars4h, daily, funding), *extra), logged, now)
+    return 0
+
+
+def _append(recs, logged, now) -> None:
+    for rec in recs:
         key = f'{rec["candidate"]}|{rec["decision_bar_close"]}'
         if key in logged:
             print("already logged", key)
@@ -143,8 +162,8 @@ def main() -> int:
         rec["mode"] = "prospective" if lag <= PROSPECTIVE_MAX_LAG else "backfill"
         with LOG.open("a") as f:
             f.write(json.dumps(rec) + "\n")
+        logged.add(key)
         print(json.dumps(rec, indent=1))
-    return 0
 
 
 

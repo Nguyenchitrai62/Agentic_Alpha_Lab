@@ -163,6 +163,16 @@ def job_signal() -> str:
 
 
 # ---------------------------------------------------------------- prospective log (all frozen advisors)
+def job_shadow_fast() -> str:
+    """Only the four advisors the trade plans read (runs before the plans; the full prospective log follows after them)."""
+    p = subprocess.run([SETTINGS.python_exe, str(ROOT / "scripts/advisor_shadow.py")], cwd=str(ROOT), capture_output=True,
+                       text=True, encoding="utf-8", errors="replace",
+                       env={**__import__("os").environ, "PYTHONUTF8": "1", "ADVISOR_SHADOW_FAST": "1"}, timeout=1800)
+    if p.returncode != 0:
+        raise RuntimeError(f"shadow (fast) failed ({p.returncode}): {p.stderr[-1500:]}")
+    return f"shadow fast: {p.stdout.count(chr(34) + 'logged_at' + chr(34))} new rows"
+
+
 def job_shadow() -> str:
     """Append this bar's rows of every frozen advisor (v151 / v233 T3 / ...) to the prospective log shadow.jsonl.
 
@@ -451,7 +461,7 @@ def job_walkforward_tm() -> str:
 def job_cycle() -> str:
     """Scheduled cycle after each 4h close: candles -> prospective log -> trade plan -> live signal -> forward paper trading."""
     out, t0 = [], datetime.now(timezone.utc)
-    for name, fn in (("candles", job_candles), ("aggflow", lambda: job_aggflow(archive=False)), ("shadow", job_shadow), ("trade_plan", job_trade_plan), ("signal", job_signal),
+    for name, fn in (("candles", job_candles), ("aggflow", lambda: job_aggflow(archive=False)), ("shadow", job_shadow_fast), ("trade_plan", job_trade_plan), ("shadow_all", job_shadow), ("signal", job_signal),
                      ("forward", job_forward), ("dip_log", job_dip_log)):
         try:
             out.append(fn())
