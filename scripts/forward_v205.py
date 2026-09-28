@@ -69,6 +69,16 @@ def research_books_w2(eu):
     return 0.5 * (f(m["A"]) + f(m["B"])) / 2 + 0.5 * (f(m["Aq"]) + f(m["Bq"])) / 2
 
 
+def research_books_o1(eu):
+    """v240 O1 research books (T3 + order-level whale flow in the A members), same units as research_books."""
+    cols, C = SYMS, eu.er.CACHE
+    m = {k: pd.read_parquet(C / f)[cols] for k, f in (("A", "member_A_O1_orders.parquet"), ("Aq", "member_Aq_O1_orders.parquet"),
+                                                       ("B", "member_B_tv.parquet"), ("Bq", "member_Bq_tv.parquet"))}
+    idx = m["A"].index.union(m["Aq"].index)
+    f = lambda X: X.reindex(idx).fillna(0.0)
+    return 0.5 * (f(m["A"]) + f(m["B"])) / 2 + 0.5 * (f(m["Aq"]) + f(m["Bq"])) / 2
+
+
 def live_books(candidate="v151_deploy_v4"):
     rows = [json.loads(l) for l in open(ROOT / "artifacts/research/advisor_shadow/shadow.jsonl", encoding="utf-8") if l.strip()]
     rows = [r for r in rows if r.get("candidate") == candidate and r.get("mode") == "prospective"]

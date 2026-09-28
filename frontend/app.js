@@ -180,7 +180,7 @@
         api(`/api/trade_plan?pipeline=${planPipe()}`).catch(() => null)]);
       if (!state.live.conf) state.live.conf = await api("/api/confidence").catch(() => null);
       // paper results of the three pipelines side by side (prospective evidence)
-      state.live.paper = await Promise.all(["v205", "v233", "v236"].map((v) =>
+      state.live.paper = await Promise.all(["v205", "v233", "v236", "v240"].map((v) =>
         api(`/api/trade_plan?pipeline=${v}`).then((pl) => [v, pl]).catch(() => [v, null])));
       renderWatchlist(); renderPlan(); renderSignal(); renderDips(); loadRecent();
     } catch (e) { toast(e.message); }
@@ -195,14 +195,14 @@
     state.live.plan = await api(`/api/trade_plan?pipeline=${v}`).catch(() => null);
     renderWatchlist(); renderPlan();
   }
-  const PIPE_LABEL = { v205: "D2", v233: "T3", v236: "W2" };
+  const PIPE_LABEL = { v205: "D2", v233: "T3", v236: "W2", v240: "O1" };
   const paperLine = () => {
     const rows = (state.live.paper || []).filter(([, pl]) => pl && pl.freeze);
     if (!rows.length) return "";
     return `<div class="muted small paper-cmp">Paper (tiến cứu) từ ${String(rows[0][1].freeze).slice(0, 10)}: ${rows.map(([v, pl]) =>
       `<b>${PIPE_LABEL[v]}</b> ${sgn(pl.net_return_pct)}`).join(" · ")}</div>`;
   };
-  const pipeSwitch = () => `<span class="pipe-switch">${[["v205", "D2 (đang dùng)"], ["v233", "T3 (thử nghiệm)"], ["v236", "W2 (tốt nhất)"]].map(([v, l]) =>
+  const pipeSwitch = () => `<span class="pipe-switch">${[["v205", "D2 (đang dùng)"], ["v233", "T3 (thử nghiệm)"], ["v236", "W2 (lãi TB cao nhất)"], ["v240", "O1 (vững nhất)"]].map(([v, l]) =>
     `<button class="chip${planPipe() === v ? " on" : ""}" data-pipe="${v}">${l}</button>`).join("")}</span>`;
   function planBadge(c) {
     if (!c) return "";

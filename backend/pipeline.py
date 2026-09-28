@@ -102,12 +102,16 @@ def job_aggflow(archive: bool = True) -> str:
     if archive and today.hour >= 3 and db.kv_get("aggflow_archive_day", "") != str(today.date()):
         p = subprocess.run([SETTINGS.python_exe, str(ROOT / "scripts/fetch_aggtrades_flow.py")], cwd=str(ROOT), capture_output=True,
                            text=True, encoding="utf-8", errors="replace", env=env, timeout=3600)
+        if p.returncode == 0:  # the order-level archive (v240 O1) from the same daily files
+            p = subprocess.run([SETTINGS.python_exe, str(ROOT / "scripts/fetch_aggtrades_flow.py"), "--orders"], cwd=str(ROOT),
+                               capture_output=True, text=True, encoding="utf-8", errors="replace", env=env, timeout=3600)
         if p.returncode == 0:
             db.kv_set("aggflow_archive_day", str(today.date()))
         msgs.append(f"archive {'ok' if p.returncode == 0 else 'FAILED: ' + p.stderr[-200:]}")
-    p = subprocess.run([SETTINGS.python_exe, str(ROOT / "scripts/aggflow_live.py")], cwd=str(ROOT), capture_output=True,
-                       text=True, encoding="utf-8", errors="replace", env=env, timeout=1800)
-    msgs.append("live " + ("ok" if p.returncode == 0 else "FAILED: " + p.stderr[-200:]))
+    for extra in ([], ["--orders"]):
+        p = subprocess.run([SETTINGS.python_exe, str(ROOT / "scripts/aggflow_live.py"), *extra], cwd=str(ROOT), capture_output=True,
+                           text=True, encoding="utf-8", errors="replace", env=env, timeout=1800)
+        msgs.append(("live orders " if extra else "live ") + ("ok" if p.returncode == 0 else "FAILED: " + p.stderr[-200:]))
     return "aggflow: " + ", ".join(msgs)
 
 
@@ -205,7 +209,7 @@ def job_trade_plan() -> str:
     Two plans: the deployed v205 books (kv 'trade_plan') and the v233 T3 foundation (kv 'trade_plan_v233', paper comparison)."""
     msgs = []
     for cand, key, fname in (("v151_deploy_v4", "trade_plan", "trade_plan.json"), ("v233_T3", "trade_plan_v233", "trade_plan_v233.json"),
-                             ("v236_W2", "trade_plan_v236", "trade_plan_v236.json")):
+                             ("v236_W2", "trade_plan_v236", "trade_plan_v236.json"), ("v240_O1", "trade_plan_v240", "trade_plan_v240.json")):
         cmd = [SETTINGS.python_exe, str(ROOT / "scripts/forward_trade.py"), "--candidate", cand]
         cfg = ROOT / "configs/trade_policy.json"
         if cfg.exists():

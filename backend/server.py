@@ -145,7 +145,7 @@ def trade_plan(request: Request, pipeline: str = "v205", user: dict = Depends(au
     """What a trader / bot should have on the exchange now (resting orders, positions with SL/TP) + the event log.
 
     pipeline=v205 (deployed, default), v233 (T3: TradingView indicator features) or v236 (W2: T3 + whale flow); paper comparison."""
-    key = {"v233": "trade_plan_v233", "v236": "trade_plan_v236"}.get(pipeline, "trade_plan")
+    key = {"v233": "trade_plan_v233", "v236": "trade_plan_v236", "v240": "trade_plan_v240"}.get(pipeline, "trade_plan")
     return cached(request, key, 20, lambda: db.kv_get(key, {}))
 
 
