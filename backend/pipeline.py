@@ -94,14 +94,35 @@ def job_candles() -> str:
     return f"candles upserted: {total}"
 
 
+def job_aggflow() -> str:
+    """Large-order flow feed (v236 whale-flow features): the live REST collector every run, the public daily archive once a day."""
+    env = {**__import__("os").environ, "PYTHONUTF8": "1"}
+    msgs = []
+    today = pd.Timestamp.now(tz="UTC")
+    if today.hour >= 3 and db.kv_get("aggflow_archive_day", "") != str(today.date()):
+        p = subprocess.run([SETTINGS.python_exe, str(ROOT / "scripts/fetch_aggtrades_flow.py")], cwd=str(ROOT), capture_output=True,
+                           text=True, encoding="utf-8", errors="replace", env=env, timeout=3600)
+        if p.returncode == 0:
+            db.kv_set("aggflow_archive_day", str(today.date()))
+        msgs.append(f"archive {'ok' if p.returncode == 0 else 'FAILED: ' + p.stderr[-200:]}")
+    p = subprocess.run([SETTINGS.python_exe, str(ROOT / "scripts/aggflow_live.py")], cwd=str(ROOT), capture_output=True,
+                       text=True, encoding="utf-8", errors="replace", env=env, timeout=1800)
+    msgs.append("live " + ("ok" if p.returncode == 0 else "FAILED: " + p.stderr[-200:]))
+    return "aggflow: " + ", ".join(msgs)
+
+
 def refresh_candles_quietly() -> None:
-    """Incremental candle refresh between cycles, without a jobs row; skipped while another job runs."""
+    """Incremental candle (and large-order flow) refresh between cycles, without a jobs row; skipped while another job runs."""
     if not _job_lock.acquire(blocking=False):
         return
     try:
         log.info("candles refreshed: %s", job_candles())
     except Exception as exc:  # network hiccups are retried on the next tick
         log.warning("candle refresh failed (retry in 15 min): %s", exc)
+    try:
+        log.info("%s", job_aggflow())
+    except Exception as exc:
+        log.warning("aggflow refresh failed (retry in 15 min): %s", exc)
     finally:
         _job_lock.release()
 
