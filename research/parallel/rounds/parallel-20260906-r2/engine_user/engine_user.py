@@ -73,7 +73,7 @@ def prepare(books, opens):
                 settle=settle_at_end, sig1h=sig1h)
 
 
-def simulate(books, opens, prep, m_sl=3.0, m_sleeve_sl=2.0, sleeve=True, target=0.25, cap=2.0, d_limit=D_LIMIT, win_end=60, sleeve_risk_budget=None, gap=0.02, m_sleeve_tp=1.0, rung_scale_fixed=None, size_mult=1.0, rungs=RUNGS, m_tp=None, hourly=False, align=None, events=None, bars=None, exec_policy=None, fixed_levels=False, attrib=None, trade=None, win_start=2, state_out=None, sleeve_filter=None, sleeve_tp=None, strat_vt=None, sleeve_start=16, risk_mult=None, sleeve_breaker=None, sleeve_stop_mode="touch", sleeve_backstop=None, sleeve_budget_sl=None, book_stop_mode="touch", book_backstop=None, sleeve_exit_agent=None):
+def simulate(books, opens, prep, m_sl=3.0, m_sleeve_sl=2.0, sleeve=True, target=0.25, cap=2.0, d_limit=D_LIMIT, win_end=60, sleeve_risk_budget=None, gap=0.02, m_sleeve_tp=1.0, rung_scale_fixed=None, size_mult=1.0, rungs=RUNGS, m_tp=None, hourly=False, align=None, events=None, bars=None, exec_policy=None, fixed_levels=False, attrib=None, trade=None, win_start=2, state_out=None, sleeve_filter=None, sleeve_tp=None, strat_vt=None, sleeve_start=16, risk_mult=None, sleeve_breaker=None, sleeve_stop_mode="touch", sleeve_backstop=None, sleeve_budget_sl=None, book_stop_mode="touch", book_backstop=None, sleeve_exit_agent=None, sleeve_lock_cut=False):
     # events: optional list; when given, every fill / stop / take-profit / sleeve rung is appended as a dict (no effect on results)
     # exec_policy: optional callable (i, a, dw, w_a, tgt_a, sig4_ia) -> ("limit", offset[, weight]) | ("market", 0[, weight]) | ("skip", 0)
     #   deciding how (and, with the optional weight, to which weight instead of the target)
@@ -89,6 +89,8 @@ def simulate(books, opens, prep, m_sl=3.0, m_sleeve_sl=2.0, sleeve=True, target=
     # sleeve_stop_mode: "touch" (default: a 1m low through the stop, fill at min(stop, open)); "close1" / "close5": the market stop
     #   triggers when a 1m close / a 5m-block close (minutes 4, 9, ... of the bar) is at or below the stop and fills at the next minute's
     #   open (next bar open after minute 239); a same-minute TP touch and close trigger resolve stop-first.
+    # sleeve_lock_cut: True -> a rung cut by sleeve_exit_agent keeps its stop risk in the budget until the bar ends (no re-use of the
+    #   freed budget inside the same flush).
     # sleeve_exit_agent: with a close stop mode, optional callable (i, a, rung_index, fill_minute, c, lv, sigma) -> True to exit a dip rung
     #   at the next minute's open; asked at every 5m-block close c before the rule's own exit while the close is >= 2 sigma below the
     #   fill (data up to minute c only). None = unchanged.
@@ -585,6 +587,7 @@ def simulate(books, opens, prep, m_sl=3.0, m_sleeve_sl=2.0, sleeve=True, target=
                                 fills.append((a0 + int(np.argmax(hit)), 1, r, a, lv, s1[a], 60 * (h + 1)))
             fills.sort(key=lambda t: t[:4])
             taken = []
+            locked = []  # (cut minute, locked risk) of agent-cut rungs when sleeve_lock_cut
             rn_base = rn
             smult = {}
             for f, lad, r, a, lv, sg, end_m in fills:
@@ -606,6 +609,8 @@ def simulate(books, opens, prep, m_sl=3.0, m_sleeve_sl=2.0, sleeve=True, target=
                 else:  # risk budget: loss if every open rung and the new one stop out (stop distance + gap allowance)
                     if sleeve_budget_sl is None:
                         risk_open = sum(t[7] * (m_sleeve_sl * t[6] + gap) for t in taken if t[4] > f)
+                        if locked:
+                            risk_open += sum(lr_ for cm_, lr_ in locked if cm_ <= f)
                         over = risk_open + rn * (m_sleeve_sl * sg + gap) > sleeve_risk_budget + 1e-12
                     else:  # the budget counts another stop distance (e.g. a native backstop)
                         risk_open = sum(t[7] * (sleeve_budget_sl * t[6] + gap) for t in taken if t[4] > f)
@@ -636,6 +641,8 @@ def simulate(books, opens, prep, m_sl=3.0, m_sleeve_sl=2.0, sleeve=True, target=
                                 ag = c_
                                 break
                     if ag is not None:
+                        if sleeve_lock_cut:
+                            locked.append((ag + 1, rn * (m_sleeve_sl * sg + gap)))
                         x = ag + 1
                         px_ = Oa[x] if x < 240 else o2[i][a]
                         x = min(x, 240)
