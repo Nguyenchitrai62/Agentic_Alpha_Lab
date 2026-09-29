@@ -1,6 +1,6 @@
 # Research map (update after every rotation)
 
-Last update: 2026-09-29 (after v263).
+Last update: 2026-09-29 (after v266).
 
 ## Honest status
 
@@ -31,6 +31,7 @@ v260 PPO risk manager on block-bootstrapped paths, 5 seeds: median dev4 4.47, la
 v261 direct-reinforcement foundation member (differentiable net Sharpe, policy gradient, 5 seeds): member IC ~0-0.07 -> dilutes (dev4 5.50 / 5.58). RL now tried at every level (sleeve bandits, entry/exit bandits, fitted-Q, PPO trade manager, PPO risk manager, direct-RL member): 14 variants, none beats the O1 rules out of sample.
 v262 Binance SPOT order-level flow (2017+, kept store): add DD 22.4, perp+spot sum DD 20.8, dev below O1 -> rejected; all venue / market extensions of whale flow (v237, v238, v244, v262; OKX v253 deferred) raise DD. Data catalog: docs/DATA_CATALOG.md.
 v263 meta-labeling of entries (win classifier, skip p<0.35/0.40): +0.04pp dev, win rate unchanged (skips re-enter next bar) - neutral.
+NEW BEST CANDIDATE (audit + robustness pending): v266 B1 = O1 B18 + dip-rung stops triggered on a 5m-block CLOSE (bot-watched, exit at the next minute open) + an 8-sigma exchange-native touch backstop: dev4 6.13, worst dev year 3.257, DD 19.70, 5y 5.795, most recent year 4.464 (scored once) - better than O1 on every selection metric and on the unseen year. Origin: dev event study of 2024-08-05 (18 rungs stopped at a liquidation-wick low, then recovery). v265 S2 close5 without backstop 6.178 / 19.29; v264 circuit breaker neutral; B2 (budget counts the 8-sigma stop) 5.725 / DD 18.08.
 PLATEAU: every management layer lands at dev4 ~5.1-5.3 and last year ~3.8-4.0 at DD ~19 -> the foundation signal is the limit.
 v223-v228 (all rejected, D2 stays): foundation component mixes slower/faster (0.25/0.25/0.5 local optimum), no long-only + trim
 (best worst year 2.47 but dev4 4.97), member D / monthly schedule, causal coin bandit for the sleeve (DD > 20), deeper limit

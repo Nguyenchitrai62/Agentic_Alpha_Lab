@@ -1,5 +1,7 @@
 # Continuous BTC research — active
 
+LEADER 2026-09-29 (v263-v266): meta-labeling neutral (v263); a dip-ladder circuit breaker neutral (v264: the 2024-08-05 losses came from rungs already filled, all stopped at one liquidation-wick low). Candle-CLOSE stops for the dip rungs fix that: v265 S2 (5m close) dev4 6.178 / DD 19.29 / stops 196 -> 100; the executable form v266 B1 (5m-close stop watched by the bot + 8-sigma native backstop) dev4 6.13, worst dev year 3.257, DD 19.70, 5y 5.795, most recent year 4.464 - the first rule change in many rounds that improves every selection metric AND the unseen year. Blind audit (v263-v266) and a B1 robustness report (cost stress, latency, bot outage) are running before any deployment.
+
 LEADER 2026-09-29 (v261-v262): direct-reinforcement foundation member (differentiable net Sharpe, 5 seeds) has IC ~0-0.07 and dilutes O1 (dev4 5.50 / 5.58); Binance SPOT order-level whale flow (full 2017+ archive, kept as a derived store) raises DD above 20 in both forms (dev4 5.32 / 5.46). O1 + sleeve budget 0.18 remains the deployed pipeline; v260 / v261 audits PASS.
 
 LEADER 2026-09-29 (v260): PPO risk manager trained on block-bootstrapped paths and judged on the median of five seeds - median dev4 4.47, most recent year median 3.13, DD 17.45: the robust learned policy only de-risks, so DD and return fall together; not adopted. v258/v259 blind audit PASS (bit-exact PPO retrain, no leakage). BTC hedge of alt dip fills (dev diagnostic) removes 70-85% of the edge.
