@@ -2,7 +2,7 @@
   "schema_version": 1,
   "project": "Agentic Alpha Lab BTC swing research",
   "created_at": "2026-09-06T00:00:00Z",
-  "next_version": 208,
+  "next_version": 252,
   "control": {
     "coordinator_model": "gpt-5.6-sol",
     "coordinator_reasoning": "high",
@@ -54,7 +54,7 @@
     "expected_workers": 3,
     "version_range": [
       45,
-      207
+      251
     ],
     "parent_commit": "1ecf947baddd5ef78444670330e9db62128dad50",
     "cloud_snapshot": {
@@ -8224,7 +8224,7 @@
       "version": "v204",
       "track": "B",
       "direction_key": "v204-sleeve-book-alignment",
-      "status": "running",
+      "status": "rejected",
       "parent_versions": [
         "v201"
       ],
@@ -8237,9 +8237,36 @@
       "write_scope": "research/parallel/rounds/parallel-20260906-r2/v204",
       "worker_agent_id": "01a07791-eecb-7053-8866-dcdbe31e84d7",
       "worker_host_id": "local",
-      "result_manifest": null,
+      "result_manifest": "research\\parallel\\rounds\\parallel-20260906-r2\\v204\\result_manifest.json",
       "registered_at": "2026-09-26T19:35:22.520875Z",
-      "assigned_at": "2026-09-26T19:35:22.520875Z"
+      "assigned_at": "2026-09-26T19:35:22.520875Z",
+      "result_manifest_sha256": "1884ef88cef672085fff5baa37530e62418df7cd54d39d52d9779df166d981ad",
+      "result_summary": {
+        "scenarios": {
+          "normal": {
+            "monthly_geometric_net_percent": 5.334,
+            "max_drawdown_percent": 19.46,
+            "fills": 40205,
+            "months": 60
+          },
+          "fee_stress": {
+            "monthly_geometric_net_percent": 5.334,
+            "max_drawdown_percent": 19.46,
+            "fills": 40205,
+            "months": 60
+          },
+          "execution_stress": {
+            "monthly_geometric_net_percent": 5.334,
+            "max_drawdown_percent": 19.46,
+            "fills": 40205,
+            "months": 60
+          }
+        },
+        "independent_test": false,
+        "live_approved": false,
+        "audit_notes": "Bit-exact on all rows; alignment uses the decision-known book sign only; look-ahead PASS."
+      },
+      "audited_at": "2026-09-27T19:06:08.433836Z"
     },
     {
       "version": "v205",
@@ -8293,7 +8320,7 @@
       "version": "v206",
       "track": "C",
       "direction_key": "v206-three-member-retrain-ensemble",
-      "status": "running",
+      "status": "rejected",
       "parent_versions": [
         "v202"
       ],
@@ -8306,15 +8333,42 @@
       "write_scope": "research/parallel/rounds/parallel-20260906-r2/v206",
       "worker_agent_id": "01a07748-5adc-7061-8052-0ed36705a8a8",
       "worker_host_id": "local",
-      "result_manifest": null,
+      "result_manifest": "research\\parallel\\rounds\\parallel-20260906-r2\\v206\\result_manifest.json",
       "registered_at": "2026-09-26T21:22:12.193063Z",
-      "assigned_at": "2026-09-26T21:22:12.193063Z"
+      "assigned_at": "2026-09-26T21:22:12.193063Z",
+      "result_manifest_sha256": "14624bdc026a39dd8bd7894aaf1cb4a43184a29ecae58eabd86fda57574b2fae",
+      "result_summary": {
+        "scenarios": {
+          "normal": {
+            "monthly_geometric_net_percent": 5.488,
+            "max_drawdown_percent": 19.76,
+            "fills": 41670,
+            "months": 60
+          },
+          "fee_stress": {
+            "monthly_geometric_net_percent": 5.488,
+            "max_drawdown_percent": 19.76,
+            "fills": 41670,
+            "months": 60
+          },
+          "execution_stress": {
+            "monthly_geometric_net_percent": 5.488,
+            "max_drawdown_percent": 19.76,
+            "fills": 41670,
+            "months": 60
+          }
+        },
+        "independent_test": false,
+        "live_approved": false,
+        "audit_notes": "Blind replication matched (books/opens/cubes identical, selection logic verified). Direction rejected: the ensemble row breaches the DD gate (20.49 > 20); status stays rejected."
+      },
+      "audited_at": "2026-09-27T16:07:16.625779Z"
     },
     {
       "version": "v207",
       "track": "A",
       "direction_key": "v207-monthly-schedule-ensemble",
-      "status": "running",
+      "status": "rejected",
       "parent_versions": [
         "v205"
       ],
@@ -8327,10 +8381,2068 @@
       "write_scope": "research/parallel/rounds/parallel-20260906-r2/v207",
       "worker_agent_id": "01a07792-4a6b-7fc3-a08a-af2923b1778a",
       "worker_host_id": "local",
-      "result_manifest": null,
+      "result_manifest": "research\\parallel\\rounds\\parallel-20260906-r2\\v207\\result_manifest.json",
       "registered_at": "2026-09-26T21:27:28.621908Z",
-      "assigned_at": "2026-09-26T21:27:28.621908Z"
+      "assigned_at": "2026-09-26T21:27:28.621908Z",
+      "result_manifest_sha256": "8ff5a25e3a28ddf9b9f150a3efd464d28f1d24262fa8030d94a3929d8aed2026",
+      "result_summary": {
+        "scenarios": {
+          "normal": {
+            "monthly_geometric_net_percent": 5.488,
+            "max_drawdown_percent": 19.76,
+            "fills": 41670,
+            "months": 60
+          },
+          "fee_stress": {
+            "monthly_geometric_net_percent": 5.488,
+            "max_drawdown_percent": 19.76,
+            "fills": 41670,
+            "months": 60
+          },
+          "execution_stress": {
+            "monthly_geometric_net_percent": 5.488,
+            "max_drawdown_percent": 19.76,
+            "fills": 41670,
+            "months": 60
+          }
+        },
+        "independent_test": false,
+        "live_approved": false,
+        "audit_notes": "Blind replication matched (books/opens/cubes identical, selection logic verified). Direction rejected: the ensemble row breaches the DD gate (20.68 > 20); status stays rejected."
+      },
+      "audited_at": "2026-09-27T10:08:19.216926Z"
+    },
+    {
+      "version": "v208",
+      "track": "A",
+      "direction_key": "v208-execution-policy",
+      "status": "rejected",
+      "parent_versions": [
+        "v205"
+      ],
+      "model_family": "hist-gradient-boosting",
+      "objective": "execution policy for v205 books: vol-scaled limit offset, market on strong opens, no-trade band",
+      "data_contract": "Binance USD-M 4h opens + 1m klines, sigma_4h from the last 360 4h bars known at the decision",
+      "policy_contract": "engine_user v205 settings; book orders by exec_policy (limit offset / market at minute-0 open / skip); Bybit maker 0.02 taker 0.055; adverse funding",
+      "hypothesis": "a deeper volatility-scaled limit plus market entries on strong opens and a no-trade band beat the fixed 0.10% limit on the robust dev criterion",
+      "parent_commit": "1ecf947baddd5ef78444670330e9db62128dad50",
+      "write_scope": "research/parallel/rounds/parallel-20260906-r2/v208",
+      "worker_agent_id": "01a07792-4a6b-7fc3-a08a-af2923b1778a",
+      "worker_host_id": "local",
+      "result_manifest": "research\\parallel\\rounds\\parallel-20260906-r2\\v208\\result_manifest.json",
+      "registered_at": "2026-09-27T10:08:19.212820Z",
+      "assigned_at": "2026-09-27T10:08:19.212820Z",
+      "result_manifest_sha256": "92033dc1a7fc757b345b02bab95dc0ef5bed58e9627eb4658879cf576ee87095",
+      "result_summary": {
+        "scenarios": {
+          "normal": {
+            "monthly_geometric_net_percent": 5.488,
+            "max_drawdown_percent": 19.76,
+            "fills": 41670,
+            "months": 60
+          },
+          "fee_stress": {
+            "monthly_geometric_net_percent": 5.488,
+            "max_drawdown_percent": 19.76,
+            "fills": 41670,
+            "months": 60
+          },
+          "execution_stress": {
+            "monthly_geometric_net_percent": 5.488,
+            "max_drawdown_percent": 19.76,
+            "fills": 41670,
+            "months": 60
+          }
+        },
+        "independent_test": false,
+        "live_approved": false,
+        "audit_notes": "Blind replication matched all four rows (dev4/worst/DD/counts); causality of sigma_4h, weights and minute-0 market fills verified. Direction rejected: every variant breaches DD <= 20; ref_v205 stays."
+      },
+      "audited_at": "2026-09-27T17:24:09.592685Z"
+    },
+    {
+      "version": "v209",
+      "track": "C",
+      "direction_key": "v209-luck-tests-discrete-trades",
+      "status": "rejected",
+      "parent_versions": [
+        "v205"
+      ],
+      "model_family": "hist-gradient-boosting",
+      "objective": "test whether v205 profit is luck (attribution, beta, placebo) and evaluate discrete one-trade-per-signal execution with fixed SL/TP",
+      "data_contract": "v205 books and engine_user data; placebo = circular shifts inside the live window (seed 209)",
+      "policy_contract": "engine_user v205 settings; discrete variants via exec_policy (open/flip/close only, no adds) and fixed_levels SL/TP at entry",
+      "hypothesis": "if the v205 edge is general, discrete trades exiting by SL/TP/flip keep most of the return and the real books beat circular-shift placebos",
+      "parent_commit": "1ecf947baddd5ef78444670330e9db62128dad50",
+      "write_scope": "research/parallel/rounds/parallel-20260906-r2/v209",
+      "worker_agent_id": "01a07748-5adc-7061-8052-0ed36705a8a8",
+      "worker_host_id": "local",
+      "result_manifest": "research\\parallel\\rounds\\parallel-20260906-r2\\v209\\result_manifest.json",
+      "registered_at": "2026-09-27T16:07:16.623250Z",
+      "assigned_at": "2026-09-27T16:07:16.623250Z",
+      "result_manifest_sha256": "d205311f1b5931c6c0bfd538b1a2479f0aa24ad5d2b275013f6172d1d6acd03a",
+      "result_summary": {
+        "scenarios": {
+          "normal": {
+            "monthly_geometric_net_percent": 5.488,
+            "max_drawdown_percent": 19.76,
+            "fills": 41670,
+            "months": 60
+          },
+          "fee_stress": {
+            "monthly_geometric_net_percent": 5.488,
+            "max_drawdown_percent": 19.76,
+            "fills": 41670,
+            "months": 60
+          },
+          "execution_stress": {
+            "monthly_geometric_net_percent": 5.488,
+            "max_drawdown_percent": 19.76,
+            "fills": 41670,
+            "months": 60
+          }
+        },
+        "independent_test": false,
+        "live_approved": false,
+        "audit_notes": "Blind replication matched part B rows and the v205 anchor exactly; alpha t 3.504 vs 3.53 (within 0.05); placebo/beta differ only by documented construction choices with identical conclusions; look-ahead PASS. Rejected; v205 stays."
+      },
+      "audited_at": "2026-09-27T17:27:20.724449Z"
+    },
+    {
+      "version": "v210",
+      "track": "A",
+      "direction_key": "v210-discrete-trade-mode",
+      "status": "rejected",
+      "parent_versions": [
+        "v205"
+      ],
+      "model_family": "hist-gradient-boosting",
+      "objective": "discrete trade mode for the v205 books: resting limit orders valid 8h, 5-minute rule, no resizing, SL/TP-only management",
+      "data_contract": "v205 books, Binance USD-M 1m cubes; sigma_4h and sigma_d known at the decision",
+      "policy_contract": "engine_user trade mode: limit open -/+ max(0.10%,0.25 sigma_4h), fill from minute 5, SL 4 sigma_d market, TP 8 sigma_d limit, break-even/partial/tighten variants; Bybit fees; adverse funding",
+      "hypothesis": "a user-executable one-position-per-asset structure with SL/TP management keeps most of v205's edge within the DD gate",
+      "parent_commit": "1ecf947baddd5ef78444670330e9db62128dad50",
+      "write_scope": "research/parallel/rounds/parallel-20260906-r2/v210",
+      "worker_agent_id": "01a07792-4a6b-7fc3-a08a-af2923b1778a",
+      "worker_host_id": "local",
+      "result_manifest": "research\\parallel\\rounds\\parallel-20260906-r2\\v210\\result_manifest.json",
+      "registered_at": "2026-09-27T17:24:09.590668Z",
+      "assigned_at": "2026-09-27T17:24:09.590668Z",
+      "result_manifest_sha256": "0f438800ce71b79d5073bf139ead4fb823e376aa8039bb98265b4045e0af56fe",
+      "result_summary": {
+        "scenarios": {
+          "normal": {
+            "monthly_geometric_net_percent": 5.488,
+            "max_drawdown_percent": 19.76,
+            "fills": 41670,
+            "months": 60
+          },
+          "fee_stress": {
+            "monthly_geometric_net_percent": 5.488,
+            "max_drawdown_percent": 19.76,
+            "fills": 41670,
+            "months": 60
+          },
+          "execution_stress": {
+            "monthly_geometric_net_percent": 5.488,
+            "max_drawdown_percent": 19.76,
+            "fills": 41670,
+            "months": 60
+          }
+        },
+        "independent_test": false,
+        "live_approved": false,
+        "audit_notes": "Independent re-implementation of the trade mode matched all rows (ref, ref_min5, T1-T3); minute-5 rule, resting-order carry, stop-first and next-minute stop moves verified causal. Selected T2 fails the DD gate; rejected."
+      },
+      "audited_at": "2026-09-27T19:02:47.213697Z"
+    },
+    {
+      "version": "v211",
+      "track": "C",
+      "direction_key": "v211-trade-mode-risk-sizing",
+      "status": "rejected",
+      "parent_versions": [
+        "v210"
+      ],
+      "model_family": "hist-gradient-boosting",
+      "objective": "risk-based position size for the v210 trade mode (loss at stop = fixed share of equity)",
+      "data_contract": "v205 books, Binance USD-M 1m cubes; sigma_d, governor known at the decision",
+      "policy_contract": "v210 T2 trade mode (limit 8h, minute-5 rule, BE +2 sigma_d, tighten 1.5 sigma_d) with weight = min(risk*g/(4 sigma_d), cap); optional open-risk cap",
+      "hypothesis": "sizing each trade by its stop distance brings the executable trade mode inside DD 20% while keeping most of its return",
+      "parent_commit": "1ecf947baddd5ef78444670330e9db62128dad50",
+      "write_scope": "research/parallel/rounds/parallel-20260906-r2/v211",
+      "worker_agent_id": "01a07748-5adc-7061-8052-0ed36705a8a8",
+      "worker_host_id": "local",
+      "result_manifest": "research\\parallel\\rounds\\parallel-20260906-r2\\v211\\result_manifest.json",
+      "registered_at": "2026-09-27T17:27:20.722428Z",
+      "assigned_at": "2026-09-27T17:27:20.722428Z",
+      "result_manifest_sha256": "870b323686c934759d3023d7d34bc4910b1fdf3ad149c76ad6076926ce590964",
+      "result_summary": {
+        "scenarios": {
+          "normal": {
+            "monthly_geometric_net_percent": 5.488,
+            "max_drawdown_percent": 19.76,
+            "fills": 41670,
+            "months": 60
+          },
+          "fee_stress": {
+            "monthly_geometric_net_percent": 5.488,
+            "max_drawdown_percent": 19.76,
+            "fills": 41670,
+            "months": 60
+          },
+          "execution_stress": {
+            "monthly_geometric_net_percent": 5.488,
+            "max_drawdown_percent": 19.76,
+            "fills": 41670,
+            "months": 60
+          }
+        },
+        "independent_test": false,
+        "live_approved": false,
+        "audit_notes": "Independent re-implementation of risk sizing matched all rows exactly; causality verified. Rejected (DD, losing dev year)."
+      },
+      "audited_at": "2026-09-27T19:13:41.278119Z"
+    },
+    {
+      "version": "v212",
+      "track": "A",
+      "direction_key": "v212-trade-mode-scaling",
+      "status": "rejected",
+      "parent_versions": [
+        "v210"
+      ],
+      "model_family": "hist-gradient-boosting",
+      "objective": "trader actions in the trade mode: scale in on a strengthening signal, scale out on a weakening one (limit orders, minute-5 rule)",
+      "data_contract": "v205 books, Binance USD-M 1m cubes; signals, sigma and weights known at the decision",
+      "policy_contract": "v210 T2 trade mode + one limit add (|target| >= 1.5x weight, in profit) and/or one limit reduce 50% (|target| <= 0.5x weight or signal gone)",
+      "hypothesis": "a few discrete scale actions recover part of the continuous-sizing edge lost by the frozen-size trade mode",
+      "parent_commit": "1ecf947baddd5ef78444670330e9db62128dad50",
+      "write_scope": "research/parallel/rounds/parallel-20260906-r2/v212",
+      "worker_agent_id": "01a07792-4a6b-7fc3-a08a-af2923b1778a",
+      "worker_host_id": "local",
+      "result_manifest": "research\\parallel\\rounds\\parallel-20260906-r2\\v212\\result_manifest.json",
+      "registered_at": "2026-09-27T19:02:47.206753Z",
+      "assigned_at": "2026-09-27T19:02:47.206753Z",
+      "result_manifest_sha256": "98a0d919c9cdf15eb0a7e4652e53dad27044a21e503883b40db58a2fe665676e",
+      "result_summary": {
+        "scenarios": {
+          "normal": {
+            "monthly_geometric_net_percent": 5.488,
+            "max_drawdown_percent": 19.76,
+            "fills": 41670,
+            "months": 60
+          },
+          "fee_stress": {
+            "monthly_geometric_net_percent": 5.488,
+            "max_drawdown_percent": 19.76,
+            "fills": 41670,
+            "months": 60
+          },
+          "execution_stress": {
+            "monthly_geometric_net_percent": 5.488,
+            "max_drawdown_percent": 19.76,
+            "fills": 41670,
+            "months": 60
+          }
+        },
+        "independent_test": false,
+        "live_approved": false,
+        "audit_notes": "Independent slot-order re-implementation matched all rows bit-exact; minute-5 rule and scan order verified. Rejected (DD 20.69)."
+      },
+      "audited_at": "2026-09-28T01:07:18.247889Z"
+    },
+    {
+      "version": "v213",
+      "track": "B",
+      "direction_key": "v213-trade-mode-exits",
+      "status": "rejected",
+      "parent_versions": [
+        "v212"
+      ],
+      "model_family": "hist-gradient-boosting",
+      "objective": "trader-like exits for the scaling trade mode: limit exit on signal loss, repeated scale-outs",
+      "data_contract": "v205 books, Binance USD-M 1m cubes; signals and sigma known at the decision",
+      "policy_contract": "v212 S3 trade mode + full limit exit when |target| < 5% or reversed and/or up to 3 successive 50% limit reduces",
+      "hypothesis": "closing positions whose signal disappeared recovers the 2021-2022 edge lost by long trade-mode holds",
+      "parent_commit": "1ecf947baddd5ef78444670330e9db62128dad50",
+      "write_scope": "research/parallel/rounds/parallel-20260906-r2/v213",
+      "worker_agent_id": "01a07791-eecb-7053-8866-dcdbe31e84d7",
+      "worker_host_id": "local",
+      "result_manifest": "research\\parallel\\rounds\\parallel-20260906-r2\\v213\\result_manifest.json",
+      "registered_at": "2026-09-27T19:06:08.433836Z",
+      "assigned_at": "2026-09-27T19:06:08.433836Z",
+      "result_manifest_sha256": "cc192bc42c0046a3c7706b6c02d9f04fd3c7e93eee064a9373cb17f0d3b22298",
+      "result_summary": {
+        "scenarios": {
+          "normal": {
+            "monthly_geometric_net_percent": 5.488,
+            "max_drawdown_percent": 19.76,
+            "fills": 41670,
+            "months": 60
+          },
+          "fee_stress": {
+            "monthly_geometric_net_percent": 5.488,
+            "max_drawdown_percent": 19.76,
+            "fills": 41670,
+            "months": 60
+          },
+          "execution_stress": {
+            "monthly_geometric_net_percent": 5.488,
+            "max_drawdown_percent": 19.76,
+            "fills": 41670,
+            "months": 60
+          }
+        },
+        "independent_test": false,
+        "live_approved": false,
+        "audit_notes": "Independent re-implementation of the full limit exit and repeated reduces matched all rows exactly; causality verified. Rejected (returns below the gate)."
+      },
+      "audited_at": "2026-09-28T01:50:53.538520Z"
+    },
+    {
+      "version": "v214",
+      "track": "C",
+      "direction_key": "v214-trader-agent-offline-rl",
+      "status": "rejected",
+      "parent_versions": [
+        "v212"
+      ],
+      "model_family": "hist-gradient-boosting",
+      "objective": "offline RL trader agent (fitted Q / Monte Carlo policy improvement) choosing limit entries, adds, reduces, limit exits and stop tightening on top of the v205 pipeline",
+      "data_contract": "v205 books and members, causal 4h features, 20 exploration runs of the engine_user trade mode; Q model for year Y fitted on transitions ending before Y - 7 days",
+      "policy_contract": "engine_user trade mode with trade[policy]; minute-5 rule; SL market, TP/entries/exits limit; Bybit fees; adverse funding",
+      "hypothesis": "a learned trade-management policy beats the fixed S3/E1 rules on the robust dev criterion",
+      "parent_commit": "1ecf947baddd5ef78444670330e9db62128dad50",
+      "write_scope": "research/parallel/rounds/parallel-20260906-r2/v214",
+      "worker_agent_id": "01a07748-5adc-7061-8052-0ed36705a8a8",
+      "worker_host_id": "local",
+      "result_manifest": "research\\parallel\\rounds\\parallel-20260906-r2\\v214\\result_manifest.json",
+      "registered_at": "2026-09-27T19:13:41.278119Z",
+      "assigned_at": "2026-09-27T19:13:41.278119Z",
+      "result_manifest_sha256": "645caa568985804d71b0e2c0dcc634b3123dbfb6faaa5d3b2bf0d6b1fb146548",
+      "result_summary": {
+        "scenarios": {
+          "normal": {
+            "monthly_geometric_net_percent": 5.488,
+            "max_drawdown_percent": 19.76,
+            "fills": 41670,
+            "months": 60
+          },
+          "fee_stress": {
+            "monthly_geometric_net_percent": 5.488,
+            "max_drawdown_percent": 19.76,
+            "fills": 41670,
+            "months": 60
+          },
+          "execution_stress": {
+            "monthly_geometric_net_percent": 5.488,
+            "max_drawdown_percent": 19.76,
+            "fills": 41670,
+            "months": 60
+          }
+        },
+        "independent_test": false,
+        "live_approved": false,
+        "audit_notes": "Leakage checks all PASS (training transitions end before Y - 7 days, causal features, rewards per holding bar, Monte Carlo stop at close, policy hook reproduces v212 S3); re-run matches. Rejected."
+      },
+      "audited_at": "2026-09-28T01:54:34.647681Z"
+    },
+    {
+      "version": "v215",
+      "track": "A",
+      "direction_key": "v215-trader-policy-improvement",
+      "status": "rejected",
+      "parent_versions": [
+        "v214"
+      ],
+      "model_family": "hist-gradient-boosting",
+      "objective": "one-step policy improvement of the trade-mode rule (S3/E1) from sparse exploration, cross-fitted advantages",
+      "data_contract": "v205 books/members, causal 4h features, 40 sparse-exploration runs (eps 0.03) per base rule; models for year Y fitted on transitions ending before Y - 7 days",
+      "policy_contract": "engine_user trade mode with trade[policy]; deviate from the rule only when both cross-fitted models show an advantage > margin",
+      "hypothesis": "a conservative learned improvement of the rule keeps its trend capture and fixes chop, beating the rules on the robust dev criterion",
+      "parent_commit": "1ecf947baddd5ef78444670330e9db62128dad50",
+      "write_scope": "research/parallel/rounds/parallel-20260906-r2/v215",
+      "worker_agent_id": "01a07792-4a6b-7fc3-a08a-af2923b1778a",
+      "worker_host_id": "local",
+      "result_manifest": "research\\parallel\\rounds\\parallel-20260906-r2\\v215\\result_manifest.json",
+      "registered_at": "2026-09-28T01:07:18.247889Z",
+      "assigned_at": "2026-09-28T01:07:18.247889Z",
+      "result_manifest_sha256": "7b5708af3a63c875434445a5f16f00cee70499cfd28a9663116d37f8c6af485f",
+      "result_summary": {
+        "scenarios": {
+          "normal": {
+            "monthly_geometric_net_percent": 5.488,
+            "max_drawdown_percent": 19.76,
+            "fills": 41670,
+            "months": 60
+          },
+          "fee_stress": {
+            "monthly_geometric_net_percent": 5.488,
+            "max_drawdown_percent": 19.76,
+            "fills": 41670,
+            "months": 60
+          },
+          "execution_stress": {
+            "monthly_geometric_net_percent": 5.488,
+            "max_drawdown_percent": 19.76,
+            "fills": 41670,
+            "months": 60
+          }
+        },
+        "independent_test": false,
+        "live_approved": false,
+        "audit_notes": "Leakage audit PASS (fit windows before Y - 7 days, causal features, MC stop at close, cross-fitting, margin rule); re-run matches. Rejected."
+      },
+      "audited_at": "2026-09-28T02:51:05.301594Z"
+    },
+    {
+      "version": "v216",
+      "track": "B",
+      "direction_key": "v216-trade-mode-grid",
+      "status": "rejected",
+      "parent_versions": [
+        "v213"
+      ],
+      "model_family": "hist-gradient-boosting",
+      "objective": "trade mode that follows the pipeline size on a coarse grid: limit adds/reduces at most once a day when the gap exceeds a band",
+      "data_contract": "v205 books, Binance USD-M 1m cubes; targets and sigma known at the decision",
+      "policy_contract": "engine_user trade mode with a grid policy: open/close/tighten by rule, size adjustments by limit with a band and a 1-day cooldown; minute-5 rule",
+      "hypothesis": "coarse, clear size adjustments recover most of the continuous edge while staying executable",
+      "parent_commit": "1ecf947baddd5ef78444670330e9db62128dad50",
+      "write_scope": "research/parallel/rounds/parallel-20260906-r2/v216",
+      "worker_agent_id": "01a07791-eecb-7053-8866-dcdbe31e84d7",
+      "worker_host_id": "local",
+      "result_manifest": "research\\parallel\\rounds\\parallel-20260906-r2\\v216\\result_manifest.json",
+      "registered_at": "2026-09-28T01:50:53.535519Z",
+      "assigned_at": "2026-09-28T01:50:53.535519Z",
+      "result_manifest_sha256": "cb67bb9bd0f40287aeda51b2b9e1d791d0c8013a35100d46e7490e66c2cfdcf0",
+      "result_summary": {
+        "scenarios": {
+          "normal": {
+            "monthly_geometric_net_percent": 5.488,
+            "max_drawdown_percent": 19.76,
+            "fills": 41670,
+            "months": 60
+          },
+          "fee_stress": {
+            "monthly_geometric_net_percent": 5.488,
+            "max_drawdown_percent": 19.76,
+            "fills": 41670,
+            "months": 60
+          },
+          "execution_stress": {
+            "monthly_geometric_net_percent": 5.488,
+            "max_drawdown_percent": 19.76,
+            "fills": 41670,
+            "months": 60
+          }
+        },
+        "independent_test": false,
+        "live_approved": false,
+        "audit_notes": "Independent grid-policy re-implementation matched G1-G3 exactly; rule_S3/rule_E1 anchors reproduced. Rejected on returns (best executable pipeline)."
+      },
+      "audited_at": "2026-09-28T02:49:57.533766Z"
+    },
+    {
+      "version": "v217",
+      "track": "C",
+      "direction_key": "v217-trader-policy-search-es",
+      "status": "rejected",
+      "parent_versions": [
+        "v216"
+      ],
+      "model_family": "evolution-strategy-policy-search",
+      "objective": "RL by direct policy search (evolution strategies) over the grid trader parameters, walk-forward per anchor",
+      "data_contract": "v205 books; engine_user trade-mode simulations; theta for year Y searched only on walk-forward years before Y",
+      "policy_contract": "v216 grid trader with learned theta (open threshold, limit offset, bands, cooldown, break-even trigger, size multiplier); minute-5 rule; limits; SL market",
+      "hypothesis": "optimising the real account objective on earlier years yields trader parameters that generalise to the next year",
+      "parent_commit": "1ecf947baddd5ef78444670330e9db62128dad50",
+      "write_scope": "research/parallel/rounds/parallel-20260906-r2/v217",
+      "worker_agent_id": "01a07748-5adc-7061-8052-0ed36705a8a8",
+      "worker_host_id": "local",
+      "result_manifest": "research\\parallel\\rounds\\parallel-20260906-r2\\v217\\result_manifest.json",
+      "registered_at": "2026-09-28T01:54:34.647681Z",
+      "assigned_at": "2026-09-28T01:54:34.647681Z",
+      "result_manifest_sha256": "67245762e8ba4acc11a282513e4278a1b11b4970b56c6fa736d6c1315143b328",
+      "result_summary": {
+        "scenarios": {
+          "normal": {
+            "monthly_geometric_net_percent": 5.488,
+            "max_drawdown_percent": 19.76,
+            "fills": 41670,
+            "months": 60
+          },
+          "fee_stress": {
+            "monthly_geometric_net_percent": 5.488,
+            "max_drawdown_percent": 19.76,
+            "fills": 41670,
+            "months": 60
+          },
+          "execution_stress": {
+            "monthly_geometric_net_percent": 5.488,
+            "max_drawdown_percent": 19.76,
+            "fills": 41670,
+            "months": 60
+          }
+        },
+        "independent_test": false,
+        "live_approved": false,
+        "audit_notes": "Verdict PASS, no leakage: objectives read only earlier anchor years, year 0 uses theta0, schedule switching verified; independent driver reproduces. Rejected."
+      },
+      "audited_at": "2026-09-28T03:02:30.377630Z"
+    },
+    {
+      "version": "v218",
+      "track": "B",
+      "direction_key": "v218-grid-dd-budget",
+      "status": "rejected",
+      "parent_versions": [
+        "v216"
+      ],
+      "model_family": "hist-gradient-boosting",
+      "objective": "spend the unused DD budget of the v216 grid trader: book size vs dip-sleeve budget",
+      "data_contract": "v205 books, Binance USD-M 1m cubes; unchanged",
+      "policy_contract": "v216 G2 grid trader; book_mult 1.10 / sleeve budget 0.15 + rung x1.75 / mix 1.05 + 0.135 + x1.6",
+      "hypothesis": "the independent dip-sleeve alpha converts the remaining DD budget into more return than a larger book",
+      "parent_commit": "1ecf947baddd5ef78444670330e9db62128dad50",
+      "write_scope": "research/parallel/rounds/parallel-20260906-r2/v218",
+      "worker_agent_id": "01a07791-eecb-7053-8866-dcdbe31e84d7",
+      "worker_host_id": "local",
+      "result_manifest": "research\\parallel\\rounds\\parallel-20260906-r2\\v218\\result_manifest.json",
+      "registered_at": "2026-09-28T02:49:57.530284Z",
+      "assigned_at": "2026-09-28T02:49:57.530284Z",
+      "result_manifest_sha256": "cf381551ca2bb86b33f896bba39106241a3dd10e99612c062b27d259cd876dc0",
+      "result_summary": {
+        "scenarios": {
+          "normal": {
+            "monthly_geometric_net_percent": 4.619,
+            "max_drawdown_percent": 18.01,
+            "fills": 1315,
+            "months": 60
+          },
+          "fee_stress": {
+            "monthly_geometric_net_percent": 4.619,
+            "max_drawdown_percent": 18.01,
+            "fills": 1315,
+            "months": 60
+          },
+          "execution_stress": {
+            "monthly_geometric_net_percent": 4.619,
+            "max_drawdown_percent": 18.01,
+            "fills": 1315,
+            "months": 60
+          }
+        },
+        "independent_test": false,
+        "live_approved": false,
+        "audit_notes": "Independent replication of the book multiplier / sleeve budget rows matched; selection D2 confirmed. Rejected on the last year (best executable, deployed)."
+      },
+      "audited_at": "2026-09-28T03:51:41.560664Z"
+    },
+    {
+      "version": "v219",
+      "track": "A",
+      "direction_key": "v219-sleeve-risk-shift",
+      "status": "rejected",
+      "parent_versions": [
+        "v218"
+      ],
+      "model_family": "hist-gradient-boosting",
+      "objective": "shift risk from the books to the dip sleeve inside the executable grid trader",
+      "data_contract": "v205 books, Binance USD-M 1m cubes; unchanged",
+      "policy_contract": "v216 G2 grid trader; book_mult 0.8-1.0; sleeve stop-risk budget 0.18-0.21; rung size x2.0-2.25",
+      "hypothesis": "a sleeve-heavier mix raises the worst year and the mean at DD <= 20",
+      "parent_commit": "1ecf947baddd5ef78444670330e9db62128dad50",
+      "write_scope": "research/parallel/rounds/parallel-20260906-r2/v219",
+      "worker_agent_id": "01a07792-4a6b-7fc3-a08a-af2923b1778a",
+      "worker_host_id": "local",
+      "result_manifest": "research\\parallel\\rounds\\parallel-20260906-r2\\v219\\result_manifest.json",
+      "registered_at": "2026-09-28T02:51:05.298271Z",
+      "assigned_at": "2026-09-28T02:51:05.298271Z",
+      "result_manifest_sha256": "85c26e4feff1722a28e5f31d0f8bfe5f21d2cb804f8aa0a51916bdc31b63e54f",
+      "result_summary": {
+        "scenarios": {
+          "normal": {
+            "monthly_geometric_net_percent": 4.619,
+            "max_drawdown_percent": 18.01,
+            "fills": 1315,
+            "months": 60
+          },
+          "fee_stress": {
+            "monthly_geometric_net_percent": 4.619,
+            "max_drawdown_percent": 18.01,
+            "fills": 1315,
+            "months": 60
+          },
+          "execution_stress": {
+            "monthly_geometric_net_percent": 4.619,
+            "max_drawdown_percent": 18.01,
+            "fills": 1315,
+            "months": 60
+          }
+        },
+        "independent_test": false,
+        "live_approved": false,
+        "audit_notes": "Independent replication matched; every H row breaches DD. Rejected."
+      },
+      "audited_at": "2026-09-28T03:07:26.731757Z"
+    },
+    {
+      "version": "v220",
+      "track": "C",
+      "direction_key": "v220-sleeve-bid-bandit",
+      "status": "rejected",
+      "parent_versions": [
+        "v218"
+      ],
+      "model_family": "hist-gradient-boosting",
+      "objective": "contextual-bandit filter of dip-sleeve bids (place / skip / enlarge) on v218 D2, walk-forward",
+      "data_contract": "v218 D2 run bid outcomes; features known at the decision of each 4h bar; model for year Y fitted on bids ending before Y - 7 days",
+      "policy_contract": "v218 D2 (grid trader + sleeve 0.15 x1.75); sleeve_filter multiplies each bid 0 / 1 / 1.25 at placement",
+      "hypothesis": "skipping the bids with the worst predicted outcome raises the sleeve win rate and the worst year at DD <= 20",
+      "parent_commit": "1ecf947baddd5ef78444670330e9db62128dad50",
+      "write_scope": "research/parallel/rounds/parallel-20260906-r2/v220",
+      "worker_agent_id": "01a07748-5adc-7061-8052-0ed36705a8a8",
+      "worker_host_id": "local",
+      "result_manifest": "research\\parallel\\rounds\\parallel-20260906-r2\\v220\\result_manifest.json",
+      "registered_at": "2026-09-28T03:02:30.377630Z",
+      "assigned_at": "2026-09-28T03:02:30.377630Z",
+      "result_manifest_sha256": "bbfdb3e8602c041fc0e39f824711552a9fe135b467a7bc7a0dcfa457aa536809",
+      "result_summary": {
+        "scenarios": {
+          "normal": {
+            "monthly_geometric_net_percent": 4.971,
+            "max_drawdown_percent": 19.09,
+            "fills": 1306,
+            "months": 60
+          },
+          "fee_stress": {
+            "monthly_geometric_net_percent": 4.971,
+            "max_drawdown_percent": 19.09,
+            "fills": 1306,
+            "months": 60
+          },
+          "execution_stress": {
+            "monthly_geometric_net_percent": 4.971,
+            "max_drawdown_percent": 19.09,
+            "fills": 1306,
+            "months": 60
+          }
+        },
+        "independent_test": false,
+        "live_approved": false,
+        "audit_notes": "Verdict PASS: blind replication within tolerance; features row-i only, fit windows before Y - 7 days, filter depends on (i, coin, rung) only, year 0 unfiltered. Rejected."
+      },
+      "audited_at": "2026-09-28T03:30:16.238904Z"
+    },
+    {
+      "version": "v221",
+      "track": "A",
+      "direction_key": "v221-grid-exit-hysteresis",
+      "status": "rejected",
+      "parent_versions": [
+        "v218"
+      ],
+      "model_family": "hist-gradient-boosting",
+      "objective": "exit hysteresis for the grid trader: open at 5%, close below 2.5% / 1% or on an EMA of the signal",
+      "data_contract": "v205 books, Binance USD-M 1m cubes; unchanged",
+      "policy_contract": "v218 D2 (G2 grid + sleeve 0.15 x1.75) with hysteresis on limit exits",
+      "hypothesis": "a wider exit band than entry band reduces churn and keeps trends, raising return at DD <= 20",
+      "parent_commit": "1ecf947baddd5ef78444670330e9db62128dad50",
+      "write_scope": "research/parallel/rounds/parallel-20260906-r2/v221",
+      "worker_agent_id": "01a07792-4a6b-7fc3-a08a-af2923b1778a",
+      "worker_host_id": "local",
+      "result_manifest": "research\\parallel\\rounds\\parallel-20260906-r2\\v221\\result_manifest.json",
+      "registered_at": "2026-09-28T03:07:26.726729Z",
+      "assigned_at": "2026-09-28T03:07:26.726729Z",
+      "result_manifest_sha256": "b56dc253fb098d03febca53a43a6c16c5b62fd75d3492980896b5e725b01aaa6",
+      "result_summary": {
+        "scenarios": {
+          "normal": {
+            "monthly_geometric_net_percent": 4.971,
+            "max_drawdown_percent": 19.09,
+            "fills": 1306,
+            "months": 60
+          },
+          "fee_stress": {
+            "monthly_geometric_net_percent": 4.971,
+            "max_drawdown_percent": 19.09,
+            "fills": 1306,
+            "months": 60
+          },
+          "execution_stress": {
+            "monthly_geometric_net_percent": 4.971,
+            "max_drawdown_percent": 19.09,
+            "fills": 1306,
+            "months": 60
+          }
+        },
+        "independent_test": false,
+        "live_approved": false,
+        "audit_notes": "Independent replication bit-exact on all rows (dev4, worst, DD, yearly legs, counts). Rejected; D2 stays."
+      },
+      "audited_at": "2026-09-28T03:48:56.725924Z"
+    },
+    {
+      "version": "v222",
+      "track": "C",
+      "direction_key": "v222-subaccount-bot-ensemble",
+      "status": "rejected",
+      "parent_versions": [
+        "v218"
+      ],
+      "model_family": "hist-gradient-boosting",
+      "objective": "ensemble of executable trader bots on separate sub-accounts (D2 grid, Y3 hysteresis, S3 hold-through)",
+      "data_contract": "v205 books, Binance USD-M 1m cubes; each sub-account simulated alone (own governor, compounding, min notional)",
+      "policy_contract": "sum of sub-account equities without rebalancing; D2 sleeve settings in every bot",
+      "hypothesis": "bots that are strong in different regimes diversify the path and raise the worst year at DD <= 20",
+      "parent_commit": "1ecf947baddd5ef78444670330e9db62128dad50",
+      "write_scope": "research/parallel/rounds/parallel-20260906-r2/v222",
+      "worker_agent_id": "01a07748-5adc-7061-8052-0ed36705a8a8",
+      "worker_host_id": "local",
+      "result_manifest": "research\\parallel\\rounds\\parallel-20260906-r2\\v222\\result_manifest.json",
+      "registered_at": "2026-09-28T03:30:16.236593Z",
+      "assigned_at": "2026-09-28T03:30:16.236593Z",
+      "result_manifest_sha256": "ed7313260fd6ad93010008a5f14fca7be59e110a7111da0816c7ecfa122a3f04",
+      "result_summary": {
+        "scenarios": {
+          "normal": {
+            "monthly_geometric_net_percent": 4.971,
+            "max_drawdown_percent": 19.09,
+            "fills": 1306,
+            "months": 60
+          },
+          "fee_stress": {
+            "monthly_geometric_net_percent": 4.971,
+            "max_drawdown_percent": 19.09,
+            "fills": 1306,
+            "months": 60
+          },
+          "execution_stress": {
+            "monthly_geometric_net_percent": 4.971,
+            "max_drawdown_percent": 19.09,
+            "fills": 1306,
+            "months": 60
+          }
+        },
+        "independent_test": false,
+        "live_approved": false,
+        "audit_notes": "Independent sub-account replication bit-exact on all rows. Rejected; practically equal to D2."
+      },
+      "audited_at": "2026-09-28T03:50:04.612940Z"
+    },
+    {
+      "version": "v223",
+      "track": "A",
+      "direction_key": "v223-foundation-component-mix",
+      "status": "rejected",
+      "parent_versions": [
+        "v218"
+      ],
+      "model_family": "hist-gradient-boosting",
+      "objective": "re-weight the three foundation components (7d long-only, multi-horizon long/short, 1-3d flow) for the executable trade mode",
+      "data_contract": "audited member pipelines re-run with components kept apart (annual + quarterly, A = v144, B = v150); sums reproduce the member caches exactly",
+      "policy_contract": "v218 D2 trade mode (G2 grid + sleeve 0.15 x1.75) on the re-weighted ensemble books",
+      "hypothesis": "a slower foundation signal (less 1-3d flow weight) suits the ~2-day trade mode and raises return at DD <= 20",
+      "parent_commit": "1ecf947baddd5ef78444670330e9db62128dad50",
+      "write_scope": "research/parallel/rounds/parallel-20260906-r2/v223",
+      "worker_agent_id": "01a07792-4a6b-7fc3-a08a-af2923b1778a",
+      "worker_host_id": "local",
+      "result_manifest": "research\\parallel\\rounds\\parallel-20260906-r2\\v223\\result_manifest.json",
+      "registered_at": "2026-09-28T03:48:56.721761Z",
+      "assigned_at": "2026-09-28T03:48:56.721761Z",
+      "result_manifest_sha256": "7eadb57351232d446de639f94faa9c66f4b9e401cbcf2d1e26fe556a2d4998aa",
+      "result_summary": {
+        "scenarios": {
+          "normal": {
+            "monthly_geometric_net_percent": 4.971,
+            "max_drawdown_percent": 19.09,
+            "fills": 1306,
+            "months": 60
+          },
+          "fee_stress": {
+            "monthly_geometric_net_percent": 4.971,
+            "max_drawdown_percent": 19.09,
+            "fills": 1306,
+            "months": 60
+          },
+          "execution_stress": {
+            "monthly_geometric_net_percent": 4.971,
+            "max_drawdown_percent": 19.09,
+            "fills": 1306,
+            "months": 60
+          }
+        },
+        "independent_test": false,
+        "live_approved": false,
+        "audit_notes": "Component rebuild verified (sums equal the member caches); all seven mixes reproduced bit-exact. Rejected; D2 stays."
+      },
+      "audited_at": "2026-09-28T04:08:28.655178Z"
+    },
+    {
+      "version": "v224",
+      "track": "C",
+      "direction_key": "v224-foundation-faster-mix",
+      "status": "rejected",
+      "parent_versions": [
+        "v223"
+      ],
+      "model_family": "hist-gradient-boosting",
+      "objective": "faster foundation mixes (more 1-3d flow weight, optional removal of the long-only component) for the trade mode",
+      "data_contract": "rebuilt audited components (v223 build_components.py)",
+      "policy_contract": "v218 D2 trade mode on the re-weighted ensemble books",
+      "hypothesis": "a faster foundation (more flow weight) raises the trade-mode return at DD <= 20",
+      "parent_commit": "1ecf947baddd5ef78444670330e9db62128dad50",
+      "write_scope": "research/parallel/rounds/parallel-20260906-r2/v224",
+      "worker_agent_id": "01a07748-5adc-7061-8052-0ed36705a8a8",
+      "worker_host_id": "local",
+      "result_manifest": "research\\parallel\\rounds\\parallel-20260906-r2\\v224\\result_manifest.json",
+      "registered_at": "2026-09-28T03:50:04.611212Z",
+      "assigned_at": "2026-09-28T03:50:04.611212Z",
+      "result_manifest_sha256": "795a0b1b328110654ef9434ca490ff5d49ac33d42cf17e979522facb72e258cf",
+      "result_summary": {
+        "scenarios": {
+          "normal": {
+            "monthly_geometric_net_percent": 4.971,
+            "max_drawdown_percent": 19.09,
+            "fills": 1306,
+            "months": 60
+          },
+          "fee_stress": {
+            "monthly_geometric_net_percent": 4.971,
+            "max_drawdown_percent": 19.09,
+            "fills": 1306,
+            "months": 60
+          },
+          "execution_stress": {
+            "monthly_geometric_net_percent": 4.971,
+            "max_drawdown_percent": 19.09,
+            "fills": 1306,
+            "months": 60
+          }
+        },
+        "independent_test": false,
+        "live_approved": false,
+        "audit_notes": "Component rebuild verified (sums equal the member caches); all seven mixes reproduced bit-exact. Rejected; D2 stays."
+      },
+      "audited_at": "2026-09-28T04:11:51.796660Z"
+    },
+    {
+      "version": "v225",
+      "track": "B",
+      "direction_key": "v225-nolo-foundation-trim",
+      "status": "rejected",
+      "parent_versions": [
+        "v224"
+      ],
+      "model_family": "hist-gradient-boosting",
+      "objective": "no-long-only foundation (v224 F3) with a small risk trim to fit DD <= 20",
+      "data_contract": "rebuilt audited components; F3 last year already scored once in v224 (labelled)",
+      "policy_contract": "v218 D2 trade mode on F3 books; book x0.95 / x0.90 or sleeve budget 0.14",
+      "hypothesis": "removing the long-only bias keeps the better worst year while a small trim restores DD <= 20",
+      "parent_commit": "1ecf947baddd5ef78444670330e9db62128dad50",
+      "write_scope": "research/parallel/rounds/parallel-20260906-r2/v225",
+      "worker_agent_id": "01a07791-eecb-7053-8866-dcdbe31e84d7",
+      "worker_host_id": "local",
+      "result_manifest": "research\\parallel\\rounds\\parallel-20260906-r2\\v225\\result_manifest.json",
+      "registered_at": "2026-09-28T03:51:41.560359Z",
+      "assigned_at": "2026-09-28T03:51:41.560359Z",
+      "result_manifest_sha256": "3ce82f1558e23d7bf7a0bdf319b9f004411a1e21d5fcf2287be9e48e21fd648f",
+      "result_summary": {
+        "scenarios": {
+          "normal": {
+            "monthly_geometric_net_percent": 4.971,
+            "max_drawdown_percent": 19.09,
+            "fills": 1306,
+            "months": 60
+          },
+          "fee_stress": {
+            "monthly_geometric_net_percent": 4.971,
+            "max_drawdown_percent": 19.09,
+            "fills": 1306,
+            "months": 60
+          },
+          "execution_stress": {
+            "monthly_geometric_net_percent": 4.971,
+            "max_drawdown_percent": 19.09,
+            "fills": 1306,
+            "months": 60
+          }
+        },
+        "independent_test": false,
+        "live_approved": false,
+        "audit_notes": "All nine rows reproduced bit-exact. Rejected; D2 stays."
+      },
+      "audited_at": "2026-09-28T04:23:27.641961Z"
+    },
+    {
+      "version": "v226",
+      "track": "A",
+      "direction_key": "v226-trade-mode-members",
+      "status": "rejected",
+      "parent_versions": [
+        "v218"
+      ],
+      "model_family": "hist-gradient-boosting",
+      "objective": "more foundation members (Coinbase-premium member D, monthly retraining) for the executable trade mode",
+      "data_contract": "audited member caches (annual, quarterly, monthly; D annual + quarterly)",
+      "policy_contract": "v218 D2 trade mode on equally weighted member-set ensembles",
+      "hypothesis": "ensemble diversity rejected for the continuous book helps the trade mode, whose risk structure differs",
+      "parent_commit": "1ecf947baddd5ef78444670330e9db62128dad50",
+      "write_scope": "research/parallel/rounds/parallel-20260906-r2/v226",
+      "worker_agent_id": "01a07792-4a6b-7fc3-a08a-af2923b1778a",
+      "worker_host_id": "local",
+      "result_manifest": "research\\parallel\\rounds\\parallel-20260906-r2\\v226\\result_manifest.json",
+      "registered_at": "2026-09-28T04:08:28.650388Z",
+      "assigned_at": "2026-09-28T04:08:28.650388Z",
+      "result_manifest_sha256": "c8361ed2b32f0408c767d4054ee676e9338e958e70d8a52725600bdaf987ec5f",
+      "result_summary": {
+        "scenarios": {
+          "normal": {
+            "monthly_geometric_net_percent": 4.971,
+            "max_drawdown_percent": 19.09,
+            "fills": 1306,
+            "months": 60
+          },
+          "fee_stress": {
+            "monthly_geometric_net_percent": 4.971,
+            "max_drawdown_percent": 19.09,
+            "fills": 1306,
+            "months": 60
+          },
+          "execution_stress": {
+            "monthly_geometric_net_percent": 4.971,
+            "max_drawdown_percent": 19.09,
+            "fills": 1306,
+            "months": 60
+          }
+        },
+        "independent_test": false,
+        "live_approved": false,
+        "audit_notes": "All nine rows reproduced bit-exact. Rejected; D2 stays."
+      },
+      "audited_at": "2026-09-28T04:25:36.800851Z"
+    },
+    {
+      "version": "v227",
+      "track": "C",
+      "direction_key": "v227-sleeve-coin-bandit",
+      "status": "rejected",
+      "parent_versions": [
+        "v218"
+      ],
+      "model_family": "hist-gradient-boosting",
+      "objective": "multi-armed-bandit allocation of the dip sleeve across coins (and rungs) from causal recent bid outcomes",
+      "data_contract": "outcomes of standard D2 dip bids that exited before each decision (computable from market data)",
+      "policy_contract": "v218 D2; sleeve_filter multiplies bid size by clip(ewma_coin/ewma_all, 0.5, 1.5); or no BNB bids (dev-motivated, labelled)",
+      "hypothesis": "shifting dip budget toward coins where dip buying currently works raises return and the worst year at DD <= 20",
+      "parent_commit": "1ecf947baddd5ef78444670330e9db62128dad50",
+      "write_scope": "research/parallel/rounds/parallel-20260906-r2/v227",
+      "worker_agent_id": "01a07748-5adc-7061-8052-0ed36705a8a8",
+      "worker_host_id": "local",
+      "result_manifest": "research\\parallel\\rounds\\parallel-20260906-r2\\v227\\result_manifest.json",
+      "registered_at": "2026-09-28T04:11:51.796660Z",
+      "assigned_at": "2026-09-28T04:11:51.796660Z",
+      "result_manifest_sha256": "3aa29732046cf18aa2a977e3bd5eca4d66dcf6006b6ff98f24430070f613f2de",
+      "result_summary": {
+        "scenarios": {
+          "normal": {
+            "monthly_geometric_net_percent": 4.971,
+            "max_drawdown_percent": 19.09,
+            "fills": 1306,
+            "months": 60
+          },
+          "fee_stress": {
+            "monthly_geometric_net_percent": 4.971,
+            "max_drawdown_percent": 19.09,
+            "fills": 1306,
+            "months": 60
+          },
+          "execution_stress": {
+            "monthly_geometric_net_percent": 4.971,
+            "max_drawdown_percent": 19.09,
+            "fills": 1306,
+            "months": 60
+          }
+        },
+        "independent_test": false,
+        "live_approved": false,
+        "audit_notes": "blind replication bit-exact on all rows; look-ahead checks PASS (bandit on exited bids only, hourly sigma known before the hour, minute-5 fills); gate fails -> rejected"
+      },
+      "audited_at": "2026-09-28T05:23:40.829222Z"
+    },
+    {
+      "version": "v228",
+      "track": "B",
+      "direction_key": "v228-trade-limit-offset",
+      "status": "rejected",
+      "parent_versions": [
+        "v218"
+      ],
+      "model_family": "hist-gradient-boosting",
+      "objective": "deeper limit offsets (0.35/0.45/0.55 sigma_4h) for the D2 grid trader's entries, adjustments and exits",
+      "data_contract": "v205 books, Binance USD-M 1m cubes; LABEL: offset 0.40 seen with all years in the D2 robustness diagnostic",
+      "policy_contract": "v218 D2 with trade[k_off]",
+      "hypothesis": "patient deeper limits improve prices enough to raise return and lower DD",
+      "parent_commit": "1ecf947baddd5ef78444670330e9db62128dad50",
+      "write_scope": "research/parallel/rounds/parallel-20260906-r2/v228",
+      "worker_agent_id": "01a07791-eecb-7053-8866-dcdbe31e84d7",
+      "worker_host_id": "local",
+      "result_manifest": "research\\parallel\\rounds\\parallel-20260906-r2\\v228\\result_manifest.json",
+      "registered_at": "2026-09-28T04:23:27.638783Z",
+      "assigned_at": "2026-09-28T04:23:27.638783Z",
+      "result_manifest_sha256": "629e5ef91d2b160f523a6d1a044d106e766ce22766b94138a36bf2dbdbb8830a",
+      "result_summary": {
+        "scenarios": {
+          "normal": {
+            "monthly_geometric_net_percent": 4.971,
+            "max_drawdown_percent": 19.09,
+            "fills": 1306,
+            "months": 60
+          },
+          "fee_stress": {
+            "monthly_geometric_net_percent": 4.971,
+            "max_drawdown_percent": 19.09,
+            "fills": 1306,
+            "months": 60
+          },
+          "execution_stress": {
+            "monthly_geometric_net_percent": 4.971,
+            "max_drawdown_percent": 19.09,
+            "fills": 1306,
+            "months": 60
+          }
+        },
+        "independent_test": false,
+        "live_approved": false,
+        "audit_notes": "blind replication bit-exact on all rows; look-ahead checks PASS (bandit on exited bids only, hourly sigma known before the hour, minute-5 fills); gate fails -> rejected"
+      },
+      "audited_at": "2026-09-28T05:22:12.798737Z"
+    },
+    {
+      "version": "v229",
+      "track": "A",
+      "direction_key": "v229-trade-hourly-dip-ladder",
+      "status": "rejected",
+      "parent_versions": [
+        "v218"
+      ],
+      "model_family": "hist-gradient-boosting",
+      "objective": "hourly dip ladder inside the executable trade mode D2",
+      "data_contract": "Binance USD-M 1m cubes; sigma_1h from the previous hours (known before the holding bar)",
+      "policy_contract": "v218 D2 + engine hourly ladder (shared stop-risk budget 0.15); rung x1.5 or aligned-only variants",
+      "hypothesis": "catching mid-bar crashes adds independent dip alpha within DD <= 20 under the trade-mode risk structure",
+      "parent_commit": "1ecf947baddd5ef78444670330e9db62128dad50",
+      "write_scope": "research/parallel/rounds/parallel-20260906-r2/v229",
+      "worker_agent_id": "01a07792-4a6b-7fc3-a08a-af2923b1778a",
+      "worker_host_id": "local",
+      "result_manifest": "research\\parallel\\rounds\\parallel-20260906-r2\\v229\\result_manifest.json",
+      "registered_at": "2026-09-28T04:25:36.797280Z",
+      "assigned_at": "2026-09-28T04:25:36.797280Z",
+      "result_manifest_sha256": "ebd65529f4ea44206c466aff79dda202972cee984514f6f3200db82f5dad280e",
+      "result_summary": {
+        "scenarios": {
+          "normal": {
+            "monthly_geometric_net_percent": 2.77,
+            "max_drawdown_percent": 42.21,
+            "fills": 1054,
+            "months": 60
+          },
+          "fee_stress": {
+            "monthly_geometric_net_percent": 2.77,
+            "max_drawdown_percent": 42.21,
+            "fills": 1054,
+            "months": 60
+          },
+          "execution_stress": {
+            "monthly_geometric_net_percent": 2.77,
+            "max_drawdown_percent": 42.21,
+            "fills": 1054,
+            "months": 60
+          }
+        },
+        "independent_test": false,
+        "live_approved": false,
+        "audit_notes": "blind replication bit-exact on all rows; look-ahead checks PASS (bandit on exited bids only, hourly sigma known before the hour, minute-5 fills); gate fails -> rejected"
+      },
+      "audited_at": "2026-09-28T04:41:03.918260Z"
+    },
+    {
+      "version": "v230",
+      "track": "A",
+      "direction_key": "v230-korea-premium-member",
+      "status": "rejected",
+      "parent_versions": [
+        "v229"
+      ],
+      "model_family": "hist-gradient-boosting",
+      "objective": "Korean (Upbit) premium member for the executable trade mode D2",
+      "data_contract": "Upbit KRW 1h candles (UTC) resampled to 4h, Binance spot 4h, USDKRW daily lagged 2 days; rolling stats only",
+      "policy_contract": "v218 D2 with member K (v144 builder + Korean features) added / replacing A",
+      "hypothesis": "Korean retail demand is an information-diverse member that lifts the foundation signal",
+      "parent_commit": "1ecf947baddd5ef78444670330e9db62128dad50",
+      "write_scope": "research/parallel/rounds/parallel-20260906-r2/v230",
+      "worker_agent_id": "01a07792-4a6b-7fc3-a08a-af2923b1778a",
+      "worker_host_id": "local",
+      "result_manifest": "research\\parallel\\rounds\\parallel-20260906-r2\\v230\\result_manifest.json",
+      "registered_at": "2026-09-28T04:41:03.916387Z",
+      "assigned_at": "2026-09-28T04:41:03.916387Z",
+      "result_manifest_sha256": "a1cfa350c32fe7cdab1e8a9323ae5b1be1c5a3caaba545dbde81eba5996f257d",
+      "result_summary": {
+        "scenarios": {
+          "normal": {
+            "monthly_geometric_net_percent": 4.83,
+            "max_drawdown_percent": 20.09,
+            "fills": 1314,
+            "months": 60
+          },
+          "fee_stress": {
+            "monthly_geometric_net_percent": 4.83,
+            "max_drawdown_percent": 20.09,
+            "fills": 1314,
+            "months": 60
+          },
+          "execution_stress": {
+            "monthly_geometric_net_percent": 4.83,
+            "max_drawdown_percent": 20.09,
+            "fills": 1314,
+            "months": 60
+          }
+        },
+        "independent_test": false,
+        "live_approved": false,
+        "audit_notes": "bit-exact replication; K cache matches a single-anchor rebuild; feature timing (FX +2d, Upbit hour ending at bar close) PASS; gate fails -> rejected"
+      },
+      "audited_at": "2026-09-28T05:03:55.584863Z"
+    },
+    {
+      "version": "v231",
+      "track": "A",
+      "direction_key": "v231-quality-features-tv-premium",
+      "status": "rejected",
+      "parent_versions": [
+        "v230"
+      ],
+      "model_family": "hist-gradient-boosting",
+      "objective": "upgrade member A with TradingView indicator features and exact 1m premium / predicted funding + Fear&Greed",
+      "data_contract": "panel 4h bars (causal TV indicators, test_tv_indicators), Binance 1m premiumIndexKlines 2020-01+ (reconstruction MAE 0.05bp), alternative.me F&G D+1h",
+      "policy_contract": "v218 D2 with member A replaced by A_tv / A_pf / A_all (annual half only)",
+      "hypothesis": "stateful trader indicators and the exact funding path add information the base features cannot express",
+      "parent_commit": "1ecf947baddd5ef78444670330e9db62128dad50",
+      "write_scope": "research/parallel/rounds/parallel-20260906-r2/v231",
+      "worker_agent_id": "01a07792-4a6b-7fc3-a08a-af2923b1778a",
+      "worker_host_id": "local",
+      "result_manifest": "research\\parallel\\rounds\\parallel-20260906-r2\\v231\\result_manifest.json",
+      "registered_at": "2026-09-28T05:03:55.581892Z",
+      "assigned_at": "2026-09-28T05:03:55.581892Z",
+      "result_manifest_sha256": "7813e6f61bbfafcaa91c0f781a8d7548ff27b7c3f8fcaf93f37f90b5457ea4e2",
+      "result_summary": {
+        "scenarios": {
+          "normal": {
+            "monthly_geometric_net_percent": 5.115,
+            "max_drawdown_percent": 20.0,
+            "fills": 1295,
+            "months": 60
+          },
+          "fee_stress": {
+            "monthly_geometric_net_percent": 5.115,
+            "max_drawdown_percent": 20.0,
+            "fills": 1295,
+            "months": 60
+          },
+          "execution_stress": {
+            "monthly_geometric_net_percent": 5.115,
+            "max_drawdown_percent": 20.0,
+            "fills": 1295,
+            "months": 60
+          }
+        },
+        "independent_test": false,
+        "live_approved": false,
+        "audit_notes": "engine rows bit-exact from the cached members; TV features and the premium reconstruction bit-exact vs independent re-implementations with truncation / timing tests; the auditor's single-anchor member rebuild correlates 0.993 (tv) / 1.0 (pf) / 0.997 (all) with the caches (not bit-exact - an independent rebuild path); the leader's builder reproduces the A_tv cache exactly (v233 builder check). Gate fails on the last year -> rejected."
+      },
+      "audited_at": "2026-09-28T06:03:19.549080Z"
+    },
+    {
+      "version": "v232",
+      "track": "B",
+      "direction_key": "v232-disciplined-rl-trader",
+      "status": "rejected",
+      "parent_versions": [
+        "v231"
+      ],
+      "model_family": "offline-rl-mc-hgb",
+      "objective": "RL trader with cut-losers / pyramid-winners action constraints and trader-indicator state on the V1 foundation",
+      "data_contract": "40 G2 behaviour runs eps 0.03, MC returns until position close, cross-fitted, walk-forward (transitions end before Y-7d)",
+      "policy_contract": "deviate from G2 only if both halves agree by margin; exits only while losing, adds only while winning",
+      "hypothesis": "asymmetric trader discipline keeps the trend tail that mean-value agents cut",
+      "parent_commit": "1ecf947baddd5ef78444670330e9db62128dad50",
+      "write_scope": "research/parallel/rounds/parallel-20260906-r2/v232",
+      "worker_agent_id": "01a07791-eecb-7053-8866-dcdbe31e84d7",
+      "worker_host_id": "local",
+      "result_manifest": "research\\parallel\\rounds\\parallel-20260906-r2\\v232\\result_manifest.json",
+      "registered_at": "2026-09-28T05:22:12.796151Z",
+      "assigned_at": "2026-09-28T05:22:12.796151Z",
+      "result_manifest_sha256": "c7598a5b76ea70087f3e3f2f7acd0085ff68263c3994dab991fbdaa5e5035edd",
+      "result_summary": {
+        "scenarios": {
+          "normal": {
+            "monthly_geometric_net_percent": 4.915,
+            "max_drawdown_percent": 18.86,
+            "fills": 1687,
+            "months": 60
+          },
+          "fee_stress": {
+            "monthly_geometric_net_percent": 4.915,
+            "max_drawdown_percent": 18.86,
+            "fills": 1687,
+            "months": 60
+          },
+          "execution_stress": {
+            "monthly_geometric_net_percent": 4.915,
+            "max_drawdown_percent": 18.86,
+            "fills": 1687,
+            "months": 60
+          }
+        },
+        "independent_test": false,
+        "live_approved": false,
+        "audit_notes": "engine rows and agent decisions/deviations bit-exact; state (33 features) and RL training windows (end before Y-7d) causal; R1 selected, fails 5y and last year -> rejected"
+      },
+      "audited_at": "2026-09-28T08:05:41.457592Z"
+    },
+    {
+      "version": "v233",
+      "track": "C",
+      "direction_key": "v233-tv-features-all-members",
+      "status": "rejected",
+      "parent_versions": [
+        "v231"
+      ],
+      "model_family": "hist-gradient-boosting",
+      "objective": "TradingView indicator features in the quarterly member A and the options member B",
+      "data_contract": "causal TV indicators (v231) merged on (t, sym) into v92/v103 panels; v202 quarterly wrapper; v150 options features",
+      "policy_contract": "v218 D2 settings on books with TV features in A/Aq/B/Bq",
+      "hypothesis": "the TV gain of v231 extends to the other members of the foundation",
+      "parent_commit": "1ecf947baddd5ef78444670330e9db62128dad50",
+      "write_scope": "research/parallel/rounds/parallel-20260906-r2/v233",
+      "worker_agent_id": "01a07748-5adc-7061-8052-0ed36705a8a8",
+      "worker_host_id": "local",
+      "result_manifest": "research\\parallel\\rounds\\parallel-20260906-r2\\v233\\result_manifest.json",
+      "registered_at": "2026-09-28T05:23:40.829222Z",
+      "assigned_at": "2026-09-28T05:23:40.829222Z",
+      "result_manifest_sha256": "48677835bd13f788af43b82cc386e338bea2176128e559bd6c3944c227a0fc44",
+      "result_summary": {
+        "scenarios": {
+          "normal": {
+            "monthly_geometric_net_percent": 5.156,
+            "max_drawdown_percent": 18.41,
+            "fills": 1338,
+            "months": 60
+          },
+          "fee_stress": {
+            "monthly_geometric_net_percent": 5.156,
+            "max_drawdown_percent": 18.41,
+            "fills": 1338,
+            "months": 60
+          },
+          "execution_stress": {
+            "monthly_geometric_net_percent": 5.156,
+            "max_drawdown_percent": 18.41,
+            "fills": 1338,
+            "months": 60
+          }
+        },
+        "independent_test": false,
+        "live_approved": false,
+        "audit_notes": "engine rows bit-exact from cached members; single-anchor member rebuilds correlate 0.991-0.996 (independent path), leader builder reproduces caches exactly; look-ahead PASS; T3 fails the last year only -> rejected"
+      },
+      "audited_at": "2026-09-28T15:19:12.283809Z"
+    },
+    {
+      "version": "v234",
+      "track": "A",
+      "direction_key": "v234-htf-tv-indicators",
+      "status": "rejected",
+      "parent_versions": [
+        "v233"
+      ],
+      "model_family": "hist-gradient-boosting",
+      "objective": "daily / weekly TradingView indicators on top of the 4h set in every foundation member",
+      "data_contract": "TV indicators on daily klines (usable from open+1d) and complete Monday weeks (usable from start+7d), merge_asof to the 4h close",
+      "policy_contract": "v218 D2 settings on books with 4h+1D(+1W) TV features in A/Aq/B/Bq",
+      "hypothesis": "higher-timeframe trend confirmation adds information the 4h indicators lack",
+      "parent_commit": "1ecf947baddd5ef78444670330e9db62128dad50",
+      "write_scope": "research/parallel/rounds/parallel-20260906-r2/v234",
+      "worker_agent_id": "01a07792-4a6b-7fc3-a08a-af2923b1778a",
+      "worker_host_id": "local",
+      "result_manifest": "research\\parallel\\rounds\\parallel-20260906-r2\\v234\\result_manifest.json",
+      "registered_at": "2026-09-28T06:03:19.549080Z",
+      "assigned_at": "2026-09-28T06:03:19.549080Z",
+      "result_manifest_sha256": "d488d191d24a86898ca268d89971ca4ca233d606b0a60bda5abceb175c9df005",
+      "result_summary": {
+        "scenarios": {
+          "normal": {
+            "monthly_geometric_net_percent": 5.238,
+            "max_drawdown_percent": 18.7,
+            "fills": 1307,
+            "months": 60
+          },
+          "fee_stress": {
+            "monthly_geometric_net_percent": 5.238,
+            "max_drawdown_percent": 18.7,
+            "fills": 1307,
+            "months": 60
+          },
+          "execution_stress": {
+            "monthly_geometric_net_percent": 5.238,
+            "max_drawdown_percent": 18.7,
+            "fills": 1307,
+            "months": 60
+          }
+        },
+        "independent_test": false,
+        "live_approved": false,
+        "audit_notes": "engine rows bit-exact; HTF availability (daily +1d, weekly +7d, complete weeks) verified by truncated recomputation; single-anchor member rebuilds corr 0.96-0.98 (independent path); H1 fails the last year -> rejected"
+      },
+      "audited_at": "2026-09-28T07:59:41.100490Z"
+    },
+    {
+      "version": "v235",
+      "track": "A",
+      "direction_key": "v235-sleeve-bandit-tv-state",
+      "status": "rejected",
+      "parent_versions": [
+        "v233"
+      ],
+      "model_family": "contextual-bandit-hgb",
+      "objective": "walk-forward dip-bid filter with TradingView indicator state on the T3 foundation",
+      "data_contract": "filled bids of the unfiltered T3 run; state at the decision row (market features, four T3 members, 17 TV indicators); fits use bids exited before Y-7d",
+      "policy_contract": "skip / boost dip bids by the predicted net return; T3 books, v218 D2 settings",
+      "hypothesis": "capitulation / structure / support indicators make dip-bid outcomes predictable where basic context (v220) could not",
+      "parent_commit": "1ecf947baddd5ef78444670330e9db62128dad50",
+      "write_scope": "research/parallel/rounds/parallel-20260906-r2/v235",
+      "worker_agent_id": "01a07792-4a6b-7fc3-a08a-af2923b1778a",
+      "worker_host_id": "local",
+      "result_manifest": "research\\parallel\\rounds\\parallel-20260906-r2\\v235\\result_manifest.json",
+      "registered_at": "2026-09-28T07:59:41.099380Z",
+      "assigned_at": "2026-09-28T07:59:41.099380Z",
+      "result_manifest_sha256": "5a31214fa7eeae0d3c521ab775c452b37c0163597d07d6507f80b1db8f0c424a",
+      "result_summary": {
+        "scenarios": {
+          "normal": {
+            "monthly_geometric_net_percent": 5.019,
+            "max_drawdown_percent": 18.22,
+            "fills": 1346,
+            "months": 60
+          },
+          "fee_stress": {
+            "monthly_geometric_net_percent": 5.019,
+            "max_drawdown_percent": 18.22,
+            "fills": 1346,
+            "months": 60
+          },
+          "execution_stress": {
+            "monthly_geometric_net_percent": 5.019,
+            "max_drawdown_percent": 18.22,
+            "fills": 1346,
+            "months": 60
+          }
+        },
+        "independent_test": false,
+        "live_approved": false,
+        "audit_notes": "bit-exact incl. filter statistics and training sizes; state causal (decision row, bid for the next holding bar), fits on bids exited before Y-7d; S3 fails the last year -> rejected"
+      },
+      "audited_at": "2026-09-28T10:10:36.842576Z"
+    },
+    {
+      "version": "v236",
+      "track": "B",
+      "direction_key": "v236-whale-flow-aggtrades",
+      "status": "rejected",
+      "parent_versions": [
+        "v233"
+      ],
+      "model_family": "hist-gradient-boosting",
+      "objective": "large-order vs retail taker flow (Binance aggTrades) in the T3 foundation",
+      "data_contract": "aggTrades 2020-01.. aggregated per 4h bar and notional tier (<10k, 10k-100k, 100k-1M, >=1M); rolling features known at the bar close",
+      "policy_contract": "v218 D2 settings on T3 members + flow features (all members / A members only)",
+      "hypothesis": "whale vs retail flow is information the kline flow features cannot express",
+      "parent_commit": "1ecf947baddd5ef78444670330e9db62128dad50",
+      "write_scope": "research/parallel/rounds/parallel-20260906-r2/v236",
+      "worker_agent_id": "01a07791-eecb-7053-8866-dcdbe31e84d7",
+      "worker_host_id": "local",
+      "result_manifest": "research\\parallel\\rounds\\parallel-20260906-r2\\v236\\result_manifest.json",
+      "registered_at": "2026-09-28T08:05:41.451282Z",
+      "assigned_at": "2026-09-28T08:05:41.451282Z",
+      "result_manifest_sha256": "357b13d1554d889cd3e7ce1d2cb8240d013bea912fe7aeda85abbdd96ef35835",
+      "result_summary": {
+        "scenarios": {
+          "normal": {
+            "monthly_geometric_net_percent": 5.442,
+            "max_drawdown_percent": 19.51,
+            "fills": 1384,
+            "months": 60
+          },
+          "fee_stress": {
+            "monthly_geometric_net_percent": 5.442,
+            "max_drawdown_percent": 19.51,
+            "fills": 1384,
+            "months": 60
+          },
+          "execution_stress": {
+            "monthly_geometric_net_percent": 5.442,
+            "max_drawdown_percent": 19.51,
+            "fills": 1384,
+            "months": 60
+          }
+        },
+        "independent_test": false,
+        "live_approved": false,
+        "audit_notes": "bit-exact; raw aggTrades re-aggregation of 3 random months max diff 0.0; manifests consistent; features causal on all symbols; W2 fails the last year only -> rejected (best foundation so far)"
+      },
+      "audited_at": "2026-09-28T12:19:48.568626Z"
+    },
+    {
+      "version": "v237",
+      "track": "A",
+      "direction_key": "v237-spot-vs-perp-flow",
+      "status": "rejected",
+      "parent_versions": [
+        "v236"
+      ],
+      "model_family": "hist-gradient-boosting",
+      "objective": "spot large-order flow and the spot-vs-perp split on top of v236 W2",
+      "data_contract": "Binance spot aggTrades 2019-06.. aggregated per 4h bar and tier; features known at the bar close; perp flow from v236",
+      "policy_contract": "v218 D2 settings; A members = TV + perp flow + spot flow (all / composites), B members = T3",
+      "hypothesis": "spot-led vs perp-led large-order flow is information the perp archive alone cannot express",
+      "parent_commit": "1ecf947baddd5ef78444670330e9db62128dad50",
+      "write_scope": "research/parallel/rounds/parallel-20260906-r2/v237",
+      "worker_agent_id": "01a07792-4a6b-7fc3-a08a-af2923b1778a",
+      "worker_host_id": "local",
+      "result_manifest": "research\\parallel\\rounds\\parallel-20260906-r2\\v237\\result_manifest.json",
+      "registered_at": "2026-09-28T10:10:36.836909Z",
+      "assigned_at": "2026-09-28T10:10:36.836909Z",
+      "result_manifest_sha256": "f28c6e1aa769ee13ed08165567aa6518311e02e327b33a44854677181c548867",
+      "result_summary": {
+        "scenarios": {
+          "normal": {
+            "monthly_geometric_net_percent": 5.405,
+            "max_drawdown_percent": 21.24,
+            "fills": 1397,
+            "months": 60
+          },
+          "fee_stress": {
+            "monthly_geometric_net_percent": 5.405,
+            "max_drawdown_percent": 21.24,
+            "fills": 1397,
+            "months": 60
+          },
+          "execution_stress": {
+            "monthly_geometric_net_percent": 5.405,
+            "max_drawdown_percent": 21.24,
+            "fills": 1397,
+            "months": 60
+          }
+        },
+        "independent_test": false,
+        "live_approved": false,
+        "audit_notes": "bit-exact; spot re-aggregation max diff 0.0; manifests consistent; features causal; X2 fails DD and the last year -> rejected"
+      },
+      "audited_at": "2026-09-28T12:37:19.005118Z"
+    },
+    {
+      "version": "v238",
+      "track": "B",
+      "direction_key": "v238-market-wide-flow",
+      "status": "rejected",
+      "parent_versions": [
+        "v236"
+      ],
+      "model_family": "hist-gradient-boosting",
+      "objective": "market-wide large-order flow (BTC + cross-asset mean) for every major on top of v236 W2",
+      "data_contract": "v236 per-asset flow features aggregated per bar (BTC, mean over majors); known at the bar close",
+      "policy_contract": "v218 D2 settings; A members = TV + (per-asset flow) + market flow; B members = T3",
+      "hypothesis": "altcoins follow the market leader's and the whole market's large-order pressure",
+      "parent_commit": "1ecf947baddd5ef78444670330e9db62128dad50",
+      "write_scope": "research/parallel/rounds/parallel-20260906-r2/v238",
+      "worker_agent_id": "01a07791-eecb-7053-8866-dcdbe31e84d7",
+      "worker_host_id": "local",
+      "result_manifest": "research\\parallel\\rounds\\parallel-20260906-r2\\v238\\result_manifest.json",
+      "registered_at": "2026-09-28T12:19:48.565272Z",
+      "assigned_at": "2026-09-28T12:19:48.565272Z",
+      "result_manifest_sha256": "9cef568aaf4fcccbf34a6e657143c039359195f38a6b49ca8050fdc8d70cfc85",
+      "result_summary": {
+        "scenarios": {
+          "normal": {
+            "monthly_geometric_net_percent": 4.919,
+            "max_drawdown_percent": 23.76,
+            "fills": 1375,
+            "months": 60
+          },
+          "fee_stress": {
+            "monthly_geometric_net_percent": 4.919,
+            "max_drawdown_percent": 23.76,
+            "fills": 1375,
+            "months": 60
+          },
+          "execution_stress": {
+            "monthly_geometric_net_percent": 4.919,
+            "max_drawdown_percent": 23.76,
+            "fills": 1375,
+            "months": 60
+          }
+        },
+        "independent_test": false,
+        "live_approved": false,
+        "audit_notes": "bit-exact; market-wide aggregation causal (bar-local, trailing rolls); M2 fails DD and the last year -> rejected"
+      },
+      "audited_at": "2026-09-28T13:33:58.873894Z"
+    },
+    {
+      "version": "v239",
+      "track": "A",
+      "direction_key": "v239-bagged-foundation-models",
+      "status": "rejected",
+      "parent_versions": [
+        "v236"
+      ],
+      "model_family": "bagged-hist-gradient-boosting",
+      "objective": "variance reduction: 5-seed feature-subsampled HGB averages in the W2 members",
+      "data_contract": "features / targets / anchors / embargo exactly as v236 W2 members",
+      "policy_contract": "v218 D2 settings; bagged A members (G1) or all members (G2)",
+      "hypothesis": "averaging feature-subsampled fits reduces the variance that keeps dev gains from reaching the unseen year",
+      "parent_commit": "1ecf947baddd5ef78444670330e9db62128dad50",
+      "write_scope": "research/parallel/rounds/parallel-20260906-r2/v239",
+      "worker_agent_id": "01a07792-4a6b-7fc3-a08a-af2923b1778a",
+      "worker_host_id": "local",
+      "result_manifest": "research\\parallel\\rounds\\parallel-20260906-r2\\v239\\result_manifest.json",
+      "registered_at": "2026-09-28T12:37:19.002525Z",
+      "assigned_at": "2026-09-28T12:37:19.002525Z",
+      "result_manifest_sha256": "74469a14bc833ee3bf4670b839480583d3915cea16a2511d0083cee5f327bcae",
+      "result_summary": {
+        "scenarios": {
+          "normal": {
+            "monthly_geometric_net_percent": 5.441,
+            "max_drawdown_percent": 19.76,
+            "fills": 1371,
+            "months": 60
+          },
+          "fee_stress": {
+            "monthly_geometric_net_percent": 5.441,
+            "max_drawdown_percent": 19.76,
+            "fills": 1371,
+            "months": 60
+          },
+          "execution_stress": {
+            "monthly_geometric_net_percent": 5.441,
+            "max_drawdown_percent": 19.76,
+            "fills": 1371,
+            "months": 60
+          }
+        },
+        "independent_test": false,
+        "live_approved": false,
+        "audit_notes": "bagged members; see v239_audit/COMPARISON.md; gate fails -> rejected"
+      },
+      "audited_at": "2026-09-28T15:17:09.704278Z"
+    },
+    {
+      "version": "v240",
+      "track": "B",
+      "direction_key": "v240-order-level-whale-flow",
+      "status": "rejected",
+      "parent_versions": [
+        "v236"
+      ],
+      "model_family": "hist-gradient-boosting",
+      "objective": "whale flow tiers on rebuilt taker orders (swept levels merged) instead of per-price fills",
+      "data_contract": "Binance USD-M aggTrades 2020-01..; consecutive rows with the same time and side = one taker order; same v236 feature formulas",
+      "policy_contract": "v218 D2 settings; A members = TV + order-level flow (O1) or fill + order flow (O2); B = T3",
+      "hypothesis": "correct order sizes sharpen the whale-vs-retail signal that produced the best foundation",
+      "parent_commit": "1ecf947baddd5ef78444670330e9db62128dad50",
+      "write_scope": "research/parallel/rounds/parallel-20260906-r2/v240",
+      "worker_agent_id": "01a07791-eecb-7053-8866-dcdbe31e84d7",
+      "worker_host_id": "local",
+      "result_manifest": "research\\parallel\\rounds\\parallel-20260906-r2\\v240\\result_manifest.json",
+      "registered_at": "2026-09-28T13:33:58.870303Z",
+      "assigned_at": "2026-09-28T13:33:58.870303Z",
+      "result_manifest_sha256": "23b2103b4c4e8f51e980523d9e32a78013ca89850bd90c0db3de67a0035cf539",
+      "result_summary": {
+        "scenarios": {
+          "normal": {
+            "monthly_geometric_net_percent": 5.364,
+            "max_drawdown_percent": 19.08,
+            "fills": 1365,
+            "months": 60
+          },
+          "fee_stress": {
+            "monthly_geometric_net_percent": 5.364,
+            "max_drawdown_percent": 19.08,
+            "fills": 1365,
+            "months": 60
+          },
+          "execution_stress": {
+            "monthly_geometric_net_percent": 5.364,
+            "max_drawdown_percent": 19.08,
+            "fills": 1365,
+            "months": 60
+          }
+        },
+        "independent_test": false,
+        "live_approved": false,
+        "audit_notes": "bit-exact; independent order rebuild equals the orders parquet on sampled months; totals preserved; reader-chunk boundary splits real but negligible (4.1e-6 of a BTC month); features causal; O1 is the robust winner but fails the last year -> rejected"
+      },
+      "audited_at": "2026-09-28T17:06:18.875043Z"
+    },
+    {
+      "version": "v241",
+      "track": "A",
+      "direction_key": "v241-learned-sizing-policy",
+      "status": "rejected",
+      "parent_versions": [
+        "v240"
+      ],
+      "model_family": "offline-policy-search",
+      "objective": "learned position-size multiplier from evidence agreement (members, whale flow, trend, vol) on O1",
+      "data_contract": "state at the decision row (causal); per-coin engine attribution of the unscaled O1 run as the fast proxy; fits on bars ending before Y-7d",
+      "policy_contract": "books * (1 + w tanh(theta.x)); G2 grid trader, v218 D2 settings; final evaluation in the full engine",
+      "hypothesis": "direct policy search on sizing uses the new reliable evidence without fragile action-value estimates",
+      "parent_commit": "1ecf947baddd5ef78444670330e9db62128dad50",
+      "write_scope": "research/parallel/rounds/parallel-20260906-r2/v241",
+      "worker_agent_id": "01a07792-4a6b-7fc3-a08a-af2923b1778a",
+      "worker_host_id": "local",
+      "result_manifest": "research\\parallel\\rounds\\parallel-20260906-r2\\v241\\result_manifest.json",
+      "registered_at": "2026-09-28T15:17:09.698310Z",
+      "assigned_at": "2026-09-28T15:17:09.698310Z",
+      "result_manifest_sha256": "10e0ee5f28ea1e4a5ff8e30700a3f8cebfb0afaf01ef5e5c754ecae75d1f8246",
+      "result_summary": {
+        "scenarios": {
+          "normal": {
+            "monthly_geometric_net_percent": 5.229,
+            "max_drawdown_percent": 19.6,
+            "fills": 1404,
+            "months": 60
+          },
+          "fee_stress": {
+            "monthly_geometric_net_percent": 5.229,
+            "max_drawdown_percent": 19.6,
+            "fills": 1404,
+            "months": 60
+          },
+          "execution_stress": {
+            "monthly_geometric_net_percent": 5.229,
+            "max_drawdown_percent": 19.6,
+            "fills": 1404,
+            "months": 60
+          }
+        },
+        "independent_test": false,
+        "live_approved": false,
+        "audit_notes": "exact replication incl. all 20 theta fits; feature timing, reward windows, fit windows and fill timing PASS; gate fails -> rejected"
+      },
+      "audited_at": "2026-09-28T17:21:34.212564Z"
+    },
+    {
+      "version": "v242",
+      "track": "C",
+      "direction_key": "v242-entry-locked-sizing",
+      "status": "rejected",
+      "parent_versions": [
+        "v241"
+      ],
+      "model_family": "offline-policy-search",
+      "objective": "v241 learned sizing with the multiplier locked at the start of each signal run",
+      "data_contract": "as v241 (causal state, walk-forward theta on the attribution proxy)",
+      "policy_contract": "books * m_run_start per signal run (|book|>=0.05, same sign); G2 grid trader, v218 D2 settings",
+      "hypothesis": "sizing once at entry keeps the conviction signal without the churn that sank v241",
+      "parent_commit": "1ecf947baddd5ef78444670330e9db62128dad50",
+      "write_scope": "research/parallel/rounds/parallel-20260906-r2/v242",
+      "worker_agent_id": "01a07748-5adc-7061-8052-0ed36705a8a8",
+      "worker_host_id": "local",
+      "result_manifest": "research\\parallel\\rounds\\parallel-20260906-r2\\v242\\result_manifest.json",
+      "registered_at": "2026-09-28T15:19:12.280077Z",
+      "assigned_at": "2026-09-28T15:19:12.280077Z",
+      "result_manifest_sha256": "94373661c21c7c3f9c8ef3ab9ad0d929a4fb61c64ad4f9b8964f963b4725ce11",
+      "result_summary": {
+        "scenarios": {
+          "normal": {
+            "monthly_geometric_net_percent": 5.233,
+            "max_drawdown_percent": 20.02,
+            "fills": 1375,
+            "months": 60
+          },
+          "fee_stress": {
+            "monthly_geometric_net_percent": 5.233,
+            "max_drawdown_percent": 20.02,
+            "fills": 1375,
+            "months": 60
+          },
+          "execution_stress": {
+            "monthly_geometric_net_percent": 5.233,
+            "max_drawdown_percent": 20.02,
+            "fills": 1375,
+            "months": 60
+          }
+        },
+        "independent_test": false,
+        "live_approved": false,
+        "audit_notes": "exact replication incl. all 20 theta fits; feature timing, reward windows, fit windows and fill timing PASS; gate fails -> rejected"
+      },
+      "audited_at": "2026-09-28T18:52:59.380831Z"
+    },
+    {
+      "version": "v243",
+      "track": "B",
+      "direction_key": "v243-sleeve-bandit-flow-state",
+      "status": "rejected",
+      "parent_versions": [
+        "v240"
+      ],
+      "model_family": "contextual-bandit-hgb",
+      "objective": "walk-forward dip-bid filter with the order-level whale-flow state on O1",
+      "data_contract": "filled bids of the unfiltered O1 run; state at the decision row incl. order-level flow; fits on bids exited before Y-7d",
+      "policy_contract": "skip / boost dip bids by the predicted net return; O1 books, v218 D2 settings",
+      "hypothesis": "who is selling (large orders vs retail) makes dip-bid outcomes predictable",
+      "parent_commit": "1ecf947baddd5ef78444670330e9db62128dad50",
+      "write_scope": "research/parallel/rounds/parallel-20260906-r2/v243",
+      "worker_agent_id": "01a07791-eecb-7053-8866-dcdbe31e84d7",
+      "worker_host_id": "local",
+      "result_manifest": "research\\parallel\\rounds\\parallel-20260906-r2\\v243\\result_manifest.json",
+      "registered_at": "2026-09-28T17:06:18.871519Z",
+      "assigned_at": "2026-09-28T17:06:18.871519Z",
+      "result_manifest_sha256": "7c40709347af775d3516ed79e800ec26c54cff88b11faaaa6aadf574ee4a0d05",
+      "result_summary": {
+        "scenarios": {
+          "normal": {
+            "monthly_geometric_net_percent": 5.134,
+            "max_drawdown_percent": 19.97,
+            "fills": 1370,
+            "months": 60
+          },
+          "fee_stress": {
+            "monthly_geometric_net_percent": 5.134,
+            "max_drawdown_percent": 19.97,
+            "fills": 1370,
+            "months": 60
+          },
+          "execution_stress": {
+            "monthly_geometric_net_percent": 5.134,
+            "max_drawdown_percent": 19.97,
+            "fills": 1370,
+            "months": 60
+          }
+        },
+        "independent_test": false,
+        "live_approved": false,
+        "audit_notes": "flow-state dip-bid filter; see v243_audit/COMPARISON.md; gate fails -> rejected"
+      },
+      "audited_at": "2026-09-28T18:51:36.014261Z"
+    },
+    {
+      "version": "v244",
+      "track": "A",
+      "direction_key": "v244-cross-venue-whale-flow",
+      "status": "rejected",
+      "parent_versions": [
+        "v240"
+      ],
+      "model_family": "hist-gradient-boosting",
+      "objective": "Bybit order-level large-order flow next to Binance on the O1 foundation",
+      "data_contract": "Bybit public trades rebuilt into taker orders (same timestamp + side), 4h tier table; v236 feature formulas; NaN before data",
+      "policy_contract": "v218 D2 settings; A members = TV + Binance order flow + Bybit order flow (Y1) or venue-summed flow (Y2); B = T3",
+      "hypothesis": "large orders on the second venue add information the Binance tape lacks",
+      "parent_commit": "1ecf947baddd5ef78444670330e9db62128dad50",
+      "write_scope": "research/parallel/rounds/parallel-20260906-r2/v244",
+      "worker_agent_id": "01a07792-4a6b-7fc3-a08a-af2923b1778a",
+      "worker_host_id": "local",
+      "result_manifest": "research\\parallel\\rounds\\parallel-20260906-r2\\v244\\result_manifest.json",
+      "registered_at": "2026-09-28T17:21:34.209037Z",
+      "assigned_at": "2026-09-28T17:21:34.209037Z",
+      "result_manifest_sha256": "8706d5d94175a3687010c229941c080d5f1f4542255af750cd91b4427462bae0",
+      "result_summary": {
+        "scenarios": {
+          "normal": {
+            "monthly_geometric_net_percent": 5.28,
+            "max_drawdown_percent": 22.24,
+            "fills": 1373,
+            "months": 60
+          },
+          "fee_stress": {
+            "monthly_geometric_net_percent": 5.28,
+            "max_drawdown_percent": 22.24,
+            "fills": 1373,
+            "months": 60
+          },
+          "execution_stress": {
+            "monthly_geometric_net_percent": 5.28,
+            "max_drawdown_percent": 22.24,
+            "fills": 1373,
+            "months": 60
+          }
+        },
+        "independent_test": false,
+        "live_approved": false,
+        "audit_notes": "bit-exact; Bybit order rebuild exact; features causal; gate fails -> rejected (v247 B18 = best robust config, deployed to the O1 paper pipeline)"
+      },
+      "audited_at": "2026-09-29T02:57:47.237355Z"
+    },
+    {
+      "version": "v245",
+      "track": "B",
+      "direction_key": "v245-small-account-universe",
+      "status": "rejected",
+      "parent_versions": [
+        "v240"
+      ],
+      "model_family": "deployment-variant",
+      "objective": "O1 restricted to the coins a small (~100 USDT) Bybit account can actually place",
+      "data_contract": "Bybit lot rules (instruments-info 2026-09-29); O1 books unchanged for the traded coins; others zero books and no dip bids",
+      "policy_contract": "v218 D2 settings; universes SOL/BNB/XRP, BNB/XRP, SOL/BNB/XRP x1.5",
+      "hypothesis": "a feasible small-account subset keeps enough of O1's edge for a meaningful live test",
+      "parent_commit": "1ecf947baddd5ef78444670330e9db62128dad50",
+      "write_scope": "research/parallel/rounds/parallel-20260906-r2/v245",
+      "worker_agent_id": "01a07791-eecb-7053-8866-dcdbe31e84d7",
+      "worker_host_id": "local",
+      "result_manifest": "research\\parallel\\rounds\\parallel-20260906-r2\\v245\\result_manifest.json",
+      "registered_at": "2026-09-28T18:51:36.011068Z",
+      "assigned_at": "2026-09-28T18:51:36.011068Z",
+      "result_manifest_sha256": "f42c71570bd9928faa10d53b19237b856d2a6c3907191be681cc23fbcabda11f",
+      "result_summary": {
+        "scenarios": {
+          "normal": {
+            "monthly_geometric_net_percent": 4.147,
+            "max_drawdown_percent": 19.86,
+            "fills": 904,
+            "months": 60
+          },
+          "fee_stress": {
+            "monthly_geometric_net_percent": 4.147,
+            "max_drawdown_percent": 19.86,
+            "fills": 904,
+            "months": 60
+          },
+          "execution_stress": {
+            "monthly_geometric_net_percent": 4.147,
+            "max_drawdown_percent": 19.86,
+            "fills": 904,
+            "months": 60
+          }
+        },
+        "independent_test": false,
+        "live_approved": false,
+        "audit_notes": "see v245_v246_audit/COMPARISON.md; gate fails -> rejected"
+      },
+      "audited_at": "2026-09-29T02:28:23.449996Z"
+    },
+    {
+      "version": "v246",
+      "track": "C",
+      "direction_key": "v246-flow-measurement-ensemble",
+      "status": "rejected",
+      "parent_versions": [
+        "v240"
+      ],
+      "model_family": "hist-gradient-boosting",
+      "objective": "average the fill-level (W2) and order-level (O1) whale-flow A members",
+      "data_contract": "cached audited members (v233 TV, v236 whale, v240 order-level); T3 B members",
+      "policy_contract": "v218 D2 settings on ensemble books",
+      "hypothesis": "two measurements of the same flow average into a lower-variance signal",
+      "parent_commit": "1ecf947baddd5ef78444670330e9db62128dad50",
+      "write_scope": "research/parallel/rounds/parallel-20260906-r2/v246",
+      "worker_agent_id": "01a07748-5adc-7061-8052-0ed36705a8a8",
+      "worker_host_id": "local",
+      "result_manifest": "research\\parallel\\rounds\\parallel-20260906-r2\\v246\\result_manifest.json",
+      "registered_at": "2026-09-28T18:52:59.380831Z",
+      "assigned_at": "2026-09-28T18:52:59.380831Z",
+      "result_manifest_sha256": "bfce0c4da9d1319d090c6e2abfe1fc35f4889c838082fc7926a705ea4315f98c",
+      "result_summary": {
+        "scenarios": {
+          "normal": {
+            "monthly_geometric_net_percent": 5.305,
+            "max_drawdown_percent": 19.07,
+            "fills": 1349,
+            "months": 60
+          },
+          "fee_stress": {
+            "monthly_geometric_net_percent": 5.305,
+            "max_drawdown_percent": 19.07,
+            "fills": 1349,
+            "months": 60
+          },
+          "execution_stress": {
+            "monthly_geometric_net_percent": 5.305,
+            "max_drawdown_percent": 19.07,
+            "fills": 1349,
+            "months": 60
+          }
+        },
+        "independent_test": false,
+        "live_approved": false,
+        "audit_notes": "see v245_v246_audit/COMPARISON.md; gate fails -> rejected"
+      },
+      "audited_at": "2026-09-29T02:31:51.800826Z"
+    },
+    {
+      "version": "v247",
+      "track": "B",
+      "direction_key": "v247-o1-sleeve-risk-budget",
+      "status": "rejected",
+      "parent_versions": [
+        "v240"
+      ],
+      "model_family": "trade-mode-parameter",
+      "objective": "dip-sleeve stop-risk budget 0.16/0.17/0.18 on O1",
+      "data_contract": "O1 cached members; v218 D2 settings except the budget",
+      "policy_contract": "G2 grid trader, rung x1.75, budget varied",
+      "hypothesis": "O1's lower DD leaves room for a larger positive-expectancy dip sleeve",
+      "parent_commit": "1ecf947baddd5ef78444670330e9db62128dad50",
+      "write_scope": "research/parallel/rounds/parallel-20260906-r2/v247",
+      "worker_agent_id": "01a07791-eecb-7053-8866-dcdbe31e84d7",
+      "worker_host_id": "local",
+      "result_manifest": "research\\parallel\\rounds\\parallel-20260906-r2\\v247\\result_manifest.json",
+      "registered_at": "2026-09-29T02:28:23.449996Z",
+      "assigned_at": "2026-09-29T02:28:23.449996Z",
+      "result_manifest_sha256": "0cfaa7c5aa06fb9905a542107924a23465aae27833e14a586d246faabbbee981",
+      "result_summary": {
+        "scenarios": {
+          "normal": {
+            "monthly_geometric_net_percent": 5.436,
+            "max_drawdown_percent": 19.65,
+            "fills": 1360,
+            "months": 60
+          },
+          "fee_stress": {
+            "monthly_geometric_net_percent": 5.436,
+            "max_drawdown_percent": 19.65,
+            "fills": 1360,
+            "months": 60
+          },
+          "execution_stress": {
+            "monthly_geometric_net_percent": 5.436,
+            "max_drawdown_percent": 19.65,
+            "fills": 1360,
+            "months": 60
+          }
+        },
+        "independent_test": false,
+        "live_approved": false,
+        "audit_notes": "bit-exact; Bybit order rebuild exact; features causal; gate fails -> rejected (v247 B18 = best robust config, deployed to the O1 paper pipeline)"
+      },
+      "audited_at": "2026-09-29T02:52:49.776604Z"
+    },
+    {
+      "version": "v248",
+      "track": "C",
+      "direction_key": "v248-learned-dip-exit",
+      "status": "rejected",
+      "parent_versions": [
+        "v247"
+      ],
+      "model_family": "contextual-bandit-hgb",
+      "objective": "learned take-profit multiple for every filled dip bid (exact counterfactuals)",
+      "data_contract": "four fixed-TP engine runs matched on fills; state known the minute before the fill; fits on fills exited before Y-7d",
+      "policy_contract": "sleeve_tp hook in {0.5,1,1.5,2} sigma; O1 books, budget 0.18, v218 D2 settings",
+      "hypothesis": "the exit, not the entry, of dip bids can be learned from the pre-fill state (fast drops revert more)",
+      "parent_commit": "1ecf947baddd5ef78444670330e9db62128dad50",
+      "write_scope": "research/parallel/rounds/parallel-20260906-r2/v248",
+      "worker_agent_id": "01a07748-5adc-7061-8052-0ed36705a8a8",
+      "worker_host_id": "local",
+      "result_manifest": "research\\parallel\\rounds\\parallel-20260906-r2\\v248\\result_manifest.json",
+      "registered_at": "2026-09-29T02:31:51.800826Z",
+      "assigned_at": "2026-09-29T02:31:51.800826Z",
+      "result_manifest_sha256": "262c68e5326a466e88182856558d276fd5b72fb3e4ee9ae92fecadc5c0203b06",
+      "result_summary": {
+        "scenarios": {
+          "normal": {
+            "monthly_geometric_net_percent": 5.606,
+            "max_drawdown_percent": 20.7,
+            "fills": 1362,
+            "months": 60
+          },
+          "fee_stress": {
+            "monthly_geometric_net_percent": 5.606,
+            "max_drawdown_percent": 20.7,
+            "fills": 1362,
+            "months": 60
+          },
+          "execution_stress": {
+            "monthly_geometric_net_percent": 5.606,
+            "max_drawdown_percent": 20.7,
+            "fills": 1362,
+            "months": 60
+          }
+        },
+        "independent_test": false,
+        "live_approved": false,
+        "audit_notes": "bit-exact replication of all four rows; state causality and embargoed cross-fitting confirmed; look-ahead PASS. Rejected: T1 DD 20.70, last year 3.846."
+      },
+      "audited_at": "2026-09-29T03:03:48.234172Z"
+    },
+    {
+      "version": "v249",
+      "track": "B",
+      "direction_key": "v249-dip-ladder-depth-agent",
+      "status": "running",
+      "parent_versions": [
+        "v247"
+      ],
+      "model_family": "hist-gradient-boosting",
+      "objective": "learned dip-ladder depth window per coin and bar (contextual bandit with exact per-rung outcomes) on O1 books, sleeve budget 0.18",
+      "data_contract": "engine_user 1m Binance USD-M majors; per-rung outcomes from an unbudgeted six-rung run; states at the decision bar close (sigma regime, returns, TV SuperTrend/market structure/WVF, order-level flow, book, hour); fits on bars ended before anchor - 7 days",
+      "policy_contract": "engine_user trade mode G2 grid + v218 D2 settings, budget 0.18; ladder window shallow/standard/deep of a six-rung ladder via sleeve_filter; limits, minute-5 rule, SL market / TP limit, Bybit fees, adverse funding",
+      "hypothesis": "bidding shallower or deeper by situation raises dip-sleeve return without breaking DD",
+      "parent_commit": "1ecf947baddd5ef78444670330e9db62128dad50",
+      "write_scope": "research/parallel/rounds/parallel-20260906-r2/v249",
+      "worker_agent_id": "01a07791-eecb-7053-8866-dcdbe31e84d7",
+      "worker_host_id": "local",
+      "result_manifest": null,
+      "registered_at": "2026-09-29T02:52:49.772994Z",
+      "assigned_at": "2026-09-29T02:52:49.772994Z"
+    },
+    {
+      "version": "v250",
+      "track": "A",
+      "direction_key": "v250-pyramid-ladder",
+      "status": "running",
+      "parent_versions": [
+        "v244"
+      ],
+      "model_family": "rule-based",
+      "objective": "per-rung size weights of the dip ladder (pyramid / steep pyramid / inverse, mean 1) on O1 books, sleeve budget 0.18",
+      "data_contract": "engine_user 1m Binance USD-M majors, O1 members (cached), no new data",
+      "policy_contract": "engine_user trade mode G2 grid + v218 D2 settings, budget 0.18; rung weights via sleeve_filter known at ladder placement; limits, minute-5 rule, SL market / TP limit, Bybit fees, adverse funding",
+      "hypothesis": "heavier bids deeper (trader scale-in) spend the risk budget on larger reversions and raise the worst dev year at DD <= 20",
+      "parent_commit": "1ecf947baddd5ef78444670330e9db62128dad50",
+      "write_scope": "research/parallel/rounds/parallel-20260906-r2/v250",
+      "worker_agent_id": "01a07792-4a6b-7fc3-a08a-af2923b1778a",
+      "worker_host_id": "local",
+      "result_manifest": null,
+      "registered_at": "2026-09-29T02:57:47.232621Z",
+      "assigned_at": "2026-09-29T02:57:47.232621Z"
+    },
+    {
+      "version": "v251",
+      "track": "C",
+      "direction_key": "v251-strategy-vol-target",
+      "status": "running",
+      "parent_versions": [
+        "v248"
+      ],
+      "model_family": "rule-based",
+      "objective": "strategy-level vol targeting of the O1 budget 0.18 trader (governor x clip(median past vol / trailing 30d vol))",
+      "data_contract": "engine_user 1m Binance USD-M majors, O1 members (cached); the multiplier uses only the strategy's own equity up to bar i-2",
+      "policy_contract": "engine_user trade mode G2 grid + v218 D2 settings, budget 0.18, new strat_vt hook scaling the governor; limits, minute-5 rule, SL market / TP limit, Bybit fees, adverse funding",
+      "hypothesis": "the strategy's trailing volatility predicts lower next-month returns (dev diagnostic, all four years) so scaling by it raises return at the same DD",
+      "parent_commit": "1ecf947baddd5ef78444670330e9db62128dad50",
+      "write_scope": "research/parallel/rounds/parallel-20260906-r2/v251",
+      "worker_agent_id": "01a07748-5adc-7061-8052-0ed36705a8a8",
+      "worker_host_id": "local",
+      "result_manifest": null,
+      "registered_at": "2026-09-29T03:03:48.228566Z",
+      "assigned_at": "2026-09-29T03:03:48.228566Z"
     }
   ],
-  "updated_at": "2026-09-26T21:27:28.624950Z"
+  "updated_at": "2026-09-29T03:03:48.234172Z"
 }

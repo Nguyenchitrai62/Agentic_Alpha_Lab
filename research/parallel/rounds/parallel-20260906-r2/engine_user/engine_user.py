@@ -73,7 +73,7 @@ def prepare(books, opens):
                 settle=settle_at_end, sig1h=sig1h)
 
 
-def simulate(books, opens, prep, m_sl=3.0, m_sleeve_sl=2.0, sleeve=True, target=0.25, cap=2.0, d_limit=D_LIMIT, win_end=60, sleeve_risk_budget=None, gap=0.02, m_sleeve_tp=1.0, rung_scale_fixed=None, size_mult=1.0, rungs=RUNGS, m_tp=None, hourly=False, align=None, events=None, bars=None, exec_policy=None, fixed_levels=False, attrib=None, trade=None, win_start=2, state_out=None, sleeve_filter=None, sleeve_tp=None):
+def simulate(books, opens, prep, m_sl=3.0, m_sleeve_sl=2.0, sleeve=True, target=0.25, cap=2.0, d_limit=D_LIMIT, win_end=60, sleeve_risk_budget=None, gap=0.02, m_sleeve_tp=1.0, rung_scale_fixed=None, size_mult=1.0, rungs=RUNGS, m_tp=None, hourly=False, align=None, events=None, bars=None, exec_policy=None, fixed_levels=False, attrib=None, trade=None, win_start=2, state_out=None, sleeve_filter=None, sleeve_tp=None, strat_vt=None):
     # events: optional list; when given, every fill / stop / take-profit / sleeve rung is appended as a dict (no effect on results)
     # exec_policy: optional callable (i, a, dw, w_a, tgt_a, sig4_ia) -> ("limit", offset[, weight]) | ("market", 0[, weight]) | ("skip", 0)
     #   deciding how (and, with the optional weight, to which weight instead of the target)
@@ -86,6 +86,10 @@ def simulate(books, opens, prep, m_sl=3.0, m_sleeve_sl=2.0, sleeve=True, target=
     #   2026-09-28: the pipeline needs ~5 minutes after the close, no fill is allowed before).
     # state_out: optional dict; filled at the end with the trade-mode state (orders, SL/TP, quantities, entries) and the last equity.
     # sleeve_filter: optional callable (i, a, rung_index) -> size multiplier for that dip-sleeve bid, decided when the ladder is placed
+    # strat_vt: optional dict(lo, hi, power, days=30, warm_days=90) -> strategy-level vol targeting: the governor is multiplied by
+    #   clip((median of the strategy's own past trailing vols / its trailing vol) ** power, lo, hi); the trailing vol is the annualised
+    #   std of the 4h log equity changes over `days` up to bar i-2 (same lag as the governor), the median runs over all earlier bars'
+    #   trailing vols (expanding, nothing fitted); multiplier 1 during the first warm_days of live trading. None = unchanged results.
     # sleeve_tp: optional callable (i, a, rung_index, fill_minute) -> take-profit multiple (sigma units) chosen when the bid FILLS
     #   (data up to the minute before the fill); None = m_sleeve_tp for every rung (unchanged results)
     #   (0 = do not place it); it may use only information known at the decision of bar i.
@@ -111,6 +115,7 @@ def simulate(books, opens, prep, m_sl=3.0, m_sleeve_sl=2.0, sleeve=True, target=
     if exec_policy is not None:
         stats.update(market=0, skipped=0, limit_offset_sum=0.0)
     minute = np.arange(240)
+    vt_hist = []  # strategy trailing vols (strat_vt)
     if trade is not None:
         stats.update(issued=0, cancelled=0, expired=0, partials=0, be_moves=0, tightened=0, risk_skipped=0, adds=0, reduces=0,
                      scale_orders=0)
@@ -377,6 +382,15 @@ def simulate(books, opens, prep, m_sl=3.0, m_sleeve_sl=2.0, sleeve=True, target=
             j = i - 2
             peak = eq[max(0, j - 90 * PD + 1): j + 1].max()
             g[i] = float(np.clip((0.20 - (1 - eq[j] / peak)) / 0.10, 0.0, 1.0))
+        if strat_vt is not None and i >= 2 and live[i]:
+            j = i - 2
+            nl = int(live[:j + 1].sum())
+            if nl >= 2:
+                lr = np.diff(np.log(eq[max(0, j - strat_vt.get("days", 30) * PD + 1): j + 1]))
+                vt_hist.append(float(lr.std() * np.sqrt(PD * 365)) if len(lr) > 1 else np.nan)
+            if nl >= strat_vt.get("warm_days", 90) * PD and len(vt_hist) > 1 and np.isfinite(vt_hist[-1]) and vt_hist[-1] > 0:
+                med = float(np.nanmedian(vt_hist[:-1]))
+                g[i] *= float(np.clip((med / vt_hist[-1]) ** strat_vt.get("power", 1.0), strat_vt["lo"], strat_vt["hi"]))
         prev_eq = eq[i - 1] if i else 1.0
         if not live[i] or not np.all(np.isfinite(o1[i])) or not np.all(np.isfinite(o2[i])):
             eq[i] = prev_eq
