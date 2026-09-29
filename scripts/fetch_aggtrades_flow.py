@@ -4,7 +4,9 @@ Source: https://data.binance.vision/data/futures/um/monthly/aggTrades/{SYM}/ (+ 
 Each aggTrade = one taker order's fill at one price. Per UTC 4h bar and size tier (notional USDT: <10k, 10k-100k, 100k-1M, >=1M) the
 script keeps the taker-buy notional, taker-sell notional and the count, so large-order ("whale") flow can be separated from retail
 flow. The raw zip is processed in chunks and discarded (no raw data kept). Resumable: finished months are listed in the output.
-Output: data/raw/aggflow_20260928/{SYM}_flow_4h.parquet (index bar open UTC; columns {buy,sell,n}_{tier}), manifest.json.
+Output: data/raw/aggflow_20260928/{SYM}_flow_4h.parquet (index bar open UTC; columns {buy,sell,n}_{tier}), manifest_{SYM}.json,
+and a 1m store <OUT>_1m/{SYM}/<source file>.parquet (per minute: buy / sell notional and taker order counts in 8 log-size bins) so new
+feature definitions (e.g. intrabar flow) never need the raw archive again.
 
   python scripts/fetch_aggtrades_flow.py [SYM ...] [--months 2024-03] [--market spot]
 (--market spot: Binance SPOT aggTrades from data/spot/..., output data/raw/aggflow_spot_20260928)
@@ -28,6 +30,9 @@ BASE = "https://data.binance.vision/"
 S3 = "https://s3-ap-northeast-1.amazonaws.com/data.binance.vision"
 OUT = Path("data/raw/aggflow_20260928")
 TIERS = (0.0, 1e4, 1e5, 1e6, np.inf)
+# 1m store (kept so new feature definitions need no re-download): 8 log-spaced notional bins in USDT
+BINS_1M = (0.0, 1e3, 1e4, 3e4, 1e5, 3e5, 1e6, 3e6, np.inf)
+BNAME_1M = ("lt1k", "1k_10k", "10k_30k", "30k_100k", "100k_300k", "300k_1m", "1m_3m", "ge3m")
 TNAME = ("lt10k", "10k_100k", "100k_1m", "ge1m")
 SYMS = ("BTCUSDT", "ETHUSDT", "SOLUSDT", "BNBUSDT", "XRPUSDT")
 
@@ -55,7 +60,7 @@ def _orders(ch: pd.DataFrame) -> pd.DataFrame:
     return pd.DataFrame({"ts": g["ts"].first(), "ibm": g["ibm"].first(), "n": g["n"].sum()})
 
 
-def aggregate(raw: bytes) -> pd.DataFrame:
+def aggregate(raw: bytes, store_1m: list | None = None) -> pd.DataFrame:
     parts = []
     with zipfile.ZipFile(io.BytesIO(raw)) as z:
         with z.open(z.namelist()[0]) as f:
@@ -80,6 +85,12 @@ def aggregate(raw: bytes) -> pd.DataFrame:
                 tier = pd.cut(n, TIERS, right=False, labels=TNAME)
                 d = pd.DataFrame({"t": t, "tier": tier, "buy": n.where(~sell, 0.0), "sell": n.where(sell, 0.0), "n": 1})
                 parts.append(d.groupby(["t", "tier"], observed=True)[["buy", "sell", "n"]].sum())
+                if store_1m is not None:
+                    t1 = pd.to_datetime(ts, unit=unit, utc=True).dt.floor("min")
+                    b1 = pd.cut(n, BINS_1M, right=False, labels=BNAME_1M)
+                    d1 = pd.DataFrame({"t": t1, "bin": b1, "buy": n.where(~sell, 0.0), "sell": n.where(sell, 0.0),
+                                       "nb": (~sell).astype(np.int32), "ns": sell.astype(np.int32)})
+                    store_1m.append(d1.groupby(["t", "bin"], observed=True)[["buy", "sell", "nb", "ns"]].sum())
     g = pd.concat(parts).groupby(level=[0, 1], observed=True).sum().unstack("tier")
     g.columns = [f"{a}_{b}" for a, b in g.columns]
     return g
@@ -106,7 +117,15 @@ def run(sym: str, only=None, since=None):
     for k in todo:
         t0 = time.time()
         raw = urllib.request.urlopen(BASE + k, timeout=600).read()
-        g = aggregate(raw)
+        s1: list = []
+        g = aggregate(raw, s1)
+        if s1:  # 1m store, one parquet per source file (float32 notionals, int32 counts)
+            m1 = pd.concat(s1).groupby(level=[0, 1], observed=True).sum().unstack("bin").fillna(0.0)
+            m1.columns = [f"{a}_{b}" for a, b in m1.columns]
+            d1 = Path(str(OUT) + "_1m") / sym
+            d1.mkdir(parents=True, exist_ok=True)
+            m1.astype({c: ("int32" if c.startswith("n") else "float32") for c in m1.columns}).to_parquet(
+                d1 / (k.rsplit("/", 1)[-1].replace(".zip", ".parquet")), compression="zstd")
         acc = g if acc is None else pd.concat([acc, g]).groupby(level=0).sum()
         acc.sort_index().to_parquet(path)
         man["done"].setdefault(sym, []).append(k.rsplit("/", 1)[-1])
