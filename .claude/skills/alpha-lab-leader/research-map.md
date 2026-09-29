@@ -1,6 +1,6 @@
 # Research map (update after every rotation)
 
-Last update: 2026-09-29 (after v262).
+Last update: 2026-09-29 (after v263).
 
 ## Honest status
 
@@ -30,6 +30,7 @@ v258 disciplined PPO (G2 pyramiding simulator, fidelity 0.985 vs engine; cut los
 v260 PPO risk manager on block-bootstrapped paths, 5 seeds: median dev4 4.47, last year median 3.13 -> the stable learned policy is plain de-risking (no timing skill); not adopted. v258/v259 audits PASS (no leakage; v259 gate pass genuine for seed 259, seed-unstable). Dev-only diagnostic: BTC-hedging alt dip fills keeps only 15-30% of the edge (the sleeve is a market-rebound bet) -> closed.
 v261 direct-reinforcement foundation member (differentiable net Sharpe, policy gradient, 5 seeds): member IC ~0-0.07 -> dilutes (dev4 5.50 / 5.58). RL now tried at every level (sleeve bandits, entry/exit bandits, fitted-Q, PPO trade manager, PPO risk manager, direct-RL member): 14 variants, none beats the O1 rules out of sample.
 v262 Binance SPOT order-level flow (2017+, kept store): add DD 22.4, perp+spot sum DD 20.8, dev below O1 -> rejected; all venue / market extensions of whale flow (v237, v238, v244, v262; OKX v253 deferred) raise DD. Data catalog: docs/DATA_CATALOG.md.
+v263 meta-labeling of entries (win classifier, skip p<0.35/0.40): +0.04pp dev, win rate unchanged (skips re-enter next bar) - neutral.
 PLATEAU: every management layer lands at dev4 ~5.1-5.3 and last year ~3.8-4.0 at DD ~19 -> the foundation signal is the limit.
 v223-v228 (all rejected, D2 stays): foundation component mixes slower/faster (0.25/0.25/0.5 local optimum), no long-only + trim
 (best worst year 2.47 but dev4 4.97), member D / monthly schedule, causal coin bandit for the sleeve (DD > 20), deeper limit
