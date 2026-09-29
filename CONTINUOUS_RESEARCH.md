@@ -1,5 +1,7 @@
 # Continuous BTC research — active
 
+LEADER 2026-09-29 (v261-v262): direct-reinforcement foundation member (differentiable net Sharpe, 5 seeds) has IC ~0-0.07 and dilutes O1 (dev4 5.50 / 5.58); Binance SPOT order-level whale flow (full 2017+ archive, kept as a derived store) raises DD above 20 in both forms (dev4 5.32 / 5.46). O1 + sleeve budget 0.18 remains the deployed pipeline; v260 / v261 audits PASS.
+
 LEADER 2026-09-29 (v260): PPO risk manager trained on block-bootstrapped paths and judged on the median of five seeds - median dev4 4.47, most recent year median 3.13, DD 17.45: the robust learned policy only de-risks, so DD and return fall together; not adopted. v258/v259 blind audit PASS (bit-exact PPO retrain, no leakage). BTC hedge of alt dip fills (dev diagnostic) removes 70-85% of the edge.
 
 LEADER 2026-09-29 (v258-v259, sequential RL): v258 disciplined PPO in a faithful G2 pyramiding simulator (monthly book PnL corr 0.985 with the engine) - cutting only losers realises reversible drawdowns (win 43-49%, DD 20.6-26.7). v259 PPO daily risk manager: the registered seed passed the whole gate (5y 5.114, most recent year 5.309, DD 17.45), but four other seeds of the same method give the most recent year 2.3-3.6 and dev4 4.5-5.0 (median 3.48 < O1 4.08): seed luck, rejected and not deployed. From now on stochastic learners must report >= 5 seeds.
