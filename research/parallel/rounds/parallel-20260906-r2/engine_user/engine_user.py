@@ -582,8 +582,8 @@ def simulate(books, opens, prep, m_sl=3.0, m_sleeve_sl=2.0, sleeve=True, target=
                 x, ret, xk = end_m, None, "rung_timeout"
                 if f + 1 < end_m and sleeve_stop_mode != "touch":
                     step = 1 if sleeve_stop_mode == "close1" else 5
-                    mins = np.arange(f + 1, end_m)
-                    trig = (Ca[f + 1:end_m] <= sl) & ((mins + 1) % step == 0)
+                    mi_ = np.arange(f + 1, end_m)
+                    trig = (Ca[f + 1:end_m] <= sl) & ((mi_ + 1) % step == 0)
                     ht = Ha[f + 1:end_m] > tp
                     ks = int(np.argmax(trig)) if trig.any() else None
                     kt = int(np.argmax(ht)) if ht.any() else None
