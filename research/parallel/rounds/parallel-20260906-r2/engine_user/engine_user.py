@@ -73,7 +73,7 @@ def prepare(books, opens):
                 settle=settle_at_end, sig1h=sig1h)
 
 
-def simulate(books, opens, prep, m_sl=3.0, m_sleeve_sl=2.0, sleeve=True, target=0.25, cap=2.0, d_limit=D_LIMIT, win_end=60, sleeve_risk_budget=None, gap=0.02, m_sleeve_tp=1.0, rung_scale_fixed=None, size_mult=1.0, rungs=RUNGS, m_tp=None, hourly=False, align=None, events=None, bars=None, exec_policy=None, fixed_levels=False, attrib=None, trade=None, win_start=2, state_out=None, sleeve_filter=None, sleeve_tp=None, strat_vt=None, sleeve_start=16, risk_mult=None, sleeve_breaker=None):
+def simulate(books, opens, prep, m_sl=3.0, m_sleeve_sl=2.0, sleeve=True, target=0.25, cap=2.0, d_limit=D_LIMIT, win_end=60, sleeve_risk_budget=None, gap=0.02, m_sleeve_tp=1.0, rung_scale_fixed=None, size_mult=1.0, rungs=RUNGS, m_tp=None, hourly=False, align=None, events=None, bars=None, exec_policy=None, fixed_levels=False, attrib=None, trade=None, win_start=2, state_out=None, sleeve_filter=None, sleeve_tp=None, strat_vt=None, sleeve_start=16, risk_mult=None, sleeve_breaker=None, sleeve_stop_mode="touch"):
     # events: optional list; when given, every fill / stop / take-profit / sleeve rung is appended as a dict (no effect on results)
     # exec_policy: optional callable (i, a, dw, w_a, tgt_a, sig4_ia) -> ("limit", offset[, weight]) | ("market", 0[, weight]) | ("skip", 0)
     #   deciding how (and, with the optional weight, to which weight instead of the target)
@@ -86,6 +86,9 @@ def simulate(books, opens, prep, m_sl=3.0, m_sleeve_sl=2.0, sleeve=True, target=
     #   2026-09-28: the pipeline needs ~5 minutes after the close, no fill is allowed before).
     # state_out: optional dict; filled at the end with the trade-mode state (orders, SL/TP, quantities, entries) and the last equity.
     # sleeve_filter: optional callable (i, a, rung_index) -> size multiplier for that dip-sleeve bid, decided when the ladder is placed
+    # sleeve_stop_mode: "touch" (default: a 1m low through the stop, fill at min(stop, open)); "close1" / "close5": the market stop
+    #   triggers when a 1m close / a 5m-block close (minutes 4, 9, ... of the bar) is at or below the stop and fills at the next minute's
+    #   open (next bar open after minute 239); a same-minute TP touch and close trigger resolve stop-first.
     # sleeve_breaker: optional loss fraction X; a new dip-rung fill at minute f is skipped when the bar's already-taken rungs are
     #   marked below -X of equity at the close of minute f-1 (realised exits included) - stop adding in a cascade. None = unchanged.
     # risk_mult: optional callable (i, eq_hist) -> multiplier on the governor of bar i (book targets and dip-rung sizes); eq_hist =
@@ -577,7 +580,28 @@ def simulate(books, opens, prep, m_sl=3.0, m_sleeve_sl=2.0, sleeve=True, target=
                 tp = lv * (1 + (m_sleeve_tp if sleeve_tp is None else float(sleeve_tp(i, a, r, f))) * sg)
                 sl = lv * (1 - m_sleeve_sl * sg)
                 x, ret, xk = end_m, None, "rung_timeout"
-                if f + 1 < end_m:
+                if f + 1 < end_m and sleeve_stop_mode != "touch":
+                    step = 1 if sleeve_stop_mode == "close1" else 5
+                    mins = np.arange(f + 1, end_m)
+                    trig = (Ca[f + 1:end_m] <= sl) & ((mins + 1) % step == 0)
+                    ht = Ha[f + 1:end_m] > tp
+                    ks = int(np.argmax(trig)) if trig.any() else None
+                    kt = int(np.argmax(ht)) if ht.any() else None
+                    if kt is not None and (ks is None or kt < ks):
+                        x = f + 1 + kt
+                        ret = tp / lv - 1 - 2 * MAKER
+                        stats["rung_tps"] += 1
+                        xk = "rung_tp"
+                    elif ks is not None:
+                        km = f + 1 + ks
+                        if km + 1 < 240:
+                            x, px_ = km + 1, Oa[km + 1]
+                        else:
+                            x, px_ = 240, o2[i][a]
+                        ret = px_ / lv - 1 - MAKER - TAKER
+                        stats["rung_stops"] += 1
+                        xk = "rung_sl"
+                elif f + 1 < end_m:
                     hs = La[f + 1:end_m] <= sl
                     ht = Ha[f + 1:end_m] > tp
                     hit = hs | ht
