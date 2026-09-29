@@ -1,6 +1,6 @@
 # Research map (update after every rotation)
 
-Last update: 2026-09-29 (after v259).
+Last update: 2026-09-29 (after v260).
 
 ## Honest status
 
@@ -27,6 +27,7 @@ v252 intrabar whale flow from the 1m order-level store (in A members): dev below
 v255 dip ladder from minute 5/10 instead of 16: neutral (last year identical). OpenCode whale-burst reversal study (dev only, research/diagnostics/whale_burst): 0/108 stable rows, all negative, worse than random entries -> closed. O1 B18 ROBUSTNESS (research/diagnostics/o1_robustness, OpenCode): no losing year in any stress row, win 0.50-0.53 everywhere; DD FRAGILE (base 19.65; cost stress 20.75, latency 30 min 21.08, 60 min 23.18, band shifts 20.4-21.0, cool 12 22.7); bootstrap P(loss year) 1.4%, P(DD>20) 6.8%, P(>=5%/mo) 55%; at 2000 USDT 99% of book and 98% of dip orders placeable. A live bot must act within ~15 minutes of the 4h close.
 v256 RL entry-execution bandit (limit offset per opening order, exact counterfactuals): neutral (agent deviates on 5-8%). v257 sequential PPO trader (per-coin simulator, walk-forward, engine evaluation): pure PPO trades win rate for return (win 56.5%, dev4 3.9, median hold 20h - cuts trends, as v214); PPO + rule prior = rule. RL CONCLUSION (10 learned layers): the rules are near-optimal given the information; learned managers either copy the rule or cut the fat-tailed trend trades. Next gains must come from new information.
 v258 disciplined PPO (G2 pyramiding simulator, fidelity 0.985 vs engine; cut losers only): worse (win 43-49%, DD 20.6-26.7). v259 PPO daily RISK MANAGER (multiplier 0.5-1.25 on the governor, DD-aware reward): seed 259 passed the whole gate (5y 5.114, last 5.309, DD 17.45) BUT the seed diagnostic (4 other seeds, research/diagnostics/v259_seeds) gives last year 2.3-3.6, dev4 4.5-5.0 -> seed luck, rejected. RULE: every stochastic learner (PPO / NN) must report >= 5 seeds before any claim.
+v260 PPO risk manager on block-bootstrapped paths, 5 seeds: median dev4 4.47, last year median 3.13 -> the stable learned policy is plain de-risking (no timing skill); not adopted. v258/v259 audits PASS (no leakage; v259 gate pass genuine for seed 259, seed-unstable). Dev-only diagnostic: BTC-hedging alt dip fills keeps only 15-30% of the edge (the sleeve is a market-rebound bet) -> closed.
 PLATEAU: every management layer lands at dev4 ~5.1-5.3 and last year ~3.8-4.0 at DD ~19 -> the foundation signal is the limit.
 v223-v228 (all rejected, D2 stays): foundation component mixes slower/faster (0.25/0.25/0.5 local optimum), no long-only + trim
 (best worst year 2.47 but dev4 4.97), member D / monthly schedule, causal coin bandit for the sleeve (DD > 20), deeper limit

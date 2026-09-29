@@ -2,7 +2,7 @@
   "schema_version": 1,
   "project": "Agentic Alpha Lab BTC swing research",
   "created_at": "2026-09-06T00:00:00Z",
-  "next_version": 260,
+  "next_version": 261,
   "control": {
     "coordinator_model": "gpt-5.6-sol",
     "coordinator_reasoning": "high",
@@ -54,7 +54,7 @@
     "expected_workers": 3,
     "version_range": [
       45,
-      259
+      260
     ],
     "parent_commit": "1ecf947baddd5ef78444670330e9db62128dad50",
     "cloud_snapshot": {
@@ -10789,7 +10789,7 @@
       "version": "v258",
       "track": "B",
       "direction_key": "v258-ppo-disciplined-pyramiding",
-      "status": "running",
+      "status": "rejected",
       "parent_versions": [
         "v256"
       ],
@@ -10802,9 +10802,36 @@
       "write_scope": "research/parallel/rounds/parallel-20260906-r2/v258",
       "worker_agent_id": "01a07791-eecb-7053-8866-dcdbe31e84d7",
       "worker_host_id": "local",
-      "result_manifest": null,
+      "result_manifest": "research\\parallel\\rounds\\parallel-20260906-r2\\v258\\result_manifest.json",
       "registered_at": "2026-09-29T06:37:38.323512Z",
-      "assigned_at": "2026-09-29T06:37:38.323512Z"
+      "assigned_at": "2026-09-29T06:37:38.323512Z",
+      "result_manifest_sha256": "dda7a0425cfa27312615fcf34578eaad3cf507766aee44a63b4ec80f18e208d2",
+      "result_summary": {
+        "scenarios": {
+          "normal": {
+            "monthly_geometric_net_percent": 4.818,
+            "max_drawdown_percent": 26.7,
+            "fills": 3119,
+            "months": 60
+          },
+          "fee_stress": {
+            "monthly_geometric_net_percent": 4.818,
+            "max_drawdown_percent": 26.7,
+            "fills": 3119,
+            "months": 60
+          },
+          "execution_stress": {
+            "monthly_geometric_net_percent": 4.818,
+            "max_drawdown_percent": 26.7,
+            "fills": 3119,
+            "months": 60
+          }
+        },
+        "independent_test": false,
+        "live_approved": false,
+        "audit_notes": "PPO re-trained bit-exact with the same seeds; fit windows, equity lag i-2, market timing, vol-median lag, 2021 fallback and simulator fidelity confirmed; no leakage. v259's gate pass is genuine for seed 259 but seed-unstable (research/diagnostics/v259_seeds)."
+      },
+      "audited_at": "2026-09-29T08:21:50.646853Z"
     },
     {
       "version": "v259",
@@ -10826,7 +10853,28 @@
       "result_manifest": null,
       "registered_at": "2026-09-29T06:48:53.790812Z",
       "assigned_at": "2026-09-29T06:48:53.790812Z"
+    },
+    {
+      "version": "v260",
+      "track": "B",
+      "direction_key": "v260-ppo-risk-bootstrap",
+      "status": "running",
+      "parent_versions": [
+        "v258"
+      ],
+      "model_family": "ppo-actor-critic-mlp",
+      "objective": "PPO daily risk manager trained on block-bootstrapped pre-anchor paths, judged on the median of five seeds",
+      "data_contract": "as v259 (reference-run attribution proxy, equity lag i-2, market state at the decision close); episodes = three random 30-day blocks of bars from 2021-09-24 to anchor - 7 days",
+      "policy_contract": "engine_user trade mode G2 + v218 D2 settings, budget 0.18, risk_mult hook; limits, minute-5 rule, SL market / TP limit, Bybit fees, adverse funding",
+      "hypothesis": "more (resampled) training paths remove v259's seed luck and leave the robust part of a learned risk dial",
+      "parent_commit": "1ecf947baddd5ef78444670330e9db62128dad50",
+      "write_scope": "research/parallel/rounds/parallel-20260906-r2/v260",
+      "worker_agent_id": "01a07791-eecb-7053-8866-dcdbe31e84d7",
+      "worker_host_id": "local",
+      "result_manifest": null,
+      "registered_at": "2026-09-29T08:21:50.643035Z",
+      "assigned_at": "2026-09-29T08:21:50.643035Z"
     }
   ],
-  "updated_at": "2026-09-29T06:48:53.796846Z"
+  "updated_at": "2026-09-29T08:21:50.646853Z"
 }

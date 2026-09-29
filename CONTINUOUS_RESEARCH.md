@@ -1,5 +1,7 @@
 # Continuous BTC research — active
 
+LEADER 2026-09-29 (v260): PPO risk manager trained on block-bootstrapped paths and judged on the median of five seeds - median dev4 4.47, most recent year median 3.13, DD 17.45: the robust learned policy only de-risks, so DD and return fall together; not adopted. v258/v259 blind audit PASS (bit-exact PPO retrain, no leakage). BTC hedge of alt dip fills (dev diagnostic) removes 70-85% of the edge.
+
 LEADER 2026-09-29 (v258-v259, sequential RL): v258 disciplined PPO in a faithful G2 pyramiding simulator (monthly book PnL corr 0.985 with the engine) - cutting only losers realises reversible drawdowns (win 43-49%, DD 20.6-26.7). v259 PPO daily risk manager: the registered seed passed the whole gate (5y 5.114, most recent year 5.309, DD 17.45), but four other seeds of the same method give the most recent year 2.3-3.6 and dev4 4.5-5.0 (median 3.48 < O1 4.08): seed luck, rejected and not deployed. From now on stochastic learners must report >= 5 seeds.
 
 LEADER 2026-09-29 (v255-v257 + OpenCode studies): whale-burst reversal event study (dev only) 0/108 stable rows, worse than random entries -> closed; v255 dip ladder from minute 5/10 neutral; v256 RL entry-execution bandit neutral; v257 sequential PPO trader: pure PPO raises the trade win rate to 56.5% but cuts trends (dev4 3.9, DD 21.1), PPO with a rule prior reproduces the rule. O1 B18 robustness: no losing year in any stress row, DD fragile (cost stress 20.75, 30-min latency 21.1); bootstrap P(loss year) 1.4%, P(DD>20) 6.8%.
