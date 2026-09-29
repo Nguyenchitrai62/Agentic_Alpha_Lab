@@ -16,3 +16,5 @@ A2 (v258): check the simulator fidelity claim (monthly corr of rule-only book Pn
 mask in simulator and engine, the fit windows; re-train with the same seeds and compare qualitatively.
 Save `replication.json`. B: compare with both result JSONs. COMPARISON.md with a "## Verdict" PASS/FAIL, explicitly checking feature
 timing, label (reward) windows, fit windows and fill timing. Do not edit leader files.
+ERRATUM (leader, after dispatch): the v259 docstring says "random 180-day windows"; the code uses EP_DEC = 30 decisions x 6 bars = 30-day
+episodes. Audit the code as run and note the discrepancy.
