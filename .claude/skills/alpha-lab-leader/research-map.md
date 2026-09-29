@@ -37,6 +37,7 @@ v267 stress-robust selection (dev DD <= 20 in base, cost stress, latency 15): EM
 v268 book close stops: DD 21.6-21.9 (touch stays right for the book). v269 close-stop distance: 4 sigma DD 18.27 dev4 6.03 last 4.645 (robust criterion keeps B1); v270 stress rule on it: cost-stress DD 20.23 -> pool empty by 0.23 pp, O1 kept. v271 RL optimal-stopping agent for losing dip rungs (exact returns): early cuts free budget for deeper rungs of the same flush -> DD 21.3, rejected.
 v272 = v271 + budget lock: identical results (freed-budget hypothesis falsified; wrong cuts miss recoveries). v273 book target 0.27 / 0.29 on M1: dev4 6.12 / 6.21 but weaker weak years (robust criterion keeps M1); T1 last year 4.684 (best unseen-year score so far, still < 5).
 v274 dip TP 1.25 / 1.5 sigma under close stops: DD 26.6 / 27.4 -> TP 1 sigma stays optimal (non-TP rungs fall back).
+Dev-only diagnostic (research/diagnostics/dip_carry): holding timed-out dip rungs 4h / 8h past the bar end under M1 rules is not consistent (2021 / 2023 negative, late fills worse, q01 -7..-9%) -> no cross-bar dip holding.
 PLATEAU: every management layer lands at dev4 ~5.1-5.3 and last year ~3.8-4.0 at DD ~19 -> the foundation signal is the limit.
 v223-v228 (all rejected, D2 stays): foundation component mixes slower/faster (0.25/0.25/0.5 local optimum), no long-only + trim
 (best worst year 2.47 but dev4 4.97), member D / monthly schedule, causal coin bandit for the sleeve (DD > 20), deeper limit
