@@ -13,3 +13,8 @@ first-year equity base fixed in 3538431 before any agent result) and the decisio
 hardware: re-train at least two seeds per variant and report whether the qualitative verdict (all seeds far below the reference) holds.
 Save `replication.json`. B: compare with both result JSONs. COMPARISON.md with a "## Verdict" PASS/FAIL, explicitly checking feature
 timing, label windows, fit windows and fill timing. Do not edit leader files.
+A3 (v283, added): read `v283/v283_stacked_members.py`; check that the stacker weights for year Y use only live rows whose 7-day label ended
+before Y - 7 days, that member C is rebuilt exactly as v281, and rerun S1 / S2.
+A4 (v284, added): read `v284/v284_spliced_flow_history.py`; check the splice (spot order-level 4h table only BEFORE the first perp bar), the
+flow features causal across the splice, rebuild at least one anchor of member A for P2 and compare; rerun P1 / P2.
+Report and compare all four versions (replication.json keys per version); the audit folder name stays v281_v282_audit.
