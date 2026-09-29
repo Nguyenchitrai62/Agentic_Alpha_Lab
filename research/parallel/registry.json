@@ -2,7 +2,7 @@
   "schema_version": 1,
   "project": "Agentic Alpha Lab BTC swing research",
   "created_at": "2026-09-06T00:00:00Z",
-  "next_version": 283,
+  "next_version": 284,
   "control": {
     "coordinator_model": "gpt-5.6-sol",
     "coordinator_reasoning": "high",
@@ -54,7 +54,7 @@
     "expected_workers": 3,
     "version_range": [
       45,
-      282
+      283
     ],
     "parent_commit": "1ecf947baddd5ef78444670330e9db62128dad50",
     "cloud_snapshot": {
@@ -11853,7 +11853,7 @@
       "version": "v280",
       "track": "A",
       "direction_key": "v280-monthly-flow-member",
-      "status": "running",
+      "status": "rejected",
       "parent_versions": [
         "v277"
       ],
@@ -11866,9 +11866,36 @@
       "write_scope": "research/parallel/rounds/parallel-20260906-r2/v280",
       "worker_agent_id": "01a07792-4a6b-7fc3-a08a-af2923b1778a",
       "worker_host_id": "local",
-      "result_manifest": null,
+      "result_manifest": "research\\parallel\\rounds\\parallel-20260906-r2\\v280\\result_manifest.json",
       "registered_at": "2026-09-29T13:52:35.552430Z",
-      "assigned_at": "2026-09-29T13:52:35.552430Z"
+      "assigned_at": "2026-09-29T13:52:35.552430Z",
+      "result_manifest_sha256": "f4129d28eea0f64516c84e13b14729d28aa461cc1015e675e7f1b1fd747ca07d",
+      "result_summary": {
+        "scenarios": {
+          "normal": {
+            "monthly_geometric_net_percent": 5.501,
+            "max_drawdown_percent": 19.47,
+            "fills": 1371,
+            "months": 60
+          },
+          "fee_stress": {
+            "monthly_geometric_net_percent": 5.501,
+            "max_drawdown_percent": 19.47,
+            "fills": 1371,
+            "months": 60
+          },
+          "execution_stress": {
+            "monthly_geometric_net_percent": 5.501,
+            "max_drawdown_percent": 19.47,
+            "fills": 1371,
+            "months": 60
+          }
+        },
+        "independent_test": false,
+        "live_approved": false,
+        "audit_notes": "monthly member fit windows and replay confirmed; no leakage."
+      },
+      "audited_at": "2026-09-29T20:06:02.239242Z"
     },
     {
       "version": "v281",
@@ -11911,7 +11938,28 @@
       "result_manifest": null,
       "registered_at": "2026-09-29T19:31:02.202155Z",
       "assigned_at": "2026-09-29T19:31:02.202155Z"
+    },
+    {
+      "version": "v283",
+      "track": "A",
+      "direction_key": "v283-stacked-members",
+      "status": "running",
+      "parent_versions": [
+        "v280"
+      ],
+      "model_family": "nnls-stacker",
+      "objective": "walk-forward NNLS stacking of the foundation members (A, Aq, B, Bq) with / without the all-exchange-data member C on the C4 rules",
+      "data_contract": "member books on the decision rows; 7-day forward return in sigma units; stacker for year Y fitted on live rows with label end before Y - 7 days",
+      "policy_contract": "engine_user trade mode G2 + v218 D2 settings, C4 dip stops, budget 0.18",
+      "hypothesis": "learned source weights use the exchange data without letting an unstable source dominate",
+      "parent_commit": "1ecf947baddd5ef78444670330e9db62128dad50",
+      "write_scope": "research/parallel/rounds/parallel-20260906-r2/v283",
+      "worker_agent_id": "01a07792-4a6b-7fc3-a08a-af2923b1778a",
+      "worker_host_id": "local",
+      "result_manifest": null,
+      "registered_at": "2026-09-29T20:06:02.222436Z",
+      "assigned_at": "2026-09-29T20:06:02.222436Z"
     }
   ],
-  "updated_at": "2026-09-29T19:31:02.208919Z"
+  "updated_at": "2026-09-29T20:06:02.239242Z"
 }
