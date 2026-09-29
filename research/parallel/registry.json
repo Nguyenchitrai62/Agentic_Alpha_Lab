@@ -2,7 +2,7 @@
   "schema_version": 1,
   "project": "Agentic Alpha Lab BTC swing research",
   "created_at": "2026-09-06T00:00:00Z",
-  "next_version": 268,
+  "next_version": 271,
   "control": {
     "coordinator_model": "gpt-5.6-sol",
     "coordinator_reasoning": "high",
@@ -54,7 +54,7 @@
     "expected_workers": 3,
     "version_range": [
       45,
-      267
+      270
     ],
     "parent_commit": "1ecf947baddd5ef78444670330e9db62128dad50",
     "cloud_snapshot": {
@@ -11173,7 +11173,7 @@
       "version": "v266",
       "track": "B",
       "direction_key": "v266-close-stops-native-backstop",
-      "status": "running",
+      "status": "rejected",
       "parent_versions": [
         "v264"
       ],
@@ -11186,15 +11186,42 @@
       "write_scope": "research/parallel/rounds/parallel-20260906-r2/v266",
       "worker_agent_id": "01a07791-eecb-7053-8866-dcdbe31e84d7",
       "worker_host_id": "local",
-      "result_manifest": null,
+      "result_manifest": "research\\parallel\\rounds\\parallel-20260906-r2\\v266\\result_manifest.json",
       "registered_at": "2026-09-29T11:27:26.333874Z",
-      "assigned_at": "2026-09-29T11:27:26.333874Z"
+      "assigned_at": "2026-09-29T11:27:26.333874Z",
+      "result_manifest_sha256": "01d2887c8b024fcb3800e271d48e5e54ce1859df9cbe94880b5d7e46682dbe7f",
+      "result_summary": {
+        "scenarios": {
+          "normal": {
+            "monthly_geometric_net_percent": 5.795,
+            "max_drawdown_percent": 19.7,
+            "fills": 1360,
+            "months": 60
+          },
+          "fee_stress": {
+            "monthly_geometric_net_percent": 5.795,
+            "max_drawdown_percent": 19.7,
+            "fills": 1360,
+            "months": 60
+          },
+          "execution_stress": {
+            "monthly_geometric_net_percent": 5.795,
+            "max_drawdown_percent": 19.7,
+            "fills": 1360,
+            "months": 60
+          }
+        },
+        "independent_test": false,
+        "live_approved": false,
+        "audit_notes": "bit-exact on all 14 rows; independent exit re-implementation (touch / close1 / close5 / close5+backstop) matches ~4000 dev fills incl. 2024-08-05 with next-minute-open observability; breaker uses closes to f-1; v263 labels and fit windows confirmed; committed scripts equal run scripts (documented 'mins' fix only); no leakage."
+      },
+      "audited_at": "2026-09-29T11:50:26.695001Z"
     },
     {
       "version": "v267",
       "track": "C",
       "direction_key": "v267-stress-robust-selection",
-      "status": "running",
+      "status": "rejected",
       "parent_versions": [
         "v265"
       ],
@@ -11207,10 +11234,127 @@
       "write_scope": "research/parallel/rounds/parallel-20260906-r2/v267",
       "worker_agent_id": "01a07748-5adc-7061-8052-0ed36705a8a8",
       "worker_host_id": "local",
-      "result_manifest": null,
+      "result_manifest": "research\\parallel\\rounds\\parallel-20260906-r2\\v267\\result_manifest.json",
       "registered_at": "2026-09-29T11:27:41.535616Z",
-      "assigned_at": "2026-09-29T11:27:41.535616Z"
+      "assigned_at": "2026-09-29T11:27:41.535616Z",
+      "result_manifest_sha256": "263eb6ff0f83580e834fc5b6eabc6a84d392a5a5b87e4e1226ac5d4acbaf4991",
+      "result_summary": {
+        "scenarios": {
+          "normal": {
+            "monthly_geometric_net_percent": 5.436,
+            "max_drawdown_percent": 19.65,
+            "fills": 1360,
+            "months": 60
+          },
+          "fee_stress": {
+            "monthly_geometric_net_percent": 5.436,
+            "max_drawdown_percent": 19.65,
+            "fills": 1360,
+            "months": 60
+          },
+          "execution_stress": {
+            "monthly_geometric_net_percent": 5.436,
+            "max_drawdown_percent": 19.65,
+            "fills": 1360,
+            "months": 60
+          }
+        },
+        "independent_test": false,
+        "live_approved": false,
+        "audit_notes": "bit-exact on all rows; book close-stop exits re-implemented (next-minute-open observability, zero prices-before-observable); stress constants restored; pre-registration matches; no leakage."
+      },
+      "audited_at": "2026-09-29T12:17:04.095584Z"
+    },
+    {
+      "version": "v268",
+      "track": "B",
+      "direction_key": "v268-book-close-stops",
+      "status": "rejected",
+      "parent_versions": [
+        "v266"
+      ],
+      "model_family": "rule-based",
+      "objective": "book position stops on 5m / 1h closes + 6-sigma_d native backstop, on top of v266 B1",
+      "data_contract": "1m klines of the holding bar; O1 members unchanged",
+      "policy_contract": "engine_user trade mode G2 + v218 D2 settings, budget 0.18, B1 dip stops; new book_stop_mode / book_backstop; limits, minute-5 rule, Bybit fees, adverse funding",
+      "hypothesis": "trend trades stopped by wicks resume; close-based book stops keep them while the native backstop bounds the loss",
+      "parent_commit": "1ecf947baddd5ef78444670330e9db62128dad50",
+      "write_scope": "research/parallel/rounds/parallel-20260906-r2/v268",
+      "worker_agent_id": "01a07791-eecb-7053-8866-dcdbe31e84d7",
+      "worker_host_id": "local",
+      "result_manifest": "research\\parallel\\rounds\\parallel-20260906-r2\\v268\\result_manifest.json",
+      "registered_at": "2026-09-29T11:50:26.690989Z",
+      "assigned_at": "2026-09-29T11:50:26.690989Z",
+      "result_manifest_sha256": "c407aae8e1eeb1be5e77dfaab9b55c01d792e541872ce84621f760efbae2ef8e",
+      "result_summary": {
+        "scenarios": {
+          "normal": {
+            "monthly_geometric_net_percent": 5.811,
+            "max_drawdown_percent": 21.91,
+            "fills": 1347,
+            "months": 60
+          },
+          "fee_stress": {
+            "monthly_geometric_net_percent": 5.811,
+            "max_drawdown_percent": 21.91,
+            "fills": 1347,
+            "months": 60
+          },
+          "execution_stress": {
+            "monthly_geometric_net_percent": 5.811,
+            "max_drawdown_percent": 21.91,
+            "fills": 1347,
+            "months": 60
+          }
+        },
+        "independent_test": false,
+        "live_approved": false,
+        "audit_notes": "bit-exact on all rows; book close-stop exits re-implemented (next-minute-open observability, zero prices-before-observable); stress constants restored; pre-registration matches; no leakage."
+      },
+      "audited_at": "2026-09-29T12:17:03.840925Z"
+    },
+    {
+      "version": "v269",
+      "track": "B",
+      "direction_key": "v269-close-stop-distance",
+      "status": "running",
+      "parent_versions": [
+        "v268"
+      ],
+      "model_family": "rule-based",
+      "objective": "dip close-stop distance 4 / 6 sigma on v266 B1",
+      "data_contract": "1m klines of the holding bar; O1 members unchanged; states up to the decision minute",
+      "policy_contract": "engine_user trade mode G2 + v218 D2 settings, budget 0.18, v266 B1 dip stops; limits, minute-5 rule, Bybit fees, adverse funding",
+      "hypothesis": "the best stop distance changes when wicks no longer trigger the stop",
+      "parent_commit": "1ecf947baddd5ef78444670330e9db62128dad50",
+      "write_scope": "research/parallel/rounds/parallel-20260906-r2/v269",
+      "worker_agent_id": "01a07791-eecb-7053-8866-dcdbe31e84d7",
+      "worker_host_id": "local",
+      "result_manifest": null,
+      "registered_at": "2026-09-29T12:17:03.838205Z",
+      "assigned_at": "2026-09-29T12:17:03.838205Z"
+    },
+    {
+      "version": "v270",
+      "track": "C",
+      "direction_key": "v270-stress-select-close4",
+      "status": "running",
+      "parent_versions": [
+        "v267"
+      ],
+      "model_family": "rule-based",
+      "objective": "v267 stress rule applied to the 4-sigma close stop (budget 0.18 / 0.20)",
+      "data_contract": "1m klines of the holding bar; O1 members unchanged; states up to the decision minute",
+      "policy_contract": "engine_user trade mode G2 + v218 D2 settings, budget 0.18, v266 B1 dip stops; limits, minute-5 rule, Bybit fees, adverse funding",
+      "hypothesis": "a 1.4 pp DD margin survives the stress rows",
+      "parent_commit": "1ecf947baddd5ef78444670330e9db62128dad50",
+      "write_scope": "research/parallel/rounds/parallel-20260906-r2/v270",
+      "worker_agent_id": "01a07748-5adc-7061-8052-0ed36705a8a8",
+      "worker_host_id": "local",
+      "result_manifest": null,
+      "registered_at": "2026-09-29T12:17:04.095584Z",
+      "assigned_at": "2026-09-29T12:17:04.095584Z"
     }
   ],
-  "updated_at": "2026-09-29T11:27:41.535616Z"
+  "updated_at": "2026-09-29T12:17:04.095584Z"
 }
