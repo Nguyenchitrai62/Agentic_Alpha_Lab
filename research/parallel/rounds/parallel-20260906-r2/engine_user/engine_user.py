@@ -576,9 +576,13 @@ def simulate(books, opens, prep, m_sl=3.0, m_sleeve_sl=2.0, sleeve=True, target=
                     if (open_now + 1) * rn > N_MAX + 1e-12:
                         continue
                 else:  # risk budget: loss if every open rung and the new one stop out (stop distance + gap allowance)
-                    mb = m_sleeve_sl if sleeve_budget_sl is None else sleeve_budget_sl
-                    risk_open = sum(t[7] * (mb * t[6] + gap) for t in taken if t[4] > f)
-                    if risk_open + rn * (mb * sg + gap) > sleeve_risk_budget + 1e-12:
+                    if sleeve_budget_sl is None:
+                        risk_open = sum(t[7] * (m_sleeve_sl * t[6] + gap) for t in taken if t[4] > f)
+                        over = risk_open + rn * (m_sleeve_sl * sg + gap) > sleeve_risk_budget + 1e-12
+                    else:  # the budget counts another stop distance (e.g. a native backstop)
+                        risk_open = sum(t[7] * (sleeve_budget_sl * t[6] + gap) for t in taken if t[4] > f)
+                        over = risk_open + rn * (sleeve_budget_sl * sg + gap) > sleeve_risk_budget + 1e-12
+                    if over:
                         continue
                 Ha, La, Ca, Oa = (X[i, :, a].astype(float) for X in (H, L, C, O))
                 tp = lv * (1 + (m_sleeve_tp if sleeve_tp is None else float(sleeve_tp(i, a, r, f))) * sg)

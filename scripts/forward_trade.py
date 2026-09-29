@@ -62,17 +62,22 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--policy", default=None, help="JSON with the policy parameters (default: v216 grid G2)")
     ap.add_argument("--from", dest="start", default=None, help="first traded holding bar (default FREEZE)")
-    ap.add_argument("--candidate", default="v151_deploy_v4", choices=["v151_deploy_v4", "v233_T3", "v236_W2", "v240_O1"],
+    ap.add_argument("--candidate", default="v151_deploy_v4", choices=["v151_deploy_v4", "v233_T3", "v236_W2", "v240_O1", "v266_B1"],
                     help="books: v205 (v151_deploy_v4 live rows, default), the v233 T3 or the v236 W2 foundation (their live rows)")
     args = ap.parse_args()
     cand = {"v151_deploy_v4": ("research_books", OUT, "v205 books + trade mode"),
             "v233_T3": ("research_books_t3", OUT.with_name("trade_plan_v233.json"), "v233 T3 books + trade mode"),
             "v236_W2": ("research_books_w2", OUT.with_name("trade_plan_v236.json"), "v236 W2 books (T3 + whale flow) + trade mode"),
-            "v240_O1": ("research_books_o1", OUT.with_name("trade_plan_v240.json"), "v240 O1 books (T3 + order-level whale flow) + trade mode")}
+            "v240_O1": ("research_books_o1", OUT.with_name("trade_plan_v240.json"), "v240 O1 books (T3 + order-level whale flow) + trade mode"),
+            "v266_B1": ("research_books_o1", OUT.with_name("trade_plan_v266.json"),
+                        "v266 B1: O1 books + dip stops on 5m closes + 8-sigma native backstop")}
     rb_name, out_path, pipe_name = cand[args.candidate]
     p = dict(DEFAULT, **(json.loads(Path(args.policy).read_text()) if args.policy else {}))
     # per-pipeline policy overrides from audited research: O1 runs the v247 sleeve stop-risk budget 0.18 (since 2026-09-29)
-    p = dict(p, **{"v240_O1": {"sleeve_risk_budget": 0.18, "name": "v218 D2 grid trader + dip sleeve budget 0.18 (v247), rung x1.75"}}.get(args.candidate, {}))
+    # v266 B1 (paper, since 2026-09-29): the same O1 books with dip-rung stops triggered on 5m closes + an 8-sigma native backstop
+    p = dict(p, **{"v240_O1": {"sleeve_risk_budget": 0.18, "name": "v218 D2 grid trader + dip sleeve budget 0.18 (v247), rung x1.75"},
+                   "v266_B1": {"sleeve_risk_budget": 0.18, "sleeve_stop_mode": "close5", "sleeve_backstop": 8.0,
+                               "name": "O1 B18 + dip stops on 5m closes + 8-sigma native backstop (v266 B1)"}}.get(args.candidate, {}))
     start = pd.Timestamp(args.start, tz="UTC") if args.start else FREEZE
     now = pd.Timestamp(datetime.now(timezone.utc))
     if now < start:  # before the first traded bar: publish an empty plan that says when trading starts
@@ -86,7 +91,7 @@ def main():
     eu = _load("engine_user_tm", RD / "engine_user/engine_user.py")
     v212 = _load("v212_tm", RD / "v212/v212_trade_scaling.py")
     books = getattr(fw, rb_name)(eu)
-    lb = fw.live_books(args.candidate)
+    lb = fw.live_books({"v266_B1": "v240_O1"}.get(args.candidate, args.candidate))  # B1 trades the O1 advisor rows
     books = pd.concat([books[books.index < lb.index.min()] if len(lb) else books, lb]).sort_index()
     opens, k1 = fw.market(start, now)
     cur_bar = now.floor("4h")                   # holding bar in progress
@@ -111,7 +116,8 @@ def main():
         cap.update(eq=eq, stats=stats)
         return {}
     eu.summarize = grab
-    kw = dict(fw.KW, sleeve_risk_budget=p["sleeve_risk_budget"], size_mult=p["size_mult"])
+    kw = dict(fw.KW, sleeve_risk_budget=p["sleeve_risk_budget"], size_mult=p["size_mult"],
+              **{k: p[k] for k in ("sleeve_stop_mode", "sleeve_backstop") if k in p})
     eu.simulate(books, opens.reindex(grid), prep, trade=trade, win_start=5, events=events, bars=bars, state_out=state, **kw)
     events = [e for e in events if e["t"] <= now]
     live = np.asarray(grid >= start - pd.Timedelta(hours=4))

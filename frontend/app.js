@@ -224,6 +224,7 @@
   // paper pipelines (prospective evidence); O1 = the most robust walk-forward foundation, the default view
   const PIPES = [
     { v: "v240", nm: "O1", ds: "cá voi theo lệnh thật · sleeve 0.18 · vững nhất", star: "khuyên dùng" },
+    { v: "v266", nm: "C5", ds: "O1 + SL lệnh dip theo nến 5m đóng cửa (bot canh) + SL sàn 8σ · lãi cao hơn, DD sát 20% · thử nghiệm" },
     { v: "v236", nm: "W2", ds: "dòng tiền cá voi · lãi TB cao nhất" },
     { v: "v233", nm: "T3", ds: "chỉ báo TradingView" },
     { v: "v205", nm: "D2", ds: "pipeline cũ" },

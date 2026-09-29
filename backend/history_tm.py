@@ -29,8 +29,10 @@ PIPELINES = {  # pipeline key -> (research-books function in scripts/forward_v20
     "v233": ("research_books_t3", 5.485),
     "v236": ("research_books_w2", 5.774),
     "v240": ("research_books_o1", 5.777),  # with the v247 sleeve budget 0.18
+    "v266": ("research_books_o1", 6.130),  # O1 + 5m-close dip stops + 8-sigma native backstop (v266 B1)
 }
-KW_OVERRIDE = {"v240": {"sleeve_risk_budget": 0.18}}
+KW_OVERRIDE = {"v240": {"sleeve_risk_budget": 0.18},
+               "v266": {"sleeve_risk_budget": 0.18, "sleeve_stop_mode": "close5", "sleeve_backstop": 8.0}}
 
 
 def _load(name, path):
