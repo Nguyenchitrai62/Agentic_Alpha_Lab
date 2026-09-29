@@ -2,7 +2,7 @@
   "schema_version": 1,
   "project": "Agentic Alpha Lab BTC swing research",
   "created_at": "2026-09-06T00:00:00Z",
-  "next_version": 253,
+  "next_version": 254,
   "control": {
     "coordinator_model": "gpt-5.6-sol",
     "coordinator_reasoning": "high",
@@ -54,7 +54,7 @@
     "expected_workers": 3,
     "version_range": [
       45,
-      252
+      253
     ],
     "parent_commit": "1ecf947baddd5ef78444670330e9db62128dad50",
     "cloud_snapshot": {
@@ -10432,7 +10432,7 @@
       "version": "v250",
       "track": "A",
       "direction_key": "v250-pyramid-ladder",
-      "status": "running",
+      "status": "rejected",
       "parent_versions": [
         "v244"
       ],
@@ -10445,9 +10445,36 @@
       "write_scope": "research/parallel/rounds/parallel-20260906-r2/v250",
       "worker_agent_id": "01a07792-4a6b-7fc3-a08a-af2923b1778a",
       "worker_host_id": "local",
-      "result_manifest": null,
+      "result_manifest": "research\\parallel\\rounds\\parallel-20260906-r2\\v250\\result_manifest.json",
       "registered_at": "2026-09-29T02:57:47.232621Z",
-      "assigned_at": "2026-09-29T02:57:47.232621Z"
+      "assigned_at": "2026-09-29T02:57:47.232621Z",
+      "result_manifest_sha256": "f9f1119384eca78e7cbe9d056d7259c68e49bb5c4a2ec899577e250fb42ee541",
+      "result_summary": {
+        "scenarios": {
+          "normal": {
+            "monthly_geometric_net_percent": 5.525,
+            "max_drawdown_percent": 19.0,
+            "fills": 1371,
+            "months": 60
+          },
+          "fee_stress": {
+            "monthly_geometric_net_percent": 5.525,
+            "max_drawdown_percent": 19.0,
+            "fills": 1371,
+            "months": 60
+          },
+          "execution_stress": {
+            "monthly_geometric_net_percent": 5.525,
+            "max_drawdown_percent": 19.0,
+            "fills": 1371,
+            "months": 60
+          }
+        },
+        "independent_test": false,
+        "live_approved": false,
+        "audit_notes": "bit-exact replication of all rows; state causality, counterfactual labels and embargoed cross-fitting confirmed; look-ahead PASS. The engine gained the default-neutral strat_vt hook (v251) while this audit ran; references unchanged."
+      },
+      "audited_at": "2026-09-29T05:17:54.723701Z"
     },
     {
       "version": "v251",
@@ -10490,7 +10517,28 @@
       "result_manifest": null,
       "registered_at": "2026-09-29T04:47:33.846755Z",
       "assigned_at": "2026-09-29T04:47:33.846755Z"
+    },
+    {
+      "version": "v253",
+      "track": "A",
+      "direction_key": "v253-okx-cross-venue-flow",
+      "status": "running",
+      "parent_versions": [
+        "v250"
+      ],
+      "model_family": "hist-gradient-boosting",
+      "objective": "O1 foundation + OKX order-level whale flow (added or venue-summed), trade mode at sleeve budget 0.18",
+      "data_contract": "OKX public daily perp trades from 2021-10-01 (BNB 2022-12-23), double-listed days skipped, taker orders rebuilt, 4h tiers; v236 formulas causal at the bar close; members retrained walk-forward with embargo",
+      "policy_contract": "engine_user trade mode G2 grid + v218 D2 settings, budget 0.18; limits, minute-5 rule, SL market / TP limit, Bybit fees, adverse funding",
+      "hypothesis": "large orders on OKX (different trader base) add whale-flow information beyond Binance",
+      "parent_commit": "1ecf947baddd5ef78444670330e9db62128dad50",
+      "write_scope": "research/parallel/rounds/parallel-20260906-r2/v253",
+      "worker_agent_id": "01a07792-4a6b-7fc3-a08a-af2923b1778a",
+      "worker_host_id": "local",
+      "result_manifest": null,
+      "registered_at": "2026-09-29T05:17:54.715980Z",
+      "assigned_at": "2026-09-29T05:17:54.715980Z"
     }
   ],
-  "updated_at": "2026-09-29T04:47:33.850596Z"
+  "updated_at": "2026-09-29T05:17:54.723701Z"
 }
