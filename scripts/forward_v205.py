@@ -79,6 +79,17 @@ def research_books_o1(eu):
     return 0.5 * (f(m["A"]) + f(m["B"])) / 2 + 0.5 * (f(m["Aq"]) + f(m["Bq"])) / 2
 
 
+def research_books_d2(eu):
+    """v285 D2 research books: 0.8 x O1 books + 0.2 x the Coinbase-premium member D (annual + quarterly)/2, same units."""
+    o1 = research_books_o1(eu)
+    C = eu.er.CACHE
+    D = pd.read_parquet(C / "members_v154.parquet").xs("D", axis=1, level=0)[SYMS]
+    Dq = pd.read_parquet(C / "members_quarterly_D.parquet")[SYMS]
+    idx = o1.index.union(D.index).union(Dq.index)
+    f = lambda X: X.reindex(idx).fillna(0.0)
+    return 0.8 * f(o1) + 0.2 * (f(D) + f(Dq)) / 2
+
+
 def live_books(candidate="v151_deploy_v4"):
     rows = [json.loads(l) for l in open(ROOT / "artifacts/research/advisor_shadow/shadow.jsonl", encoding="utf-8") if l.strip()]
     rows = [r for r in rows if r.get("candidate") == candidate and r.get("mode") == "prospective" and "perp_weight" in r]  # skip error rows

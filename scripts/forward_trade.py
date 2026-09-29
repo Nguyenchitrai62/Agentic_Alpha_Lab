@@ -62,7 +62,7 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--policy", default=None, help="JSON with the policy parameters (default: v216 grid G2)")
     ap.add_argument("--from", dest="start", default=None, help="first traded holding bar (default FREEZE)")
-    ap.add_argument("--candidate", default="v151_deploy_v4", choices=["v151_deploy_v4", "v233_T3", "v236_W2", "v240_O1", "v266_B1", "v269_M1"],
+    ap.add_argument("--candidate", default="v151_deploy_v4", choices=["v151_deploy_v4", "v233_T3", "v236_W2", "v240_O1", "v266_B1", "v269_M1", "v285_D2"],
                     help="books: v205 (v151_deploy_v4 live rows, default), the v233 T3 or the v236 W2 foundation (their live rows)")
     args = ap.parse_args()
     cand = {"v151_deploy_v4": ("research_books", OUT, "v205 books + trade mode"),
@@ -72,7 +72,9 @@ def main():
             "v266_B1": ("research_books_o1", OUT.with_name("trade_plan_v266.json"),
                         "v266 B1: O1 books + dip stops on 5m closes + 8-sigma native backstop"),
             "v269_M1": ("research_books_o1", OUT.with_name("trade_plan_v269.json"),
-                        "v269 M1: O1 books + dip stops on 5m closes at 4 sigma + 8-sigma native backstop")}
+                        "v269 M1: O1 books + dip stops on 5m closes at 4 sigma + 8-sigma native backstop"),
+            "v285_D2": ("research_books_d2", OUT.with_name("trade_plan_v285.json"),
+                        "v285 D2: 0.8 O1 books + 0.2 Coinbase-premium member, C4 dip stops")}
     rb_name, out_path, pipe_name = cand[args.candidate]
     p = dict(DEFAULT, **(json.loads(Path(args.policy).read_text()) if args.policy else {}))
     # per-pipeline policy overrides from audited research: O1 runs the v247 sleeve stop-risk budget 0.18 (since 2026-09-29)
@@ -81,8 +83,11 @@ def main():
                    "v266_B1": {"sleeve_risk_budget": 0.18, "sleeve_stop_mode": "close5", "sleeve_backstop": 8.0,
                                "name": "O1 B18 + dip stops on 5m closes + 8-sigma native backstop (v266 B1)"},
                    "v269_M1": {"sleeve_risk_budget": 0.18, "sleeve_stop_mode": "close5", "sleeve_backstop": 8.0, "m_sleeve_sl": 4.0,
-                               "name": "O1 B18 + dip stops on 5m closes at 4 sigma + 8-sigma native backstop (v269 M1)"}}.get(args.candidate, {}))
-    start = pd.Timestamp(args.start, tz="UTC") if args.start else FREEZE
+                               "name": "O1 B18 + dip stops on 5m closes at 4 sigma + 8-sigma native backstop (v269 M1)"},
+                   "v285_D2": {"sleeve_risk_budget": 0.18, "sleeve_stop_mode": "close5", "sleeve_backstop": 8.0, "m_sleeve_sl": 4.0,
+                               "name": "v285 D2: 0.8 O1 + 0.2 Coinbase-premium member books, C4 rules"}}.get(args.candidate, {}))
+    # D2's live Coinbase member is logged from 2026-09-29 21 UTC; its paper window starts at the next 4h bar
+    start = pd.Timestamp(args.start, tz="UTC") if args.start else {"v285_D2": pd.Timestamp("2026-09-30T00:00:00Z")}.get(args.candidate, FREEZE)
     now = pd.Timestamp(datetime.now(timezone.utc))
     if now < start:  # before the first traded bar: publish an empty plan that says when trading starts
         out_path.write_text(json.dumps({"pipeline": pipe_name, "policy": p, "freeze": str(start), "generated_at": now.isoformat(),
@@ -95,7 +100,12 @@ def main():
     eu = _load("engine_user_tm", RD / "engine_user/engine_user.py")
     v212 = _load("v212_tm", RD / "v212/v212_trade_scaling.py")
     books = getattr(fw, rb_name)(eu)
-    lb = fw.live_books({"v266_B1": "v240_O1", "v269_M1": "v240_O1"}.get(args.candidate, args.candidate))  # B1 trades the O1 advisor rows
+    if args.candidate == "v285_D2":  # 0.8 x the O1 advisor rows + 0.2 x the live Coinbase member (rows present in both)
+        lo1, lcb = fw.live_books("v240_O1"), fw.live_books("v285_CB")
+        common = lo1.index.intersection(lcb.index)
+        lb = 0.8 * lo1.loc[common] + 0.2 * lcb.loc[common]
+    else:
+        lb = fw.live_books({"v266_B1": "v240_O1", "v269_M1": "v240_O1"}.get(args.candidate, args.candidate))  # B1 / M1 trade the O1 rows
     books = pd.concat([books[books.index < lb.index.min()] if len(lb) else books, lb]).sort_index()
     opens, k1 = fw.market(start, now)
     cur_bar = now.floor("4h")                   # holding bar in progress
