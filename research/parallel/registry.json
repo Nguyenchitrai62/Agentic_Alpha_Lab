@@ -2,7 +2,7 @@
   "schema_version": 1,
   "project": "Agentic Alpha Lab BTC swing research",
   "created_at": "2026-09-06T00:00:00Z",
-  "next_version": 256,
+  "next_version": 257,
   "control": {
     "coordinator_model": "gpt-5.6-sol",
     "coordinator_reasoning": "high",
@@ -54,7 +54,7 @@
     "expected_workers": 3,
     "version_range": [
       45,
-      255
+      256
     ],
     "parent_commit": "1ecf947baddd5ef78444670330e9db62128dad50",
     "cloud_snapshot": {
@@ -10618,7 +10618,7 @@
       "version": "v255",
       "track": "B",
       "direction_key": "v255-sleeve-start-minute",
-      "status": "running",
+      "status": "rejected",
       "parent_versions": [
         "v252"
       ],
@@ -10631,10 +10631,58 @@
       "write_scope": "research/parallel/rounds/parallel-20260906-r2/v255",
       "worker_agent_id": "01a07791-eecb-7053-8866-dcdbe31e84d7",
       "worker_host_id": "local",
-      "result_manifest": null,
+      "result_manifest": "research\\parallel\\rounds\\parallel-20260906-r2\\v255\\result_manifest.json",
       "registered_at": "2026-09-29T05:40:43.181951Z",
-      "assigned_at": "2026-09-29T05:40:43.181951Z"
+      "assigned_at": "2026-09-29T05:40:43.181951Z",
+      "result_manifest_sha256": "a4c85e2a9cd027a6ae21b48c9eb14d3ffffcc47c9a04d7c8c99187f9917eaa0d",
+      "result_summary": {
+        "scenarios": {
+          "normal": {
+            "monthly_geometric_net_percent": 5.388,
+            "max_drawdown_percent": 19.65,
+            "fills": 1355,
+            "months": 60
+          },
+          "fee_stress": {
+            "monthly_geometric_net_percent": 5.388,
+            "max_drawdown_percent": 19.65,
+            "fills": 1355,
+            "months": 60
+          },
+          "execution_stress": {
+            "monthly_geometric_net_percent": 5.388,
+            "max_drawdown_percent": 19.65,
+            "fills": 1355,
+            "months": 60
+          }
+        },
+        "independent_test": false,
+        "live_approved": false,
+        "audit_notes": "bit-exact replication of all rows; independent RV ratio rebuild and truncation probes exact; sleeve_start respected; look-ahead PASS. Rejected / neutral."
+      },
+      "audited_at": "2026-09-29T05:53:53.292645Z"
+    },
+    {
+      "version": "v256",
+      "track": "B",
+      "direction_key": "v256-entry-execution-agent",
+      "status": "running",
+      "parent_versions": [
+        "v255"
+      ],
+      "model_family": "hist-gradient-boosting",
+      "objective": "RL entry-execution agent: per opening order choose the limit offset (0.10/0.25/0.50/0.75 sigma_4h) from exact counterfactual trade outcomes, walk-forward, O1 budget 0.18",
+      "data_contract": "four counterfactual engine runs; orders matched on (issue bar, coin, side); state at the decision-bar close; models per anchor fitted on positions closed before anchor - 7 days, cross-fitted halves",
+      "policy_contract": "engine_user trade mode G2 grid + v218 D2 settings, budget 0.18; new policy action {'open': k}; limits, minute-5 rule, SL market / TP limit, Bybit fees, adverse funding",
+      "hypothesis": "choosing to chase or to wait by trend / flow / stretch state improves entry prices and the trade win rate without losing the trend trades",
+      "parent_commit": "1ecf947baddd5ef78444670330e9db62128dad50",
+      "write_scope": "research/parallel/rounds/parallel-20260906-r2/v256",
+      "worker_agent_id": "01a07791-eecb-7053-8866-dcdbe31e84d7",
+      "worker_host_id": "local",
+      "result_manifest": null,
+      "registered_at": "2026-09-29T05:53:53.292645Z",
+      "assigned_at": "2026-09-29T05:53:53.292645Z"
     }
   ],
-  "updated_at": "2026-09-29T05:40:43.184631Z"
+  "updated_at": "2026-09-29T05:53:53.292645Z"
 }

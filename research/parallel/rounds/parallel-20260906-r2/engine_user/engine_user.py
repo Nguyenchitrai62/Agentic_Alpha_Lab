@@ -176,6 +176,8 @@ def simulate(books, opens, prep, m_sl=3.0, m_sleeve_sl=2.0, sleeve=True, target=
                     size = 0.0
                 elif act == "open_deep":
                     k_off = P.get("k_off_deep", 0.75)
+                elif isinstance(act, dict) and "open" in act:  # agent-chosen entry offset (multiple of sigma_4h)
+                    k_off = float(act["open"])
             if ps == 0 and sgn != 0 and size > 0 and size * prev_eq * ACCOUNT >= mins[a] and np.isfinite(sd_a) and np.isfinite(s4_a):
                 off = max(P.get("min_off", 0.001), k_off * s4_a)
                 T["side"][a], T["px"][a], T["w"][a] = sgn, Oa[0] * (1 - sgn * off), size
