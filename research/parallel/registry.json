@@ -2,7 +2,7 @@
   "schema_version": 1,
   "project": "Agentic Alpha Lab BTC swing research",
   "created_at": "2026-09-06T00:00:00Z",
-  "next_version": 263,
+  "next_version": 264,
   "control": {
     "coordinator_model": "gpt-5.6-sol",
     "coordinator_reasoning": "high",
@@ -54,7 +54,7 @@
     "expected_workers": 3,
     "version_range": [
       45,
-      262
+      263
     ],
     "parent_commit": "1ecf947baddd5ef78444670330e9db62128dad50",
     "cloud_snapshot": {
@@ -10933,7 +10933,7 @@
       "version": "v261",
       "track": "C",
       "direction_key": "v261-direct-rl-member",
-      "status": "running",
+      "status": "rejected",
       "parent_versions": [
         "v259"
       ],
@@ -10946,9 +10946,36 @@
       "write_scope": "research/parallel/rounds/parallel-20260906-r2/v261",
       "worker_agent_id": "01a07748-5adc-7061-8052-0ed36705a8a8",
       "worker_host_id": "local",
-      "result_manifest": null,
+      "result_manifest": "research\\parallel\\rounds\\parallel-20260906-r2\\v261\\result_manifest.json",
       "registered_at": "2026-09-29T08:24:28.021511Z",
-      "assigned_at": "2026-09-29T08:24:28.021511Z"
+      "assigned_at": "2026-09-29T08:24:28.021511Z",
+      "result_manifest_sha256": "5a17d681524ea2e7df937118869cb85897b3ca520b25fc08ac5a95570f76a037",
+      "result_summary": {
+        "scenarios": {
+          "normal": {
+            "monthly_geometric_net_percent": 5.15,
+            "max_drawdown_percent": 19.87,
+            "fills": 1749,
+            "months": 60
+          },
+          "fee_stress": {
+            "monthly_geometric_net_percent": 5.15,
+            "max_drawdown_percent": 19.87,
+            "fills": 1749,
+            "months": 60
+          },
+          "execution_stress": {
+            "monthly_geometric_net_percent": 5.15,
+            "max_drawdown_percent": 19.87,
+            "fills": 1749,
+            "months": 60
+          }
+        },
+        "independent_test": false,
+        "live_approved": false,
+        "audit_notes": "bit-exact retrain of all seeds; bootstrap windows, joint resampling, equity lag, training-only standardisation and scale confirmed; v260 committed script equals the run script; no leakage."
+      },
+      "audited_at": "2026-09-29T10:52:07.643005Z"
     },
     {
       "version": "v262",
@@ -10970,7 +10997,28 @@
       "result_manifest": null,
       "registered_at": "2026-09-29T09:42:47.159079Z",
       "assigned_at": "2026-09-29T09:42:47.159079Z"
+    },
+    {
+      "version": "v263",
+      "track": "C",
+      "direction_key": "v263-meta-labeling",
+      "status": "running",
+      "parent_versions": [
+        "v261"
+      ],
+      "model_family": "hist-gradient-boosting-classifier",
+      "objective": "meta-labeling of book entries: skip signals whose predicted trade win probability is below 0.35 / 0.40, O1 budget 0.18",
+      "data_contract": "labels = realised net sign of filled opening orders in the reference run; state at the decision-bar close; per-anchor cross-fitted classifiers on positions closed before anchor - 7 days",
+      "policy_contract": "engine_user trade mode G2 grid + v218 D2 settings, budget 0.18; wait/open decision on new signals only; limits, minute-5 rule, SL market / TP limit, Bybit fees, adverse funding",
+      "hypothesis": "skipping only the least promising entries raises the trade win rate while keeping the trend trades and the return",
+      "parent_commit": "1ecf947baddd5ef78444670330e9db62128dad50",
+      "write_scope": "research/parallel/rounds/parallel-20260906-r2/v263",
+      "worker_agent_id": "01a07748-5adc-7061-8052-0ed36705a8a8",
+      "worker_host_id": "local",
+      "result_manifest": null,
+      "registered_at": "2026-09-29T10:52:07.641000Z",
+      "assigned_at": "2026-09-29T10:52:07.641000Z"
     }
   ],
-  "updated_at": "2026-09-29T09:42:47.164230Z"
+  "updated_at": "2026-09-29T10:52:07.643005Z"
 }
