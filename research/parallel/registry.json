@@ -2,7 +2,7 @@
   "schema_version": 1,
   "project": "Agentic Alpha Lab BTC swing research",
   "created_at": "2026-09-06T00:00:00Z",
-  "next_version": 284,
+  "next_version": 286,
   "control": {
     "coordinator_model": "gpt-5.6-sol",
     "coordinator_reasoning": "high",
@@ -54,7 +54,7 @@
     "expected_workers": 3,
     "version_range": [
       45,
-      283
+      285
     ],
     "parent_commit": "1ecf947baddd5ef78444670330e9db62128dad50",
     "cloud_snapshot": {
@@ -11922,7 +11922,7 @@
       "version": "v282",
       "track": "B",
       "direction_key": "v282-full-action-rl-trader",
-      "status": "running",
+      "status": "rejected",
       "parent_versions": [
         "v278"
       ],
@@ -11935,15 +11935,23 @@
       "write_scope": "research/parallel/rounds/parallel-20260906-r2/v282",
       "worker_agent_id": "01a07791-eecb-7053-8866-dcdbe31e84d7",
       "worker_host_id": "local",
-      "result_manifest": null,
+      "result_manifest": "research\\parallel\\rounds\\parallel-20260906-r2\\v282\\result_manifest.json",
       "registered_at": "2026-09-29T19:31:02.202155Z",
-      "assigned_at": "2026-09-29T19:31:02.202155Z"
+      "assigned_at": "2026-09-29T19:31:02.202155Z",
+      "result_manifest_sha256": "3facf34c69673d37010194c6753402781c15400027a6d9d0687ecfac50766a1d",
+      "result_summary": {
+        "scenarios": {},
+        "independent_test": false,
+        "live_approved": false,
+        "audit_notes": "reproduced; timing checks passed; no leakage."
+      },
+      "audited_at": "2026-09-29T21:37:08.215924Z"
     },
     {
       "version": "v283",
       "track": "A",
       "direction_key": "v283-stacked-members",
-      "status": "running",
+      "status": "rejected",
       "parent_versions": [
         "v280"
       ],
@@ -11956,10 +11964,79 @@
       "write_scope": "research/parallel/rounds/parallel-20260906-r2/v283",
       "worker_agent_id": "01a07792-4a6b-7fc3-a08a-af2923b1778a",
       "worker_host_id": "local",
-      "result_manifest": null,
+      "result_manifest": "research\\parallel\\rounds\\parallel-20260906-r2\\v283\\result_manifest.json",
       "registered_at": "2026-09-29T20:06:02.222436Z",
-      "assigned_at": "2026-09-29T20:06:02.222436Z"
+      "assigned_at": "2026-09-29T20:06:02.222436Z",
+      "result_manifest_sha256": "06b5c8acdd0e549c80c310418a5b02a407efa6b3efe81061ba2ecbabfb785c5b",
+      "result_summary": {
+        "scenarios": {
+          "normal": {
+            "monthly_geometric_net_percent": 5.172,
+            "max_drawdown_percent": 22.1,
+            "fills": 1381,
+            "months": 60
+          },
+          "fee_stress": {
+            "monthly_geometric_net_percent": 5.172,
+            "max_drawdown_percent": 22.1,
+            "fills": 1381,
+            "months": 60
+          },
+          "execution_stress": {
+            "monthly_geometric_net_percent": 5.172,
+            "max_drawdown_percent": 22.1,
+            "fills": 1381,
+            "months": 60
+          }
+        },
+        "independent_test": false,
+        "live_approved": false,
+        "audit_notes": "reproduced; timing checks passed; no leakage."
+      },
+      "audited_at": "2026-09-29T21:37:07.964328Z"
+    },
+    {
+      "version": "v284",
+      "track": "A",
+      "direction_key": "v284-spliced-flow-history",
+      "status": "running",
+      "parent_versions": [
+        "v283"
+      ],
+      "model_family": "hist-gradient-boosting",
+      "objective": "spot order flow spliced before the perp archive in the O1 flow member",
+      "data_contract": "Binance spot order-level 4h table before the first perp bar, perp after; members retrained walk-forward",
+      "policy_contract": "engine_user trade mode G2 + v218 D2 settings, C4 dip stops (4 sigma on 5m closes + 8-sigma backstop), budget 0.18",
+      "hypothesis": "more flow history stabilises the flow relationships",
+      "parent_commit": "1ecf947baddd5ef78444670330e9db62128dad50",
+      "write_scope": "research/parallel/rounds/parallel-20260906-r2/v284",
+      "worker_agent_id": "01a07792-4a6b-7fc3-a08a-af2923b1778a",
+      "worker_host_id": "local",
+      "result_manifest": null,
+      "registered_at": "2026-09-29T21:37:07.962321Z",
+      "assigned_at": "2026-09-29T21:37:07.962321Z"
+    },
+    {
+      "version": "v285",
+      "track": "B",
+      "direction_key": "v285-coinbase-member-c4",
+      "status": "running",
+      "parent_versions": [
+        "v282"
+      ],
+      "model_family": "hist-gradient-boosting",
+      "objective": "Coinbase-premium member D (annual + quarterly) blended into the C4 books",
+      "data_contract": "cached v154 / v206 member D (Coinbase premium features, audited builders)",
+      "policy_contract": "engine_user trade mode G2 + v218 D2 settings, C4 dip stops (4 sigma on 5m closes + 8-sigma backstop), budget 0.18",
+      "hypothesis": "the good-alone Coinbase member fits under C4's DD margin and lifts the weakest year",
+      "parent_commit": "1ecf947baddd5ef78444670330e9db62128dad50",
+      "write_scope": "research/parallel/rounds/parallel-20260906-r2/v285",
+      "worker_agent_id": "01a07791-eecb-7053-8866-dcdbe31e84d7",
+      "worker_host_id": "local",
+      "result_manifest": null,
+      "registered_at": "2026-09-29T21:37:08.201860Z",
+      "assigned_at": "2026-09-29T21:37:08.201860Z"
     }
   ],
-  "updated_at": "2026-09-29T20:06:02.239242Z"
+  "updated_at": "2026-09-29T21:37:08.215924Z"
 }
