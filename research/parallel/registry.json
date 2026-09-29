@@ -2,7 +2,7 @@
   "schema_version": 1,
   "project": "Agentic Alpha Lab BTC swing research",
   "created_at": "2026-09-06T00:00:00Z",
-  "next_version": 281,
+  "next_version": 282,
   "control": {
     "coordinator_model": "gpt-5.6-sol",
     "coordinator_reasoning": "high",
@@ -54,7 +54,7 @@
     "expected_workers": 3,
     "version_range": [
       45,
-      280
+      281
     ],
     "parent_commit": "1ecf947baddd5ef78444670330e9db62128dad50",
     "cloud_snapshot": {
@@ -11778,7 +11778,7 @@
       "version": "v279",
       "track": "C",
       "direction_key": "v279-fill-speed-sizing",
-      "status": "running",
+      "status": "rejected",
       "parent_versions": [
         "v274"
       ],
@@ -11791,9 +11791,36 @@
       "write_scope": "research/parallel/rounds/parallel-20260906-r2/v279",
       "worker_agent_id": "01a07748-5adc-7061-8052-0ed36705a8a8",
       "worker_host_id": "local",
-      "result_manifest": null,
+      "result_manifest": "research\\parallel\\rounds\\parallel-20260906-r2\\v279\\result_manifest.json",
       "registered_at": "2026-09-29T13:13:57.723370Z",
-      "assigned_at": "2026-09-29T13:13:57.723370Z"
+      "assigned_at": "2026-09-29T13:13:57.723370Z",
+      "result_manifest_sha256": "eb84e9848d59f6569cd3dcdb8f131a586241fd5f162f525799e23b722006395a",
+      "result_summary": {
+        "scenarios": {
+          "normal": {
+            "monthly_geometric_net_percent": 5.779,
+            "max_drawdown_percent": 18.74,
+            "fills": 1363,
+            "months": 60
+          },
+          "fee_stress": {
+            "monthly_geometric_net_percent": 5.779,
+            "max_drawdown_percent": 18.74,
+            "fills": 1363,
+            "months": 60
+          },
+          "execution_stress": {
+            "monthly_geometric_net_percent": 5.779,
+            "max_drawdown_percent": 18.74,
+            "fills": 1363,
+            "months": 60
+          }
+        },
+        "independent_test": false,
+        "live_approved": false,
+        "audit_notes": "reproduced; timing checks passed; no leakage."
+      },
+      "audited_at": "2026-09-29T19:25:16.636353Z"
     },
     {
       "version": "v280",
@@ -11815,7 +11842,28 @@
       "result_manifest": null,
       "registered_at": "2026-09-29T13:52:35.552430Z",
       "assigned_at": "2026-09-29T13:52:35.552430Z"
+    },
+    {
+      "version": "v281",
+      "track": "C",
+      "direction_key": "v281-microstructure-member",
+      "status": "running",
+      "parent_versions": [
+        "v279"
+      ],
+      "model_family": "hist-gradient-boosting",
+      "objective": "separate microstructure member from all kept exchange data, blended 20% / 33% into the C4 books",
+      "data_contract": "pooled 4h panel from 2020-01: returns, TV, Binance perp / spot, OKX, Bybit order flow, premium, OI and long/short ratios, 1m intrabar flow; causal at the bar close; annual walk-forward models trained on rows whose 7-day label ended before anchor - 7 days",
+      "policy_contract": "engine_user trade mode G2 + v218 D2 settings, C4 dip stops (4 sigma on 5m closes + 8-sigma backstop), budget 0.18",
+      "hypothesis": "exchange data as a separate member errs in different years than the members and lifts the weakest year",
+      "parent_commit": "1ecf947baddd5ef78444670330e9db62128dad50",
+      "write_scope": "research/parallel/rounds/parallel-20260906-r2/v281",
+      "worker_agent_id": "01a07748-5adc-7061-8052-0ed36705a8a8",
+      "worker_host_id": "local",
+      "result_manifest": null,
+      "registered_at": "2026-09-29T19:25:16.636353Z",
+      "assigned_at": "2026-09-29T19:25:16.636353Z"
     }
   ],
-  "updated_at": "2026-09-29T13:52:35.552430Z"
+  "updated_at": "2026-09-29T19:25:16.636353Z"
 }
