@@ -99,6 +99,8 @@ def simulate(books, opens, prep, m_sl=3.0, m_sleeve_sl=2.0, sleeve=True, target=
     idx, cols = prep["idx"], prep["cols"]
     O, H, L, C = prep["O"], prep["H"], prep["L"], prep["C"]
     sig4, o1, o2, settle = prep["sig4"], prep["o1"], prep["o2"], prep["settle"]
+    # optional sleeve-only sigma (rung spacing, TP / SL distance and budget risk of the 4h dip ladder); default = sig4 (unchanged)
+    sig_sl = prep.get("sig4_sleeve", sig4)
     B = books.to_numpy()
     na, n = len(cols), len(idx)
     o = opens.reindex(idx)[cols]
@@ -519,12 +521,12 @@ def simulate(books, opens, prep, m_sl=3.0, m_sleeve_sl=2.0, sleeve=True, target=
             fills = []  # (fill minute, ladder 0=4h / 1=hourly, rung, asset, limit, sigma, end minute)
             for r, k in enumerate(rungs):
                 for a in range(na):
-                    if not np.isfinite(sig4[i][a]):
+                    if not np.isfinite(sig_sl[i][a]):
                         continue
-                    lv = o1[i][a] * (1 - k * sig4[i][a])
+                    lv = o1[i][a] * (1 - k * sig_sl[i][a])
                     hit = L[i, 16:239, a].astype(float) < lv
                     if hit.any():
-                        fills.append((16 + int(np.argmax(hit)), 0, r, a, lv, sig4[i][a], 240))
+                        fills.append((16 + int(np.argmax(hit)), 0, r, a, lv, sig_sl[i][a], 240))
             if hourly and "sig1h" in prep:
                 s1 = prep["sig1h"][i]
                 for h in range(4):
