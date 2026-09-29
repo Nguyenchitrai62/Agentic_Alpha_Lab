@@ -2,7 +2,7 @@
   "schema_version": 1,
   "project": "Agentic Alpha Lab BTC swing research",
   "created_at": "2026-09-06T00:00:00Z",
-  "next_version": 271,
+  "next_version": 275,
   "control": {
     "coordinator_model": "gpt-5.6-sol",
     "coordinator_reasoning": "high",
@@ -54,7 +54,7 @@
     "expected_workers": 3,
     "version_range": [
       45,
-      270
+      274
     ],
     "parent_commit": "1ecf947baddd5ef78444670330e9db62128dad50",
     "cloud_snapshot": {
@@ -11317,7 +11317,7 @@
       "version": "v269",
       "track": "B",
       "direction_key": "v269-close-stop-distance",
-      "status": "running",
+      "status": "rejected",
       "parent_versions": [
         "v268"
       ],
@@ -11330,15 +11330,42 @@
       "write_scope": "research/parallel/rounds/parallel-20260906-r2/v269",
       "worker_agent_id": "01a07791-eecb-7053-8866-dcdbe31e84d7",
       "worker_host_id": "local",
-      "result_manifest": null,
+      "result_manifest": "research\\parallel\\rounds\\parallel-20260906-r2\\v269\\result_manifest.json",
       "registered_at": "2026-09-29T12:17:03.838205Z",
-      "assigned_at": "2026-09-29T12:17:03.838205Z"
+      "assigned_at": "2026-09-29T12:17:03.838205Z",
+      "result_manifest_sha256": "e68f8c00cdb6375e5a3e987b34690bbb7b6e93f85e5c0996d21640b669516a26",
+      "result_summary": {
+        "scenarios": {
+          "normal": {
+            "monthly_geometric_net_percent": 5.749,
+            "max_drawdown_percent": 18.27,
+            "fills": 1350,
+            "months": 60
+          },
+          "fee_stress": {
+            "monthly_geometric_net_percent": 5.749,
+            "max_drawdown_percent": 18.27,
+            "fills": 1350,
+            "months": 60
+          },
+          "execution_stress": {
+            "monthly_geometric_net_percent": 5.749,
+            "max_drawdown_percent": 18.27,
+            "fills": 1350,
+            "months": 60
+          }
+        },
+        "independent_test": false,
+        "live_approved": false,
+        "audit_notes": "all rows reproduced independently; cost constants restored; v271/v272 data set identical (2556 checkpoints); lock probe changes no fill; no leakage."
+      },
+      "audited_at": "2026-09-29T12:49:41.217357Z"
     },
     {
       "version": "v270",
       "track": "C",
       "direction_key": "v270-stress-select-close4",
-      "status": "running",
+      "status": "rejected",
       "parent_versions": [
         "v267"
       ],
@@ -11351,10 +11378,175 @@
       "write_scope": "research/parallel/rounds/parallel-20260906-r2/v270",
       "worker_agent_id": "01a07748-5adc-7061-8052-0ed36705a8a8",
       "worker_host_id": "local",
-      "result_manifest": null,
+      "result_manifest": "research\\parallel\\rounds\\parallel-20260906-r2\\v270\\result_manifest.json",
       "registered_at": "2026-09-29T12:17:04.095584Z",
-      "assigned_at": "2026-09-29T12:17:04.095584Z"
+      "assigned_at": "2026-09-29T12:17:04.095584Z",
+      "result_manifest_sha256": "3eaedaf355803f312ed33567611541c4ae6ee25f34ee4aa0b8d8b4dbabdb7685",
+      "result_summary": {
+        "scenarios": {
+          "normal": {
+            "monthly_geometric_net_percent": 5.436,
+            "max_drawdown_percent": 19.65,
+            "fills": 1360,
+            "months": 60
+          },
+          "fee_stress": {
+            "monthly_geometric_net_percent": 5.436,
+            "max_drawdown_percent": 19.65,
+            "fills": 1360,
+            "months": 60
+          },
+          "execution_stress": {
+            "monthly_geometric_net_percent": 5.436,
+            "max_drawdown_percent": 19.65,
+            "fills": 1360,
+            "months": 60
+          }
+        },
+        "independent_test": false,
+        "live_approved": false,
+        "audit_notes": "all rows reproduced independently; cost constants restored; v271/v272 data set identical (2556 checkpoints); lock probe changes no fill; no leakage."
+      },
+      "audited_at": "2026-09-29T12:49:41.506254Z"
+    },
+    {
+      "version": "v271",
+      "track": "B",
+      "direction_key": "v271-rl-optimal-stopping",
+      "status": "rejected",
+      "parent_versions": [
+        "v269"
+      ],
+      "model_family": "hist-gradient-boosting",
+      "objective": "RL optimal-stopping agent for losing dip rungs (cut at a 5m close vs follow B1)",
+      "data_contract": "1m klines of the holding bar; O1 members unchanged; states up to the decision minute",
+      "policy_contract": "engine_user trade mode G2 + v218 D2 settings, budget 0.18, candle-close dip stops; limits, minute-5 rule, Bybit fees, adverse funding",
+      "hypothesis": "exact bounded returns make the stopping value learnable",
+      "parent_commit": "1ecf947baddd5ef78444670330e9db62128dad50",
+      "write_scope": "research/parallel/rounds/parallel-20260906-r2/v271",
+      "worker_agent_id": "01a07791-eecb-7053-8866-dcdbe31e84d7",
+      "worker_host_id": "local",
+      "result_manifest": "research\\parallel\\rounds\\parallel-20260906-r2\\v271\\result_manifest.json",
+      "registered_at": "2026-09-29T12:49:41.217357Z",
+      "assigned_at": "2026-09-29T12:49:41.217357Z",
+      "result_manifest_sha256": "942a7de67435361afcd1b5170ebaf285be77e5f27ee37a6031ae72aca6a2270c",
+      "result_summary": {
+        "scenarios": {
+          "normal": {
+            "monthly_geometric_net_percent": 5.743,
+            "max_drawdown_percent": 21.29,
+            "fills": 1352,
+            "months": 60
+          },
+          "fee_stress": {
+            "monthly_geometric_net_percent": 5.743,
+            "max_drawdown_percent": 21.29,
+            "fills": 1352,
+            "months": 60
+          },
+          "execution_stress": {
+            "monthly_geometric_net_percent": 5.743,
+            "max_drawdown_percent": 21.29,
+            "fills": 1352,
+            "months": 60
+          }
+        },
+        "independent_test": false,
+        "live_approved": false,
+        "audit_notes": "all rows reproduced independently; cost constants restored; v271/v272 data set identical (2556 checkpoints); lock probe changes no fill; no leakage."
+      },
+      "audited_at": "2026-09-29T12:49:41.788661Z"
+    },
+    {
+      "version": "v272",
+      "track": "C",
+      "direction_key": "v272-stop-agent-budget-lock",
+      "status": "rejected",
+      "parent_versions": [
+        "v270"
+      ],
+      "model_family": "hist-gradient-boosting",
+      "objective": "v271 agent with the cut rung's risk locked in the budget until the bar ends",
+      "data_contract": "1m klines of the holding bar; O1 members unchanged; states up to the decision minute",
+      "policy_contract": "engine_user trade mode G2 + v218 D2 settings, budget 0.18, candle-close dip stops; limits, minute-5 rule, Bybit fees, adverse funding",
+      "hypothesis": "the v271 DD rise came from re-used budget",
+      "parent_commit": "1ecf947baddd5ef78444670330e9db62128dad50",
+      "write_scope": "research/parallel/rounds/parallel-20260906-r2/v272",
+      "worker_agent_id": "01a07748-5adc-7061-8052-0ed36705a8a8",
+      "worker_host_id": "local",
+      "result_manifest": "research\\parallel\\rounds\\parallel-20260906-r2\\v272\\result_manifest.json",
+      "registered_at": "2026-09-29T12:49:41.504077Z",
+      "assigned_at": "2026-09-29T12:49:41.504077Z",
+      "result_manifest_sha256": "c7f2f7960fc031ff780f8f91391374af719cd49f44da410a88eb31720479160a",
+      "result_summary": {
+        "scenarios": {
+          "normal": {
+            "monthly_geometric_net_percent": 5.743,
+            "max_drawdown_percent": 21.29,
+            "fills": 1352,
+            "months": 60
+          },
+          "fee_stress": {
+            "monthly_geometric_net_percent": 5.743,
+            "max_drawdown_percent": 21.29,
+            "fills": 1352,
+            "months": 60
+          },
+          "execution_stress": {
+            "monthly_geometric_net_percent": 5.743,
+            "max_drawdown_percent": 21.29,
+            "fills": 1352,
+            "months": 60
+          }
+        },
+        "independent_test": false,
+        "live_approved": false,
+        "audit_notes": "all rows reproduced independently; cost constants restored; v271/v272 data set identical (2556 checkpoints); lock probe changes no fill; no leakage."
+      },
+      "audited_at": "2026-09-29T12:49:42.058177Z"
+    },
+    {
+      "version": "v273",
+      "track": "B",
+      "direction_key": "v273-target-on-close4",
+      "status": "running",
+      "parent_versions": [
+        "v271"
+      ],
+      "model_family": "rule-based",
+      "objective": "book vol target 0.27 / 0.29 on the 4-sigma close stop",
+      "data_contract": "1m klines of the holding bar; O1 members unchanged; states up to the decision minute",
+      "policy_contract": "engine_user trade mode G2 + v218 D2 settings, budget 0.18, candle-close dip stops; limits, minute-5 rule, Bybit fees, adverse funding",
+      "hypothesis": "the freed DD margin can carry more book risk",
+      "parent_commit": "1ecf947baddd5ef78444670330e9db62128dad50",
+      "write_scope": "research/parallel/rounds/parallel-20260906-r2/v273",
+      "worker_agent_id": "01a07791-eecb-7053-8866-dcdbe31e84d7",
+      "worker_host_id": "local",
+      "result_manifest": null,
+      "registered_at": "2026-09-29T12:49:41.784615Z",
+      "assigned_at": "2026-09-29T12:49:41.784615Z"
+    },
+    {
+      "version": "v274",
+      "track": "C",
+      "direction_key": "v274-close-stop-tp",
+      "status": "running",
+      "parent_versions": [
+        "v272"
+      ],
+      "model_family": "rule-based",
+      "objective": "dip TP 1.25 / 1.5 sigma under close stops",
+      "data_contract": "1m klines of the holding bar; O1 members unchanged; states up to the decision minute",
+      "policy_contract": "engine_user trade mode G2 + v218 D2 settings, budget 0.18, candle-close dip stops; limits, minute-5 rule, Bybit fees, adverse funding",
+      "hypothesis": "close stops let survivors reach larger rebounds",
+      "parent_commit": "1ecf947baddd5ef78444670330e9db62128dad50",
+      "write_scope": "research/parallel/rounds/parallel-20260906-r2/v274",
+      "worker_agent_id": "01a07748-5adc-7061-8052-0ed36705a8a8",
+      "worker_host_id": "local",
+      "result_manifest": null,
+      "registered_at": "2026-09-29T12:49:42.054306Z",
+      "assigned_at": "2026-09-29T12:49:42.054306Z"
     }
   ],
-  "updated_at": "2026-09-29T12:17:04.095584Z"
+  "updated_at": "2026-09-29T12:49:42.058177Z"
 }
