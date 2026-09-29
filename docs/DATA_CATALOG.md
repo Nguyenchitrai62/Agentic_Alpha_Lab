@@ -8,7 +8,7 @@ aggTrades ~122 GB, spot ~150 GB+); every fetcher keeps the derived tables below,
 | `data/raw/aggflow_20260929_orders/{SYM}_flow_4h.parquet` | Binance USD-M perp taker ORDERS per 4h bar and size tier (<10k, 10k-100k, 100k-1M, >=1M USDT): buy / sell notional, counts | 2020-01 (SOL 2020-09) .. 2026-09-27 | `scripts/fetch_aggtrades_flow.py SYM --orders --out ...` |
 | `data/raw/aggflow_20260929_orders_1m/{SYM}/*.parquet` | same orders per MINUTE in 8 log-size bins (lt1k .. ge3m): buy / sell notional, buy / sell order counts | same | same (1m store) |
 | `data/raw/aggflow_20260928_orders/` | audited O1 4h table (identical to the 20260929 4h table) | same | `--orders` |
-| `data/raw/aggflow_spot_20260929_orders/` + `_1m/` | Binance SPOT taker orders, 4h tiers + 1m store | 2017-12 (BNB 2017-11, XRP 2018-05, SOL 2020-08) .. 2026-09 | `--market spot --orders --out ...` |
+| `data/raw/aggflow_spot_20260929_orders/` + `_1m/` | Binance SPOT taker orders, 4h tiers + 1m store | BTC / ETH 2017-08, BNB 2017-11, XRP 2018-05, SOL 2020-08 .. 2026-09-28 (complete, 973 MB 1m store) | `--market spot --orders --out ...` |
 | `data/raw/okxflow_20260929/` + `_1m/` | OKX USDT-perp taker orders (price x contracts x ctVal), 4h tiers + 1m store; days listing every trade twice (until ~2021-11) skipped | 2021-10-01 (BNB 2022-12-23) .. 2026-09-27 | `scripts/fetch_okx_flow.py` |
 | `data/raw/bybitflow_20260929/` | Bybit perp taker orders, 4h tiers only | BTC 2020-03, others mid-2021 .. 2026-09 | `scripts/fetch_bybit_flow.py` |
 | `data/raw/aggflow_20260928/`, `aggflow_spot_20260928/` | fill-level (per aggTrade) 4h tiers, perp and spot | 2020 / 2017 .. 2026-09 | default mode |
