@@ -2,7 +2,7 @@
   "schema_version": 1,
   "project": "Agentic Alpha Lab BTC swing research",
   "created_at": "2026-09-06T00:00:00Z",
-  "next_version": 264,
+  "next_version": 265,
   "control": {
     "coordinator_model": "gpt-5.6-sol",
     "coordinator_reasoning": "high",
@@ -54,7 +54,7 @@
     "expected_workers": 3,
     "version_range": [
       45,
-      263
+      264
     ],
     "parent_commit": "1ecf947baddd5ef78444670330e9db62128dad50",
     "cloud_snapshot": {
@@ -10981,7 +10981,7 @@
       "version": "v262",
       "track": "B",
       "direction_key": "v262-spot-order-flow",
-      "status": "running",
+      "status": "rejected",
       "parent_versions": [
         "v260"
       ],
@@ -10994,9 +10994,36 @@
       "write_scope": "research/parallel/rounds/parallel-20260906-r2/v262",
       "worker_agent_id": "01a07791-eecb-7053-8866-dcdbe31e84d7",
       "worker_host_id": "local",
-      "result_manifest": null,
+      "result_manifest": "research\\parallel\\rounds\\parallel-20260906-r2\\v262\\result_manifest.json",
       "registered_at": "2026-09-29T09:42:47.159079Z",
-      "assigned_at": "2026-09-29T09:42:47.159079Z"
+      "assigned_at": "2026-09-29T09:42:47.159079Z",
+      "result_manifest_sha256": "c3786e0cbf3db4d1622ad503f2602f84ecf3ea05cea2f5d502fe2e80fe397c9d",
+      "result_summary": {
+        "scenarios": {
+          "normal": {
+            "monthly_geometric_net_percent": 5.248,
+            "max_drawdown_percent": 20.76,
+            "fills": 1352,
+            "months": 60
+          },
+          "fee_stress": {
+            "monthly_geometric_net_percent": 5.248,
+            "max_drawdown_percent": 20.76,
+            "fills": 1352,
+            "months": 60
+          },
+          "execution_stress": {
+            "monthly_geometric_net_percent": 5.248,
+            "max_drawdown_percent": 20.76,
+            "fills": 1352,
+            "months": 60
+          }
+        },
+        "independent_test": false,
+        "live_approved": false,
+        "audit_notes": "bit-exact; independent spot order rebuild exact on sampled months; features and truncation exact; no leakage. Rejected (DD > 20)."
+      },
+      "audited_at": "2026-09-29T11:02:00.413605Z"
     },
     {
       "version": "v263",
@@ -11018,7 +11045,28 @@
       "result_manifest": null,
       "registered_at": "2026-09-29T10:52:07.641000Z",
       "assigned_at": "2026-09-29T10:52:07.641000Z"
+    },
+    {
+      "version": "v264",
+      "track": "B",
+      "direction_key": "v264-sleeve-circuit-breaker",
+      "status": "running",
+      "parent_versions": [
+        "v262"
+      ],
+      "model_family": "rule-based",
+      "objective": "dip-ladder circuit breaker: skip new rung fills while the bar's taken rungs are marked below -3% / -5% of equity",
+      "data_contract": "1m closes up to minute f-1 of the holding bar; O1 members unchanged",
+      "policy_contract": "engine_user trade mode G2 + v218 D2 settings, budget 0.18 (0.22 in C3); new sleeve_breaker argument; limits, minute-5 rule, SL market / TP limit, Bybit fees, adverse funding",
+      "hypothesis": "not adding bids while the open dip trades bleed cuts the crash-bar tail",
+      "parent_commit": "1ecf947baddd5ef78444670330e9db62128dad50",
+      "write_scope": "research/parallel/rounds/parallel-20260906-r2/v264",
+      "worker_agent_id": "01a07791-eecb-7053-8866-dcdbe31e84d7",
+      "worker_host_id": "local",
+      "result_manifest": null,
+      "registered_at": "2026-09-29T11:02:00.410447Z",
+      "assigned_at": "2026-09-29T11:02:00.410447Z"
     }
   ],
-  "updated_at": "2026-09-29T10:52:07.643005Z"
+  "updated_at": "2026-09-29T11:02:00.413605Z"
 }
