@@ -1,6 +1,6 @@
 # Research map (update after every rotation)
 
-Last update: 2026-09-30 (after v284).
+Last update: 2026-09-30 (after v285).
 
 ## Honest status
 
@@ -50,6 +50,7 @@ DATA LEADERBOARD (research/diagnostics/data_leaderboard, dev only; pooled HGB, 7
 v282 FULL-ACTION RL trader (user suggestion: direction, size / leverage up to 150%, reversal, stop / target moved every bar; PPO, 10 seeds): every seed far below the G2 rule (dev4 2.8-4.7 vs 6.13, losing years, DD 22-53). RL now tried from single decisions up to full control; the rule on the pipeline signal stays best.
 v283 walk-forward NNLS stacking of members (+ exchange member C): corner weights chasing last year's best member, C weight ~0; dev4 5.42 DD 22.1 -> equal weights (C4) stay best.
 v284 spot order flow spliced before the perp archive (+2.5y flow history): worse (5.32 / 5.51 vs 6.03) - spot-era flow differs from perp flow.
+*** v285 D2 = 0.8 x C4 books + 0.2 x Coinbase-premium member D (annual + quarterly, v154 / v206 caches) on the C4 rules: dev4 5.864, worst dev year 3.005 (beats C4 2.951 -> robust selection), DD 18.39; final 5y 5.725, MOST RECENT YEAR 5.167, no losing year -> FIRST DETERMINISTIC GATE PASS (hidden win 55.8%). Audit + robustness (v285_audit / d2c_robustness) pending; live feed exists (v154 advisor logs members.coinbase_model; unit check needed before deployment).
 PLATEAU: every management layer lands at dev4 ~5.1-5.3 and last year ~3.8-4.0 at DD ~19 -> the foundation signal is the limit.
 v223-v228 (all rejected, D2 stays): foundation component mixes slower/faster (0.25/0.25/0.5 local optimum), no long-only + trim
 (best worst year 2.47 but dev4 4.97), member D / monthly schedule, causal coin bandit for the sleeve (DD > 20), deeper limit
