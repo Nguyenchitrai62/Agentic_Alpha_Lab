@@ -40,6 +40,7 @@ v274 dip TP 1.25 / 1.5 sigma under close stops: DD 26.6 / 27.4 -> TP 1 sigma sta
 Dev-only diagnostic (research/diagnostics/dip_carry): holding timed-out dip rungs 4h / 8h past the bar end under M1 rules is not consistent (2021 / 2023 negative, late fills worse, q01 -7..-9%) -> no cross-bar dip holding.
 v275 hourly dip ladder WITH close stops: 2022 -35%, DD 44.7 -> hourly dips continue; the hourly ladder is closed for good (3rd failure).
 v276 rung size 2.0 / 2.25 on M1: DD 20.5 / 22.0, weak year down -> M1 sits at the frontier.
+Dev-only diagnostic (research/diagnostics/dip_funding): M1 dip outcomes by predicted-funding / premium-z quintile flip sign between years (2021 high = worst, 2023/2024 high = best) -> no funding-state sizing of the dip rungs.
 PLATEAU: every management layer lands at dev4 ~5.1-5.3 and last year ~3.8-4.0 at DD ~19 -> the foundation signal is the limit.
 v223-v228 (all rejected, D2 stays): foundation component mixes slower/faster (0.25/0.25/0.5 local optimum), no long-only + trim
 (best worst year 2.47 but dev4 4.97), member D / monthly schedule, causal coin bandit for the sleeve (DD > 20), deeper limit
