@@ -28,8 +28,9 @@ PIPELINES = {  # pipeline key -> (research-books function in scripts/forward_v20
     "v205": ("research_books", 5.261),
     "v233": ("research_books_t3", 5.485),
     "v236": ("research_books_w2", 5.774),
-    "v240": ("research_books_o1", 5.690),
+    "v240": ("research_books_o1", 5.777),  # with the v247 sleeve budget 0.18
 }
+KW_OVERRIDE = {"v240": {"sleeve_risk_budget": 0.18}}
 
 
 def _load(name, path):
@@ -54,7 +55,7 @@ def simulate(pipe: str):
     prep = eu.prepare(books154, opens)
     events, bars = [], []
     res = eu.simulate(books, opens, prep, trade=dict(v216.GRID, policy=v216.grid_policy(v221.B_ABS, v221.B_REL)), win_start=5,
-                      events=events, bars=bars, **v221.KW)
+                      events=events, bars=bars, **dict(v221.KW, **KW_OVERRIDE.get(pipe, {})))
     if abs(res["monthly_dev4"] - dev4) > 0.01:
         raise RuntimeError(f"{pipe}: replay dev4 {res['monthly_dev4']} != research {dev4}")
     return res, events, bars, cols

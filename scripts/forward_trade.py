@@ -71,6 +71,8 @@ def main():
             "v240_O1": ("research_books_o1", OUT.with_name("trade_plan_v240.json"), "v240 O1 books (T3 + order-level whale flow) + trade mode")}
     rb_name, out_path, pipe_name = cand[args.candidate]
     p = dict(DEFAULT, **(json.loads(Path(args.policy).read_text()) if args.policy else {}))
+    # per-pipeline policy overrides from audited research: O1 runs the v247 sleeve stop-risk budget 0.18 (since 2026-09-29)
+    p = dict(p, **{"v240_O1": {"sleeve_risk_budget": 0.18, "name": "v218 D2 grid trader + dip sleeve budget 0.18 (v247), rung x1.75"}}.get(args.candidate, {}))
     start = pd.Timestamp(args.start, tz="UTC") if args.start else FREEZE
     now = pd.Timestamp(datetime.now(timezone.utc))
     if now < start:  # before the first traded bar: publish an empty plan that says when trading starts
