@@ -73,7 +73,7 @@ def prepare(books, opens):
                 settle=settle_at_end, sig1h=sig1h)
 
 
-def simulate(books, opens, prep, m_sl=3.0, m_sleeve_sl=2.0, sleeve=True, target=0.25, cap=2.0, d_limit=D_LIMIT, win_end=60, sleeve_risk_budget=None, gap=0.02, m_sleeve_tp=1.0, rung_scale_fixed=None, size_mult=1.0, rungs=RUNGS, m_tp=None, hourly=False, align=None, events=None, bars=None, exec_policy=None, fixed_levels=False, attrib=None, trade=None, win_start=2, state_out=None, sleeve_filter=None, sleeve_tp=None, strat_vt=None, sleeve_start=16, risk_mult=None):
+def simulate(books, opens, prep, m_sl=3.0, m_sleeve_sl=2.0, sleeve=True, target=0.25, cap=2.0, d_limit=D_LIMIT, win_end=60, sleeve_risk_budget=None, gap=0.02, m_sleeve_tp=1.0, rung_scale_fixed=None, size_mult=1.0, rungs=RUNGS, m_tp=None, hourly=False, align=None, events=None, bars=None, exec_policy=None, fixed_levels=False, attrib=None, trade=None, win_start=2, state_out=None, sleeve_filter=None, sleeve_tp=None, strat_vt=None, sleeve_start=16, risk_mult=None, sleeve_breaker=None):
     # events: optional list; when given, every fill / stop / take-profit / sleeve rung is appended as a dict (no effect on results)
     # exec_policy: optional callable (i, a, dw, w_a, tgt_a, sig4_ia) -> ("limit", offset[, weight]) | ("market", 0[, weight]) | ("skip", 0)
     #   deciding how (and, with the optional weight, to which weight instead of the target)
@@ -86,6 +86,8 @@ def simulate(books, opens, prep, m_sl=3.0, m_sleeve_sl=2.0, sleeve=True, target=
     #   2026-09-28: the pipeline needs ~5 minutes after the close, no fill is allowed before).
     # state_out: optional dict; filled at the end with the trade-mode state (orders, SL/TP, quantities, entries) and the last equity.
     # sleeve_filter: optional callable (i, a, rung_index) -> size multiplier for that dip-sleeve bid, decided when the ladder is placed
+    # sleeve_breaker: optional loss fraction X; a new dip-rung fill at minute f is skipped when the bar's already-taken rungs are
+    #   marked below -X of equity at the close of minute f-1 (realised exits included) - stop adding in a cascade. None = unchanged.
     # risk_mult: optional callable (i, eq_hist) -> multiplier on the governor of bar i (book targets and dip-rung sizes); eq_hist =
     #   equity path up to bar i-2 (same lag as the governor). None = unchanged results.
     # sleeve_start: first minute of the holding bar in which a 4h dip-ladder bid may fill (default 16, the v171 legacy window; the
@@ -559,6 +561,10 @@ def simulate(books, opens, prep, m_sl=3.0, m_sleeve_sl=2.0, sleeve=True, target=
                     rn *= smult[(a, r)]
                 if rn <= 0:
                     continue
+                if sleeve_breaker is not None and taken and f >= 1:
+                    mark = sum(t[7] * (t[5] if t[4] <= f - 1 else float(C[i, f - 1, t[2]]) / t[3] - 1) for t in taken if t[0] <= f - 1)
+                    if mark < -sleeve_breaker:
+                        continue
                 if sleeve_risk_budget is None:
                     open_now = sum(1 for t in taken if t[4] > f)
                     if (open_now + 1) * rn > N_MAX + 1e-12:
