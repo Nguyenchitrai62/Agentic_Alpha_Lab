@@ -1,6 +1,6 @@
 # Research map (update after every rotation)
 
-Last update: 2026-09-29 (after v267).
+Last update: 2026-09-29 (after v271).
 
 ## Honest status
 
@@ -34,6 +34,7 @@ v263 meta-labeling of entries (win classifier, skip p<0.35/0.40): +0.04pp dev, w
 NEW BEST CANDIDATE (audit + robustness pending): v266 B1 = O1 B18 + dip-rung stops triggered on a 5m-block CLOSE (bot-watched, exit at the next minute open) + an 8-sigma exchange-native touch backstop: dev4 6.13, worst dev year 3.257, DD 19.70, 5y 5.795, most recent year 4.464 (scored once) - better than O1 on every selection metric and on the unseen year. Origin: dev event study of 2024-08-05 (18 rungs stopped at a liquidation-wick low, then recovery). v265 S2 close5 without backstop 6.178 / 19.29; v264 circuit breaker neutral; B2 (budget counts the 8-sigma stop) 5.725 / DD 18.08.
 B1 robustness (research/diagnostics/b1_robustness): return higher in every stress row (+0.27-0.39pp dev4; bootstrap P(>=5%/mo) 60% vs 55%, P(loss year) 1.0% vs 1.4%) but DD worse in 12/13 rows (cost stress 22.8 vs 20.75, latency 15 min 21.9 vs 19.8); bot outage (8-sigma backstop only) safe (DD 18.7). -> v267 selects under a stress-robust rule (dev DD <= 20 in base, cost stress, latency 15).
 v267 stress-robust selection (dev DD <= 20 in base, cost stress, latency 15): EMPTY pool - no design (not even O1: cost stress 20.75) holds the stress rows; rule keeps O1. DEPLOYED 2026-09-29 as an extra PAPER pipeline: C5 = v266 B1 (forward_trade --candidate v266_B1, backend history_tm 'v266', FE pipe C5) next to O1 (O1 stays the default / recommended view).
+v268 book close stops: DD 21.6-21.9 (touch stays right for the book). v269 close-stop distance: 4 sigma DD 18.27 dev4 6.03 last 4.645 (robust criterion keeps B1); v270 stress rule on it: cost-stress DD 20.23 -> pool empty by 0.23 pp, O1 kept. v271 RL optimal-stopping agent for losing dip rungs (exact returns): early cuts free budget for deeper rungs of the same flush -> DD 21.3, rejected.
 PLATEAU: every management layer lands at dev4 ~5.1-5.3 and last year ~3.8-4.0 at DD ~19 -> the foundation signal is the limit.
 v223-v228 (all rejected, D2 stays): foundation component mixes slower/faster (0.25/0.25/0.5 local optimum), no long-only + trim
 (best worst year 2.47 but dev4 4.97), member D / monthly schedule, causal coin bandit for the sleeve (DD > 20), deeper limit
