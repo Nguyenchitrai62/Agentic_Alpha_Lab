@@ -2,7 +2,7 @@
   "schema_version": 1,
   "project": "Agentic Alpha Lab BTC swing research",
   "created_at": "2026-09-06T00:00:00Z",
-  "next_version": 261,
+  "next_version": 262,
   "control": {
     "coordinator_model": "gpt-5.6-sol",
     "coordinator_reasoning": "high",
@@ -54,7 +54,7 @@
     "expected_workers": 3,
     "version_range": [
       45,
-      260
+      261
     ],
     "parent_commit": "1ecf947baddd5ef78444670330e9db62128dad50",
     "cloud_snapshot": {
@@ -10837,7 +10837,7 @@
       "version": "v259",
       "track": "C",
       "direction_key": "v259-ppo-risk-manager",
-      "status": "running",
+      "status": "rejected",
       "parent_versions": [
         "v257"
       ],
@@ -10850,9 +10850,36 @@
       "write_scope": "research/parallel/rounds/parallel-20260906-r2/v259",
       "worker_agent_id": "01a07748-5adc-7061-8052-0ed36705a8a8",
       "worker_host_id": "local",
-      "result_manifest": null,
+      "result_manifest": "research\\parallel\\rounds\\parallel-20260906-r2\\v259\\result_manifest.json",
       "registered_at": "2026-09-29T06:48:53.790812Z",
-      "assigned_at": "2026-09-29T06:48:53.790812Z"
+      "assigned_at": "2026-09-29T06:48:53.790812Z",
+      "result_manifest_sha256": "dbe554ff002098cd8452c4bb81c3c2c41602c64cf334b013c6134c57b0b3564e",
+      "result_summary": {
+        "scenarios": {
+          "normal": {
+            "monthly_geometric_net_percent": 5.114,
+            "max_drawdown_percent": 17.45,
+            "fills": 1339,
+            "months": 60
+          },
+          "fee_stress": {
+            "monthly_geometric_net_percent": 5.114,
+            "max_drawdown_percent": 17.45,
+            "fills": 1339,
+            "months": 60
+          },
+          "execution_stress": {
+            "monthly_geometric_net_percent": 5.114,
+            "max_drawdown_percent": 17.45,
+            "fills": 1339,
+            "months": 60
+          }
+        },
+        "independent_test": false,
+        "live_approved": false,
+        "audit_notes": "PPO re-trained bit-exact with the same seeds; fit windows, equity lag i-2, market timing, vol-median lag, 2021 fallback and simulator fidelity confirmed; no leakage. v259's gate pass is genuine for seed 259 but seed-unstable (research/diagnostics/v259_seeds)."
+      },
+      "audited_at": "2026-09-29T08:24:28.025325Z"
     },
     {
       "version": "v260",
@@ -10874,7 +10901,28 @@
       "result_manifest": null,
       "registered_at": "2026-09-29T08:21:50.643035Z",
       "assigned_at": "2026-09-29T08:21:50.643035Z"
+    },
+    {
+      "version": "v261",
+      "track": "C",
+      "direction_key": "v261-direct-rl-member",
+      "status": "running",
+      "parent_versions": [
+        "v259"
+      ],
+      "model_family": "direct-reinforcement-policy-gradient",
+      "objective": "direct-reinforcement foundation member (positions maximising the net differentiable Sharpe), 20% blend into O1 books, budget 0.18",
+      "data_contract": "TradingView 17 + order-level flow 6 + returns / vol regime at the decision-bar close, standardised on training rows; reward = next holding-bar return minus turnover cost; models per anchor fitted on rows whose holding bar ends before anchor - 7 days; 5-seed average",
+      "policy_contract": "engine_user trade mode G2 grid + v218 D2 settings, budget 0.18; limits, minute-5 rule, SL market / TP limit, Bybit fees, adverse funding",
+      "hypothesis": "a member trained on the trading objective itself adds model diversity to the foundation that transfers like new information did",
+      "parent_commit": "1ecf947baddd5ef78444670330e9db62128dad50",
+      "write_scope": "research/parallel/rounds/parallel-20260906-r2/v261",
+      "worker_agent_id": "01a07748-5adc-7061-8052-0ed36705a8a8",
+      "worker_host_id": "local",
+      "result_manifest": null,
+      "registered_at": "2026-09-29T08:24:28.021511Z",
+      "assigned_at": "2026-09-29T08:24:28.021511Z"
     }
   ],
-  "updated_at": "2026-09-29T08:21:50.646853Z"
+  "updated_at": "2026-09-29T08:24:28.025325Z"
 }
