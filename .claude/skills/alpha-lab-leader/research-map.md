@@ -1,6 +1,6 @@
 # Research map (update after every rotation)
 
-Last update: 2026-09-29 (after v255).
+Last update: 2026-09-29 (after v257).
 
 ## Honest status
 
@@ -25,6 +25,7 @@ v244 Bybit cross-venue order flow: DD 22 (3rd flow extension raising DD; flow di
 v249 learned ladder-depth window (six rungs, sleeve_filter): D1 DD 22.6, strict = reference -> rejected. v250 per-rung weights: inverse (heavier near) P3 dev4 5.914 / worst 2.968 / DD 19.0 / 5y 5.525 but last year 3.98 (< 4.082) -> no transfer; pyramid (heavier deep) worse. v251 strategy-level vol targeting (engine hook strat_vt): V1/V2 DD 28-30, de-risk only 4.32 -> rejected; the dev diagnostic (calm -> higher next-month return, all 4 years) was confounded by the 20% governor. Dev-only, not registered: 2023 DD = one bar 2024-08-05 (sleeve -12.3%); 5th-coin (market-wide) fills: most stops but positive mean; slide ladder vs 24h high: incremental fills ~0/negative. Sleeve knobs exhausted: TP (v248), depth (v249), size by depth (v250), budget (v247), selection (v220/v235/v243), concurrency (v177).
 v252 intrabar whale flow from the 1m order-level store (in A members): dev below O1 -> rejected. v253 OKX cross-venue flow: registered, DEFERRED (user: OKX incomplete - starts 2021-10, BNB 2022-12 - keep as option; data kept in data/raw/okxflow_20260929). v254 adaptive ladder spacing by current 1m RV: much worse (buys ordinary pullbacks). Premium/predicted funding INSIDE A was already tested in v231 V2/V3 (worse) - do not repeat.
 v255 dip ladder from minute 5/10 instead of 16: neutral (last year identical). OpenCode whale-burst reversal study (dev only, research/diagnostics/whale_burst): 0/108 stable rows, all negative, worse than random entries -> closed. O1 B18 ROBUSTNESS (research/diagnostics/o1_robustness, OpenCode): no losing year in any stress row, win 0.50-0.53 everywhere; DD FRAGILE (base 19.65; cost stress 20.75, latency 30 min 21.08, 60 min 23.18, band shifts 20.4-21.0, cool 12 22.7); bootstrap P(loss year) 1.4%, P(DD>20) 6.8%, P(>=5%/mo) 55%; at 2000 USDT 99% of book and 98% of dip orders placeable. A live bot must act within ~15 minutes of the 4h close.
+v256 RL entry-execution bandit (limit offset per opening order, exact counterfactuals): neutral (agent deviates on 5-8%). v257 sequential PPO trader (per-coin simulator, walk-forward, engine evaluation): pure PPO trades win rate for return (win 56.5%, dev4 3.9, median hold 20h - cuts trends, as v214); PPO + rule prior = rule. RL CONCLUSION (10 learned layers): the rules are near-optimal given the information; learned managers either copy the rule or cut the fat-tailed trend trades. Next gains must come from new information.
 PLATEAU: every management layer lands at dev4 ~5.1-5.3 and last year ~3.8-4.0 at DD ~19 -> the foundation signal is the limit.
 v223-v228 (all rejected, D2 stays): foundation component mixes slower/faster (0.25/0.25/0.5 local optimum), no long-only + trim
 (best worst year 2.47 but dev4 4.97), member D / monthly schedule, causal coin bandit for the sleeve (DD > 20), deeper limit
