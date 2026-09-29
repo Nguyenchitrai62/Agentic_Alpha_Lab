@@ -73,7 +73,7 @@ def prepare(books, opens):
                 settle=settle_at_end, sig1h=sig1h)
 
 
-def simulate(books, opens, prep, m_sl=3.0, m_sleeve_sl=2.0, sleeve=True, target=0.25, cap=2.0, d_limit=D_LIMIT, win_end=60, sleeve_risk_budget=None, gap=0.02, m_sleeve_tp=1.0, rung_scale_fixed=None, size_mult=1.0, rungs=RUNGS, m_tp=None, hourly=False, align=None, events=None, bars=None, exec_policy=None, fixed_levels=False, attrib=None, trade=None, win_start=2, state_out=None, sleeve_filter=None, sleeve_tp=None, strat_vt=None, sleeve_start=16, risk_mult=None, sleeve_breaker=None, sleeve_stop_mode="touch", sleeve_backstop=None, sleeve_budget_sl=None):
+def simulate(books, opens, prep, m_sl=3.0, m_sleeve_sl=2.0, sleeve=True, target=0.25, cap=2.0, d_limit=D_LIMIT, win_end=60, sleeve_risk_budget=None, gap=0.02, m_sleeve_tp=1.0, rung_scale_fixed=None, size_mult=1.0, rungs=RUNGS, m_tp=None, hourly=False, align=None, events=None, bars=None, exec_policy=None, fixed_levels=False, attrib=None, trade=None, win_start=2, state_out=None, sleeve_filter=None, sleeve_tp=None, strat_vt=None, sleeve_start=16, risk_mult=None, sleeve_breaker=None, sleeve_stop_mode="touch", sleeve_backstop=None, sleeve_budget_sl=None, book_stop_mode="touch", book_backstop=None):
     # events: optional list; when given, every fill / stop / take-profit / sleeve rung is appended as a dict (no effect on results)
     # exec_policy: optional callable (i, a, dw, w_a, tgt_a, sig4_ia) -> ("limit", offset[, weight]) | ("market", 0[, weight]) | ("skip", 0)
     #   deciding how (and, with the optional weight, to which weight instead of the target)
@@ -89,6 +89,9 @@ def simulate(books, opens, prep, m_sl=3.0, m_sleeve_sl=2.0, sleeve=True, target=
     # sleeve_stop_mode: "touch" (default: a 1m low through the stop, fill at min(stop, open)); "close1" / "close5": the market stop
     #   triggers when a 1m close / a 5m-block close (minutes 4, 9, ... of the bar) is at or below the stop and fills at the next minute's
     #   open (next bar open after minute 239); a same-minute TP touch and close trigger resolve stop-first.
+    # book_stop_mode: "touch" (default) or "close5" / "close60": a trade-mode position's stop fires when a 5m / 60m-block close is beyond
+    #   the stop and fills at the next minute's open (next bar open after minute 239); book_backstop (sigma_d multiple, e.g. 6) adds an
+    #   exchange-native touch stop (book_backstop - m_sl) sigma_d beyond the stop, which wins on any tie.
     # sleeve_backstop: with a close stop mode, an exchange-native touch stop at lv * (1 - backstop * sigma) (market, fills at
     #   min(level, open)); it wins over a same-minute close trigger or TP. sleeve_budget_sl: sigma multiple used as the stop distance in
     #   the risk budget (default m_sleeve_sl). None = unchanged.
@@ -292,9 +295,19 @@ def simulate(books, opens, prep, m_sl=3.0, m_sleeve_sl=2.0, sleeve=True, target=
         while cur_q != 0 and m < 240:
             sl, tp = T["sl"][a], T["tp"][a]
             Ls, Hs = La[m:], Ha[m:]
-            hs = Ls <= sl if side > 0 else Hs >= sl
-            ht = Hs > tp if side > 0 else Ls < tp
             none = np.zeros(len(Ls), bool)
+            if book_stop_mode == "touch":
+                hs, hsb = (Ls <= sl if side > 0 else Hs >= sl), none
+            else:
+                Cs = C[i, m:, a].astype(float)
+                step = 5 if book_stop_mode == "close5" else 60
+                hs = (Cs <= sl if side > 0 else Cs >= sl) & ((np.arange(m, 240) + 1) % step == 0)
+                if book_backstop is not None and np.isfinite(sdv):
+                    slb = sl - side * (book_backstop - m_sl) * sdv
+                    hsb = Ls <= slb if side > 0 else Hs >= slb
+                else:
+                    hsb = none
+            ht = Hs > tp if side > 0 else Ls < tp
             tp1 = ent * (1 + side * P["partial_k"] * sdv) if P.get("partial_k") and not T["part"][a] else None
             hp = none if tp1 is None else (Hs > tp1 if side > 0 else Ls < tp1)
             trig = ent * (1 + side * P["be_k"] * sdv) if P.get("be_k") and not T["be"][a] else None
@@ -308,12 +321,24 @@ def simulate(books, opens, prep, m_sl=3.0, m_sleeve_sl=2.0, sleeve=True, target=
                 if first > 0:
                     hx = hx.copy()
                     hx[:first] = False
-            anyhit = hs | ht | hp | hb | hx
+            anyhit = hs | ht | hp | hb | hx | hsb
             if not anyhit.any():
                 break
             k = int(np.argmax(anyhit))
             mm = m + k
-            if hs[k]:  # stop first on any tie
+            if book_stop_mode != "touch" and not hsb[k] and hs[k]:  # close-triggered stop: market at the next minute's open
+                ex = mm + 1
+                px = float(Oa[ex]) if ex < 240 else float(o2[i][a])
+                mm = min(ex, 239)
+                carr[mm:] += cur_q * px - abs(cur_q) * px * TAKER
+                stats["fees"] += abs(cur_q) * px * TAKER
+                stats["stops"] += 1
+                _ev(i, a, mm, "book_stop", "sell" if side > 0 else "buy", px, -cur_q * px / (prev_eq if prev_eq else 1.0))
+                qarr[mm:] = 0.0
+                cur_q = 0.0
+            elif hs[k] or hsb[k]:  # stop first on any tie (a native backstop, if touched, fills at its level)
+                if hsb[k]:
+                    sl = slb
                 px = min(sl, Oa[mm]) if side > 0 else max(sl, Oa[mm])
                 carr[mm:] += cur_q * px - abs(cur_q) * px * TAKER
                 stats["fees"] += abs(cur_q) * px * TAKER
