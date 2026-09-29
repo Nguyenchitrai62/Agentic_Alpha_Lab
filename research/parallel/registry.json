@@ -2,7 +2,7 @@
   "schema_version": 1,
   "project": "Agentic Alpha Lab BTC swing research",
   "created_at": "2026-09-06T00:00:00Z",
-  "next_version": 282,
+  "next_version": 283,
   "control": {
     "coordinator_model": "gpt-5.6-sol",
     "coordinator_reasoning": "high",
@@ -54,7 +54,7 @@
     "expected_workers": 3,
     "version_range": [
       45,
-      281
+      282
     ],
     "parent_commit": "1ecf947baddd5ef78444670330e9db62128dad50",
     "cloud_snapshot": {
@@ -11757,7 +11757,7 @@
       "version": "v278",
       "track": "B",
       "direction_key": "v278-subaccount-blend",
-      "status": "running",
+      "status": "rejected",
       "parent_versions": [
         "v276"
       ],
@@ -11770,9 +11770,36 @@
       "write_scope": "research/parallel/rounds/parallel-20260906-r2/v278",
       "worker_agent_id": "01a07791-eecb-7053-8866-dcdbe31e84d7",
       "worker_host_id": "local",
-      "result_manifest": null,
+      "result_manifest": "research\\parallel\\rounds\\parallel-20260906-r2\\v278\\result_manifest.json",
       "registered_at": "2026-09-29T13:11:22.157767Z",
-      "assigned_at": "2026-09-29T13:11:22.157767Z"
+      "assigned_at": "2026-09-29T13:11:22.157767Z",
+      "result_manifest_sha256": "f9e7b4680bde57baacec289d84b4c88aeb3a17f2e6f0eca20c53bb3e39ff505f",
+      "result_summary": {
+        "scenarios": {
+          "normal": {
+            "monthly_geometric_net_percent": 5.619,
+            "max_drawdown_percent": 19.67,
+            "fills": 0,
+            "months": 60
+          },
+          "fee_stress": {
+            "monthly_geometric_net_percent": 5.619,
+            "max_drawdown_percent": 19.67,
+            "fills": 0,
+            "months": 60
+          },
+          "execution_stress": {
+            "monthly_geometric_net_percent": 5.619,
+            "max_drawdown_percent": 19.67,
+            "fills": 0,
+            "months": 60
+          }
+        },
+        "independent_test": false,
+        "live_approved": false,
+        "audit_notes": "reproduced; timing checks passed; no leakage."
+      },
+      "audited_at": "2026-09-29T19:31:02.208919Z"
     },
     {
       "version": "v279",
@@ -11863,7 +11890,28 @@
       "result_manifest": null,
       "registered_at": "2026-09-29T19:25:16.636353Z",
       "assigned_at": "2026-09-29T19:25:16.636353Z"
+    },
+    {
+      "version": "v282",
+      "track": "B",
+      "direction_key": "v282-full-action-rl-trader",
+      "status": "running",
+      "parent_versions": [
+        "v278"
+      ],
+      "model_family": "ppo-actor-critic-mlp",
+      "objective": "full-action PPO trader per coin: target level -2..+2 x 0.15 equity (reversals, leverage up to 150%), stop 2/4/6 and target 3/6/12 sigma_d re-chosen every bar; 5 seeds; simulator evaluation + C4 sleeve",
+      "data_contract": "per-coin 4h simulator from the engine arrays (minute-5 high/low, limit fills on trade-through, market stops, fees, adverse funding); state = pipeline signals (C4 target, members A/B/Aq/Bq), TV, flow, returns at the decision close; policy for year Y trained on bars from 2021-09-24 to Y - 7 days",
+      "policy_contract": "agent decides direction, size, leverage, reversal, stop and target every bar; dip sleeve unchanged (C4 engine attribution); evaluation labelled simulator",
+      "hypothesis": "an agent that controls every trader decision on top of the pipeline beats the G2 rule (user suggestion)",
+      "parent_commit": "1ecf947baddd5ef78444670330e9db62128dad50",
+      "write_scope": "research/parallel/rounds/parallel-20260906-r2/v282",
+      "worker_agent_id": "01a07791-eecb-7053-8866-dcdbe31e84d7",
+      "worker_host_id": "local",
+      "result_manifest": null,
+      "registered_at": "2026-09-29T19:31:02.202155Z",
+      "assigned_at": "2026-09-29T19:31:02.202155Z"
     }
   ],
-  "updated_at": "2026-09-29T19:25:16.636353Z"
+  "updated_at": "2026-09-29T19:31:02.208919Z"
 }
