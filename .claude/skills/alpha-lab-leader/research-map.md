@@ -1,6 +1,6 @@
 # Research map (update after every rotation)
 
-Last update: 2026-09-29 (after v277).
+Last update: 2026-09-29 (after v278).
 
 ## Honest status
 
@@ -42,6 +42,7 @@ v275 hourly dip ladder WITH close stops: 2022 -35%, DD 44.7 -> hourly dips conti
 v276 rung size 2.0 / 2.25 on M1: DD 20.5 / 22.0, weak year down -> M1 sits at the frontier.
 Dev-only diagnostic (research/diagnostics/dip_funding): M1 dip outcomes by predicted-funding / premium-z quintile flip sign between years (2021 high = worst, 2023/2024 high = best) -> no funding-state sizing of the dip rungs.
 v277 aligned dip sizing re-tuned under close stops: neutral ((1.5, 0.5) stays). Close-stop family fully explored (v264-v277).
+v278 50/50 sub-accounts of stop designs (B1+M1: 6.08 / 3.11 / DD 18.4; O1+B1: 5.96 / 3.13 / 19.67): no diversification gain over B1.
 PLATEAU: every management layer lands at dev4 ~5.1-5.3 and last year ~3.8-4.0 at DD ~19 -> the foundation signal is the limit.
 v223-v228 (all rejected, D2 stays): foundation component mixes slower/faster (0.25/0.25/0.5 local optimum), no long-only + trim
 (best worst year 2.47 but dev4 4.97), member D / monthly schedule, causal coin bandit for the sleeve (DD > 20), deeper limit
