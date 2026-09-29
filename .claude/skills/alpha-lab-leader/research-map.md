@@ -1,6 +1,6 @@
 # Research map (update after every rotation)
 
-Last update: 2026-09-30 (after v282).
+Last update: 2026-09-30 (after v283).
 
 ## Honest status
 
@@ -48,6 +48,7 @@ M1 ROBUSTNESS (research/diagnostics/m1_robustness): M1 beats O1 in all 13 paired
 v280 monthly-retrained flow member on C4: dev worse (5.69 / 2.71) but most recent year 4.75 (highest) - rejected by the protocol; 'fresher models help new regimes' stays a hypothesis for prospective evidence, never a selection signal.
 DATA LEADERBOARD (research/diagnostics/data_leaderboard, dev only; pooled HGB, 7d target, IC gain over base): all groups mean IC 0.051, Bybit flow and spot flow gain in 3/4 years, positioning (OI / long-short) +0.12 in 2023 but negative 2021/2024, premium and OKX nothing; members A / Aq / B / Bq / C4 books IC 0.070 / 0.052 / 0.068 / 0.057 / 0.057, all negative in 2022. v281 microstructure member (all exchange data) blended 20 / 33%: DD 27 / 34 -> rejected.
 v282 FULL-ACTION RL trader (user suggestion: direction, size / leverage up to 150%, reversal, stop / target moved every bar; PPO, 10 seeds): every seed far below the G2 rule (dev4 2.8-4.7 vs 6.13, losing years, DD 22-53). RL now tried from single decisions up to full control; the rule on the pipeline signal stays best.
+v283 walk-forward NNLS stacking of members (+ exchange member C): corner weights chasing last year's best member, C weight ~0; dev4 5.42 DD 22.1 -> equal weights (C4) stay best.
 PLATEAU: every management layer lands at dev4 ~5.1-5.3 and last year ~3.8-4.0 at DD ~19 -> the foundation signal is the limit.
 v223-v228 (all rejected, D2 stays): foundation component mixes slower/faster (0.25/0.25/0.5 local optimum), no long-only + trim
 (best worst year 2.47 but dev4 4.97), member D / monthly schedule, causal coin bandit for the sleeve (DD > 20), deeper limit
