@@ -261,7 +261,7 @@ def main():
             sel = np.flatnonzero((yr == j) & (np.arange(n) >= live[0]))
             if len(sel) == 0:
                 continue
-            e0 = eq[sel[0] - 1]
+            e0 = eq[sel[0] - 1] if sel[0] > 0 else 1.0
             e = eq[sel] / e0
             dd = float(np.max(1 - e / np.maximum.accumulate(np.r_[1.0, e])[1:]))
             net = float(e[-1] - 1)
