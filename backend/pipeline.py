@@ -220,7 +220,8 @@ def job_trade_plan() -> str:
     msgs = []
     for cand, key, fname in (("v151_deploy_v4", "trade_plan", "trade_plan.json"), ("v233_T3", "trade_plan_v233", "trade_plan_v233.json"),
                              ("v236_W2", "trade_plan_v236", "trade_plan_v236.json"), ("v240_O1", "trade_plan_v240", "trade_plan_v240.json"),
-                             ("v266_B1", "trade_plan_v266", "trade_plan_v266.json")):
+                             ("v266_B1", "trade_plan_v266", "trade_plan_v266.json"),
+                             ("v269_M1", "trade_plan_v269", "trade_plan_v269.json")):
         cmd = [SETTINGS.python_exe, str(ROOT / "scripts/forward_trade.py"), "--candidate", cand]
         cfg = ROOT / "configs/trade_policy.json"
         if cfg.exists():

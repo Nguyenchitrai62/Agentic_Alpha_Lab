@@ -35,10 +35,10 @@
   const CONF = { CAO: "Cao", "TRUNG BINH": "Trung bình", THAP: "Thấp" };
   const REASON = { TP: "Chạm TP", SL: "Chạm SL", "SL hoà vốn": "SL hoà vốn", "Đóng limit": "Đóng bằng limit", "Hết giờ": "Hết giờ (dip)", "Hết dữ liệu mô phỏng": "Hết dữ liệu mô phỏng (23/09)",
                   "Rebalance về 0": "Đóng (rebalance)", "Đảo chiều": "Đảo chiều", "Đang mở": "Đang mở", "Hết 4h (market)": "Hết 4h" };
-  const histSource = () => `tm_${state.h.pipe || "v240"}`;
+  const histSource = () => `tm_${state.h.pipe || "v269"}`;
   // walk-forward replay (until the research data end) + the prospective paper window (since the freeze), oldest first per endpoint order
   async function histBoth(kind, symbol) {
-    const pipe = state.h.pipe || "v240";
+    const pipe = state.h.pipe || "v269";
     const [a, b] = await Promise.all([api(`/api/${kind}?symbol=${symbol}&source=tm_${pipe}&limit=30000`),
       api(`/api/${kind}?symbol=${symbol}&source=paper_${pipe}&limit=30000`).catch(() => [])]);
     return kind === "orders" ? b.concat(a) : a.concat(b);  // orders come newest first, positions / trades oldest first
@@ -223,7 +223,8 @@
   const planOf = (sym) => state.live.plan?.coins?.[sym];
   // paper pipelines (prospective evidence); O1 = the most robust walk-forward foundation, the default view
   const PIPES = [
-    { v: "v240", nm: "O1", ds: "cá voi theo lệnh thật · sleeve 0.18 · vững nhất", star: "khuyên dùng" },
+    { v: "v269", nm: "C4", ds: "O1 + SL lệnh dip 4σ theo nến 5m đóng cửa (bot canh) + SL sàn 8σ · DD thấp nhất, bền nhất", star: "khuyên dùng" },
+    { v: "v240", nm: "O1", ds: "cá voi theo lệnh thật · sleeve 0.18 · SL chạm" },
     { v: "v266", nm: "C5", ds: "O1 + SL lệnh dip theo nến 5m đóng cửa (bot canh) + SL sàn 8σ · lãi cao hơn, DD sát 20% · thử nghiệm" },
     { v: "v236", nm: "W2", ds: "dòng tiền cá voi · lãi TB cao nhất" },
     { v: "v233", nm: "T3", ds: "chỉ báo TradingView" },
@@ -231,10 +232,10 @@
   ];
   const PIPE_LABEL = Object.fromEntries(PIPES.map((p) => [p.v, p.nm]));
   function planPipe() {
-    try { const v = localStorage.getItem("planPipe2"); return PIPES.some((p) => p.v === v) ? v : "v240"; } catch { return "v240"; }
+    try { const v = localStorage.getItem("planPipe3"); return PIPES.some((p) => p.v === v) ? v : "v269"; } catch { return "v269"; }
   }
   async function setPlanPipe(v) {
-    try { localStorage.setItem("planPipe2", v); } catch { /* per-viewer convenience only */ }
+    try { localStorage.setItem("planPipe3", v); } catch { /* per-viewer convenience only */ }
     const cached = (state.live.paper || []).find(([k]) => k === v);
     state.live.plan = cached?.[1] || await api(`/api/trade_plan?pipeline=${v}`).catch(() => null);
     renderPipeBar(); renderBoard(); renderCards(); renderWatchlist(); renderPlan();
@@ -526,8 +527,18 @@
   function renderDips() {
     const sym = state.live.symbol;
     const rows = (state.live.latest?.sleeve || []).filter((r) => r.symbol === sym);
-    table($("dipTbl"), ["Bậc", "Mua limit", "TP", "SL", "Vốn"], rows.map((r) => `<tr><td>${r.rung}σ</td><td>${fmtPx(r.buy_limit)}</td>
+    // C4 / C5: the dip stop fires on a 5m CLOSE (bot) at 4 / 5 sigma, plus a native 8-sigma touch stop on the exchange
+    const closeK = { v269: 4, v266: 5 }[planPipe()];
+    if (closeK) {
+      table($("dipTbl"), ["Bậc", "Mua limit", "TP", "SL nến 5m đóng", "SL sàn (đặt sẵn)", "Vốn"], rows.map((r) => {
+        const s = r.buy_limit > 0 ? (r.buy_limit - r.sl) / (5 * r.buy_limit) : 0; // sigma from the advisor's 5-sigma stop
+        return `<tr><td>${r.rung}σ</td><td>${fmtPx(r.buy_limit)}</td><td class="up">${fmtPx(r.tp)}</td>
+        <td class="down">${fmtPx(r.buy_limit * (1 - closeK * s))}</td><td class="down">${fmtPx(r.buy_limit * (1 - 8 * s))}</td><td>${pct(r.size_frac)}</td></tr>`;
+      }), "Không có lệnh chờ");
+    } else {
+      table($("dipTbl"), ["Bậc", "Mua limit", "TP", "SL", "Vốn"], rows.map((r) => `<tr><td>${r.rung}σ</td><td>${fmtPx(r.buy_limit)}</td>
       <td class="up">${fmtPx(r.tp)}</td><td class="down">${fmtPx(r.sl)}</td><td>${pct(r.size_frac)}</td></tr>`), "Không có lệnh chờ");
+    }
     const d = state.live.conf?.levels?.DIP;
     const note = $("dipNote") || Object.assign(document.createElement("div"), { id: "dipNote", className: "muted small" });
     note.innerHTML = d ? `Lịch sử lệnh dip: thắng <b>${(100 * d.dev.win_rate).toFixed(0)}%</b> (${d.dev.n} lệnh, 4 năm đầu) · năm giấu <b>${(100 * d.hidden.win_rate).toFixed(0)}%</b> (${d.hidden.n} lệnh) · TB thắng +${d.dev.avg_win_pct.toFixed(2)}% / thua ${d.dev.avg_loss_pct.toFixed(2)}%` : "";
@@ -634,7 +645,7 @@
       histInit = true;
       state.h.pipe = planPipe();
       seg($("hPipe"), PIPES.map((p) => p.v), state.h.pipe, (v) => { state.h.pipe = v; loadHistory(); },
-        (v) => PIPES.find((p) => p.v === v).nm + (v === "v240" ? " ★" : ""));
+        (v) => PIPES.find((p) => p.v === v).nm + (v === "v269" ? " ★" : ""));
       seg($("hSymbols"), SYMS, state.h.symbol, (v) => { state.h.symbol = v; store.set("hSym", v); loadHistory(); updateTitle(); }, coin);
       seg($("hIntervals"), ["1h", "4h", "1d"], state.h.interval, (v) => { state.h.interval = v; store.set("hIv", v); loadHistory(); }, (x) => IV_LABEL[x]);
       seg($("hRanges"), Object.keys(RANGES), state.h.range, (v) => { state.h.range = v; store.set("hRange2", v); applyRange(); });
