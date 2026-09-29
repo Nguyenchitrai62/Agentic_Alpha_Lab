@@ -2,7 +2,7 @@
   "schema_version": 1,
   "project": "Agentic Alpha Lab BTC swing research",
   "created_at": "2026-09-06T00:00:00Z",
-  "next_version": 258,
+  "next_version": 259,
   "control": {
     "coordinator_model": "gpt-5.6-sol",
     "coordinator_reasoning": "high",
@@ -54,7 +54,7 @@
     "expected_workers": 3,
     "version_range": [
       45,
-      257
+      258
     ],
     "parent_commit": "1ecf947baddd5ef78444670330e9db62128dad50",
     "cloud_snapshot": {
@@ -10693,7 +10693,7 @@
       "version": "v256",
       "track": "B",
       "direction_key": "v256-entry-execution-agent",
-      "status": "running",
+      "status": "rejected",
       "parent_versions": [
         "v255"
       ],
@@ -10706,9 +10706,36 @@
       "write_scope": "research/parallel/rounds/parallel-20260906-r2/v256",
       "worker_agent_id": "01a07791-eecb-7053-8866-dcdbe31e84d7",
       "worker_host_id": "local",
-      "result_manifest": null,
+      "result_manifest": "research\\parallel\\rounds\\parallel-20260906-r2\\v256\\result_manifest.json",
       "registered_at": "2026-09-29T05:53:53.292645Z",
-      "assigned_at": "2026-09-29T05:53:53.292645Z"
+      "assigned_at": "2026-09-29T05:53:53.292645Z",
+      "result_manifest_sha256": "df7b56250ca473137f685a3a9596357438206bc1c6d7dea20561446f2a2574d9",
+      "result_summary": {
+        "scenarios": {
+          "normal": {
+            "monthly_geometric_net_percent": 5.435,
+            "max_drawdown_percent": 19.7,
+            "fills": 1349,
+            "months": 60
+          },
+          "fee_stress": {
+            "monthly_geometric_net_percent": 5.435,
+            "max_drawdown_percent": 19.7,
+            "fills": 1349,
+            "months": 60
+          },
+          "execution_stress": {
+            "monthly_geometric_net_percent": 5.435,
+            "max_drawdown_percent": 19.7,
+            "fills": 1349,
+            "months": 60
+          }
+        },
+        "independent_test": false,
+        "live_approved": false,
+        "audit_notes": "v256 bit-exact; v257 PPO re-trained with the same seeds reproduces dev4 within 0.3pp and the qualitative result; decision-row state, outcome-end and holding-bar-end embargoes confirmed; look-ahead PASS."
+      },
+      "audited_at": "2026-09-29T06:37:38.329608Z"
     },
     {
       "version": "v257",
@@ -10730,7 +10757,28 @@
       "result_manifest": null,
       "registered_at": "2026-09-29T06:00:08.651238Z",
       "assigned_at": "2026-09-29T06:00:08.651238Z"
+    },
+    {
+      "version": "v258",
+      "track": "B",
+      "direction_key": "v258-ppo-disciplined-pyramiding",
+      "status": "running",
+      "parent_versions": [
+        "v256"
+      ],
+      "model_family": "ppo-actor-critic-mlp",
+      "objective": "disciplined sequential PPO trader: G2 pyramiding simulator, agent may only cut / tighten losing positions (and wait on signals in S1), O1 budget 0.18",
+      "data_contract": "per-coin 4h G2 simulator from the engine arrays (minute-5 high/low, limit adds/reduces/entries, SL/TP, break-even, fees, adverse funding); states at the decision-bar close; policy for year Y trained on holding bars from 2021-09-24 to Y - 7 days; fidelity vs engine reported on dev years",
+      "policy_contract": "engine_user trade mode G2 grid + v218 D2 settings, budget 0.18; agent open/wait when flat (S1), close/tighten only while losing, G2 otherwise; limits, minute-5 rule, SL market / TP limit, Bybit fees, adverse funding",
+      "hypothesis": "with pyramiding in the simulator and a cut-losers-only mask the sequential policy keeps the trend tail and trims losers, raising win rate without losing return",
+      "parent_commit": "1ecf947baddd5ef78444670330e9db62128dad50",
+      "write_scope": "research/parallel/rounds/parallel-20260906-r2/v258",
+      "worker_agent_id": "01a07791-eecb-7053-8866-dcdbe31e84d7",
+      "worker_host_id": "local",
+      "result_manifest": null,
+      "registered_at": "2026-09-29T06:37:38.323512Z",
+      "assigned_at": "2026-09-29T06:37:38.323512Z"
     }
   ],
-  "updated_at": "2026-09-29T06:00:08.654607Z"
+  "updated_at": "2026-09-29T06:37:38.329608Z"
 }
