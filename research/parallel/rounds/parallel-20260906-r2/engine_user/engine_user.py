@@ -73,7 +73,7 @@ def prepare(books, opens):
                 settle=settle_at_end, sig1h=sig1h)
 
 
-def simulate(books, opens, prep, m_sl=3.0, m_sleeve_sl=2.0, sleeve=True, target=0.25, cap=2.0, d_limit=D_LIMIT, win_end=60, sleeve_risk_budget=None, gap=0.02, m_sleeve_tp=1.0, rung_scale_fixed=None, size_mult=1.0, rungs=RUNGS, m_tp=None, hourly=False, align=None, events=None, bars=None, exec_policy=None, fixed_levels=False, attrib=None, trade=None, win_start=2, state_out=None, sleeve_filter=None, sleeve_tp=None, strat_vt=None, sleeve_start=16, risk_mult=None, sleeve_breaker=None, sleeve_stop_mode="touch"):
+def simulate(books, opens, prep, m_sl=3.0, m_sleeve_sl=2.0, sleeve=True, target=0.25, cap=2.0, d_limit=D_LIMIT, win_end=60, sleeve_risk_budget=None, gap=0.02, m_sleeve_tp=1.0, rung_scale_fixed=None, size_mult=1.0, rungs=RUNGS, m_tp=None, hourly=False, align=None, events=None, bars=None, exec_policy=None, fixed_levels=False, attrib=None, trade=None, win_start=2, state_out=None, sleeve_filter=None, sleeve_tp=None, strat_vt=None, sleeve_start=16, risk_mult=None, sleeve_breaker=None, sleeve_stop_mode="touch", sleeve_backstop=None, sleeve_budget_sl=None):
     # events: optional list; when given, every fill / stop / take-profit / sleeve rung is appended as a dict (no effect on results)
     # exec_policy: optional callable (i, a, dw, w_a, tgt_a, sig4_ia) -> ("limit", offset[, weight]) | ("market", 0[, weight]) | ("skip", 0)
     #   deciding how (and, with the optional weight, to which weight instead of the target)
@@ -89,6 +89,9 @@ def simulate(books, opens, prep, m_sl=3.0, m_sleeve_sl=2.0, sleeve=True, target=
     # sleeve_stop_mode: "touch" (default: a 1m low through the stop, fill at min(stop, open)); "close1" / "close5": the market stop
     #   triggers when a 1m close / a 5m-block close (minutes 4, 9, ... of the bar) is at or below the stop and fills at the next minute's
     #   open (next bar open after minute 239); a same-minute TP touch and close trigger resolve stop-first.
+    # sleeve_backstop: with a close stop mode, an exchange-native touch stop at lv * (1 - backstop * sigma) (market, fills at
+    #   min(level, open)); it wins over a same-minute close trigger or TP. sleeve_budget_sl: sigma multiple used as the stop distance in
+    #   the risk budget (default m_sleeve_sl). None = unchanged.
     # sleeve_breaker: optional loss fraction X; a new dip-rung fill at minute f is skipped when the bar's already-taken rungs are
     #   marked below -X of equity at the close of minute f-1 (realised exits included) - stop adding in a cascade. None = unchanged.
     # risk_mult: optional callable (i, eq_hist) -> multiplier on the governor of bar i (book targets and dip-rung sizes); eq_hist =
@@ -573,8 +576,9 @@ def simulate(books, opens, prep, m_sl=3.0, m_sleeve_sl=2.0, sleeve=True, target=
                     if (open_now + 1) * rn > N_MAX + 1e-12:
                         continue
                 else:  # risk budget: loss if every open rung and the new one stop out (stop distance + gap allowance)
-                    risk_open = sum(t[7] * (m_sleeve_sl * t[6] + gap) for t in taken if t[4] > f)
-                    if risk_open + rn * (m_sleeve_sl * sg + gap) > sleeve_risk_budget + 1e-12:
+                    mb = m_sleeve_sl if sleeve_budget_sl is None else sleeve_budget_sl
+                    risk_open = sum(t[7] * (mb * t[6] + gap) for t in taken if t[4] > f)
+                    if risk_open + rn * (mb * sg + gap) > sleeve_risk_budget + 1e-12:
                         continue
                 Ha, La, Ca, Oa = (X[i, :, a].astype(float) for X in (H, L, C, O))
                 tp = lv * (1 + (m_sleeve_tp if sleeve_tp is None else float(sleeve_tp(i, a, r, f))) * sg)
@@ -587,7 +591,17 @@ def simulate(books, opens, prep, m_sl=3.0, m_sleeve_sl=2.0, sleeve=True, target=
                     ht = Ha[f + 1:end_m] > tp
                     ks = int(np.argmax(trig)) if trig.any() else None
                     kt = int(np.argmax(ht)) if ht.any() else None
-                    if kt is not None and (ks is None or kt < ks):
+                    kb = None
+                    if sleeve_backstop is not None:
+                        bl = lv * (1 - sleeve_backstop * sg)
+                        hb_ = La[f + 1:end_m] <= bl
+                        kb = int(np.argmax(hb_)) if hb_.any() else None
+                    if kb is not None and (ks is None or kb <= ks) and (kt is None or kb <= kt):
+                        x = f + 1 + kb
+                        ret = min(bl, Oa[x]) / lv - 1 - MAKER - TAKER
+                        stats["rung_stops"] += 1
+                        xk = "rung_sl"
+                    elif kt is not None and (ks is None or kt < ks):
                         x = f + 1 + kt
                         ret = tp / lv - 1 - 2 * MAKER
                         stats["rung_tps"] += 1
