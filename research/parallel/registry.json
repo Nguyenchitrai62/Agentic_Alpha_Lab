@@ -2,7 +2,7 @@
   "schema_version": 1,
   "project": "Agentic Alpha Lab BTC swing research",
   "created_at": "2026-09-06T00:00:00Z",
-  "next_version": 252,
+  "next_version": 253,
   "control": {
     "coordinator_model": "gpt-5.6-sol",
     "coordinator_reasoning": "high",
@@ -54,7 +54,7 @@
     "expected_workers": 3,
     "version_range": [
       45,
-      251
+      252
     ],
     "parent_commit": "1ecf947baddd5ef78444670330e9db62128dad50",
     "cloud_snapshot": {
@@ -10384,7 +10384,7 @@
       "version": "v249",
       "track": "B",
       "direction_key": "v249-dip-ladder-depth-agent",
-      "status": "running",
+      "status": "rejected",
       "parent_versions": [
         "v247"
       ],
@@ -10397,9 +10397,36 @@
       "write_scope": "research/parallel/rounds/parallel-20260906-r2/v249",
       "worker_agent_id": "01a07791-eecb-7053-8866-dcdbe31e84d7",
       "worker_host_id": "local",
-      "result_manifest": null,
+      "result_manifest": "research\\parallel\\rounds\\parallel-20260906-r2\\v249\\result_manifest.json",
       "registered_at": "2026-09-29T02:52:49.772994Z",
-      "assigned_at": "2026-09-29T02:52:49.772994Z"
+      "assigned_at": "2026-09-29T02:52:49.772994Z",
+      "result_manifest_sha256": "e1692a23533d8cd5ca1a58f7f9a1c94c2e0ef02f83e65cf1e5d5342fcff5a038",
+      "result_summary": {
+        "scenarios": {
+          "normal": {
+            "monthly_geometric_net_percent": 5.447,
+            "max_drawdown_percent": 19.65,
+            "fills": 1354,
+            "months": 60
+          },
+          "fee_stress": {
+            "monthly_geometric_net_percent": 5.447,
+            "max_drawdown_percent": 19.65,
+            "fills": 1354,
+            "months": 60
+          },
+          "execution_stress": {
+            "monthly_geometric_net_percent": 5.447,
+            "max_drawdown_percent": 19.65,
+            "fills": 1354,
+            "months": 60
+          }
+        },
+        "independent_test": false,
+        "live_approved": false,
+        "audit_notes": "bit-exact replication of all rows; state causality, counterfactual labels and embargoed cross-fitting confirmed; look-ahead PASS. The engine gained the default-neutral strat_vt hook (v251) while this audit ran; references unchanged."
+      },
+      "audited_at": "2026-09-29T04:47:33.850596Z"
     },
     {
       "version": "v250",
@@ -10442,7 +10469,28 @@
       "result_manifest": null,
       "registered_at": "2026-09-29T03:03:48.228566Z",
       "assigned_at": "2026-09-29T03:03:48.228566Z"
+    },
+    {
+      "version": "v252",
+      "track": "B",
+      "direction_key": "v252-intrabar-whale-flow",
+      "status": "running",
+      "parent_versions": [
+        "v249"
+      ],
+      "model_family": "hist-gradient-boosting",
+      "objective": "O1 foundation members + intrabar whale-flow features from the 1m order-level store; trade mode at sleeve budget 0.18",
+      "data_contract": "Binance USD-M aggTrades order-level 1m store (data/raw/aggflow_20260929_orders_1m) + 1m klines; bar t aggregates minutes t..t+239, known at the close; rolling stats on rows <= t; members retrained walk-forward with embargo (v144 builder / v202 quarterly)",
+      "policy_contract": "engine_user trade mode G2 grid + v218 D2 settings, budget 0.18; limits, minute-5 rule, SL market / TP limit, Bybit fees, adverse funding",
+      "hypothesis": "when and against what price move whales trade inside the bar adds foundation information that transfers like the 4h whale flow did",
+      "parent_commit": "1ecf947baddd5ef78444670330e9db62128dad50",
+      "write_scope": "research/parallel/rounds/parallel-20260906-r2/v252",
+      "worker_agent_id": "01a07791-eecb-7053-8866-dcdbe31e84d7",
+      "worker_host_id": "local",
+      "result_manifest": null,
+      "registered_at": "2026-09-29T04:47:33.846755Z",
+      "assigned_at": "2026-09-29T04:47:33.846755Z"
     }
   ],
-  "updated_at": "2026-09-29T03:03:48.234172Z"
+  "updated_at": "2026-09-29T04:47:33.850596Z"
 }

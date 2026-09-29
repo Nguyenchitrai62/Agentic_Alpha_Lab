@@ -8,7 +8,7 @@ Output: data/raw/aggflow_20260928/{SYM}_flow_4h.parquet (index bar open UTC; col
 and a 1m store <OUT>_1m/{SYM}/<source file>.parquet (per minute: buy / sell notional and taker order counts in 8 log-size bins) so new
 feature definitions (e.g. intrabar flow) never need the raw archive again.
 
-  python scripts/fetch_aggtrades_flow.py [SYM ...] [--months 2024-03] [--market spot]
+  python scripts/fetch_aggtrades_flow.py [SYM ...] [--months 2024-03] [--market spot] [--orders] [--out DIR]
 (--market spot: Binance SPOT aggTrades from data/spot/..., output data/raw/aggflow_spot_20260928)
 """
 
@@ -140,12 +140,15 @@ def main():
     ap.add_argument("--market", choices=["um", "spot"], default="um")
     ap.add_argument("--since", default=None, help="first month YYYY-MM to fetch")
     ap.add_argument("--orders", action="store_true", help="order-level tiers (rebuild swept taker orders); output *_orders dir")
+    ap.add_argument("--out", default=None, help="output dir (overrides the default; the 1m store goes to <out>_1m)")
     a = ap.parse_args()
     global MARKET, OUT, ORDER_LEVEL
     if a.market == "spot":
         MARKET, OUT = "spot", Path("data/raw/aggflow_spot_20260928")
     if a.orders:
         ORDER_LEVEL, OUT = True, Path(str(OUT) + "_orders")
+    if a.out:
+        OUT = Path(a.out)
     for s in a.syms:
         run(s, a.months, a.since)
 
