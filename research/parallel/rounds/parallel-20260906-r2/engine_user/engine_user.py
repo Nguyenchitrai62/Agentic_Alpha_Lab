@@ -73,7 +73,7 @@ def prepare(books, opens):
                 settle=settle_at_end, sig1h=sig1h)
 
 
-def simulate(books, opens, prep, m_sl=3.0, m_sleeve_sl=2.0, sleeve=True, target=0.25, cap=2.0, d_limit=D_LIMIT, win_end=60, sleeve_risk_budget=None, gap=0.02, m_sleeve_tp=1.0, rung_scale_fixed=None, size_mult=1.0, rungs=RUNGS, m_tp=None, hourly=False, align=None, events=None, bars=None, exec_policy=None, fixed_levels=False, attrib=None, trade=None, win_start=2, state_out=None, sleeve_filter=None, sleeve_tp=None, strat_vt=None, sleeve_start=16):
+def simulate(books, opens, prep, m_sl=3.0, m_sleeve_sl=2.0, sleeve=True, target=0.25, cap=2.0, d_limit=D_LIMIT, win_end=60, sleeve_risk_budget=None, gap=0.02, m_sleeve_tp=1.0, rung_scale_fixed=None, size_mult=1.0, rungs=RUNGS, m_tp=None, hourly=False, align=None, events=None, bars=None, exec_policy=None, fixed_levels=False, attrib=None, trade=None, win_start=2, state_out=None, sleeve_filter=None, sleeve_tp=None, strat_vt=None, sleeve_start=16, risk_mult=None):
     # events: optional list; when given, every fill / stop / take-profit / sleeve rung is appended as a dict (no effect on results)
     # exec_policy: optional callable (i, a, dw, w_a, tgt_a, sig4_ia) -> ("limit", offset[, weight]) | ("market", 0[, weight]) | ("skip", 0)
     #   deciding how (and, with the optional weight, to which weight instead of the target)
@@ -86,6 +86,8 @@ def simulate(books, opens, prep, m_sl=3.0, m_sleeve_sl=2.0, sleeve=True, target=
     #   2026-09-28: the pipeline needs ~5 minutes after the close, no fill is allowed before).
     # state_out: optional dict; filled at the end with the trade-mode state (orders, SL/TP, quantities, entries) and the last equity.
     # sleeve_filter: optional callable (i, a, rung_index) -> size multiplier for that dip-sleeve bid, decided when the ladder is placed
+    # risk_mult: optional callable (i, eq_hist) -> multiplier on the governor of bar i (book targets and dip-rung sizes); eq_hist =
+    #   equity path up to bar i-2 (same lag as the governor). None = unchanged results.
     # sleeve_start: first minute of the holding bar in which a 4h dip-ladder bid may fill (default 16, the v171 legacy window; the
     #   2026-09-28 user rule allows fills from minute 5)
     # strat_vt: optional dict(lo, hi, power, days=30, warm_days=90) -> strategy-level vol targeting: the governor is multiplied by
@@ -397,6 +399,8 @@ def simulate(books, opens, prep, m_sl=3.0, m_sleeve_sl=2.0, sleeve=True, target=
             if nl >= strat_vt.get("warm_days", 90) * PD and len(vt_hist) > 1 and np.isfinite(vt_hist[-1]) and vt_hist[-1] > 0:
                 med = float(np.nanmedian(vt_hist[:-1]))
                 g[i] *= float(np.clip((med / vt_hist[-1]) ** strat_vt.get("power", 1.0), strat_vt["lo"], strat_vt["hi"]))
+        if risk_mult is not None and i >= 2 and live[i]:
+            g[i] *= float(risk_mult(i, eq[:i - 1]))
         prev_eq = eq[i - 1] if i else 1.0
         if not live[i] or not np.all(np.isfinite(o1[i])) or not np.all(np.isfinite(o2[i])):
             eq[i] = prev_eq
