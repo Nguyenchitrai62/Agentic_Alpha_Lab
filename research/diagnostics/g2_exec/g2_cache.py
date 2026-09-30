@@ -41,7 +41,7 @@ for jj, a0 in enumerate(anchors):
     mus[jj] = float(y[keep].mean())
     models[jj] = [hgb(10 * jj + h).fit(X[keep & (half == h)], y[keep & (half == h)]) for h in (0, 1)]
     tpm[jj] = [[hgb(10 * jj + h + 3 * c).fit(X[keep & (half == h)], Yall[keep & (half == h), c]) for c in range(len(v293.ACTIONS))] for h in (0, 1)]
-rows = []
+meta, feats = [], []  # batch the predictions (one call per model and anchor year)
 for s, A in assets.items():
     for j, T in enumerate(A.t0):
         if T < anchors[0] or not np.isfinite(A.sig[j]):
@@ -51,13 +51,23 @@ for s, A in assets.items():
         base = [A.sp30(kk), 0.0, A.volreg[j], A.trend[j], btc.sp30(kk),
                 np.log(A.C[kk] / A.hmax24[kk]) / A.sig[j] if A.hmax24[kk] > 0 else np.nan, T.hour]
         for r, k in enumerate(v293.RUNGS):
-            x = np.array([base[:1] + [k] + base[2:]], float)
-            pa, pb = (mm.predict(x)[0] for mm in models[jj])
-            mult = 1.5 if (pa > 2 * mus[jj] and pb > 2 * mus[jj]) else (0.5 if (pa < 0 and pb < 0) else 1.0)
-            qa = np.array([mm.predict(x)[0] for mm in tpm[jj][0]]); qb = np.array([mm.predict(x)[0] for mm in tpm[jj][1]])
-            ba, bb, b0 = int(np.argmax(qa)), int(np.argmax(qb)), v293.ACTIONS.index(1.0)
-            tpk = v293.ACTIONS[ba] if (ba == bb and ba != b0 and qa[ba] - qa[b0] > 0.0010 and qb[bb] - qb[b0] > 0.0010) else 1.0
-            rows.append((T, s, r, mult, tpk))
+            meta.append((T, s, r, jj))
+            feats.append(base[:1] + [k] + base[2:])
+F = np.array(feats, float)
+J = np.array([m_[3] for m_ in meta])
+size_out, tp_out = np.ones(len(meta)), np.ones(len(meta))
+b0 = v293.ACTIONS.index(1.0)
+for jj in np.unique(J):
+    sel = J == jj
+    x = F[sel]
+    pa, pb = (mm.predict(x) for mm in models[jj])
+    mu = mus[jj]
+    size_out[sel] = np.where((pa > 2 * mu) & (pb > 2 * mu), 1.5, np.where((pa < 0) & (pb < 0), 0.5, 1.0))
+    qa = np.stack([mm.predict(x) for mm in tpm[jj][0]], axis=1); qb = np.stack([mm.predict(x) for mm in tpm[jj][1]], axis=1)
+    ba, bb = qa.argmax(1), qb.argmax(1)
+    ok = (ba == bb) & (ba != b0) & (qa[np.arange(len(x)), ba] - qa[:, b0] > 0.0010) & (qb[np.arange(len(x)), bb] - qb[:, b0] > 0.0010)
+    tp_out[sel] = np.where(ok, np.array(v293.ACTIONS)[ba], 1.0)
+rows = [(T, s, r, float(size_out[q]), float(tp_out[q])) for q, (T, s, r, _) in enumerate(meta)]
 tab = pd.DataFrame(rows, columns=["T", "sym", "rung", "size", "tp"])
 look = {(T, s, r): m_ for T, s, r, m_, _ in rows}
 lookt = {(T, s, r): t_ for T, s, r, _, t_ in rows}
