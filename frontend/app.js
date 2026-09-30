@@ -224,16 +224,13 @@
       const s = ev[p.v]?.walkforward || {}, y = s.yearly || [];
       const dev = y.slice(0, 4).map((r) => mo(r[1]));
       const worst = dev.length ? Math.min(...dev) : null;
-      const last = s.monthly_last_year, gate = last >= 5 && s.monthly_5y >= 5 && s.gate_dd <= 20 && !s.losing_years;
+      const last = s.monthly_last_year;
       const win = s.win_dev != null ? `${(100 * s.win_dev).toFixed(0)}% / ${(100 * (s.win_hidden ?? 0)).toFixed(0)}%` : "—";
-      const pap = ev[p.v]?.paper_net_pct;
       return `<tr class="${cur === p.v ? "on" : ""}" data-pipe="${p.v}"><td><b>${p.nm}</b>${p.star ? ' <span class="star">★</span>' : ""}</td>
         <td>${f(s.monthly_dev4)}</td><td>${f(worst)}</td><td class="${s.gate_dd > 20 ? "down" : ""}">${f(s.gate_dd, 1)}%</td>
-        <td>${f(s.monthly_5y)}</td><td class="${last >= 5 ? "up" : ""}"><b>${f(last)}</b></td><td>${s.losing_years ?? "—"}</td><td>${win}</td>
-        <td>${pap == null ? "—" : sgn(pap)}</td><td>${gate ? '<span class="up">đạt</span>' : '<span class="muted">chưa</span>'}</td></tr>`;
+        <td>${f(s.monthly_5y)}</td><td class="${last >= 5 ? "up" : ""}"><b>${f(last)}</b></td><td>${s.losing_years ?? "—"}</td><td>${win}</td></tr>`;
     });
-    table($("pipeEvid"), ["Pipeline", "4 năm dev %/th", "Năm dev tệ nhất", "DD", "5 năm %/th", "Năm giấu %/th", "Năm lỗ",
-      "Thắng dev / giấu", "Paper", "Gate 5%"], rows);
+    table($("pipeEvid"), ["Pipeline", "Dev 4 năm", "Năm dev tệ nhất", "DD", "5 năm", "Năm giấu", "Năm lỗ", "Thắng (dev / giấu)"], rows);
     $("pipeEvid").onclick = (e) => { const r = e.target.closest("[data-pipe]"); if (r) setPlanPipe(r.dataset.pipe); };
   }
 

@@ -9,11 +9,11 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="styles.css?v=20260930b" />
+  <link rel="stylesheet" href="styles.css?v=20260930c" />
   <script src="config.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/lightweight-charts@4.2.0/dist/lightweight-charts.standalone.production.js" defer></script>
   <script src="https://accounts.google.com/gsi/client" async defer></script>
-  <script src="app.js?v=20260930b" defer></script>
+  <script src="app.js?v=20260930c" defer></script>
 </head>
 <body>
   <header class="topbar">
@@ -58,12 +58,11 @@
       </div>
       <div class="pipebar" id="pipeBar"></div>
       <div class="panel evid-panel">
-        <div class="panel-h"><span>Bằng chứng của từng pipeline</span>
-          <span class="muted small">walk-forward 5 năm (2021-09 → 2026-09), mô phỏng lệnh thật: limit, SL/TP, phí Bybit, funding</span></div>
+        <div class="panel-h"><span>Kết quả huấn luyện (walk-forward)</span>
+          <span class="muted small">%/tháng · 2021-09 → 2026-09 · mô phỏng lệnh thật (limit, SL/TP, phí, funding)</span></div>
         <div class="table-wrap"><table class="tbl compact evid" id="pipeEvid"></table></div>
-        <div class="muted small evid-note">%/tháng = lãi kép trung bình mỗi tháng. <b>4 năm dev</b> = 2021-09 → 2025-09, dùng để chọn cấu hình.
-          <b>Năm giấu</b> = 2025-09 → 2026-09, chỉ chấm sau khi đã chọn. DD = sụt giảm tối đa (tính cả biến động trong nến 1 phút).
-          Thắng = tỷ lệ lệnh book có lãi sau phí. Paper = kết quả thật từ ngày bắt đầu theo dõi (dữ liệu chưa tồn tại lúc chọn).</div>
+        <div class="muted small evid-note">Dev 4 năm = 2021-09 → 2025-09 (dùng để chọn) · Năm giấu = 2025-09 → 2026-09 (chấm sau khi chọn) ·
+          DD = sụt giảm tối đa · Thắng = tỷ lệ lệnh có lãi sau phí.</div>
       </div>
       <div class="panel board-panel">
         <div class="panel-h"><span>Việc cần làm ngay bây giờ</span><span class="muted small" id="boardMeta"></span>
