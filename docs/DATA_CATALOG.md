@@ -19,3 +19,11 @@ aggTrades ~122 GB, spot ~150 GB+); every fetcher keeps the derived tables below,
 Live extensions: `scripts/aggflow_live.py` appends live perp order flow (REST aggTrades) and the backend keeps a daily archive.
 If a new feature needs information finer than the 1m store (single order sizes, sub-minute timing), the archive has to be streamed
 again - extend the fetcher to keep the new aggregate at the same time.
+
+## Added 2026-09-30
+
+| Store | Content | Range | Fetcher |
+|---|---|---|---|
+| `data/raw/coinbase_alts_20260930/` | Coinbase Exchange 1h candles SOL-USD, XRP-USD (XRP gap 2021-01..2023-07: delisted) | 2021-01 .. 2026-09 | `scripts/fetch_coinbase_alts.py` |
+| `data/raw/um_universe_20260930/volume_2020_12.csv` | every Binance USD-M USDT perp in the archive (864, delisted included) ranked by Dec-2020 quote volume - the causal alt universe U2020 | 2020-12 | `scripts/fetch_um_universe_2020.py` |
+| `data/raw/alts2020_intraday_20260930/` | 1m klines of U2020 (top-30 non-major perps by Dec-2020 volume; 26 here + ADA/LINK/LTC/TRX in alts_intraday_20260926), delisted coins end at delisting (YFII 2022-04, EOS 2025-05, SXP 2026-06); 3.7 GB; research / RL training only, never traded | 2020-08 .. 2026-09-23 | `scripts/fetch_alts2020_1m.py` |
