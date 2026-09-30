@@ -33,13 +33,16 @@ PIPELINES = {  # pipeline key -> (research-books function in scripts/forward_v20
     "v269": ("research_books_o1", 6.026),  # O1 + 5m-close dip stops at 4 sigma + 8-sigma native backstop (v269 M1)
     "v285": ("research_books_d2", 5.864),  # 0.8 O1 + 0.2 Coinbase-premium member, C4 rules (v285 D2)
     "v295": ("research_books_d2", 6.168),  # CB + v295 size agent (walk-forward multipliers, sized at the bar open)
+    "v301": ("research_books_d2", 6.504),  # CB + v301 G2 size + take-profit agents at the bar open, dip budget 0.26
 }
 KW_OVERRIDE = {"v240": {"sleeve_risk_budget": 0.18},
                "v266": {"sleeve_risk_budget": 0.18, "sleeve_stop_mode": "close5", "sleeve_backstop": 8.0},
                "v269": {"sleeve_risk_budget": 0.18, "sleeve_stop_mode": "close5", "sleeve_backstop": 8.0, "m_sleeve_sl": 4.0},
                "v285": {"sleeve_risk_budget": 0.18, "sleeve_stop_mode": "close5", "sleeve_backstop": 8.0, "m_sleeve_sl": 4.0},
-               "v295": {"sleeve_risk_budget": 0.18, "sleeve_stop_mode": "close5", "sleeve_backstop": 8.0, "m_sleeve_sl": 4.0}}
+               "v295": {"sleeve_risk_budget": 0.18, "sleeve_stop_mode": "close5", "sleeve_backstop": 8.0, "m_sleeve_sl": 4.0},
+               "v301": {"sleeve_risk_budget": 0.26, "sleeve_stop_mode": "close5", "sleeve_backstop": 8.0, "m_sleeve_sl": 4.0}}
 SIZE_TABLE = ROOT / "artifacts/research/engine_real/v295_size_mult_m0.parquet"  # research/diagnostics/s1_exec/s1_cache.py
+G2_TABLE = ROOT / "artifacts/research/engine_real/v301_g2_table_m0.parquet"  # research/diagnostics/g2_exec/g2_cache.py
 
 
 def _load(name, path):
@@ -69,6 +72,13 @@ def simulate(pipe: str):
         look = {(pd.Timestamp(t), s, int(r)): float(m) for t, s, r, m in zip(tab["T"], tab["sym"], tab["rung"], tab["mult"])}
         idx = books.index
         kw["sleeve_fill_size"] = lambda i, a, r, f: look.get((idx[i] + pd.Timedelta(hours=4), cols[a], r), 1.0)
+    if pipe == "v301":  # walk-forward size + take-profit decisions of the v301 G2 agents (one per holding bar, coin and rung)
+        tab = pd.read_parquet(G2_TABLE)
+        keys = [(pd.Timestamp(t), s, int(r)) for t, s, r in zip(tab["T"], tab["sym"], tab["rung"])]
+        lsz, ltp = dict(zip(keys, tab["size"].astype(float))), dict(zip(keys, tab["tp"].astype(float)))
+        idx = books.index
+        kw["sleeve_fill_size"] = lambda i, a, r, f: lsz.get((idx[i] + pd.Timedelta(hours=4), cols[a], r), 1.0)
+        kw["sleeve_tp"] = lambda i, a, r, f: ltp.get((idx[i] + pd.Timedelta(hours=4), cols[a], r), 1.0)
     res = eu.simulate(books, opens, prep, trade=dict(v216.GRID, policy=v216.grid_policy(v221.B_ABS, v221.B_REL)), win_start=5,
                       events=events, bars=bars, **kw)
     if abs(res["monthly_dev4"] - dev4) > 0.01:

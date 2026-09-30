@@ -131,7 +131,7 @@ def auth_me(user: dict | None = Depends(auth.current_user)):
 @app.get("/api/overview")
 def overview(request: Request, pipeline: str | None = None, user: dict = Depends(auth.require_viewer)):
     """pipeline=v205/v233/v236/v240: the walk-forward summary of that executable trade-mode pipeline (history_tm)."""
-    if pipeline in ("v205", "v233", "v236", "v240", "v266", "v269", "v285", "v295"):
+    if pipeline in ("v205", "v233", "v236", "v240", "v266", "v269", "v285", "v295", "v301"):
         return cached(request, f"overview:{pipeline}", 60, lambda: {"walkforward": db.kv_get(f"summary_tm_{pipeline}", {}),
                                                                    "plan": db.kv_get({"v205": "trade_plan"}.get(pipeline, f"trade_plan_{pipeline}"), {})})
 
@@ -150,7 +150,7 @@ def overview(request: Request, pipeline: str | None = None, user: dict = Depends
 def pipelines_summary(request: Request, user: dict = Depends(auth.require_viewer)):
     """Walk-forward summary of every paper pipeline (history_tm) + its paper result since the freeze, for the pipeline evidence table."""
     keys = {"v205": "trade_plan", "v233": "trade_plan_v233", "v236": "trade_plan_v236", "v240": "trade_plan_v240",
-            "v266": "trade_plan_v266", "v269": "trade_plan_v269", "v285": "trade_plan_v285", "v295": "trade_plan_v295"}
+            "v266": "trade_plan_v266", "v269": "trade_plan_v269", "v285": "trade_plan_v285", "v295": "trade_plan_v295", "v301": "trade_plan_v301"}
 
     def load():
         out = {}
@@ -166,7 +166,7 @@ def trade_plan(request: Request, pipeline: str = "v205", user: dict = Depends(au
     """What a trader / bot should have on the exchange now (resting orders, positions with SL/TP) + the event log.
 
     pipeline=v205 (deployed, default), v233 (T3: TradingView indicator features) or v236 (W2: T3 + whale flow); paper comparison."""
-    key = {"v233": "trade_plan_v233", "v236": "trade_plan_v236", "v240": "trade_plan_v240", "v266": "trade_plan_v266", "v269": "trade_plan_v269", "v285": "trade_plan_v285", "v295": "trade_plan_v295"}.get(pipeline, "trade_plan")
+    key = {"v233": "trade_plan_v233", "v236": "trade_plan_v236", "v240": "trade_plan_v240", "v266": "trade_plan_v266", "v269": "trade_plan_v269", "v285": "trade_plan_v285", "v295": "trade_plan_v295", "v301": "trade_plan_v301"}.get(pipeline, "trade_plan")
     return cached(request, key, 20, lambda: db.kv_get(key, {}))
 
 

@@ -75,7 +75,7 @@ def cs_size_hook(grid, cur_bar, start, now):
     return hook, cur
 
 
-G2_START = pd.Timestamp("2026-10-01T00:00:00Z")  # v301 G2 paper window (first bar after its deployment)
+G2_START = pd.Timestamp("2026-09-30T16:00:00Z")  # v301 G2 paper window (first bar after its deployment)
 
 
 def live_state(start, now):

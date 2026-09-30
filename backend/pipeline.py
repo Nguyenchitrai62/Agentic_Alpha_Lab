@@ -223,7 +223,8 @@ def job_trade_plan() -> str:
                              ("v266_B1", "trade_plan_v266", "trade_plan_v266.json"),
                              ("v269_M1", "trade_plan_v269", "trade_plan_v269.json"),
                              ("v285_D2", "trade_plan_v285", "trade_plan_v285.json"),
-                             ("v295_CS", "trade_plan_v295", "trade_plan_v295.json")):
+                             ("v295_CS", "trade_plan_v295", "trade_plan_v295.json"),
+                             ("v301_G2", "trade_plan_v301", "trade_plan_v301.json")):
         cmd = [SETTINGS.python_exe, str(ROOT / "scripts/forward_trade.py"), "--candidate", cand]
         cfg = ROOT / "configs/trade_policy.json"
         if cfg.exists():
