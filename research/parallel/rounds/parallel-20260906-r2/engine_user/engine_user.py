@@ -73,7 +73,10 @@ def prepare(books, opens):
                 settle=settle_at_end, sig1h=sig1h)
 
 
-def simulate(books, opens, prep, m_sl=3.0, m_sleeve_sl=2.0, sleeve=True, target=0.25, cap=2.0, d_limit=D_LIMIT, win_end=60, sleeve_risk_budget=None, gap=0.02, m_sleeve_tp=1.0, rung_scale_fixed=None, size_mult=1.0, rungs=RUNGS, m_tp=None, hourly=False, align=None, events=None, bars=None, exec_policy=None, fixed_levels=False, attrib=None, trade=None, win_start=2, state_out=None, sleeve_filter=None, sleeve_tp=None, strat_vt=None, sleeve_start=16, risk_mult=None, sleeve_breaker=None, sleeve_stop_mode="touch", sleeve_backstop=None, sleeve_budget_sl=None, book_stop_mode="touch", book_backstop=None, sleeve_exit_agent=None, sleeve_lock_cut=False, sleeve_fill_size=None, path_out=None):
+def simulate(books, opens, prep, m_sl=3.0, m_sleeve_sl=2.0, sleeve=True, target=0.25, cap=2.0, d_limit=D_LIMIT, win_end=60, sleeve_risk_budget=None, gap=0.02, m_sleeve_tp=1.0, rung_scale_fixed=None, size_mult=1.0, rungs=RUNGS, m_tp=None, hourly=False, align=None, events=None, bars=None, exec_policy=None, fixed_levels=False, attrib=None, trade=None, win_start=2, state_out=None, sleeve_filter=None, sleeve_tp=None, strat_vt=None, sleeve_start=16, risk_mult=None, sleeve_breaker=None, sleeve_stop_mode="touch", sleeve_backstop=None, sleeve_budget_sl=None, book_stop_mode="touch", book_backstop=None, sleeve_exit_agent=None, sleeve_lock_cut=False, sleeve_fill_size=None, path_out=None, book_size=None):
+    # book_size: trade mode only; optional callable (i, a, sgn) -> size multiplier of a NEW book entry order (0 = skip), decided when the
+    #   order is issued (data up to the decision bar); the multiplier then scales the asset's target for the life of that order / position,
+    #   so grid adds / reduces aim at the scaled target. None = unchanged results.
     # path_out: optional dict; filled at the end with the bar index, equity (4h closes) and 1m-marked minimum per bar (no effect on results).
     # events: optional list; when given, every fill / stop / take-profit / sleeve rung is appended as a dict (no effect on results)
     # exec_policy: optional callable (i, a, dw, w_a, tgt_a, sig4_ia) -> ("limit", offset[, weight]) | ("market", 0[, weight]) | ("skip", 0)
@@ -146,7 +149,7 @@ def simulate(books, opens, prep, m_sl=3.0, m_sleeve_sl=2.0, sleeve=True, target=
                      scale_orders=0)
     T = dict(sl=np.full(na, np.nan), tp=np.full(na, np.nan), sd=np.full(na, np.nan), be=np.zeros(na, bool),
              part=np.zeros(na, bool), side=np.zeros(na, int), px=np.full(na, np.nan), w=np.zeros(na), exp=np.full(na, -1),
-             psd=np.full(na, np.nan), issued=np.full(na, -1), risk=np.zeros(na),
+             psd=np.full(na, np.nan), issued=np.full(na, -1), risk=np.zeros(na), bm=np.ones(na),
              # in-position order: ak +1 add / -1 reduce, price, add weight or reduce fraction, expiry, issue bar
              ak=np.zeros(na, int), apx=np.full(na, np.nan), aw=np.zeros(na), aexp=np.full(na, -1), aiss=np.full(na, -1),
              nadd=np.zeros(na, int), nred=np.zeros(na, int), open_i=np.full(na, -1), last_adj=np.full(na, -10**6))
@@ -168,6 +171,8 @@ def simulate(books, opens, prep, m_sl=3.0, m_sleeve_sl=2.0, sleeve=True, target=
         th = P.get("theta", 0.05)
         sgn = int(np.sign(tg)) if abs(tg) >= th else 0
         tg = tg * P.get("book_mult", 1.0)  # position size multiplier (the signal threshold uses the unscaled target)
+        if book_size is not None and (cur_q != 0 or T["side"][a] != 0):
+            tg = tg * T["bm"][a]  # the entry's learned multiplier holds for the life of the order / position
         m0 = 0
         if cur_q == 0:
             ps = int(T["side"][a])
@@ -199,6 +204,9 @@ def simulate(books, opens, prep, m_sl=3.0, m_sleeve_sl=2.0, sleeve=True, target=
                     k_off = P.get("k_off_deep", 0.75)
                 elif isinstance(act, dict) and "open" in act:  # agent-chosen entry offset (multiple of sigma_4h)
                     k_off = float(act["open"])
+            if book_size is not None and ps == 0 and sgn != 0 and size > 0:
+                T["bm"][a] = float(book_size(i, a, sgn))
+                size *= T["bm"][a]
             if ps == 0 and sgn != 0 and size > 0 and size * prev_eq * ACCOUNT >= mins[a] and np.isfinite(sd_a) and np.isfinite(s4_a):
                 off = max(P.get("min_off", 0.001), k_off * s4_a)
                 T["side"][a], T["px"][a], T["w"][a] = sgn, Oa[0] * (1 - sgn * off), size
