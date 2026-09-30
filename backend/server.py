@@ -104,7 +104,8 @@ def health():
     last = db.one("SELECT kind, status, started_at, finished_at FROM jobs ORDER BY id DESC LIMIT 1")
     cyc = db.one("SELECT status, started_at, finished_at, triggered_by FROM jobs WHERE kind = 'cycle' ORDER BY id DESC LIMIT 1")
     return {"status": "ok", "version": APP_VERSION, "pipeline": pipeline.PIPELINE, "last_job": last, "last_cycle": cyc,
-            "scheduler": SETTINGS.scheduler_enabled, "next_cycle_utc": _next_cycle["t"]}
+            "scheduler": SETTINGS.scheduler_enabled, "next_cycle_utc": _next_cycle["t"], "scheduler_heartbeat_utc": _heartbeat["t"],
+            "last_cycle_done_ms": _last_cycle_ms()}
 
 
 @app.get("/api/public/config")
@@ -342,33 +343,61 @@ def admin_set_user(payload: dict = Body(...), user: dict = Depends(auth.require_
 
 # ------------------------------------------------------------------ scheduler
 _next_cycle: dict = {"t": None}
+_heartbeat: dict = {"t": None}  # last time the scheduler loop was alive (the /health watchdog restarts a dead scheduler)
+
+
+def _keep_awake():
+    """Ask Windows not to sleep while the scheduler thread runs (released automatically when the backend exits)."""
+    try:
+        import ctypes
+        ctypes.windll.kernel32.SetThreadExecutionState(0x80000000 | 0x00000001)  # ES_CONTINUOUS | ES_SYSTEM_REQUIRED
+        log.info("scheduler: keep-awake requested (system sleep blocked while the backend runs)")
+    except Exception as exc:  # not Windows / not allowed: the watchdog task still restarts missed cycles
+        log.warning("scheduler: keep-awake unavailable: %r", exc)
+
+
+def _last_cycle_ms() -> int:
+    r = db.one("SELECT finished_at FROM jobs WHERE kind = 'cycle' AND status = 'done' ORDER BY id DESC LIMIT 1")
+    return int(r["finished_at"]) if r and r.get("finished_at") else 0
 
 
 def _scheduler():
     time.sleep(5)
+    _keep_awake()
+    _heartbeat["t"] = datetime.now(timezone.utc).isoformat()
     if not db.one("SELECT 1 AS x FROM candles LIMIT 1"):
         pipeline.run_job("candles", pipeline.job_candles, "startup")
     if not db.one("SELECT 1 AS x FROM runs WHERE source = 'live' LIMIT 1"):
         pipeline.run_job("cycle", pipeline.job_cycle, "startup")
     if not db.one("SELECT 1 AS x FROM runs WHERE source = 'walkforward' LIMIT 1"):
         pipeline.run_job("walkforward", pipeline.job_walkforward, "startup")
+    # catch-up: a restart / reboot / sleep after a 4h close would otherwise wait up to 4 hours for the next cycle
+    if db.now_ms() - _last_cycle_ms() > (4 * 3600 + 10 * 60) * 1000:
+        log.info("scheduler: the last completed cycle is older than 4h10m - running a catch-up cycle now")
+        pipeline.run_job("cycle", pipeline.job_cycle, "catch-up")
     clear_cache()
     while True:
-        now = datetime.now(timezone.utc)
-        nxt = now.replace(minute=0, second=0, microsecond=0) + timedelta(hours=4 - now.hour % 4, minutes=SETTINGS.schedule_offset_minutes)
-        if nxt - now > timedelta(hours=4):
-            nxt -= timedelta(hours=4)
-        log.info("scheduler: next pipeline cycle at %s UTC (%s local); candles refresh every 15 min",
-                 nxt.strftime("%Y-%m-%d %H:%M"), nxt.astimezone().strftime("%H:%M"))
-        _next_cycle["t"] = nxt.isoformat()
-        while (wait := (nxt - datetime.now(timezone.utc)).total_seconds()) > 5:
-            time.sleep(min(wait, 900))
-            if (nxt - datetime.now(timezone.utc)).total_seconds() > 60:
-                pipeline.refresh_candles_quietly()  # keep candles <= 15 min old between cycles
-                clear_cache()
-        pipeline.run_job("cycle", pipeline.job_cycle, "scheduler")
-        clear_cache()
-        db.optimize()
+        try:
+            now = datetime.now(timezone.utc)
+            nxt = now.replace(minute=0, second=0, microsecond=0) + timedelta(hours=4 - now.hour % 4, minutes=SETTINGS.schedule_offset_minutes)
+            if nxt - now > timedelta(hours=4):
+                nxt -= timedelta(hours=4)
+            log.info("scheduler: next pipeline cycle at %s UTC (%s local); candles refresh every 15 min",
+                     nxt.strftime("%Y-%m-%d %H:%M"), nxt.astimezone().strftime("%H:%M"))
+            _next_cycle["t"] = nxt.isoformat()
+            while (wait := (nxt - datetime.now(timezone.utc)).total_seconds()) > 5:
+                _heartbeat["t"] = datetime.now(timezone.utc).isoformat()
+                time.sleep(min(wait, 900))
+                _heartbeat["t"] = datetime.now(timezone.utc).isoformat()
+                if (nxt - datetime.now(timezone.utc)).total_seconds() > 60:
+                    pipeline.refresh_candles_quietly()  # keep candles <= 15 min old between cycles
+                    clear_cache()
+            pipeline.run_job("cycle", pipeline.job_cycle, "scheduler")
+            clear_cache()
+            db.optimize()
+        except Exception:  # never let one error kill the scheduler thread silently
+            log.exception("scheduler: loop error - retrying in 60 s")
+            time.sleep(60)
 
 
 @app.on_event("startup")

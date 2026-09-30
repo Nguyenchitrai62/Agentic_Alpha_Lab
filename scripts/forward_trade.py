@@ -37,7 +37,7 @@ def _load(name, path):
     return mod
 
 
-CS_START = pd.Timestamp("2026-09-30T12:00:00Z")  # v295 CS paper window (first bar after deployment)
+CS_START = pd.Timestamp("2026-09-30T00:00:00Z")  # v295 CS paper window (first bar after deployment)
 
 
 def cs_size_hook(grid, cur_bar, start, now):
@@ -75,7 +75,7 @@ def cs_size_hook(grid, cur_bar, start, now):
     return hook, cur
 
 
-G2_START = pd.Timestamp("2026-09-30T16:00:00Z")  # v301 G2 paper window (first bar after its deployment)
+G2_START = pd.Timestamp("2026-09-30T00:00:00Z")  # v301 G2 paper window (first bar after its deployment)
 
 
 def live_state(start, now):
@@ -124,6 +124,41 @@ def g2_hooks(grid, cur_bar, start, now):
         return dec(SYMS[a], grid[i] + pd.Timedelta(hours=4), r)[1]
     cur = {s: {str(k): {"size": dec(s, cur_bar, r)[0], "tp": dec(s, cur_bar, r)[1]} for r, k in enumerate(ga.RUNGS)} for s in SYMS}
     return size_hook, tp_hook, cur
+
+
+def current_dips(eu, prep, bars, events, p, kw, dip_size, cur_bar):
+    """The dip ladder resting in the bar in progress, per coin: what a trader / bot should have on the exchange now (engine rules:
+    rungs k x sigma_4h below the bar open, valid from minute 16 to the end of the bar, TP limit, bot stop on 5m closes, native backstop,
+    rung size = vol scale x governor x size_mult x SIZE/4/S_REF x alignment with the book x the agent's size)."""
+    if not bars:
+        return {}
+    b = bars[-1]
+    o1, sg4 = prep["o1"][-1], prep["sig4"][-1]
+    align = kw.get("align") or (1.0, 1.0)
+    base_rn = float(b["scale"]) * float(b["governor"]) * float(p.get("size_mult", 1.0)) * eu.SIZE / 4 / eu.S_REF
+    m_sl, back = float(p.get("m_sleeve_sl", kw.get("m_sleeve_sl", 5.0))), p.get("sleeve_backstop")
+    close_stop = p.get("sleeve_stop_mode", "touch") != "touch"
+    out = {}
+    for a, s in enumerate(SYMS):
+        sg = float(sg4[a])
+        if not (np.isfinite(sg) and np.isfinite(o1[a])):
+            continue
+        tgt = float(b["target"][a])
+        rows = []
+        for r, k in enumerate(eu.RUNGS):
+            d = (dip_size or {}).get(s, {}).get(str(k))
+            m_size = float(d["size"] if isinstance(d, dict) else d) if d is not None else 1.0
+            m_tp = float(d["tp"]) if isinstance(d, dict) else 1.0
+            lv = float(o1[a]) * (1 - k * sg)
+            filled = any(e["kind"] == "rung_fill" and e["symbol"] == s and cur_bar <= e["t"] < cur_bar + pd.Timedelta(hours=4)
+                         and abs(float(e.get("rung", -1)) - k) < 1e-9 for e in events)
+            rows.append(dict(rung=k, buy_limit=lv, tp=lv * (1 + m_tp * sg), stop=lv * (1 - m_sl * sg), stop_kind="close5" if close_stop else "touch",
+                             backstop=lv * (1 - float(back) * sg) if back else None,
+                             size_frac=base_rn * (align[0] if tgt > 0 else align[1]) * m_size, agent_size=m_size, agent_tp=m_tp,
+                             active_from=str(cur_bar + pd.Timedelta(minutes=16)), active_until=str(cur_bar + pd.Timedelta(minutes=239)),
+                             filled=bool(filled)))
+        out[s] = rows
+    return out
 
 
 def grid_policy(p):
@@ -239,6 +274,7 @@ def main():
         kw["sleeve_fill_size"], kw["sleeve_tp"] = size_hook, tp_hook
     eu.simulate(books, opens.reindex(grid), prep, trade=trade, win_start=5, events=events, bars=bars, state_out=state, **kw)
     events = [e for e in events if e["t"] <= now]
+    dips = current_dips(eu, prep, bars, events, p, kw, dip_size, cur_bar)
     live = np.asarray(grid >= start - pd.Timedelta(hours=4))
     eq = cap["eq"][live]
     coins = {}
@@ -268,8 +304,9 @@ def main():
             c["state"] = "flat"
         coins[s] = c
     ret = float(eq[-1] - 1) if len(eq) else 0.0
-    if dip_size is not None:
-        for s_ in SYMS:
+    for s_ in SYMS:
+        coins[s_]["dips"] = dips.get(s_, [])
+        if dip_size is not None:
             coins[s_]["dip_size"] = dip_size.get(s_)
     out = {"pipeline": pipe_name, "policy": p, "freeze": str(start), "generated_at": now.isoformat(),
            "decision_bar": str(cur_bar), "next_decision": str(cur_bar + pd.Timedelta(hours=4, minutes=5)),

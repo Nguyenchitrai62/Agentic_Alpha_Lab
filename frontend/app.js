@@ -330,7 +330,28 @@
     return body + `<div class="timeline">${evs.map((e) => `<div><span class="muted">${dt(Date.parse(e.t))}</span> ${EVVI[e.kind] || e.kind}
         ${e.kind.startsWith("sl_") ? "" : (e.side === "buy" ? "mua" : "bán")} ${fmtPx(e.price)}${e.why ? ` <span class="muted">(${esc(e.why)})</span>` : ""}</div>`).join("") || '<div class="muted small">Chưa có sự kiện.</div>'}</div>`;
   }
+  function dipBlock(sym) {  // the dip ladder resting in the bar in progress (from the plan): what to have on the exchange now
+    const c = planOf(sym), px = state.live.prices[sym]?.c, d = c?.dips || [];
+    if (!d.length) return "";
+    const from = Date.parse(d[0].active_from), until = Date.parse(d[0].active_until), now = Date.now();
+    const status = now < from ? `đặt lúc ${dt(from)}` : now > until ? "đã hết hạn" : `đang chờ tới ${dt(until)}`;
+    const rows = d.map((r) => {
+      const q = qty(sym, r.size_frac, r.buy_limit), ag = r.agent_size !== 1 || r.agent_tp !== 1;
+      return `<tr class="${r.filled ? "dip-filled" : ""}"><td>${r.rung}σ</td><td>${fmtPx(r.buy_limit)}${px ? `<span class="note">${((r.buy_limit / px - 1) * 100).toFixed(1)}%</span>` : ""}</td>
+        <td class="up">${fmtPx(r.tp)}</td><td class="down">${fmtPx(r.stop)}${r.stop_kind === "close5" ? '<span class="note">nến 5m đóng</span>' : ""}</td>
+        <td class="down">${r.backstop ? fmtPx(r.backstop) : "—"}</td><td>${q} <span class="note">≈ ${usdt(r.size_frac)} USDT</span></td>
+        <td>${ag ? `<span class="${r.agent_size > 1 ? "up" : r.agent_size < 1 ? "down" : ""}">×${r.agent_size}</span>${r.agent_tp !== 1 ? ` · TP ${r.agent_tp}σ` : ""}` : '<span class="muted">—</span>'}</td>
+        <td>${r.filled ? '<span class="up">đã khớp</span>' : '<span class="muted">chờ</span>'}</td></tr>`;
+    }).join("");
+    return `<details class="dip-d" open><summary>Lệnh chờ bắt đáy nến này <span class="muted small">(${status})</span></summary>
+      <div class="tbl-scroll"><table class="tbl compact dip-tbl"><thead><tr><th>Bậc</th><th>Mua limit</th><th>TP</th><th>SL bot</th><th>SL sàn</th><th>Khối lượng</th><th>Agent</th><th></th></tr></thead>
+      <tbody>${rows}</tbody></table></div>
+      <div class="muted small">Mỗi bậc: 1 lệnh limit mua riêng, kèm TP limit + SL sàn đặt sẵn; bot đóng lệnh nếu nến 5m đóng dưới "SL bot"; lệnh còn mở tới cuối nến thì đóng ở giá mở nến sau.</div></details>`;
+  }
   function compactPlan(sym) {
+    return compactPlanCore(sym) + dipBlock(sym);
+  }
+  function compactPlanCore(sym) {
     const c = planOf(sym), px = state.live.prices[sym]?.c;
     const row = (k, v, d = "", cls = "") => `<div class="pb-row ${cls}"><span class="k">${k}</span><span class="v">${v}</span><span class="d">${d}</span></div>`;
     const rel = (x, base) => (base ? `${x >= base ? "+" : ""}${((x / base - 1) * 100).toFixed(2)}%` : "");

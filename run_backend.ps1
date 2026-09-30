@@ -8,7 +8,7 @@
 #   .\run_backend.ps1 -Status      show what is running and check local + public /health
 #   .\run_backend.ps1 -Stop        stop the backend (foreground or background) and the tunnel connector
 # The tunnel token is read from CLOUDFLARE_TUNNEL_TOKEN in the local .env (gitignored; never commit it).
-param([switch]$Background, [switch]$Stop, [switch]$Status, [switch]$AccessLog)
+param([switch]$Background, [switch]$Stop, [switch]$Status, [switch]$AccessLog, [switch]$Ensure)
 
 $root = $PSScriptRoot
 $py = Join-Path $root ".venv\Scripts\python.exe"
@@ -61,6 +61,24 @@ if ($Status) {
     catch { Write-Host "Local  http://127.0.0.1:$port/health : NOT RESPONDING" -ForegroundColor Red }
     Write-Host ("Public {0} : {1}" -f $publicUrl, $(if (Test-Url $publicUrl 15) { "OK" } else { "NOT REACHABLE" }))
     return
+}
+
+if ($Ensure) {
+    $ensureLog = Join-Path $logDir "watchdog.log"
+    $healthy = $false
+    try {
+        $h = Invoke-RestMethod "http://127.0.0.1:$port/health" -TimeoutSec 10
+        $hb = if ($h.scheduler_heartbeat_utc) { [datetime]::Parse($h.scheduler_heartbeat_utc).ToUniversalTime() } else { [datetime]::MinValue }
+        $healthy = ((Get-Date).ToUniversalTime() - $hb).TotalMinutes -lt 40
+    } catch { $healthy = $false }
+    if (-not $healthy) {
+        Add-Content $ensureLog ("{0}  backend down or scheduler stale -> restarting" -f (Get-Date -Format s))
+        $Background = $true
+    } elseif ((Get-Procs).Tunnels.Count -eq 0) {
+        Add-Content $ensureLog ("{0}  tunnel connector missing -> starting it" -f (Get-Date -Format s))
+        Start-Tunnel | Out-Null
+        return
+    } else { return }
 }
 
 if ($Background) {
