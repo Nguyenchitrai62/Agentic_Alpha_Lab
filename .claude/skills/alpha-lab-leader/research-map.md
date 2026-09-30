@@ -1,6 +1,6 @@
 # Research map (update after every rotation)
 
-Last update: 2026-09-30 (after v289).
+Last update: 2026-09-30 (after v291).
 
 ## Honest status
 
@@ -55,6 +55,7 @@ v286 Coinbase member upgraded with TV / order flow: more similar to A/B, worst d
 *** v287 PATH-LABEL member (first-touch / triple-barrier target on the O1 features, same window/embargo): P1 = 0.8 CB + 0.2 PA: worst dev year 3.054, dev DD 18.05, dev4 5.683; final 5y 5.586, most recent year 5.200, DD 18.05, hidden win 56.2% -> candidate (audit + robustness pending). Replacing A with the path member (P2) worse (2.70 / 19.5). Next ideas: path labels in the B / D members as extra diverse members; barrier width.
 v288 path label in the options+TV member too (Q1 = 0.8 CB + 0.2 four path members): worst dev year 2.57, DD 19.4 -> the path-label gain does NOT generalise; P1's +0.05 worst-year edge is weak evidence. Path-label direction closed.
 12h DIP ENGINE (research/diagnostics/daily_dip, dev only): no-stop event study positive every dev year at 3.5-4 sigma (t 3-5, win 75-87%), daily corr with CB ~0; v289 sub-account with 3-sigma TOUCH stops loses 2022/2023 (touch stops turn the edge negative, as for the 4h sleeve); close5 4-sigma + 8-sigma backstop or backstop-only restore positive years but the stream is ~+8%/yr at DD ~8% per 1% risk - mixing it dilutes CB's return unless CB is re-levered -> direction closed. CB drawdown anatomy (research/diagnostics/cb_dd): no single cause (2022 book whipsaws, 2023-04..06 sleeve -11.7%, 2024-07 short book into a +16% BTC squeeze) -> no structural DD filter to buy leverage with.
+v290 INFORMATION-SATELLITE SCREEN on CB (20% each, annual + quarterly members; new data: Coinbase SOL/XRP 1h -> per-coin premium Dc): K 2.13/DD 20.4, E DVOL 1.54/21.7, F macro 1.91/18.4, G F&G 2.53/22.3, H COT 3.17/22.0 (DD breach), Dc 2.75/18.2 vs CB 3.005/18.39 -> none accepted; D (Coinbase BTC/ETH premium) stays the only helpful satellite. v291 consensus sizing (CB x agreement of the six model sets): agreement already 0.945 -> neutral/worse. Binance archive: no liquidation history; bookDepth only from 2023-01 (too short for the 2021+ walk-forward).
 PLATEAU: every management layer lands at dev4 ~5.1-5.3 and last year ~3.8-4.0 at DD ~19 -> the foundation signal is the limit.
 v223-v228 (all rejected, D2 stays): foundation component mixes slower/faster (0.25/0.25/0.5 local optimum), no long-only + trim
 (best worst year 2.47 but dev4 4.97), member D / monthly schedule, causal coin bandit for the sleeve (DD > 20), deeper limit
