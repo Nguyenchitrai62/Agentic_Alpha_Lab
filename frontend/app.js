@@ -226,7 +226,8 @@
       const worst = dev.length ? Math.min(...dev) : null;
       const last = s.monthly_last_year;
       const win = s.win_dev != null ? `${(100 * s.win_dev).toFixed(0)}% / ${(100 * (s.win_hidden ?? 0)).toFixed(0)}%` : "—";
-      return `<tr class="${cur === p.v ? "on" : ""}" data-pipe="${p.v}"><td><b>${p.nm}</b>${p.star ? ' <span class="star">★</span>' : ""}</td>
+      return `<tr class="${cur === p.v ? "on" : ""}" data-pipe="${p.v}"><td class="pcell"><span class="radio"></span><div>
+        <div class="pn-name"><b>${p.nm}</b>${p.star ? ` <span class="star">★ ${p.star}</span>` : ""}</div><div class="pn-desc">${p.ds}</div></div></td>
         <td>${f(s.monthly_dev4)}</td><td>${f(worst)}</td><td class="${s.gate_dd > 20 ? "down" : ""}">${f(s.gate_dd, 1)}%</td>
         <td>${f(s.monthly_5y)}</td><td class="${last >= 5 ? "up" : ""}"><b>${f(last)}</b></td><td>${s.losing_years ?? "—"}</td><td>${win}</td></tr>`;
     });
@@ -247,13 +248,13 @@
   const planOf = (sym) => state.live.plan?.coins?.[sym];
   // paper pipelines (prospective evidence); O1 = the most robust walk-forward foundation, the default view
   const PIPES = [
-    { v: "v285", nm: "CB", ds: "C4 + 20% model Coinbase premium · năm giấu 5.17%/tháng, vượt gate · SL dip 4σ nến 5m + SL sàn 8σ", star: "khuyên dùng" },
-    { v: "v269", nm: "C4", ds: "O1 + SL lệnh dip 4σ theo nến 5m đóng cửa (bot canh) + SL sàn 8σ · DD thấp nhất" },
-    { v: "v240", nm: "O1", ds: "cá voi theo lệnh thật · sleeve 0.18 · SL chạm" },
-    { v: "v266", nm: "C5", ds: "O1 + SL lệnh dip theo nến 5m đóng cửa (bot canh) + SL sàn 8σ · lãi cao hơn, DD sát 20% · thử nghiệm" },
-    { v: "v236", nm: "W2", ds: "dòng tiền cá voi · lãi TB cao nhất" },
+    { v: "v285", nm: "CB", ds: "C4 + 20% model Coinbase premium", star: "khuyên dùng" },
+    { v: "v269", nm: "C4", ds: "O1 + SL dip 4σ theo nến 5m + SL sàn 8σ" },
+    { v: "v240", nm: "O1", ds: "dòng tiền cá voi theo lệnh thật" },
+    { v: "v266", nm: "C5", ds: "O1 + SL dip 5σ theo nến 5m + SL sàn 8σ" },
+    { v: "v236", nm: "W2", ds: "dòng tiền cá voi (theo lần khớp)" },
     { v: "v233", nm: "T3", ds: "chỉ báo TradingView" },
-    { v: "v205", nm: "D2", ds: "pipeline cũ" },
+    { v: "v205", nm: "D2", ds: "pipeline gốc" },
   ];
   const PIPE_LABEL = Object.fromEntries(PIPES.map((p) => [p.v, p.nm]));
   function planPipe() {
@@ -266,6 +267,7 @@
     renderPipeBar(); renderBoard(); renderCards(); renderWatchlist(); renderPlan(); renderEvidence();
   }
   function renderPipeBar() {
+    if (!$("pipeBar")) return;  // the Pipeline tab now selects pipelines in the training-results table
     const cur = planPipe(), paper = Object.fromEntries(state.live.paper || []);
     $("pipeBar").innerHTML = PIPES.map((p) => {
       const pl = paper[p.v];
@@ -442,8 +444,10 @@
     el.innerHTML = `<thead><tr><th>Coin</th><th>Giá</th><th>24h</th><th>Việc cần làm</th><th>Giá vào / limit</th><th>Stop-loss</th>
       <th>Take-profit</th><th>Lãi/lỗ</th><th>Số tiền</th></tr></thead><tbody>${rows.join("")}</tbody>`;
     const plan = state.live.plan;
+    const paperTxt = plan?.freeze && plan.net_return_pct != null
+      ? ` · paper từ ${String(plan.freeze).slice(5, 10).split("-").reverse().join("/")}: ${plan.net_return_pct >= 0 ? "+" : ""}${Number(plan.net_return_pct).toFixed(2)}%` : "";
     $("boardMeta").textContent = !plan?.coins ? `${PIPE_LABEL[planPipe()]} · chưa có kế hoạch lệnh (chờ chu kỳ 4h kế tiếp)`
-      : `${PIPE_LABEL[planPipe()]} · cập nhật ${dt(Date.parse(plan.generated_at))} · quyết định kế tiếp ${dt(Date.parse(plan.next_decision))}`;
+      : `${PIPE_LABEL[planPipe()]}${paperTxt} · cập nhật ${dt(Date.parse(plan.generated_at))} · quyết định kế tiếp ${dt(Date.parse(plan.next_decision))}`;
     el.onclick = (e) => { const tr = e.target.closest("tr[data-sym]"); if (tr) $("card-" + tr.dataset.sym)?.scrollIntoView({ behavior: "smooth", block: "start" }); };
   }
   function shortAct(s) {
