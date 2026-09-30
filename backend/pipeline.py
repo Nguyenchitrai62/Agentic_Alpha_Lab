@@ -170,29 +170,14 @@ BACKFILL_DAYS = 14
 
 
 def job_backfill() -> str:
-    """Before every cycle: find the 4h decision bars of the last 14 days a missed cycle left without (a) an advisor row of the pipelines
-    the trade plans read (shadow.jsonl) or (b) a live signal run, and recompute each one AS OF its bar (ADVISOR_ASOF: only data up to
-    that bar). Candles and the whale-flow feed resume from their last stored point, and the trade plans / paper logs replay their whole
-    window every run, so after this step nothing is missing."""
+    """Before every cycle: find the 4h decision bars of the last 14 days a missed cycle left without an advisor row of the member
+    advisors the five pipelines read (shadow.jsonl), and recompute each one AS OF its bar (ADVISOR_ASOF: only data up to that bar).
+    Candles and the whale-flow feed resume from their last stored point, and the trade plans replay their whole window every run, so
+    after this step nothing is missing."""
     env = {**__import__("os").environ, "PYTHONUTF8": "1", "ADVISOR_SHADOW_BACKFILL": "1"}
     p = subprocess.run([SETTINGS.python_exe, str(ROOT / "scripts/advisor_shadow.py")], cwd=str(ROOT), capture_output=True,
                        text=True, encoding="utf-8", errors="replace", env=env, timeout=3600)
     msgs = [(p.stdout.strip().splitlines() or ["backfill: no output"])[-1] if p.returncode == 0 else f"shadow backfill FAILED: {p.stderr[-300:]}"]
-    now = pd.Timestamp.now(tz="UTC")
-    latest = now.floor("4h") - pd.Timedelta(hours=4)          # start of the bar whose close the regular cycle handles
-    have = {int(r["decision_time"]) for r in db.rows("SELECT decision_time FROM runs WHERE source = 'live' AND decision_time >= ?",
-                                                       (_ms(latest - pd.Timedelta(days=BACKFILL_DAYS)),))}
-    first = db.one("SELECT MIN(decision_time) AS t FROM runs WHERE source = 'live'")
-    start = max(pd.Timestamp(first["t"], unit="ms", tz="UTC") if first and first["t"] else latest, latest - pd.Timedelta(days=BACKFILL_DAYS))
-    missing = [t for t in pd.date_range(start, latest - pd.Timedelta(hours=4), freq="4h") if _ms(t + pd.Timedelta(hours=4)) not in have]
-    done = 0
-    for t in missing:  # a run's decision_time is the start of the bar the orders are for = the close of the decision bar + 1 ms
-        try:
-            job_signal(asof=str(t + pd.Timedelta(hours=4) - pd.Timedelta(milliseconds=1)))
-            done += 1
-        except Exception as exc:
-            msgs.append(f"signal backfill {t} FAILED: {str(exc)[:120]}")
-    msgs.append(f"signal runs backfilled: {done}/{len(missing)}")
     return " | ".join(msgs)
 
 
@@ -247,18 +232,18 @@ def job_forward() -> str:
 
 
 # ---------------------------------------------------------------- executable trade plan (trade mode)
+# the five pipelines the site shows (2026-09-30: only the best five are computed; older paper pipelines and research logs are retired)
+PLAN_PIPELINES = (("v301_G2", "trade_plan_v301", "trade_plan_v301.json"), ("v295_CS", "trade_plan_v295", "trade_plan_v295.json"),
+                  ("v266_B1", "trade_plan_v266", "trade_plan_v266.json"), ("v269_M1", "trade_plan_v269", "trade_plan_v269.json"),
+                  ("v285_D2", "trade_plan_v285", "trade_plan_v285.json"))
+
+
 def job_trade_plan() -> str:
     """Current orders / positions / SL-TP of the executable trade-mode pipeline and its paper log since its freeze.
 
     Two plans: the deployed v205 books (kv 'trade_plan') and the v233 T3 foundation (kv 'trade_plan_v233', paper comparison)."""
     msgs = []
-    for cand, key, fname in (("v151_deploy_v4", "trade_plan", "trade_plan.json"), ("v233_T3", "trade_plan_v233", "trade_plan_v233.json"),
-                             ("v236_W2", "trade_plan_v236", "trade_plan_v236.json"), ("v240_O1", "trade_plan_v240", "trade_plan_v240.json"),
-                             ("v266_B1", "trade_plan_v266", "trade_plan_v266.json"),
-                             ("v269_M1", "trade_plan_v269", "trade_plan_v269.json"),
-                             ("v285_D2", "trade_plan_v285", "trade_plan_v285.json"),
-                             ("v295_CS", "trade_plan_v295", "trade_plan_v295.json"),
-                             ("v301_G2", "trade_plan_v301", "trade_plan_v301.json")):
+    for cand, key, fname in PLAN_PIPELINES:
         cmd = [SETTINGS.python_exe, str(ROOT / "scripts/forward_trade.py"), "--candidate", cand]
         cfg = ROOT / "configs/trade_policy.json"
         if cfg.exists():
@@ -266,7 +251,7 @@ def job_trade_plan() -> str:
         p = subprocess.run(cmd, cwd=str(ROOT), capture_output=True, text=True, encoding="utf-8", errors="replace",
                            env={**__import__("os").environ, "PYTHONUTF8": "1"}, timeout=1800)
         if p.returncode != 0:
-            if key == "trade_plan":
+            if key == "trade_plan_v301":
                 raise RuntimeError(f"trade plan failed ({p.returncode}): {p.stderr[-1500:]}")
             msgs.append(f"{key} FAILED: {p.stderr[-300:]}")
             continue
@@ -498,11 +483,11 @@ def job_walkforward_tm() -> str:
 
 
 def job_cycle() -> str:
-    """Scheduled cycle after each 4h close: candles -> gap check + as-of backfill of missed bars -> prospective log -> trade plan ->
-    live signal -> forward paper trading."""
+    """Scheduled cycle after each 4h close: candles + whale flow -> gap check + as-of backfill of missed bars -> the member advisors
+    (O1 flow set + Coinbase member) -> the five pipelines' trade plans. The retired research logs (full shadow log, v205 live signal,
+    v205 forward, dip log) no longer run."""
     out, t0 = [], datetime.now(timezone.utc)
-    for name, fn in (("candles", job_candles), ("aggflow", lambda: job_aggflow(archive=False)), ("backfill", job_backfill), ("shadow", job_shadow_fast), ("trade_plan", job_trade_plan), ("shadow_all", job_shadow), ("signal", job_signal),
-                     ("forward", job_forward), ("dip_log", job_dip_log)):
+    for name, fn in (("candles", job_candles), ("aggflow", lambda: job_aggflow(archive=False)), ("backfill", job_backfill), ("shadow", job_shadow_fast), ("trade_plan", job_trade_plan)):
         try:
             out.append(fn())
         except Exception as exc:

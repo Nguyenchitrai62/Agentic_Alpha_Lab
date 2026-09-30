@@ -188,8 +188,8 @@
   }
 
   async function loadPlans() {
-    [state.live.latest, state.live.plan] = await Promise.all([api("/api/signals/latest?source=live"),
-      api(`/api/trade_plan?pipeline=${planPipe()}`).catch(() => null)]);
+    state.live.latest = null;  // the retired v205 live signal is no longer computed; everything comes from the selected pipeline's plan
+    state.live.plan = await api(`/api/trade_plan?pipeline=${planPipe()}`).catch(() => null);
     if (!state.live.conf) state.live.conf = await api("/api/confidence").catch(() => null);
     // paper results of the four pipelines side by side (prospective evidence)
     state.live.paper = await Promise.all(PIPES.map((p) => p.v).map((v) =>
@@ -199,7 +199,7 @@
     mountTv(state.live.symbol);
     try {
       await loadPlans();
-      renderWatchlist(); renderPlan(); renderDips(); loadRecent(); updateTitle();
+      renderWatchlist(); renderPlan(); updateTitle();
     } catch (e) { toast(e.message); }
   }
   async function renderPipeStatus() {
@@ -247,16 +247,12 @@
   // ---- executable trade plan (trade mode): what should be on the exchange now
   const planOf = (sym) => state.live.plan?.coins?.[sym];
   // paper pipelines (prospective evidence); O1 = the most robust walk-forward foundation, the default view
-  const PIPES = [
+  const PIPES = [  // the five best pipelines (walk-forward, bar-open forms); older paper pipelines are retired (2026-09-30)
     { v: "v301", nm: "G2", ds: "CB + agent RL chọn khối lượng & chốt lời bắt đáy, ngân sách dip 0.26", star: "khuyên dùng" },
     { v: "v295", nm: "CS", ds: "CB + agent RL chọn khối lượng bắt đáy (học từ 35 coin)" },
-    { v: "v285", nm: "CB", ds: "C4 + 20% model Coinbase premium" },
-    { v: "v269", nm: "C4", ds: "O1 + SL dip 4σ theo nến 5m + SL sàn 8σ" },
-    { v: "v240", nm: "O1", ds: "dòng tiền cá voi theo lệnh thật" },
     { v: "v266", nm: "C5", ds: "O1 + SL dip 5σ theo nến 5m + SL sàn 8σ" },
-    { v: "v236", nm: "W2", ds: "dòng tiền cá voi (theo lần khớp)" },
-    { v: "v233", nm: "T3", ds: "chỉ báo TradingView" },
-    { v: "v205", nm: "D2", ds: "pipeline gốc" },
+    { v: "v269", nm: "C4", ds: "O1 + SL dip 4σ theo nến 5m + SL sàn 8σ" },
+    { v: "v285", nm: "CB", ds: "C4 + 20% model Coinbase premium" },
   ];
   const PIPE_LABEL = Object.fromEntries(PIPES.map((p) => [p.v, p.nm]));
   function planPipe() {
@@ -336,15 +332,17 @@
     const from = Date.parse(d[0].active_from), until = Date.parse(d[0].active_until), now = Date.now();
     const status = now < from ? `đặt lúc ${dt(from)}` : now > until ? "đã hết hạn" : `đang chờ tới ${dt(until)}`;
     const rows = d.map((r) => {
-      const q = qty(sym, r.size_frac, r.buy_limit), ag = r.agent_size !== 1 || r.agent_tp !== 1;
-      return `<tr class="${r.filled ? "dip-filled" : ""}"><td>${r.rung}σ</td><td>${fmtPx(r.buy_limit)}${px ? `<span class="note">${((r.buy_limit / px - 1) * 100).toFixed(1)}%</span>` : ""}</td>
-        <td class="up">${fmtPx(r.tp)}</td><td class="down">${fmtPx(r.stop)}${r.stop_kind === "close5" ? '<span class="note">nến 5m đóng</span>' : ""}</td>
-        <td class="down">${r.backstop ? fmtPx(r.backstop) : "—"}</td><td>${q} <span class="note">≈ ${usdt(r.size_frac)} USDT</span></td>
-        <td>${ag ? `<span class="${r.agent_size > 1 ? "up" : r.agent_size < 1 ? "down" : ""}">×${r.agent_size}</span>${r.agent_tp !== 1 ? ` · TP ${r.agent_tp}σ` : ""}` : '<span class="muted">—</span>'}</td>
-        <td>${r.filled ? '<span class="up">đã khớp</span>' : '<span class="muted">chờ</span>'}</td></tr>`;
+      const q = qty(sym, r.size_frac, r.buy_limit);
+      const ag = [r.agent_size !== 1 ? `<span class="${r.agent_size > 1 ? "up" : "down"}">agent ×${r.agent_size}</span>` : "",
+                  r.agent_tp !== 1 ? `TP ${r.agent_tp}σ` : ""].filter(Boolean).join(" · ");
+      return `<tr class="${r.filled ? "dip-filled" : ""}"><td>${r.rung}σ${r.filled ? ' <span class="up" title="đã khớp">✓</span>' : ""}</td>
+        <td>${fmtPx(r.buy_limit)}${px ? `<span class="note">${((r.buy_limit / px - 1) * 100).toFixed(1)}%</span>` : ""}</td>
+        <td class="up">${fmtPx(r.tp)}</td>
+        <td class="down">${fmtPx(r.stop)}<span class="note">${r.stop_kind === "close5" ? "bot · nến 5m đóng" : "chạm"}${r.backstop ? ` · sàn ${fmtPx(r.backstop)}` : ""}</span></td>
+        <td>${q}<span class="note">≈ ${usdt(r.size_frac)} USDT${ag ? " · " + ag : ""}</span></td></tr>`;
     }).join("");
     return `<details class="dip-d" open><summary>Lệnh chờ bắt đáy nến này <span class="muted small">(${status})</span></summary>
-      <div class="tbl-scroll"><table class="tbl compact dip-tbl"><thead><tr><th>Bậc</th><th>Mua limit</th><th>TP</th><th>SL bot</th><th>SL sàn</th><th>Khối lượng</th><th>Agent</th><th></th></tr></thead>
+      <div class="tbl-scroll"><table class="tbl compact dip-tbl"><thead><tr><th>Bậc</th><th>Mua limit</th><th>TP</th><th>SL</th><th>Khối lượng</th></tr></thead>
       <tbody>${rows}</tbody></table></div>
       <div class="muted small">Mỗi bậc: 1 lệnh limit mua riêng, kèm TP limit + SL sàn đặt sẵn; bot đóng lệnh nếu nến 5m đóng dưới "SL bot"; lệnh còn mở tới cuối nến thì đóng ở giá mở nến sau.</div></details>`;
   }
@@ -489,7 +487,7 @@
     $("watchlist").onclick = (e) => {
       const tr = e.target.closest("tr[data-sym]"); if (!tr) return;
       state.live.symbol = tr.dataset.sym; store.set("liveSym", tr.dataset.sym);
-      renderWatchlist(); renderPlan(); renderDips(); loadRecent(); mountTv(tr.dataset.sym); updateTitle();
+      renderWatchlist(); renderPlan(); mountTv(tr.dataset.sym); updateTitle();
     };
   }
   // browser-tab title = live price of the coin being viewed (market / history page), e.g. "83,874.6"

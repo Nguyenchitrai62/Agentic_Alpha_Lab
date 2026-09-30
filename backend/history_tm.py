@@ -25,10 +25,6 @@ RD = ROOT / "research/parallel/rounds/parallel-20260906-r2"
 MAKER, TAKER = 0.0002, 0.00055
 H4 = 4 * 3600_000
 PIPELINES = {  # pipeline key -> (research-books function in scripts/forward_v205.py, expected dev4 %/month for a sanity check)
-    "v205": ("research_books", 5.261),
-    "v233": ("research_books_t3", 5.485),
-    "v236": ("research_books_w2", 5.774),
-    "v240": ("research_books_o1", 5.777),  # with the v247 sleeve budget 0.18
     "v266": ("research_books_o1", 6.130),  # O1 + 5m-close dip stops + 8-sigma native backstop (v266 B1)
     "v269": ("research_books_o1", 6.026),  # O1 + 5m-close dip stops at 4 sigma + 8-sigma native backstop (v269 M1)
     "v285": ("research_books_d2", 5.864),  # 0.8 O1 + 0.2 Coinbase-premium member, C4 rules (v285 D2)

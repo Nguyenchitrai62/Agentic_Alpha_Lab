@@ -150,8 +150,7 @@ def overview(request: Request, pipeline: str | None = None, user: dict = Depends
 @app.get("/api/pipelines_summary")
 def pipelines_summary(request: Request, user: dict = Depends(auth.require_viewer)):
     """Walk-forward summary of every paper pipeline (history_tm) + its paper result since the freeze, for the pipeline evidence table."""
-    keys = {"v205": "trade_plan", "v233": "trade_plan_v233", "v236": "trade_plan_v236", "v240": "trade_plan_v240",
-            "v266": "trade_plan_v266", "v269": "trade_plan_v269", "v285": "trade_plan_v285", "v295": "trade_plan_v295", "v301": "trade_plan_v301"}
+    keys = {"v301": "trade_plan_v301", "v295": "trade_plan_v295", "v266": "trade_plan_v266", "v269": "trade_plan_v269", "v285": "trade_plan_v285"}
 
     def load():
         out = {}

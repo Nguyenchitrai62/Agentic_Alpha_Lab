@@ -46,8 +46,7 @@ def _retry(fn, wait=45):
         return fn()
 
 
-FAST = (("v151_advisor", "v151_deploy_v4"), ("v233_advisor", "v233_T3"), ("v236_advisor", "v236_W2"),
-        ("v240_advisor", "v240_O1"), ("v285_cb_advisor", "v285_CB"))
+FAST = (("v240_advisor", "v240_O1"), ("v285_cb_advisor", "v285_CB"))  # the member advisors all five site pipelines read
 BACKFILL_DAYS = 14
 
 
@@ -113,8 +112,7 @@ def main() -> int:
     if os.environ.get("ADVISOR_SHADOW_FAST") == "1":  # only the advisors the trade plans read (backend cycle, before its plans)
         import importlib.util as _u
         rows = []
-        for mod, cand in (("v151_advisor", "v151_deploy_v4"), ("v233_advisor", "v233_T3"), ("v236_advisor", "v236_W2"),
-                          ("v240_advisor", "v240_O1"), ("v285_cb_advisor", "v285_CB")):
+        for mod, cand in FAST:
             try:
                 _spec = _u.spec_from_file_location(mod, Path(__file__).parent / f"{mod}.py")
                 _m = _u.module_from_spec(_spec); _spec.loader.exec_module(_m)
