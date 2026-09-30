@@ -59,7 +59,7 @@ def main() -> int:
         import importlib.util as _u
         rows = []
         for mod, cand in (("v151_advisor", "v151_deploy_v4"), ("v233_advisor", "v233_T3"), ("v236_advisor", "v236_W2"),
-                          ("v240_advisor", "v240_O1"), ("v285_cb_advisor", "v285_CB"), ("v287_path_advisor", "v287_PA")):
+                          ("v240_advisor", "v240_O1"), ("v285_cb_advisor", "v285_CB")):
             try:
                 _spec = _u.spec_from_file_location(mod, Path(__file__).parent / f"{mod}.py")
                 _m = _u.module_from_spec(_spec); _spec.loader.exec_module(_m)
