@@ -73,7 +73,8 @@ def prepare(books, opens):
                 settle=settle_at_end, sig1h=sig1h)
 
 
-def simulate(books, opens, prep, m_sl=3.0, m_sleeve_sl=2.0, sleeve=True, target=0.25, cap=2.0, d_limit=D_LIMIT, win_end=60, sleeve_risk_budget=None, gap=0.02, m_sleeve_tp=1.0, rung_scale_fixed=None, size_mult=1.0, rungs=RUNGS, m_tp=None, hourly=False, align=None, events=None, bars=None, exec_policy=None, fixed_levels=False, attrib=None, trade=None, win_start=2, state_out=None, sleeve_filter=None, sleeve_tp=None, strat_vt=None, sleeve_start=16, risk_mult=None, sleeve_breaker=None, sleeve_stop_mode="touch", sleeve_backstop=None, sleeve_budget_sl=None, book_stop_mode="touch", book_backstop=None, sleeve_exit_agent=None, sleeve_lock_cut=False, sleeve_fill_size=None):
+def simulate(books, opens, prep, m_sl=3.0, m_sleeve_sl=2.0, sleeve=True, target=0.25, cap=2.0, d_limit=D_LIMIT, win_end=60, sleeve_risk_budget=None, gap=0.02, m_sleeve_tp=1.0, rung_scale_fixed=None, size_mult=1.0, rungs=RUNGS, m_tp=None, hourly=False, align=None, events=None, bars=None, exec_policy=None, fixed_levels=False, attrib=None, trade=None, win_start=2, state_out=None, sleeve_filter=None, sleeve_tp=None, strat_vt=None, sleeve_start=16, risk_mult=None, sleeve_breaker=None, sleeve_stop_mode="touch", sleeve_backstop=None, sleeve_budget_sl=None, book_stop_mode="touch", book_backstop=None, sleeve_exit_agent=None, sleeve_lock_cut=False, sleeve_fill_size=None, path_out=None):
+    # path_out: optional dict; filled at the end with the bar index, equity (4h closes) and 1m-marked minimum per bar (no effect on results).
     # events: optional list; when given, every fill / stop / take-profit / sleeve rung is appended as a dict (no effect on results)
     # exec_policy: optional callable (i, a, dw, w_a, tgt_a, sig4_ia) -> ("limit", offset[, weight]) | ("market", 0[, weight]) | ("skip", 0)
     #   deciding how (and, with the optional weight, to which weight instead of the target)
@@ -733,6 +734,8 @@ def simulate(books, opens, prep, m_sl=3.0, m_sleeve_sl=2.0, sleeve=True, target=
     if state_out is not None:
         state_out.update({k: v.copy() for k, v in T.items()}, qty=q.copy(), entry=entry.copy(), equity=float(eq[-1]),
                          governor=float(g[-1]), last_i=int(n - 1))
+    if path_out is not None:
+        path_out.update(t=idx, eq=eq.copy(), eq_min=eq_min.copy())
     return summarize(idx, net, eq, eq_min, g, stats, eq_max)
 
 
