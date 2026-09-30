@@ -32,11 +32,14 @@ PIPELINES = {  # pipeline key -> (research-books function in scripts/forward_v20
     "v266": ("research_books_o1", 6.130),  # O1 + 5m-close dip stops + 8-sigma native backstop (v266 B1)
     "v269": ("research_books_o1", 6.026),  # O1 + 5m-close dip stops at 4 sigma + 8-sigma native backstop (v269 M1)
     "v285": ("research_books_d2", 5.864),  # 0.8 O1 + 0.2 Coinbase-premium member, C4 rules (v285 D2)
+    "v295": ("research_books_d2", 6.168),  # CB + v295 size agent (walk-forward multipliers, sized at the bar open)
 }
 KW_OVERRIDE = {"v240": {"sleeve_risk_budget": 0.18},
                "v266": {"sleeve_risk_budget": 0.18, "sleeve_stop_mode": "close5", "sleeve_backstop": 8.0},
                "v269": {"sleeve_risk_budget": 0.18, "sleeve_stop_mode": "close5", "sleeve_backstop": 8.0, "m_sleeve_sl": 4.0},
-               "v285": {"sleeve_risk_budget": 0.18, "sleeve_stop_mode": "close5", "sleeve_backstop": 8.0, "m_sleeve_sl": 4.0}}
+               "v285": {"sleeve_risk_budget": 0.18, "sleeve_stop_mode": "close5", "sleeve_backstop": 8.0, "m_sleeve_sl": 4.0},
+               "v295": {"sleeve_risk_budget": 0.18, "sleeve_stop_mode": "close5", "sleeve_backstop": 8.0, "m_sleeve_sl": 4.0}}
+SIZE_TABLE = ROOT / "artifacts/research/engine_real/v295_size_mult_m0.parquet"  # research/diagnostics/s1_exec/s1_cache.py
 
 
 def _load(name, path):
@@ -60,8 +63,14 @@ def simulate(pipe: str):
     books = getattr(fw, fn)(eu).reindex(books154.index).fillna(0.0)[cols]
     prep = eu.prepare(books154, opens)
     events, bars = [], []
+    kw = dict(v221.KW, **KW_OVERRIDE.get(pipe, {}))
+    if pipe == "v295":  # walk-forward size multipliers of the v295 size agent (one per holding bar, coin and rung)
+        tab = pd.read_parquet(SIZE_TABLE)
+        look = {(pd.Timestamp(t), s, int(r)): float(m) for t, s, r, m in zip(tab["T"], tab["sym"], tab["rung"], tab["mult"])}
+        idx = books.index
+        kw["sleeve_fill_size"] = lambda i, a, r, f: look.get((idx[i] + pd.Timedelta(hours=4), cols[a], r), 1.0)
     res = eu.simulate(books, opens, prep, trade=dict(v216.GRID, policy=v216.grid_policy(v221.B_ABS, v221.B_REL)), win_start=5,
-                      events=events, bars=bars, **dict(v221.KW, **KW_OVERRIDE.get(pipe, {})))
+                      events=events, bars=bars, **kw)
     if abs(res["monthly_dev4"] - dev4) > 0.01:
         raise RuntimeError(f"{pipe}: replay dev4 {res['monthly_dev4']} != research {dev4}")
     res["trade_stats"] = v221.v216.v213.trade_stats(events)  # book trades after fees: dev years / most recent year
