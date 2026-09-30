@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import os
 import pickle
 import sys
 from datetime import datetime, timedelta, timezone
@@ -67,15 +68,35 @@ def freeze(cutoff: pd.Timestamp) -> None:
     print("saved", MODELS)
 
 
+def asof() -> pd.Timestamp | None:
+    """ADVISOR_ASOF = the close of a past decision bar to reproduce (backfill of a missed cycle); None = the latest closed bar."""
+    v = os.environ.get("ADVISOR_ASOF")
+    return pd.Timestamp(v) if v else None
+
+
+def funding_asof(session: requests.Session, sym: str) -> pd.DataFrame:
+    """Funding settlements up to the as-of time (the latest 1000 when live)."""
+    from agentic_alpha_lab.data.binance_usdm import BASE_URL
+    t = asof()
+    params = {"symbol": sym, "limit": 1000}
+    if t is not None:
+        params["endTime"] = int(t.value // 1_000_000)
+    f = pd.DataFrame(session.get(f"{BASE_URL}/fapi/v1/fundingRate", params=params, timeout=60).json())
+    f["fundingRate"] = f["fundingRate"].astype(float)
+    f["fundingTime"] = pd.to_datetime(f["fundingTime"], unit="ms", utc=True)
+    return f[f.fundingTime <= t] if t is not None else f
+
+
 def live_panel(session: requests.Session, now: datetime) -> pd.DataFrame:
-    from agentic_alpha_lab.data.binance_usdm import BASE_URL, fetch_klines
+    from agentic_alpha_lab.data.binance_usdm import fetch_klines
     rows = []
     for i, s in enumerate(v92.SYMS):
-        b = fetch_klines(s, "4h", now - timedelta(days=500), session=session).reset_index(drop=True)
-        d = fetch_klines(s, "1d", now - timedelta(days=800), session=session).reset_index(drop=True)
-        f = pd.DataFrame(session.get(f"{BASE_URL}/fapi/v1/fundingRate", params={"symbol": s, "limit": 1000}, timeout=60).json())
-        f["fundingRate"] = f["fundingRate"].astype(float)
-        f["fundingTime"] = pd.to_datetime(f["fundingTime"], unit="ms", utc=True)
+        b = fetch_klines(s, "4h", now - timedelta(days=500), end=now, session=session)
+        d = fetch_klines(s, "1d", now - timedelta(days=800), end=now, session=session)
+        cut = pd.Timestamp(now)  # only bars CLOSED by now (as-of: a daily bar still forming at the as-of time is dropped)
+        b = b[b["close_time"] <= cut].reset_index(drop=True)
+        d = d[d["close_time"] <= cut].reset_index(drop=True)
+        f = funding_asof(session, s)
         x, y = v92.features(b, d, f.sort_values("fundingTime"))
         x = pd.concat([x, v103.flow_features(b, x["vol42"])], axis=1)
         x["asset"], x["y"], x["t"], x["open"], x["sym"], x["bar"] = i, y, b["open_time"].to_numpy(), b["open"].to_numpy(), s, np.arange(len(b))
@@ -103,7 +124,9 @@ def _w_ls(df):
 
 def advise() -> dict:
     models = pickle.loads(MODELS.read_bytes())
-    now = datetime.now(timezone.utc)
+    t_asof = asof()
+    # as-of mode: only klines that closed by the as-of bar close (the next bar is not requested) and funding up to it
+    now = datetime.now(timezone.utc) if t_asof is None else t_asof.to_pydatetime()
     s = requests.Session()
     panel = live_panel(s, now)
     recent = _augment(panel[panel.t >= panel.t.max() - pd.Timedelta(days=120)].copy())
@@ -123,10 +146,7 @@ def advise() -> dict:
     carry_cfg = json.loads((ROOT / "artifacts/research/advisor_shadow/portfolio_v1.json").read_text())["carry"]
     carry_state = {}
     for sym in v92.SYMS:
-        f = pd.DataFrame(s.get(f"{BASE_URL}/fapi/v1/fundingRate", params={"symbol": sym, "limit": 1000}, timeout=60).json())
-        f["fundingRate"] = f["fundingRate"].astype(float)
-        f["fundingTime"] = pd.to_datetime(f["fundingTime"], unit="ms", utc=True)
-        carry_state[sym] = carry_on(f, carry_cfg[sym])
+        carry_state[sym] = carry_on(funding_asof(s, sym), carry_cfg[sym])
     o = panel.pivot_table(index="t", columns="sym", values="open").reindex(idx)
     realized = v99.W_BOOKS * (books.shift(2) * (o / o.shift(1) - 1)).sum(axis=1)  # carry leg omitted (no live carry return history)
     vol = realized.rolling(60 * v92.PD, min_periods=20 * v92.PD).std() * np.sqrt(v92.PD * 365)

@@ -60,7 +60,11 @@ def _load(name, path):
 def market_state(sess, sym):
     """Current 4h bar open (the bar in progress) and sigma_4h / sigma_d from the last 360 closed 4h bars."""
     from agentic_alpha_lab.data.binance_usdm import BASE_URL
-    r = sess.get(f"{BASE_URL}/fapi/v1/klines", params={"symbol": sym, "interval": "4h", "limit": 400}, timeout=60)
+    t = pd.Timestamp(__import__("os").environ["ADVISOR_ASOF"]) if __import__("os").environ.get("ADVISOR_ASOF") else None
+    prm = {"symbol": sym, "interval": "4h", "limit": 400}
+    if t is not None:  # as-of mode (backfill): the bar right after the as-of decision bar is the "bar in progress"
+        prm["endTime"] = int((t + pd.Timedelta(hours=4)).value // 1_000_000)
+    r = sess.get(f"{BASE_URL}/fapi/v1/klines", params=prm, timeout=60)
     r.raise_for_status()
     k = pd.DataFrame(r.json()).iloc[:, :5]
     k.columns = ["open_time", "open", "high", "low", "close"]
@@ -70,8 +74,8 @@ def market_state(sess, sym):
     cur = k.iloc[-1]
     closed_opens = k["open"].iloc[:-1]
     sig4 = float(closed_opens.pct_change().tail(360).std())
-    p = sess.get(f"{BASE_URL}/fapi/v1/ticker/price", params={"symbol": sym}, timeout=30).json()
-    return dict(bar_open_time=cur["open_time"], bar_open=float(cur["open"]), last=float(p["price"]), sig4=sig4,
+    last = float(cur["open"]) if t is not None else float(sess.get(f"{BASE_URL}/fapi/v1/ticker/price", params={"symbol": sym}, timeout=30).json()["price"])
+    return dict(bar_open_time=cur["open_time"], bar_open=float(cur["open"]), last=last, sig4=sig4,
                 sig_d=sig4 * np.sqrt(6))
 
 

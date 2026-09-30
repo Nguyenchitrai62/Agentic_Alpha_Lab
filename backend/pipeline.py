@@ -136,10 +136,13 @@ def refresh_candles_quietly() -> None:
 
 
 # ---------------------------------------------------------------- live signal
-def job_signal() -> str:
+def job_signal(asof: str | None = None) -> str:
+    """Live signal run of the decision bar (the latest closed one, or `asof` = a missed bar's close for the backfill)."""
     cmd = [SETTINGS.python_exe, str(ROOT / "scripts/v197_advisor.py"), "--equity", str(SETTINGS.default_equity_usdt)]
-    p = subprocess.run(cmd, cwd=str(ROOT), capture_output=True, text=True, encoding="utf-8", errors="replace",
-                       env={**__import__("os").environ, "PYTHONUTF8": "1"}, timeout=1800)
+    env = {**__import__("os").environ, "PYTHONUTF8": "1"}
+    if asof:
+        env["ADVISOR_ASOF"] = asof
+    p = subprocess.run(cmd, cwd=str(ROOT), capture_output=True, text=True, encoding="utf-8", errors="replace", env=env, timeout=1800)
     if p.returncode != 0:
         raise RuntimeError(f"advisor failed ({p.returncode}): {p.stderr[-1500:]}")
     adv = json.loads((ROOT / "artifacts/research/advisor_shadow/v197_advice_latest.json").read_text(encoding="utf-8"))
@@ -160,6 +163,37 @@ def job_signal() -> str:
                       [(run_id, r["symbol"], r["rung_sigma"], r["buy_limit"], r["take_profit_limit"], r["stop_loss_market"], r["size_frac"])
                        for r in adv["dip_sleeve"]])
     return f"live run {run_id} for bar {decision}"
+
+
+# ---------------------------------------------------------------- gap check + backfill of missed cycles
+BACKFILL_DAYS = 14
+
+
+def job_backfill() -> str:
+    """Before every cycle: find the 4h decision bars of the last 14 days a missed cycle left without (a) an advisor row of the pipelines
+    the trade plans read (shadow.jsonl) or (b) a live signal run, and recompute each one AS OF its bar (ADVISOR_ASOF: only data up to
+    that bar). Candles and the whale-flow feed resume from their last stored point, and the trade plans / paper logs replay their whole
+    window every run, so after this step nothing is missing."""
+    env = {**__import__("os").environ, "PYTHONUTF8": "1", "ADVISOR_SHADOW_BACKFILL": "1"}
+    p = subprocess.run([SETTINGS.python_exe, str(ROOT / "scripts/advisor_shadow.py")], cwd=str(ROOT), capture_output=True,
+                       text=True, encoding="utf-8", errors="replace", env=env, timeout=3600)
+    msgs = [(p.stdout.strip().splitlines() or ["backfill: no output"])[-1] if p.returncode == 0 else f"shadow backfill FAILED: {p.stderr[-300:]}"]
+    now = pd.Timestamp.now(tz="UTC")
+    latest = now.floor("4h") - pd.Timedelta(hours=4)          # start of the bar whose close the regular cycle handles
+    have = {int(r["decision_time"]) for r in db.rows("SELECT decision_time FROM runs WHERE source = 'live' AND decision_time >= ?",
+                                                       (_ms(latest - pd.Timedelta(days=BACKFILL_DAYS)),))}
+    first = db.one("SELECT MIN(decision_time) AS t FROM runs WHERE source = 'live'")
+    start = max(pd.Timestamp(first["t"], unit="ms", tz="UTC") if first and first["t"] else latest, latest - pd.Timedelta(days=BACKFILL_DAYS))
+    missing = [t for t in pd.date_range(start, latest - pd.Timedelta(hours=4), freq="4h") if _ms(t + pd.Timedelta(hours=4)) not in have]
+    done = 0
+    for t in missing:  # a run's decision_time is the start of the bar the orders are for = the close of the decision bar + 1 ms
+        try:
+            job_signal(asof=str(t + pd.Timedelta(hours=4) - pd.Timedelta(milliseconds=1)))
+            done += 1
+        except Exception as exc:
+            msgs.append(f"signal backfill {t} FAILED: {str(exc)[:120]}")
+    msgs.append(f"signal runs backfilled: {done}/{len(missing)}")
+    return " | ".join(msgs)
 
 
 # ---------------------------------------------------------------- prospective log (all frozen advisors)
@@ -464,9 +498,10 @@ def job_walkforward_tm() -> str:
 
 
 def job_cycle() -> str:
-    """Scheduled cycle after each 4h close: candles -> prospective log -> trade plan -> live signal -> forward paper trading."""
+    """Scheduled cycle after each 4h close: candles -> gap check + as-of backfill of missed bars -> prospective log -> trade plan ->
+    live signal -> forward paper trading."""
     out, t0 = [], datetime.now(timezone.utc)
-    for name, fn in (("candles", job_candles), ("aggflow", lambda: job_aggflow(archive=False)), ("shadow", job_shadow_fast), ("trade_plan", job_trade_plan), ("shadow_all", job_shadow), ("signal", job_signal),
+    for name, fn in (("candles", job_candles), ("aggflow", lambda: job_aggflow(archive=False)), ("backfill", job_backfill), ("shadow", job_shadow_fast), ("trade_plan", job_trade_plan), ("shadow_all", job_shadow), ("signal", job_signal),
                      ("forward", job_forward), ("dip_log", job_dip_log)):
         try:
             out.append(fn())

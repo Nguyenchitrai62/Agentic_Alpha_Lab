@@ -92,7 +92,11 @@ def research_books_d2(eu):
 
 def live_books(candidate="v151_deploy_v4"):
     rows = [json.loads(l) for l in open(ROOT / "artifacts/research/advisor_shadow/shadow.jsonl", encoding="utf-8") if l.strip()]
-    rows = [r for r in rows if r.get("candidate") == candidate and r.get("mode") == "prospective" and "perp_weight" in r]  # skip error rows
+    # prospective rows + as-of backfill rows of missed cycles (advisor_shadow.py backfill: computed only with data up to their bar);
+    # a prospective row always wins over a backfill row of the same bar; error rows are skipped
+    rows = [r for r in rows if r.get("candidate") == candidate and "perp_weight" in r
+            and (r.get("mode") == "prospective" or (r.get("mode") == "backfill" and r.get("asof")))]
+    rows.sort(key=lambda r: r.get("mode") == "prospective")
     out = {}
     for r in rows:
         t = pd.Timestamp(r["decision_bar_close"]) + pd.Timedelta(milliseconds=1) - pd.Timedelta(hours=4)

@@ -46,6 +46,59 @@ def _retry(fn, wait=45):
         return fn()
 
 
+FAST = (("v151_advisor", "v151_deploy_v4"), ("v233_advisor", "v233_T3"), ("v236_advisor", "v236_W2"),
+        ("v240_advisor", "v240_O1"), ("v285_cb_advisor", "v285_CB"))
+BACKFILL_DAYS = 14
+
+
+def backfill() -> int:
+    """Gap check + backfill of the advisors the trade plans read: every 4h decision bar of the last BACKFILL_DAYS (from each candidate's
+    first row) that has no valid row gets one, computed AS OF that bar (ADVISOR_ASOF: only bars closed by then, funding up to then;
+    the other inputs are joined on the bar time, so nothing after the bar reaches the features). Rows carry asof=True; rows logged more
+    than 6h after the bar are mode 'backfill' (not forward evidence, but the trade plans may replay them). The latest closed bar is
+    left to the regular fast run."""
+    import importlib.util as _u
+    rows = [json.loads(l) for l in LOG.read_text().splitlines() if l.strip()] if LOG.exists() else []
+    good = {f'{r.get("candidate")}|{r["decision_bar_close"]}' for r in rows if "perp_weight" in r}
+    now = datetime.now(timezone.utc)
+    latest = pd.Timestamp(now).floor("4h") - pd.Timedelta(milliseconds=1)          # close of the last closed 4h bar
+    n_new, n_err = 0, 0
+    for mod, cand in FAST:
+        mine = [pd.Timestamp(r["decision_bar_close"]) for r in rows if r.get("candidate") == cand and "perp_weight" in r]
+        if not mine:
+            continue
+        first = max(min(mine), latest - pd.Timedelta(days=BACKFILL_DAYS))
+        bars = pd.date_range(first, latest - pd.Timedelta(hours=4), freq="4h")
+        missing = [t for t in bars if f"{cand}|{t}" not in good]
+        if not missing:
+            continue
+        spec = _u.spec_from_file_location(f"{mod}_bf", Path(__file__).parent / f"{mod}.py")
+        m = _u.module_from_spec(spec)
+        spec.loader.exec_module(m)
+        for t in missing:
+            os.environ["ADVISOR_ASOF"] = str(t)
+            try:
+                rec = _retry(m.advise)
+                if str(pd.Timestamp(rec["decision_bar_close"])) != str(t):
+                    raise RuntimeError(f"as-of bar mismatch: got {rec['decision_bar_close']}, wanted {t}")
+                rec["decision_bar_close"] = str(t)
+                rec["asof"] = True
+            except Exception as exc:
+                rec = dict(candidate=cand, decision_bar_close=str(t), error="backfill: " + repr(exc)[:300], asof=True)
+                n_err += 1
+            finally:
+                os.environ.pop("ADVISOR_ASOF", None)
+            lag = now - pd.Timestamp(t).to_pydatetime()
+            rec["logged_at"] = now.isoformat()
+            rec["mode"] = "prospective" if lag <= PROSPECTIVE_MAX_LAG else "backfill"
+            with LOG.open("a") as f:
+                f.write(json.dumps(rec, default=str) + "\n")
+            n_new += "perp_weight" in rec
+            print("backfilled", cand, t, "ok" if "perp_weight" in rec else rec.get("error"), flush=True)
+    print(f"backfill: {n_new} rows added, {n_err} errors")
+    return 0
+
+
 def main() -> int:
     now = datetime.now(timezone.utc)
     s = requests.Session()
@@ -55,6 +108,8 @@ def main() -> int:
     if LOG.exists():
         logged = {f'{r.get("candidate")}|{r["decision_bar_close"]}' for r in map(json.loads, filter(str.strip, LOG.read_text().splitlines()))}
     LOG.parent.mkdir(parents=True, exist_ok=True)
+    if os.environ.get("ADVISOR_SHADOW_BACKFILL") == "1":  # gap check + as-of backfill of missed decision bars (backend cycle, first)
+        return backfill()
     if os.environ.get("ADVISOR_SHADOW_FAST") == "1":  # only the advisors the trade plans read (backend cycle, before its plans)
         import importlib.util as _u
         rows = []
