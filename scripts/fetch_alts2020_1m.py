@@ -22,7 +22,7 @@ ROOT = Path(__file__).resolve().parents[1]
 OUT = ROOT / "data/raw/alts2020_intraday_20260930"
 HAVE = ROOT / "data/raw/alts_intraday_20260926"
 MAJORS = {"BTCUSDT", "ETHUSDT", "SOLUSDT", "BNBUSDT", "XRPUSDT"}
-N_UNIVERSE = 30
+N_UNIVERSE = int(__import__("os").environ.get("N_UNIVERSE", "30"))
 
 spec = importlib.util.spec_from_file_location("fetch_majors", ROOT / "research/mj/fetch_majors.py")
 fm = importlib.util.module_from_spec(spec)
