@@ -226,8 +226,8 @@
       const worst = dev.length ? Math.min(...dev) : null;
       const last = s.monthly_last_year;
       const win = s.win_dev != null ? `${(100 * s.win_dev).toFixed(0)}% / ${(100 * (s.win_hidden ?? 0)).toFixed(0)}%` : "—";
-      return `<tr class="${cur === p.v ? "on" : ""}" data-pipe="${p.v}"><td class="pcell"><span class="radio"></span><div>
-        <div class="pn-name"><b>${p.nm}</b>${p.star ? ` <span class="star">★ ${p.star}</span>` : ""}</div><div class="pn-desc">${p.ds}</div></div></td>
+      return `<tr class="${cur === p.v ? "on" : ""}" data-pipe="${p.v}"><td><div class="pcell"><span class="radio"></span><div>
+        <div class="pn-name"><b>${p.nm}</b>${p.star ? ` <span class="star">★ ${p.star}</span>` : ""}</div><div class="pn-desc">${p.ds}</div></div></div></td>
         <td>${f(s.monthly_dev4)}</td><td>${f(worst)}</td><td class="${s.gate_dd > 20 ? "down" : ""}">${f(s.gate_dd, 1)}%</td>
         <td>${f(s.monthly_5y)}</td><td class="${last >= 5 ? "up" : ""}"><b>${f(last)}</b></td><td>${s.losing_years ?? "—"}</td><td>${win}</td></tr>`;
     });
