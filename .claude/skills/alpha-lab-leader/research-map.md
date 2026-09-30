@@ -1,6 +1,6 @@
 # Research map (update after every rotation)
 
-Last update: 2026-09-30 (after v285).
+Last update: 2026-09-30 (after v287).
 
 ## Honest status
 
@@ -51,6 +51,8 @@ v282 FULL-ACTION RL trader (user suggestion: direction, size / leverage up to 15
 v283 walk-forward NNLS stacking of members (+ exchange member C): corner weights chasing last year's best member, C weight ~0; dev4 5.42 DD 22.1 -> equal weights (C4) stay best.
 v284 spot order flow spliced before the perp archive (+2.5y flow history): worse (5.32 / 5.51 vs 6.03) - spot-era flow differs from perp flow.
 *** v285 D2 = 0.8 x C4 books + 0.2 x Coinbase-premium member D (annual + quarterly, v154 / v206 caches) on the C4 rules: dev4 5.864, worst dev year 3.005 (beats C4 2.951 -> robust selection), DD 18.39; final 5y 5.725, MOST RECENT YEAR 5.167, no losing year -> FIRST DETERMINISTIC GATE PASS (hidden win 55.8%). Audit PASS (member D replay bit-identical, Coinbase timing / label / fit windows PASS); robustness: at least as robust as C4 (DD <= 20 in 11 vs 10 stress rows, last year higher in all 15 rows). DEPLOYED 2026-09-30 as paper pipeline CB = RECOMMENDED default (scripts/v285_cb_advisor.py logs the live Coinbase member 'v285_CB' in the fast shadow; forward_trade --candidate v285_D2, paper start 2026-09-30 00:00 UTC).
+v286 Coinbase member upgraded with TV / order flow: more similar to A/B, worst dev year and DD worse -> rejected (member diversity > member strength). From v286 on the selection DD filter is dev-only (max yearly 1m DD 2021-2024).
+*** v287 PATH-LABEL member (first-touch / triple-barrier target on the O1 features, same window/embargo): P1 = 0.8 CB + 0.2 PA: worst dev year 3.054, dev DD 18.05, dev4 5.683; final 5y 5.586, most recent year 5.200, DD 18.05, hidden win 56.2% -> candidate (audit + robustness pending). Replacing A with the path member (P2) worse (2.70 / 19.5). Next ideas: path labels in the B / D members as extra diverse members; barrier width.
 PLATEAU: every management layer lands at dev4 ~5.1-5.3 and last year ~3.8-4.0 at DD ~19 -> the foundation signal is the limit.
 v223-v228 (all rejected, D2 stays): foundation component mixes slower/faster (0.25/0.25/0.5 local optimum), no long-only + trim
 (best worst year 2.47 but dev4 4.97), member D / monthly schedule, causal coin bandit for the sleeve (DD > 20), deeper limit
