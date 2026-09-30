@@ -211,11 +211,38 @@
         <span>Lần tới: <b>${h.next_cycle_utc ? dt(Date.parse(h.next_cycle_utc)) : "—"}</b></span>`;
     } catch (e) { el.textContent = ""; }
   }
+  // ---- evidence table: the walk-forward record of every paper pipeline
+  async function loadEvidence() {
+    try { state.evid = await api("/api/pipelines_summary"); renderEvidence(); } catch (e) { /* the table is optional */ }
+  }
+  function renderEvidence() {
+    const ev = state.evid; if (!ev) return;
+    const cur = planPipe();
+    const mo = (net) => (Math.pow(1 + net / 100, 1 / 12) - 1) * 100;
+    const f = (x, d = 2) => x == null || !isFinite(x) ? "—" : Number(x).toFixed(d);
+    const rows = PIPES.map((p) => {
+      const s = ev[p.v]?.walkforward || {}, y = s.yearly || [];
+      const dev = y.slice(0, 4).map((r) => mo(r[1]));
+      const worst = dev.length ? Math.min(...dev) : null;
+      const last = s.monthly_last_year, gate = last >= 5 && s.monthly_5y >= 5 && s.gate_dd <= 20 && !s.losing_years;
+      const win = s.win_dev != null ? `${(100 * s.win_dev).toFixed(0)}% / ${(100 * (s.win_hidden ?? 0)).toFixed(0)}%` : "—";
+      const pap = ev[p.v]?.paper_net_pct;
+      return `<tr class="${cur === p.v ? "on" : ""}" data-pipe="${p.v}"><td><b>${p.nm}</b>${p.star ? ' <span class="star">★</span>' : ""}</td>
+        <td>${f(s.monthly_dev4)}</td><td>${f(worst)}</td><td class="${s.gate_dd > 20 ? "down" : ""}">${f(s.gate_dd, 1)}%</td>
+        <td>${f(s.monthly_5y)}</td><td class="${last >= 5 ? "up" : ""}"><b>${f(last)}</b></td><td>${s.losing_years ?? "—"}</td><td>${win}</td>
+        <td>${pap == null ? "—" : sgn(pap)}</td><td>${gate ? '<span class="up">đạt</span>' : '<span class="muted">chưa</span>'}</td></tr>`;
+    });
+    table($("pipeEvid"), ["Pipeline", "4 năm dev %/th", "Năm dev tệ nhất", "DD", "5 năm %/th", "Năm giấu %/th", "Năm lỗ",
+      "Thắng dev / giấu", "Paper", "Gate 5%"], rows);
+    $("pipeEvid").onclick = (e) => { const r = e.target.closest("[data-pipe]"); if (r) setPlanPipe(r.dataset.pipe); };
+  }
+
   async function loadTodo() {
     try {
       renderPipeStatus();
       await loadPlans();
       renderPipeBar(); renderBoard(); renderCards(); updateTitle();
+      loadEvidence();
     } catch (e) { toast(e.message); }
   }
 
@@ -239,7 +266,7 @@
     try { localStorage.setItem("planPipe4", v); } catch { /* per-viewer convenience only */ }
     const cached = (state.live.paper || []).find(([k]) => k === v);
     state.live.plan = cached?.[1] || await api(`/api/trade_plan?pipeline=${v}`).catch(() => null);
-    renderPipeBar(); renderBoard(); renderCards(); renderWatchlist(); renderPlan();
+    renderPipeBar(); renderBoard(); renderCards(); renderWatchlist(); renderPlan(); renderEvidence();
   }
   function renderPipeBar() {
     const cur = planPipe(), paper = Object.fromEntries(state.live.paper || []);

@@ -146,6 +146,21 @@ def overview(request: Request, pipeline: str | None = None, user: dict = Depends
     return cached(request, "overview", 20, load)
 
 
+@app.get("/api/pipelines_summary")
+def pipelines_summary(request: Request, user: dict = Depends(auth.require_viewer)):
+    """Walk-forward summary of every paper pipeline (history_tm) + its paper result since the freeze, for the pipeline evidence table."""
+    keys = {"v205": "trade_plan", "v233": "trade_plan_v233", "v236": "trade_plan_v236", "v240": "trade_plan_v240",
+            "v266": "trade_plan_v266", "v269": "trade_plan_v269", "v285": "trade_plan_v285"}
+
+    def load():
+        out = {}
+        for p, k in keys.items():
+            plan = db.kv_get(k, {}) or {}
+            out[p] = {"walkforward": db.kv_get(f"summary_tm_{p}", {}), "paper_net_pct": plan.get("net_return_pct"), "freeze": plan.get("freeze")}
+        return out
+    return cached(request, "pipelines_summary", 60, load)
+
+
 @app.get("/api/trade_plan")
 def trade_plan(request: Request, pipeline: str = "v205", user: dict = Depends(auth.require_viewer)):
     """What a trader / bot should have on the exchange now (resting orders, positions with SL/TP) + the event log.

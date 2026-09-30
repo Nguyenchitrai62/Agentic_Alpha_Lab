@@ -64,6 +64,7 @@ def simulate(pipe: str):
                       events=events, bars=bars, **dict(v221.KW, **KW_OVERRIDE.get(pipe, {})))
     if abs(res["monthly_dev4"] - dev4) > 0.01:
         raise RuntimeError(f"{pipe}: replay dev4 {res['monthly_dev4']} != research {dev4}")
+    res["trade_stats"] = v221.v216.v213.trade_stats(events)  # book trades after fees: dev years / most recent year
     return res, events, bars, cols
 
 
@@ -132,6 +133,9 @@ def build(pipe: str, db) -> str:
     orders = build_orders(events, open_reason="Hết dữ liệu mô phỏng")  # replay ends with the research data (2026-09-23)
     summary = {k: res[k] for k in ("monthly_5y", "monthly_dev4", "monthly_last_year", "dd_4h", "dd_1m", "gate_dd", "losing_years")}
     summary["yearly"] = [(y["anchor"], y["net_pct"], y["dd_1m_pct"]) for y in res["yearly"]]
+    ts = res.get("trade_stats", {})
+    summary["win_dev"], summary["win_hidden"] = ts.get("dev", {}).get("win_rate"), ts.get("_hidden", {}).get("win_rate")
+    summary["trades_dev"], summary["trades_hidden"] = ts.get("dev", {}).get("trades"), ts.get("_hidden", {}).get("trades")
     with db.write() as c:
         c.execute("DELETE FROM run_books WHERE run_id IN (SELECT id FROM runs WHERE source = ?)", (src,))
         for tb in ("runs", "trades", "equity", "orders"):
