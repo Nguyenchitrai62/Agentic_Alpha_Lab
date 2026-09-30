@@ -17,7 +17,7 @@ s = rows[sel]
 fills = int(s.get("stats", {}).get("fills", 0) or 0)
 scen = {sc: dict(monthly_geometric_net_percent=s["monthly_5y"], max_drawdown_percent=s["gate_dd"], fills=fills, months=60)
         for sc in ("normal", "fee_stress", "execution_stress")}
-out = {k: {"monthly_dev4": r["monthly_dev4"], "worst_dev_month": r.get("worst_dev_month_pct"), "gate_dd": r["gate_dd"],
+out = {k: {"monthly_dev4": r["monthly_dev4"], "worst_dev_month": r.get("worst_dev_month_pct"), "gate_dd": r.get("gate_dd", r.get("dev_dd")),
            "dev_years": [[y["net_pct"], y["dd_1m_pct"]] for y in r["yearly"][:4]]} for k, r in rows.items()}
 out["selected"], out["final_score_selected"] = sel, res["final_score_selected"]
 m = {"schema_version": 1, "experiment_id": v, "track": track, "status": "candidate" if s.get("gate_pass") else "rejected",
