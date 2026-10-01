@@ -715,8 +715,13 @@
       $("tZone").onchange = () => H.prim && H.prim.update();
       $("tWeight").onchange = () => H.wSeries && H.wSeries.applyOptions({ visible: $("tWeight").checked });
       $("zIn").onclick = () => zoom(0.6); $("zOut").onclick = () => zoom(1 / 0.6);
-      $("zFit").onclick = () => H.chart && H.chart.timeScale().fitContent();
-      $("zNow").onclick = () => H.chart && H.chart.timeScale().scrollToRealTime();
+      $("zFit").onclick = () => H.chart && H.times.length && showRange(0);
+      $("zNow").onclick = () => {  // back to the latest candle, same zoom, with the empty third on the right
+        if (!H.chart || !H.times.length) return;
+        const r = H.chart.timeScale().getVisibleLogicalRange(); if (!r) return;
+        const w = r.to - r.from, last = H.times.length - 1;
+        H.chart.timeScale().setVisibleLogicalRange({ from: last + w / 3 - w, to: last + w / 3 });
+      };
       initResizer();
       loadHistory();
     } else if (H.chart) { H.prim && H.prim.update(); }
@@ -731,6 +736,12 @@
       const up = () => { store.set("bottomH", b.offsetHeight); window.removeEventListener("pointermove", mv); window.removeEventListener("pointerup", up); };
       window.addEventListener("pointermove", mv); window.addEventListener("pointerup", up);
     };
+  }
+
+  // candles take 2/3 of the chart width and the right third stays empty (like TradingView), so the latest candles and orders are easy to see
+  function showRange(from) {
+    const last = H.times.length - 1, span = Math.max(12, last - from);
+    H.chart.timeScale().setVisibleLogicalRange({ from, to: last + span * 0.5 });
   }
 
   function zoom(f) {
@@ -831,11 +842,11 @@
   async function applyRange() {
     if (!H.chart || !H.times.length) return;
     const days = RANGES[state.h.range], lastT = H.times[H.times.length - 1];
-    if (!days) { H.chart.timeScale().fitContent(); return; }
+    if (!days) { showRange(0); return; }
     const from = lastT - days * 86400e3;
     if (from < H.times[0] && !H.noOlder) await loadOlder(from);
     const i = Math.max(0, idxAt(from));
-    H.chart.timeScale().setVisibleLogicalRange({ from: i, to: H.times.length + 8 });
+    showRange(i);
   }
 
   function setWeights() { // position record in force for every candle (4h decision rows mapped onto 1h / 1D candles)
