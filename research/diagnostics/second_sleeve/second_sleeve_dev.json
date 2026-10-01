@@ -1,0 +1,561 @@
+{
+ "version": "second_sleeve",
+ "dev_window": [
+  "2021-09-24",
+  "2025-09-24"
+ ],
+ "embargo": "7d",
+ "periods": {
+  "720": {
+   "P": 720,
+   "pooled_rungs": 15415,
+   "pooled_by_sym": {
+    "BTCUSDT": 433,
+    "ETHUSDT": 480,
+    "SOLUSDT": 392,
+    "BNBUSDT": 521,
+    "XRPUSDT": 579,
+    "LTCUSDT": 522,
+    "LINKUSDT": 412,
+    "BCHUSDT": 451,
+    "YFIUSDT": 458,
+    "SUSHIUSDT": 408,
+    "XLMUSDT": 475,
+    "ADAUSDT": 455,
+    "EOSUSDT": 532,
+    "DOTUSDT": 448,
+    "UNIUSDT": 398,
+    "ZILUSDT": 514,
+    "AAVEUSDT": 379,
+    "EGLDUSDT": 461,
+    "THETAUSDT": 404,
+    "TRXUSDT": 450,
+    "ETCUSDT": 526,
+    "COMPUSDT": 415,
+    "WAVESUSDT": 356,
+    "FILUSDT": 481,
+    "CRVUSDT": 408,
+    "VETUSDT": 428,
+    "YFIIUSDT": 121,
+    "XMRUSDT": 485,
+    "SNXUSDT": 388,
+    "SXPUSDT": 470,
+    "MKRUSDT": 387,
+    "BANDUSDT": 422,
+    "XTZUSDT": 466,
+    "ZECUSDT": 455,
+    "ALGOUSDT": 435
+   },
+   "train_rows": {
+    "2021-09-24": 3210,
+    "2022-09-24": 6152,
+    "2023-09-24": 9526,
+    "2024-09-24": 13099
+   },
+   "mu": {
+    "2021-09-24": 0.005610429971182461,
+    "2022-09-24": 0.003305030204334899,
+    "2023-09-24": 0.000441540028317657,
+    "2024-09-24": 0.0003519361217002414
+   },
+   "majors_dev_rungs": 1903,
+   "skipped_share": 0.1697,
+   "stopped_dev": 78,
+   "per_year_baseline": {
+    "2021": {
+     "n": 477,
+     "win_rate": 0.646,
+     "mean_net_bps": 55.0,
+     "stopped": 11,
+     "timeouts": 255
+    },
+    "2022": {
+     "n": 486,
+     "win_rate": 0.685,
+     "mean_net_bps": -5.4,
+     "stopped": 31,
+     "timeouts": 202
+    },
+    "2023": {
+     "n": 521,
+     "win_rate": 0.758,
+     "mean_net_bps": 27.1,
+     "stopped": 41,
+     "timeouts": 190
+    },
+    "2024": {
+     "n": 419,
+     "win_rate": 0.678,
+     "mean_net_bps": 57.5,
+     "stopped": 9,
+     "timeouts": 204
+    }
+   },
+   "per_year_policy": {
+    "2021": {
+     "n": 394,
+     "win_rate": 0.673,
+     "mean_net_bps": 88.3,
+     "stopped": 7,
+     "timeouts": 200
+    },
+    "2022": {
+     "n": 377,
+     "win_rate": 0.69,
+     "mean_net_bps": 0.3,
+     "stopped": 24,
+     "timeouts": 158
+    },
+    "2023": {
+     "n": 456,
+     "win_rate": 0.763,
+     "mean_net_bps": 23.0,
+     "stopped": 40,
+     "timeouts": 154
+    },
+    "2024": {
+     "n": 353,
+     "win_rate": 0.688,
+     "mean_net_bps": 63.3,
+     "stopped": 7,
+     "timeouts": 166
+    }
+   },
+   "baseline": {
+    "years": [
+     {
+      "anchor": "2021-09-24",
+      "net_pct": 11.75,
+      "dd_1m_pct": 19.61
+     },
+     {
+      "anchor": "2022-09-24",
+      "net_pct": -0.62,
+      "dd_1m_pct": 22.83
+     },
+     {
+      "anchor": "2023-09-24",
+      "net_pct": 8.34,
+      "dd_1m_pct": 26.34
+     },
+     {
+      "anchor": "2024-09-24",
+      "net_pct": 23.54,
+      "dd_1m_pct": 16.26
+     }
+    ],
+    "dev4_monthly_pct": 0.829,
+    "dd_1m_full_pct": 26.34,
+    "liquidated": null,
+    "skipped": 0
+   },
+   "policy": {
+    "years": [
+     {
+      "anchor": "2021-09-24",
+      "net_pct": 26.59,
+      "dd_1m_pct": 11.11
+     },
+     {
+      "anchor": "2022-09-24",
+      "net_pct": 8.29,
+      "dd_1m_pct": 15.03
+     },
+     {
+      "anchor": "2023-09-24",
+      "net_pct": 14.22,
+      "dd_1m_pct": 32.84
+     },
+     {
+      "anchor": "2024-09-24",
+      "net_pct": 33.61,
+      "dd_1m_pct": 14.45
+     }
+    ],
+    "dev4_monthly_pct": 1.55,
+    "dd_1m_full_pct": 32.84,
+    "liquidated": null,
+    "skipped": 323
+   }
+  },
+  "1440": {
+   "P": 1440,
+   "pooled_rungs": 7717,
+   "pooled_by_sym": {
+    "BTCUSDT": 197,
+    "ETHUSDT": 236,
+    "SOLUSDT": 181,
+    "BNBUSDT": 223,
+    "XRPUSDT": 288,
+    "LTCUSDT": 248,
+    "LINKUSDT": 204,
+    "BCHUSDT": 228,
+    "YFIUSDT": 233,
+    "SUSHIUSDT": 187,
+    "XLMUSDT": 239,
+    "ADAUSDT": 234,
+    "EOSUSDT": 287,
+    "DOTUSDT": 256,
+    "UNIUSDT": 188,
+    "ZILUSDT": 242,
+    "AAVEUSDT": 201,
+    "EGLDUSDT": 232,
+    "THETAUSDT": 200,
+    "TRXUSDT": 228,
+    "ETCUSDT": 265,
+    "COMPUSDT": 229,
+    "WAVESUSDT": 200,
+    "FILUSDT": 224,
+    "CRVUSDT": 214,
+    "VETUSDT": 203,
+    "YFIIUSDT": 60,
+    "XMRUSDT": 231,
+    "SNXUSDT": 188,
+    "SXPUSDT": 241,
+    "MKRUSDT": 191,
+    "BANDUSDT": 214,
+    "XTZUSDT": 236,
+    "ZECUSDT": 257,
+    "ALGOUSDT": 232
+   },
+   "train_rows": {
+    "2021-09-24": 1576,
+    "2022-09-24": 3098,
+    "2023-09-24": 4754,
+    "2024-09-24": 6672
+   },
+   "mu": {
+    "2021-09-24": 0.010137143198913104,
+    "2022-09-24": 0.01310774331648369,
+    "2023-09-24": 0.00590875495244678,
+    "2024-09-24": 0.00966471444504812
+   },
+   "majors_dev_rungs": 891,
+   "skipped_share": 0.1077,
+   "stopped_dev": 39,
+   "per_year_baseline": {
+    "2021": {
+     "n": 249,
+     "win_rate": 0.739,
+     "mean_net_bps": 170.6,
+     "stopped": 4,
+     "timeouts": 101
+    },
+    "2022": {
+     "n": 219,
+     "win_rate": 0.68,
+     "mean_net_bps": -35.6,
+     "stopped": 26,
+     "timeouts": 91
+    },
+    "2023": {
+     "n": 246,
+     "win_rate": 0.858,
+     "mean_net_bps": 173.4,
+     "stopped": 7,
+     "timeouts": 68
+    },
+    "2024": {
+     "n": 177,
+     "win_rate": 0.746,
+     "mean_net_bps": 117.9,
+     "stopped": 3,
+     "timeouts": 84
+    }
+   },
+   "per_year_policy": {
+    "2021": {
+     "n": 172,
+     "win_rate": 0.709,
+     "mean_net_bps": 142.8,
+     "stopped": 3,
+     "timeouts": 86
+    },
+    "2022": {
+     "n": 210,
+     "win_rate": 0.681,
+     "mean_net_bps": -38.1,
+     "stopped": 26,
+     "timeouts": 87
+    },
+    "2023": {
+     "n": 237,
+     "win_rate": 0.857,
+     "mean_net_bps": 171.9,
+     "stopped": 7,
+     "timeouts": 67
+    },
+    "2024": {
+     "n": 176,
+     "win_rate": 0.75,
+     "mean_net_bps": 120.8,
+     "stopped": 3,
+     "timeouts": 83
+    }
+   },
+   "baseline": {
+    "years": [
+     {
+      "anchor": "2021-09-24",
+      "net_pct": 23.94,
+      "dd_1m_pct": 10.42
+     },
+     {
+      "anchor": "2022-09-24",
+      "net_pct": -15.62,
+      "dd_1m_pct": 24.09
+     },
+     {
+      "anchor": "2023-09-24",
+      "net_pct": 40.8,
+      "dd_1m_pct": 16.28
+     },
+     {
+      "anchor": "2024-09-24",
+      "net_pct": 17.4,
+      "dd_1m_pct": 13.06
+     }
+    ],
+    "dev4_monthly_pct": 1.147,
+    "dd_1m_full_pct": 24.09,
+    "liquidated": null,
+    "skipped": 0
+   },
+   "policy": {
+    "years": [
+     {
+      "anchor": "2021-09-24",
+      "net_pct": 11.35,
+      "dd_1m_pct": 8.98
+     },
+     {
+      "anchor": "2022-09-24",
+      "net_pct": -14.56,
+      "dd_1m_pct": 21.9
+     },
+     {
+      "anchor": "2023-09-24",
+      "net_pct": 46.31,
+      "dd_1m_pct": 18.03
+     },
+     {
+      "anchor": "2024-09-24",
+      "net_pct": 20.51,
+      "dd_1m_pct": 15.01
+     }
+    ],
+    "dev4_monthly_pct": 1.083,
+    "dd_1m_full_pct": 21.9,
+    "liquidated": null,
+    "skipped": 96
+   }
+  }
+ },
+ "post_hoc_changes": [],
+ "leakage_checks": [
+  "END=2025-09-24 exclusive; every 1m load sliced to < END before use",
+  "sigma_P uses only closed periods (rolling std shift 1, min 20)",
+  "features at minute f-1 only; fills from minute 5 on trade-through",
+  "fits per anchor use only fills with t_exit < anchor - 7 days",
+  "no statistic computed on >= 2025-09-24 (asserted max t_exit < END)"
+ ],
+ "g2": {
+  "dev_years": [
+   {
+    "anchor": "2021-09-24",
+    "net_pct": 53.18,
+    "dd_1m_pct": 17.08
+   },
+   {
+    "anchor": "2022-09-24",
+    "net_pct": 60.35,
+    "dd_1m_pct": 17.15
+   },
+   {
+    "anchor": "2023-09-24",
+    "net_pct": 189.97,
+    "dd_1m_pct": 16.01
+   },
+   {
+    "anchor": "2024-09-24",
+    "net_pct": 192.06,
+    "dd_1m_pct": 13.9
+   }
+  ],
+  "dev4_monthly_pct": 6.527,
+  "dev_dd_max_yearly": 17.15,
+  "ref_expect": "monthly_dev4 6.527 and dev DD 17.33"
+ },
+ "e3": {
+  "720": {
+   "daily_corr_dev": 0.113,
+   "blends": {
+    "0.15": {
+     "years": [
+      {
+       "anchor": "2021-09-24",
+       "net_pct": 49.04,
+       "dd_1m_pct": 14.97
+      },
+      {
+       "anchor": "2022-09-24",
+       "net_pct": 52.34,
+       "dd_1m_pct": 14.47
+      },
+      {
+       "anchor": "2023-09-24",
+       "net_pct": 155.2,
+       "dd_1m_pct": 15.98
+      },
+      {
+       "anchor": "2024-09-24",
+       "net_pct": 164.27,
+       "dd_1m_pct": 11.98
+      }
+     ],
+     "dev4_monthly_pct": 5.849,
+     "dev_dd_max_yearly": 15.98
+    },
+    "0.25": {
+     "years": [
+      {
+       "anchor": "2021-09-24",
+       "net_pct": 46.31,
+       "dd_1m_pct": 13.54
+      },
+      {
+       "anchor": "2022-09-24",
+       "net_pct": 47.02,
+       "dd_1m_pct": 12.66
+      },
+      {
+       "anchor": "2023-09-24",
+       "net_pct": 133.86,
+       "dd_1m_pct": 16.28
+      },
+      {
+       "anchor": "2024-09-24",
+       "net_pct": 146.53,
+       "dd_1m_pct": 10.74
+      }
+     ],
+     "dev4_monthly_pct": 5.385,
+     "dev_dd_max_yearly": 16.28
+    },
+    "0.35": {
+     "years": [
+      {
+       "anchor": "2021-09-24",
+       "net_pct": 43.6,
+       "dd_1m_pct": 12.07
+      },
+      {
+       "anchor": "2022-09-24",
+       "net_pct": 41.73,
+       "dd_1m_pct": 11.8
+      },
+      {
+       "anchor": "2023-09-24",
+       "net_pct": 113.93,
+       "dd_1m_pct": 16.65
+      },
+      {
+       "anchor": "2024-09-24",
+       "net_pct": 129.42,
+       "dd_1m_pct": 9.49
+      }
+     ],
+     "dev4_monthly_pct": 4.912,
+     "dev_dd_max_yearly": 16.65
+    }
+   },
+   "sub_policy_dev4": 1.55,
+   "sub_policy_dd": 32.84
+  },
+  "1440": {
+   "daily_corr_dev": 0.162,
+   "blends": {
+    "0.15": {
+     "years": [
+      {
+       "anchor": "2021-09-24",
+       "net_pct": 46.23,
+       "dd_1m_pct": 14.82
+      },
+      {
+       "anchor": "2022-09-24",
+       "net_pct": 47.23,
+       "dd_1m_pct": 14.88
+      },
+      {
+       "anchor": "2023-09-24",
+       "net_pct": 164.14,
+       "dd_1m_pct": 14.88
+      },
+      {
+       "anchor": "2024-09-24",
+       "net_pct": 160.08,
+       "dd_1m_pct": 11.71
+      }
+     ],
+     "dev4_monthly_pct": 5.773,
+     "dev_dd_max_yearly": 14.88
+    },
+    "0.25": {
+     "years": [
+      {
+       "anchor": "2021-09-24",
+       "net_pct": 41.74,
+       "dd_1m_pct": 13.28
+      },
+      {
+       "anchor": "2022-09-24",
+       "net_pct": 38.87,
+       "dd_1m_pct": 13.99
+      },
+      {
+       "anchor": "2023-09-24",
+       "net_pct": 147.8,
+       "dd_1m_pct": 14.14
+      },
+      {
+       "anchor": "2024-09-24",
+       "net_pct": 140.1,
+       "dd_1m_pct": 10.23
+      }
+     ],
+     "dev4_monthly_pct": 5.26,
+     "dev_dd_max_yearly": 14.14
+    },
+    "0.35": {
+     "years": [
+      {
+       "anchor": "2021-09-24",
+       "net_pct": 37.36,
+       "dd_1m_pct": 11.72
+      },
+      {
+       "anchor": "2022-09-24",
+       "net_pct": 30.8,
+       "dd_1m_pct": 14.32
+      },
+      {
+       "anchor": "2023-09-24",
+       "net_pct": 132.14,
+       "dd_1m_pct": 13.46
+      },
+      {
+       "anchor": "2024-09-24",
+       "net_pct": 121.13,
+       "dd_1m_pct": 8.75
+      }
+     ],
+     "dev4_monthly_pct": 4.737,
+     "dev_dd_max_yearly": 14.32
+    }
+   },
+   "sub_policy_dev4": 1.083,
+   "sub_policy_dd": 21.9
+  }
+ }
+}

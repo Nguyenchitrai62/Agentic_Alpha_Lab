@@ -1,0 +1,2781 @@
+{
+ "meta": {
+  "dev_window": [
+   "2021-09-24",
+   "2025-09-24"
+  ],
+  "reference": "v301 G2_b26 must give monthly_dev4 6.527 and dev DD 17.33",
+  "episode_def": "4h-close equity (path_out eq, indexed by bar close T) sliced to dev; running peak/cummax; dd=1-eq/peak; scan for dd>0.07; extend while dd>0; trough=argmax dd in segment; peak=argmax eq up to trough; window=(peak,trough] for sums.",
+  "book_sleeve_def": "attrib (t, per-asset book array, sleeve) as fractions of bar-start equity; sums over window bars (t>peak & t<=trough).",
+  "sleeve_coin_def": "per-coin sleeve = sum(ret*weight) of rung_tp/sl/timeout exits with peak<t_exit<=trough.",
+  "top3_def": "book: 3 worst single-bar total-book attrib sums in the window, share of book_sum; rungs: rung exits grouped by exit 4h bar, 3 worst bars' share of sleeve_sum; combined: 3 worst total-bar (book+sleeve attrib) share of total loss. Shares reported only when the denominator is negative.",
+  "flush_def": "rung_sl grouped by floor-4h bar of exit time; systemic flush = bar with >=3 stopped rungs of >=3 distinct coins.",
+  "exposure_def": "bars[i].target per coin (fraction of equity, governor included); gross=sum|tgt|, net=sum(tgt); top decile = 90th percentile of |net| over dev bars; daily eod net = last bar.",
+  "a_def": "BTC 4h vol = rolling std(42) of BTC 4h-open returns on the decision grid; threshold = 80th percentile of the past 540 vols excluding the current bar; risk_mult 0.5/1.0 (governor; scales book targets and sleeve sizes).",
+  "b_def": "skip a rung fill at minute f when >=3 rungs of other coins (symbol != current) in the same holding bar already stopped with exit minute < f (causal; engine copy).",
+  "c_def": "per-bar sleeve budget 0.26, cut to 0.13 when eq[i-2] is >6% below its trailing 540-bar peak (2-bar lag like the governor; engine copy).",
+  "definitions_fixed_before_results": true,
+  "post_hoc_changes": [
+   "after the first run: attribute peak->recovery as well as peak->trough. Reason: the 2024-08-05 systemic flush (-12.6% sleeve exits in 2 bars, 4h-close dd 10.6% on 2024-08-05) and the 2024-09-20 8.6% local trough sit in ep9's recovery leg (dd never reset to 0 between 2024-07-16 and Oct), so peak->trough-only windows orphan the largest flush. Added recovery_date, peak->recovery book/sleeve sums, and recovery-leg max dd per episode. Episode peak/trough/depth/days definitions unchanged."
+  ]
+ },
+ "reference": {
+  "monthly_dev4": 6.527,
+  "worst_dev_month_pct": 3.618,
+  "dev_dd": 17.33,
+  "dev_book_win_rate": 0.51,
+  "dev_years": [
+   [
+    "2021",
+    53.18,
+    17.27
+   ],
+   [
+    "2022",
+    60.35,
+    17.33
+   ],
+   [
+    "2023",
+    189.97,
+    16.77
+   ],
+   [
+    "2024",
+    192.06,
+    14.86
+   ]
+  ]
+ },
+ "copy_fidelity": {
+  "monthly_dev4": 6.527,
+  "dev_dd": 17.33
+ },
+ "q1_episodes": [
+  {
+   "id": 0,
+   "peak": "2022-01-15 12:00:00+00:00",
+   "trough": "2022-01-22 04:00:00+00:00",
+   "recovery": "2022-02-08 04:00:00+00:00",
+   "depth_pct": 11.75,
+   "days": 6.7,
+   "bars": 40,
+   "book_sum_pct": -8.7,
+   "sleeve_sum_pct": -3.55,
+   "total_pct": -12.25,
+   "book_sum_peak_to_recovery_pct": -3.73,
+   "sleeve_sum_peak_to_recovery_pct": 3.68,
+   "recovery_leg_max_dd_pct": 2.61,
+   "recovery_leg_max_dd_date": "2022-01-24 04:00:00+00:00",
+   "book_by_coin_pct": {
+    "BNBUSDT": -3.01,
+    "BTCUSDT": 0.0,
+    "ETHUSDT": -4.56,
+    "SOLUSDT": -1.13,
+    "XRPUSDT": 0.0
+   },
+   "sleeve_by_coin_pct": {
+    "BTCUSDT": -0.03,
+    "ETHUSDT": -1.41,
+    "BNBUSDT": -1.51,
+    "SOLUSDT": -0.27,
+    "XRPUSDT": 0.39
+   },
+   "worst_day_pct": -4.96,
+   "worst_3d_pct": -9.94,
+   "btc_move_pct": -15.53,
+   "rungs_filled": 44,
+   "rungs_stopped": 0,
+   "worst3_book_bar_share": 0.637,
+   "worst3_rung_bar_share": 1.69,
+   "worst3_total_bar_share": 0.841
+  },
+  {
+   "id": 1,
+   "peak": "2022-02-16 16:00:00+00:00",
+   "trough": "2022-03-19 12:00:00+00:00",
+   "recovery": "2022-04-03 16:00:00+00:00",
+   "depth_pct": 12.57,
+   "days": 30.8,
+   "bars": 185,
+   "book_sum_pct": -10.83,
+   "sleeve_sum_pct": -2.46,
+   "total_pct": -13.29,
+   "book_sum_peak_to_recovery_pct": 1.09,
+   "sleeve_sum_peak_to_recovery_pct": -1.14,
+   "recovery_leg_max_dd_pct": 3.32,
+   "recovery_leg_max_dd_date": "2022-04-01 00:00:00+00:00",
+   "book_by_coin_pct": {
+    "BNBUSDT": -1.32,
+    "BTCUSDT": -3.16,
+    "ETHUSDT": -2.49,
+    "SOLUSDT": -1.72,
+    "XRPUSDT": -2.14
+   },
+   "sleeve_by_coin_pct": {
+    "BTCUSDT": -0.73,
+    "BNBUSDT": -0.09,
+    "ETHUSDT": -0.52,
+    "SOLUSDT": -0.12,
+    "XRPUSDT": -1.0
+   },
+   "worst_day_pct": -3.19,
+   "worst_3d_pct": -5.09,
+   "btc_move_pct": -4.3,
+   "rungs_filled": 58,
+   "rungs_stopped": 0,
+   "worst3_book_bar_share": 0.356,
+   "worst3_rung_bar_share": 1.477,
+   "worst3_total_bar_share": 0.399
+  },
+  {
+   "id": 2,
+   "peak": "2022-04-05 08:00:00+00:00",
+   "trough": "2022-05-05 12:00:00+00:00",
+   "recovery": "2022-05-13 16:00:00+00:00",
+   "depth_pct": 8.88,
+   "days": 30.2,
+   "bars": 181,
+   "book_sum_pct": -8.84,
+   "sleeve_sum_pct": -0.32,
+   "total_pct": -9.16,
+   "book_sum_peak_to_recovery_pct": -2.79,
+   "sleeve_sum_peak_to_recovery_pct": 2.9,
+   "recovery_leg_max_dd_pct": 2.96,
+   "recovery_leg_max_dd_date": "2022-05-11 12:00:00+00:00",
+   "book_by_coin_pct": {
+    "BNBUSDT": -1.91,
+    "BTCUSDT": -0.8,
+    "ETHUSDT": -1.86,
+    "SOLUSDT": -4.82,
+    "XRPUSDT": 0.55
+   },
+   "sleeve_by_coin_pct": {
+    "ETHUSDT": 0.33,
+    "SOLUSDT": 0.9,
+    "XRPUSDT": 0.86,
+    "BNBUSDT": -0.06,
+    "BTCUSDT": -0.1
+   },
+   "worst_day_pct": -3.97,
+   "worst_3d_pct": -3.72,
+   "btc_move_pct": -15.43,
+   "rungs_filled": 40,
+   "rungs_stopped": 0,
+   "worst3_book_bar_share": 0.585,
+   "worst3_rung_bar_share": 2.456,
+   "worst3_total_bar_share": 0.534
+  },
+  {
+   "id": 3,
+   "peak": "2022-07-20 12:00:00+00:00",
+   "trough": "2022-07-26 12:00:00+00:00",
+   "recovery": "2022-12-16 04:00:00+00:00",
+   "depth_pct": 13.32,
+   "days": 6.0,
+   "bars": 36,
+   "book_sum_pct": -13.76,
+   "sleeve_sum_pct": 0.1,
+   "total_pct": -13.66,
+   "book_sum_peak_to_recovery_pct": -9.77,
+   "sleeve_sum_peak_to_recovery_pct": 9.17,
+   "recovery_leg_max_dd_pct": 12.07,
+   "recovery_leg_max_dd_date": "2022-11-10 08:00:00+00:00",
+   "book_by_coin_pct": {
+    "BNBUSDT": -2.33,
+    "BTCUSDT": -0.84,
+    "ETHUSDT": -3.03,
+    "SOLUSDT": -4.79,
+    "XRPUSDT": -2.76
+   },
+   "sleeve_by_coin_pct": {
+    "SOLUSDT": 0.04,
+    "ETHUSDT": 0.06
+   },
+   "worst_day_pct": -4.87,
+   "worst_3d_pct": -4.86,
+   "btc_move_pct": -11.13,
+   "rungs_filled": 2,
+   "rungs_stopped": 0,
+   "worst3_book_bar_share": 0.838,
+   "worst3_rung_bar_share": null,
+   "worst3_total_bar_share": 0.843
+  },
+  {
+   "id": 4,
+   "peak": "2023-04-18 08:00:00+00:00",
+   "trough": "2023-06-15 04:00:00+00:00",
+   "recovery": "2023-07-13 12:00:00+00:00",
+   "depth_pct": 16.06,
+   "days": 57.8,
+   "bars": 347,
+   "book_sum_pct": -7.14,
+   "sleeve_sum_pct": -9.58,
+   "total_pct": -16.72,
+   "book_sum_peak_to_recovery_pct": 4.51,
+   "sleeve_sum_peak_to_recovery_pct": -4.26,
+   "recovery_leg_max_dd_pct": 1.99,
+   "recovery_leg_max_dd_date": "2023-07-06 20:00:00+00:00",
+   "book_by_coin_pct": {
+    "BNBUSDT": -3.53,
+    "BTCUSDT": -2.5,
+    "ETHUSDT": -2.75,
+    "SOLUSDT": 0.38,
+    "XRPUSDT": 1.27
+   },
+   "sleeve_by_coin_pct": {
+    "ETHUSDT": -3.7,
+    "SOLUSDT": -1.0,
+    "XRPUSDT": -0.35,
+    "BNBUSDT": -3.82,
+    "BTCUSDT": -0.71
+   },
+   "worst_day_pct": -7.32,
+   "worst_3d_pct": -7.95,
+   "btc_move_pct": -15.8,
+   "rungs_filled": 173,
+   "rungs_stopped": 18,
+   "worst3_book_bar_share": 0.938,
+   "worst3_rung_bar_share": 1.107,
+   "worst3_total_bar_share": 1.109
+  },
+  {
+   "id": 5,
+   "peak": "2023-07-14 00:00:00+00:00",
+   "trough": "2023-09-30 12:00:00+00:00",
+   "recovery": "2023-11-01 12:00:00+00:00",
+   "depth_pct": 15.96,
+   "days": 78.5,
+   "bars": 471,
+   "book_sum_pct": -9.18,
+   "sleeve_sum_pct": -7.62,
+   "total_pct": -16.8,
+   "book_sum_peak_to_recovery_pct": 1.27,
+   "sleeve_sum_peak_to_recovery_pct": -1.44,
+   "recovery_leg_max_dd_pct": 4.59,
+   "recovery_leg_max_dd_date": "2023-10-24 12:00:00+00:00",
+   "book_by_coin_pct": {
+    "BNBUSDT": -0.32,
+    "BTCUSDT": -3.04,
+    "ETHUSDT": -2.11,
+    "SOLUSDT": -3.01,
+    "XRPUSDT": -0.69
+   },
+   "sleeve_by_coin_pct": {
+    "XRPUSDT": -0.77,
+    "SOLUSDT": -0.68,
+    "BTCUSDT": -2.25,
+    "BNBUSDT": -0.52,
+    "ETHUSDT": -1.46
+   },
+   "worst_day_pct": -9.82,
+   "worst_3d_pct": -10.48,
+   "btc_move_pct": -14.37,
+   "rungs_filled": 161,
+   "rungs_stopped": 18,
+   "worst3_book_bar_share": 0.348,
+   "worst3_rung_bar_share": 1.552,
+   "worst3_total_bar_share": 0.842
+  },
+  {
+   "id": 6,
+   "peak": "2024-02-28 12:00:00+00:00",
+   "trough": "2024-02-28 16:00:00+00:00",
+   "recovery": "2024-03-03 20:00:00+00:00",
+   "depth_pct": 8.6,
+   "days": 0.2,
+   "bars": 1,
+   "book_sum_pct": -2.03,
+   "sleeve_sum_pct": -6.57,
+   "total_pct": -8.6,
+   "book_sum_peak_to_recovery_pct": 4.57,
+   "sleeve_sum_peak_to_recovery_pct": -4.35,
+   "recovery_leg_max_dd_pct": 1.37,
+   "recovery_leg_max_dd_date": "2024-03-03 04:00:00+00:00",
+   "book_by_coin_pct": {
+    "BNBUSDT": -0.28,
+    "BTCUSDT": 0.01,
+    "ETHUSDT": -0.25,
+    "SOLUSDT": -0.21,
+    "XRPUSDT": -1.31
+   },
+   "sleeve_by_coin_pct": {},
+   "worst_day_pct": null,
+   "worst_3d_pct": null,
+   "btc_move_pct": 3.39,
+   "rungs_filled": 0,
+   "rungs_stopped": 0,
+   "worst3_book_bar_share": 1.0,
+   "worst3_rung_bar_share": -0.0,
+   "worst3_total_bar_share": 1.0
+  },
+  {
+   "id": 7,
+   "peak": "2024-03-05 12:00:00+00:00",
+   "trough": "2024-03-05 16:00:00+00:00",
+   "recovery": "2024-03-10 20:00:00+00:00",
+   "depth_pct": 11.05,
+   "days": 0.2,
+   "bars": 1,
+   "book_sum_pct": -7.62,
+   "sleeve_sum_pct": -3.42,
+   "total_pct": -11.05,
+   "book_sum_peak_to_recovery_pct": 0.64,
+   "sleeve_sum_peak_to_recovery_pct": -1.01,
+   "recovery_leg_max_dd_pct": 0.66,
+   "recovery_leg_max_dd_date": "2024-03-10 12:00:00+00:00",
+   "book_by_coin_pct": {
+    "BNBUSDT": -1.2,
+    "BTCUSDT": -2.09,
+    "ETHUSDT": -0.98,
+    "SOLUSDT": -2.26,
+    "XRPUSDT": -1.09
+   },
+   "sleeve_by_coin_pct": {},
+   "worst_day_pct": null,
+   "worst_3d_pct": null,
+   "btc_move_pct": 0.14,
+   "rungs_filled": 0,
+   "rungs_stopped": 0,
+   "worst3_book_bar_share": 1.0,
+   "worst3_rung_bar_share": -0.0,
+   "worst3_total_bar_share": 1.0
+  },
+  {
+   "id": 8,
+   "peak": "2024-06-05 12:00:00+00:00",
+   "trough": "2024-06-16 20:00:00+00:00",
+   "recovery": "2024-07-03 20:00:00+00:00",
+   "depth_pct": 9.18,
+   "days": 11.3,
+   "bars": 68,
+   "book_sum_pct": -6.26,
+   "sleeve_sum_pct": -3.14,
+   "total_pct": -9.4,
+   "book_sum_peak_to_recovery_pct": -1.76,
+   "sleeve_sum_peak_to_recovery_pct": -0.03,
+   "recovery_leg_max_dd_pct": 1.28,
+   "recovery_leg_max_dd_date": "2024-07-02 20:00:00+00:00",
+   "book_by_coin_pct": {
+    "BNBUSDT": -0.9,
+    "BTCUSDT": -2.19,
+    "ETHUSDT": -1.06,
+    "SOLUSDT": -0.65,
+    "XRPUSDT": -1.45
+   },
+   "sleeve_by_coin_pct": {
+    "XRPUSDT": -6.54,
+    "BNBUSDT": 0.85,
+    "ETHUSDT": 0.9,
+    "SOLUSDT": 1.5,
+    "BTCUSDT": 0.15
+   },
+   "worst_day_pct": -5.98,
+   "worst_3d_pct": -6.0,
+   "btc_move_pct": -6.29,
+   "rungs_filled": 32,
+   "rungs_stopped": 4,
+   "worst3_book_bar_share": 0.776,
+   "worst3_rung_bar_share": 1.272,
+   "worst3_total_bar_share": 0.851
+  },
+  {
+   "id": 9,
+   "peak": "2024-07-08 00:00:00+00:00",
+   "trough": "2024-07-16 04:00:00+00:00",
+   "recovery": "2024-11-08 20:00:00+00:00",
+   "depth_pct": 12.34,
+   "days": 8.2,
+   "bars": 49,
+   "book_sum_pct": -13.73,
+   "sleeve_sum_pct": 0.71,
+   "total_pct": -13.02,
+   "book_sum_peak_to_recovery_pct": -9.67,
+   "sleeve_sum_peak_to_recovery_pct": 9.92,
+   "recovery_leg_max_dd_pct": 8.62,
+   "recovery_leg_max_dd_date": "2024-09-20 20:00:00+00:00",
+   "book_by_coin_pct": {
+    "BNBUSDT": -1.98,
+    "BTCUSDT": -0.89,
+    "ETHUSDT": -3.32,
+    "SOLUSDT": -2.5,
+    "XRPUSDT": -5.05
+   },
+   "sleeve_by_coin_pct": {
+    "BNBUSDT": 0.5,
+    "XRPUSDT": -0.31,
+    "BTCUSDT": 1.02,
+    "ETHUSDT": 0.46,
+    "SOLUSDT": 0.23
+   },
+   "worst_day_pct": -3.58,
+   "worst_3d_pct": -8.52,
+   "btc_move_pct": 15.93,
+   "rungs_filled": 35,
+   "rungs_stopped": 0,
+   "worst3_book_bar_share": 0.335,
+   "worst3_rung_bar_share": null,
+   "worst3_total_bar_share": 0.366
+  },
+  {
+   "id": 10,
+   "peak": "2024-12-10 08:00:00+00:00",
+   "trough": "2025-01-05 08:00:00+00:00",
+   "recovery": "2025-01-28 00:00:00+00:00",
+   "depth_pct": 8.61,
+   "days": 26.0,
+   "bars": 156,
+   "book_sum_pct": -0.16,
+   "sleeve_sum_pct": -8.43,
+   "total_pct": -8.59,
+   "book_sum_peak_to_recovery_pct": -2.14,
+   "sleeve_sum_peak_to_recovery_pct": 2.63,
+   "recovery_leg_max_dd_pct": 2.62,
+   "recovery_leg_max_dd_date": "2025-01-27 00:00:00+00:00",
+   "book_by_coin_pct": {
+    "BNBUSDT": 0.22,
+    "BTCUSDT": -0.23,
+    "ETHUSDT": 0.01,
+    "SOLUSDT": 0.07,
+    "XRPUSDT": -0.22
+   },
+   "sleeve_by_coin_pct": {
+    "BNBUSDT": -2.84,
+    "ETHUSDT": -2.02,
+    "XRPUSDT": -3.2,
+    "SOLUSDT": 0.03,
+    "BTCUSDT": -0.4
+   },
+   "worst_day_pct": -8.25,
+   "worst_3d_pct": -8.19,
+   "btc_move_pct": 1.04,
+   "rungs_filled": 55,
+   "rungs_stopped": 0,
+   "worst3_book_bar_share": 9.45,
+   "worst3_rung_bar_share": 1.293,
+   "worst3_total_bar_share": 1.282
+  },
+  {
+   "id": 11,
+   "peak": "2025-05-23 00:00:00+00:00",
+   "trough": "2025-07-04 16:00:00+00:00",
+   "recovery": "2025-07-20 20:00:00+00:00",
+   "depth_pct": 8.78,
+   "days": 42.7,
+   "bars": 256,
+   "book_sum_pct": -9.67,
+   "sleeve_sum_pct": 0.62,
+   "total_pct": -9.05,
+   "book_sum_peak_to_recovery_pct": -1.21,
+   "sleeve_sum_peak_to_recovery_pct": 0.9,
+   "recovery_leg_max_dd_pct": 4.48,
+   "recovery_leg_max_dd_date": "2025-07-15 04:00:00+00:00",
+   "book_by_coin_pct": {
+    "BNBUSDT": -4.32,
+    "BTCUSDT": -1.72,
+    "ETHUSDT": -1.13,
+    "SOLUSDT": -2.01,
+    "XRPUSDT": -0.49
+   },
+   "sleeve_by_coin_pct": {
+    "XRPUSDT": 0.52,
+    "BNBUSDT": -0.21,
+    "BTCUSDT": -0.68,
+    "SOLUSDT": 0.47,
+    "ETHUSDT": 0.53
+   },
+   "worst_day_pct": -2.71,
+   "worst_3d_pct": -3.62,
+   "btc_move_pct": -3.7,
+   "rungs_filled": 70,
+   "rungs_stopped": 0,
+   "worst3_book_bar_share": 0.4,
+   "worst3_rung_bar_share": null,
+   "worst3_total_bar_share": 0.428
+  }
+ ],
+ "q2_dip_clusters": {
+  "n_rung_sl": 146,
+  "n_rung_tp": 2081,
+  "flush_bars": [
+   {
+    "bar": "2021-12-04 04:00:00+00:00",
+    "stops": 6,
+    "coins": [
+     "BTCUSDT",
+     "ETHUSDT",
+     "XRPUSDT"
+    ],
+    "pnl_pct": -1.818
+   },
+   {
+    "bar": "2022-05-11 12:00:00+00:00",
+    "stops": 10,
+    "coins": [
+     "BNBUSDT",
+     "ETHUSDT",
+     "SOLUSDT",
+     "XRPUSDT"
+    ],
+    "pnl_pct": -4.411
+   },
+   {
+    "bar": "2022-11-08 16:00:00+00:00",
+    "stops": 6,
+    "coins": [
+     "BNBUSDT",
+     "BTCUSDT",
+     "ETHUSDT",
+     "SOLUSDT",
+     "XRPUSDT"
+    ],
+    "pnl_pct": -4.507
+   },
+   {
+    "bar": "2022-11-09 08:00:00+00:00",
+    "stops": 6,
+    "coins": [
+     "BNBUSDT",
+     "ETHUSDT",
+     "SOLUSDT"
+    ],
+    "pnl_pct": -3.91
+   },
+   {
+    "bar": "2023-06-10 04:00:00+00:00",
+    "stops": 8,
+    "coins": [
+     "BNBUSDT",
+     "SOLUSDT",
+     "XRPUSDT"
+    ],
+    "pnl_pct": -2.423
+   },
+   {
+    "bar": "2023-08-17 20:00:00+00:00",
+    "stops": 18,
+    "coins": [
+     "BNBUSDT",
+     "BTCUSDT",
+     "ETHUSDT",
+     "SOLUSDT",
+     "XRPUSDT"
+    ],
+    "pnl_pct": -8.81
+   },
+   {
+    "bar": "2024-03-05 16:00:00+00:00",
+    "stops": 6,
+    "coins": [
+     "BNBUSDT",
+     "BTCUSDT",
+     "ETHUSDT",
+     "XRPUSDT"
+    ],
+    "pnl_pct": -7.019
+   },
+   {
+    "bar": "2024-08-05 00:00:00+00:00",
+    "stops": 12,
+    "coins": [
+     "BNBUSDT",
+     "BTCUSDT",
+     "ETHUSDT",
+     "XRPUSDT"
+    ],
+    "pnl_pct": -7.708
+   },
+   {
+    "bar": "2024-08-05 04:00:00+00:00",
+    "stops": 4,
+    "coins": [
+     "BNBUSDT",
+     "BTCUSDT",
+     "SOLUSDT"
+    ],
+    "pnl_pct": -4.87
+   },
+   {
+    "bar": "2025-02-03 00:00:00+00:00",
+    "stops": 8,
+    "coins": [
+     "BNBUSDT",
+     "ETHUSDT",
+     "XRPUSDT"
+    ],
+    "pnl_pct": -7.741
+   }
+  ],
+  "n_flush_bars": 10,
+  "total_stop_loss_pct": 103.664,
+  "flush_stop_loss_pct": 53.216,
+  "flush_share_of_stop_loss": 0.513,
+  "sleeve_net_other_bars_pct": 216.599,
+  "sleeve_net_flush_bars_pct": -36.598,
+  "tp_cluster_bars": [
+   {
+    "bar": "2021-10-21 12:00:00+00:00",
+    "tps": 3,
+    "coins": [
+     "BNBUSDT",
+     "ETHUSDT",
+     "XRPUSDT"
+    ],
+    "pnl_pct": 0.336
+   },
+   {
+    "bar": "2021-11-10 20:00:00+00:00",
+    "tps": 16,
+    "coins": [
+     "BNBUSDT",
+     "BTCUSDT",
+     "ETHUSDT",
+     "SOLUSDT",
+     "XRPUSDT"
+    ],
+    "pnl_pct": 3.077
+   },
+   {
+    "bar": "2021-11-16 00:00:00+00:00",
+    "tps": 5,
+    "coins": [
+     "BTCUSDT",
+     "ETHUSDT",
+     "SOLUSDT",
+     "XRPUSDT"
+    ],
+    "pnl_pct": 0.984
+   },
+   {
+    "bar": "2021-11-16 08:00:00+00:00",
+    "tps": 11,
+    "coins": [
+     "BNBUSDT",
+     "BTCUSDT",
+     "ETHUSDT",
+     "SOLUSDT",
+     "XRPUSDT"
+    ],
+    "pnl_pct": 1.486
+   },
+   {
+    "bar": "2021-11-26 08:00:00+00:00",
+    "tps": 11,
+    "coins": [
+     "BNBUSDT",
+     "BTCUSDT",
+     "ETHUSDT",
+     "SOLUSDT",
+     "XRPUSDT"
+    ],
+    "pnl_pct": 1.322
+   },
+   {
+    "bar": "2021-12-03 20:00:00+00:00",
+    "tps": 7,
+    "coins": [
+     "BTCUSDT",
+     "ETHUSDT",
+     "XRPUSDT"
+    ],
+    "pnl_pct": 0.632
+   },
+   {
+    "bar": "2021-12-04 04:00:00+00:00",
+    "tps": 10,
+    "coins": [
+     "BTCUSDT",
+     "ETHUSDT",
+     "SOLUSDT",
+     "XRPUSDT"
+    ],
+    "pnl_pct": 0.751
+   },
+   {
+    "bar": "2022-01-05 20:00:00+00:00",
+    "tps": 15,
+    "coins": [
+     "BNBUSDT",
+     "BTCUSDT",
+     "ETHUSDT",
+     "SOLUSDT",
+     "XRPUSDT"
+    ],
+    "pnl_pct": 3.664
+   },
+   {
+    "bar": "2022-01-08 16:00:00+00:00",
+    "tps": 5,
+    "coins": [
+     "BNBUSDT",
+     "ETHUSDT",
+     "SOLUSDT"
+    ],
+    "pnl_pct": 1.681
+   },
+   {
+    "bar": "2022-01-10 12:00:00+00:00",
+    "tps": 10,
+    "coins": [
+     "BNBUSDT",
+     "BTCUSDT",
+     "ETHUSDT",
+     "SOLUSDT",
+     "XRPUSDT"
+    ],
+    "pnl_pct": 2.115
+   },
+   {
+    "bar": "2022-01-21 20:00:00+00:00",
+    "tps": 11,
+    "coins": [
+     "BNBUSDT",
+     "BTCUSDT",
+     "ETHUSDT",
+     "SOLUSDT",
+     "XRPUSDT"
+    ],
+    "pnl_pct": 3.179
+   },
+   {
+    "bar": "2022-01-22 04:00:00+00:00",
+    "tps": 5,
+    "coins": [
+     "BNBUSDT",
+     "ETHUSDT",
+     "SOLUSDT",
+     "XRPUSDT"
+    ],
+    "pnl_pct": 2.336
+   },
+   {
+    "bar": "2022-01-22 08:00:00+00:00",
+    "tps": 12,
+    "coins": [
+     "BTCUSDT",
+     "ETHUSDT",
+     "SOLUSDT",
+     "XRPUSDT"
+    ],
+    "pnl_pct": 3.427
+   },
+   {
+    "bar": "2022-01-24 08:00:00+00:00",
+    "tps": 7,
+    "coins": [
+     "BNBUSDT",
+     "BTCUSDT",
+     "ETHUSDT",
+     "XRPUSDT"
+    ],
+    "pnl_pct": 1.322
+   },
+   {
+    "bar": "2022-01-26 20:00:00+00:00",
+    "tps": 4,
+    "coins": [
+     "BNBUSDT",
+     "ETHUSDT",
+     "SOLUSDT",
+     "XRPUSDT"
+    ],
+    "pnl_pct": 1.369
+   },
+   {
+    "bar": "2022-02-10 12:00:00+00:00",
+    "tps": 5,
+    "coins": [
+     "BTCUSDT",
+     "ETHUSDT",
+     "SOLUSDT",
+     "XRPUSDT"
+    ],
+    "pnl_pct": 1.743
+   },
+   {
+    "bar": "2022-04-06 00:00:00+00:00",
+    "tps": 3,
+    "coins": [
+     "ETHUSDT",
+     "SOLUSDT",
+     "XRPUSDT"
+    ],
+    "pnl_pct": 1.528
+   },
+   {
+    "bar": "2022-05-05 16:00:00+00:00",
+    "tps": 4,
+    "coins": [
+     "BNBUSDT",
+     "BTCUSDT",
+     "XRPUSDT"
+    ],
+    "pnl_pct": 0.295
+   },
+   {
+    "bar": "2022-05-07 20:00:00+00:00",
+    "tps": 5,
+    "coins": [
+     "BNBUSDT",
+     "BTCUSDT",
+     "ETHUSDT",
+     "SOLUSDT",
+     "XRPUSDT"
+    ],
+    "pnl_pct": 0.381
+   },
+   {
+    "bar": "2022-05-09 08:00:00+00:00",
+    "tps": 4,
+    "coins": [
+     "BNBUSDT",
+     "ETHUSDT",
+     "XRPUSDT"
+    ],
+    "pnl_pct": 0.277
+   },
+   {
+    "bar": "2022-05-09 16:00:00+00:00",
+    "tps": 16,
+    "coins": [
+     "BNBUSDT",
+     "BTCUSDT",
+     "ETHUSDT",
+     "SOLUSDT",
+     "XRPUSDT"
+    ],
+    "pnl_pct": 1.28
+   },
+   {
+    "bar": "2022-05-10 20:00:00+00:00",
+    "tps": 11,
+    "coins": [
+     "BNBUSDT",
+     "BTCUSDT",
+     "ETHUSDT",
+     "SOLUSDT",
+     "XRPUSDT"
+    ],
+    "pnl_pct": 1.201
+   },
+   {
+    "bar": "2022-05-11 04:00:00+00:00",
+    "tps": 9,
+    "coins": [
+     "BTCUSDT",
+     "ETHUSDT",
+     "SOLUSDT",
+     "XRPUSDT"
+    ],
+    "pnl_pct": 0.875
+   },
+   {
+    "bar": "2022-05-11 12:00:00+00:00",
+    "tps": 10,
+    "coins": [
+     "BNBUSDT",
+     "BTCUSDT",
+     "ETHUSDT",
+     "SOLUSDT",
+     "XRPUSDT"
+    ],
+    "pnl_pct": 0.821
+   },
+   {
+    "bar": "2022-05-11 16:00:00+00:00",
+    "tps": 16,
+    "coins": [
+     "BNBUSDT",
+     "BTCUSDT",
+     "ETHUSDT",
+     "SOLUSDT",
+     "XRPUSDT"
+    ],
+    "pnl_pct": 1.51
+   },
+   {
+    "bar": "2022-05-11 20:00:00+00:00",
+    "tps": 16,
+    "coins": [
+     "BNBUSDT",
+     "BTCUSDT",
+     "ETHUSDT",
+     "SOLUSDT",
+     "XRPUSDT"
+    ],
+    "pnl_pct": 1.873
+   },
+   {
+    "bar": "2022-05-12 04:00:00+00:00",
+    "tps": 18,
+    "coins": [
+     "BNBUSDT",
+     "BTCUSDT",
+     "ETHUSDT",
+     "SOLUSDT",
+     "XRPUSDT"
+    ],
+    "pnl_pct": 2.069
+   },
+   {
+    "bar": "2022-05-12 20:00:00+00:00",
+    "tps": 3,
+    "coins": [
+     "ETHUSDT",
+     "SOLUSDT",
+     "XRPUSDT"
+    ],
+    "pnl_pct": 0.435
+   },
+   {
+    "bar": "2022-05-13 16:00:00+00:00",
+    "tps": 3,
+    "coins": [
+     "BNBUSDT",
+     "BTCUSDT",
+     "SOLUSDT"
+    ],
+    "pnl_pct": 0.478
+   },
+   {
+    "bar": "2022-05-26 12:00:00+00:00",
+    "tps": 4,
+    "coins": [
+     "BNBUSDT",
+     "BTCUSDT",
+     "ETHUSDT"
+    ],
+    "pnl_pct": 0.354
+   },
+   {
+    "bar": "2022-06-13 00:00:00+00:00",
+    "tps": 7,
+    "coins": [
+     "BNBUSDT",
+     "BTCUSDT",
+     "ETHUSDT",
+     "SOLUSDT",
+     "XRPUSDT"
+    ],
+    "pnl_pct": 1.283
+   },
+   {
+    "bar": "2022-06-13 08:00:00+00:00",
+    "tps": 7,
+    "coins": [
+     "BNBUSDT",
+     "ETHUSDT",
+     "XRPUSDT"
+    ],
+    "pnl_pct": 0.964
+   },
+   {
+    "bar": "2022-06-14 00:00:00+00:00",
+    "tps": 15,
+    "coins": [
+     "BNBUSDT",
+     "BTCUSDT",
+     "ETHUSDT",
+     "SOLUSDT",
+     "XRPUSDT"
+    ],
+    "pnl_pct": 3.996
+   },
+   {
+    "bar": "2022-07-13 12:00:00+00:00",
+    "tps": 6,
+    "coins": [
+     "BNBUSDT",
+     "BTCUSDT",
+     "ETHUSDT",
+     "XRPUSDT"
+    ],
+    "pnl_pct": 1.38
+   },
+   {
+    "bar": "2022-08-19 04:00:00+00:00",
+    "tps": 10,
+    "coins": [
+     "BNBUSDT",
+     "BTCUSDT",
+     "ETHUSDT",
+     "SOLUSDT",
+     "XRPUSDT"
+    ],
+    "pnl_pct": 1.553
+   },
+   {
+    "bar": "2022-09-13 12:00:00+00:00",
+    "tps": 6,
+    "coins": [
+     "BTCUSDT",
+     "ETHUSDT",
+     "SOLUSDT",
+     "XRPUSDT"
+    ],
+    "pnl_pct": 0.721
+   },
+   {
+    "bar": "2022-09-21 20:00:00+00:00",
+    "tps": 3,
+    "coins": [
+     "BNBUSDT",
+     "BTCUSDT",
+     "XRPUSDT"
+    ],
+    "pnl_pct": 0.313
+   },
+   {
+    "bar": "2022-09-27 16:00:00+00:00",
+    "tps": 4,
+    "coins": [
+     "BNBUSDT",
+     "BTCUSDT",
+     "ETHUSDT"
+    ],
+    "pnl_pct": 0.219
+   },
+   {
+    "bar": "2022-10-13 08:00:00+00:00",
+    "tps": 3,
+    "coins": [
+     "BNBUSDT",
+     "ETHUSDT",
+     "SOLUSDT"
+    ],
+    "pnl_pct": 0.201
+   },
+   {
+    "bar": "2022-10-13 12:00:00+00:00",
+    "tps": 8,
+    "coins": [
+     "BNBUSDT",
+     "BTCUSDT",
+     "ETHUSDT",
+     "SOLUSDT"
+    ],
+    "pnl_pct": 0.706
+   },
+   {
+    "bar": "2022-11-08 04:00:00+00:00",
+    "tps": 14,
+    "coins": [
+     "BNBUSDT",
+     "BTCUSDT",
+     "ETHUSDT",
+     "SOLUSDT"
+    ],
+    "pnl_pct": 1.433
+   },
+   {
+    "bar": "2022-11-08 12:00:00+00:00",
+    "tps": 3,
+    "coins": [
+     "BTCUSDT",
+     "ETHUSDT",
+     "SOLUSDT"
+    ],
+    "pnl_pct": 0.392
+   },
+   {
+    "bar": "2022-11-08 16:00:00+00:00",
+    "tps": 14,
+    "coins": [
+     "BNBUSDT",
+     "BTCUSDT",
+     "ETHUSDT",
+     "SOLUSDT",
+     "XRPUSDT"
+    ],
+    "pnl_pct": 2.099
+   },
+   {
+    "bar": "2022-11-09 00:00:00+00:00",
+    "tps": 5,
+    "coins": [
+     "BNBUSDT",
+     "BTCUSDT",
+     "ETHUSDT",
+     "SOLUSDT"
+    ],
+    "pnl_pct": 0.683
+   },
+   {
+    "bar": "2022-11-09 08:00:00+00:00",
+    "tps": 12,
+    "coins": [
+     "BNBUSDT",
+     "BTCUSDT",
+     "ETHUSDT",
+     "XRPUSDT"
+    ],
+    "pnl_pct": 1.984
+   },
+   {
+    "bar": "2022-11-09 12:00:00+00:00",
+    "tps": 15,
+    "coins": [
+     "BNBUSDT",
+     "BTCUSDT",
+     "ETHUSDT",
+     "SOLUSDT"
+    ],
+    "pnl_pct": 2.807
+   },
+   {
+    "bar": "2022-11-09 16:00:00+00:00",
+    "tps": 8,
+    "coins": [
+     "BNBUSDT",
+     "BTCUSDT",
+     "XRPUSDT"
+    ],
+    "pnl_pct": 1.828
+   },
+   {
+    "bar": "2022-11-09 20:00:00+00:00",
+    "tps": 11,
+    "coins": [
+     "BNBUSDT",
+     "BTCUSDT",
+     "ETHUSDT",
+     "SOLUSDT",
+     "XRPUSDT"
+    ],
+    "pnl_pct": 1.603
+   },
+   {
+    "bar": "2022-11-10 08:00:00+00:00",
+    "tps": 5,
+    "coins": [
+     "BNBUSDT",
+     "BTCUSDT",
+     "SOLUSDT"
+    ],
+    "pnl_pct": 0.756
+   },
+   {
+    "bar": "2022-11-10 16:00:00+00:00",
+    "tps": 6,
+    "coins": [
+     "BNBUSDT",
+     "ETHUSDT",
+     "SOLUSDT"
+    ],
+    "pnl_pct": 0.836
+   },
+   {
+    "bar": "2022-11-11 12:00:00+00:00",
+    "tps": 14,
+    "coins": [
+     "BNBUSDT",
+     "BTCUSDT",
+     "ETHUSDT",
+     "SOLUSDT",
+     "XRPUSDT"
+    ],
+    "pnl_pct": 3.835
+   },
+   {
+    "bar": "2023-01-14 08:00:00+00:00",
+    "tps": 14,
+    "coins": [
+     "BNBUSDT",
+     "BTCUSDT",
+     "ETHUSDT",
+     "SOLUSDT",
+     "XRPUSDT"
+    ],
+    "pnl_pct": 1.701
+   },
+   {
+    "bar": "2023-01-18 12:00:00+00:00",
+    "tps": 10,
+    "coins": [
+     "BNBUSDT",
+     "BTCUSDT",
+     "ETHUSDT",
+     "SOLUSDT",
+     "XRPUSDT"
+    ],
+    "pnl_pct": 1.458
+   },
+   {
+    "bar": "2023-01-18 16:00:00+00:00",
+    "tps": 12,
+    "coins": [
+     "BNBUSDT",
+     "BTCUSDT",
+     "ETHUSDT",
+     "SOLUSDT",
+     "XRPUSDT"
+    ],
+    "pnl_pct": 1.756
+   },
+   {
+    "bar": "2023-01-24 20:00:00+00:00",
+    "tps": 5,
+    "coins": [
+     "BNBUSDT",
+     "SOLUSDT",
+     "XRPUSDT"
+    ],
+    "pnl_pct": 1.104
+   },
+   {
+    "bar": "2023-02-09 00:00:00+00:00",
+    "tps": 4,
+    "coins": [
+     "BNBUSDT",
+     "BTCUSDT",
+     "XRPUSDT"
+    ],
+    "pnl_pct": 0.086
+   },
+   {
+    "bar": "2023-03-09 20:00:00+00:00",
+    "tps": 11,
+    "coins": [
+     "BNBUSDT",
+     "BTCUSDT",
+     "ETHUSDT",
+     "SOLUSDT",
+     "XRPUSDT"
+    ],
+    "pnl_pct": 0.66
+   },
+   {
+    "bar": "2023-03-14 16:00:00+00:00",
+    "tps": 5,
+    "coins": [
+     "BNBUSDT",
+     "BTCUSDT",
+     "ETHUSDT",
+     "XRPUSDT"
+    ],
+    "pnl_pct": 1.037
+   },
+   {
+    "bar": "2023-04-03 20:00:00+00:00",
+    "tps": 5,
+    "coins": [
+     "BNBUSDT",
+     "BTCUSDT",
+     "XRPUSDT"
+    ],
+    "pnl_pct": 1.208
+   },
+   {
+    "bar": "2023-05-10 16:00:00+00:00",
+    "tps": 11,
+    "coins": [
+     "BTCUSDT",
+     "ETHUSDT",
+     "SOLUSDT",
+     "XRPUSDT"
+    ],
+    "pnl_pct": 1.299
+   },
+   {
+    "bar": "2023-05-24 12:00:00+00:00",
+    "tps": 4,
+    "coins": [
+     "BTCUSDT",
+     "SOLUSDT",
+     "XRPUSDT"
+    ],
+    "pnl_pct": 0.287
+   },
+   {
+    "bar": "2023-06-07 12:00:00+00:00",
+    "tps": 3,
+    "coins": [
+     "BNBUSDT",
+     "BTCUSDT",
+     "SOLUSDT"
+    ],
+    "pnl_pct": 0.256
+   },
+   {
+    "bar": "2023-06-10 04:00:00+00:00",
+    "tps": 5,
+    "coins": [
+     "BNBUSDT",
+     "BTCUSDT",
+     "XRPUSDT"
+    ],
+    "pnl_pct": 0.399
+   },
+   {
+    "bar": "2023-06-14 20:00:00+00:00",
+    "tps": 4,
+    "coins": [
+     "BNBUSDT",
+     "SOLUSDT",
+     "XRPUSDT"
+    ],
+    "pnl_pct": 0.346
+   },
+   {
+    "bar": "2023-06-26 16:00:00+00:00",
+    "tps": 3,
+    "coins": [
+     "ETHUSDT",
+     "SOLUSDT",
+     "XRPUSDT"
+    ],
+    "pnl_pct": 0.331
+   },
+   {
+    "bar": "2023-06-28 16:00:00+00:00",
+    "tps": 4,
+    "coins": [
+     "BNBUSDT",
+     "SOLUSDT",
+     "XRPUSDT"
+    ],
+    "pnl_pct": 0.298
+   },
+   {
+    "bar": "2023-06-30 12:00:00+00:00",
+    "tps": 14,
+    "coins": [
+     "BNBUSDT",
+     "BTCUSDT",
+     "ETHUSDT",
+     "SOLUSDT",
+     "XRPUSDT"
+    ],
+    "pnl_pct": 1.573
+   },
+   {
+    "bar": "2023-07-05 08:00:00+00:00",
+    "tps": 6,
+    "coins": [
+     "BNBUSDT",
+     "SOLUSDT",
+     "XRPUSDT"
+    ],
+    "pnl_pct": 0.966
+   },
+   {
+    "bar": "2023-07-06 12:00:00+00:00",
+    "tps": 6,
+    "coins": [
+     "BTCUSDT",
+     "ETHUSDT",
+     "SOLUSDT"
+    ],
+    "pnl_pct": 1.408
+   },
+   {
+    "bar": "2023-07-24 08:00:00+00:00",
+    "tps": 4,
+    "coins": [
+     "BTCUSDT",
+     "ETHUSDT",
+     "SOLUSDT"
+    ],
+    "pnl_pct": 0.364
+   },
+   {
+    "bar": "2023-08-15 16:00:00+00:00",
+    "tps": 4,
+    "coins": [
+     "BNBUSDT",
+     "SOLUSDT",
+     "XRPUSDT"
+    ],
+    "pnl_pct": 0.718
+   },
+   {
+    "bar": "2023-08-31 16:00:00+00:00",
+    "tps": 5,
+    "coins": [
+     "BNBUSDT",
+     "BTCUSDT",
+     "ETHUSDT",
+     "SOLUSDT"
+    ],
+    "pnl_pct": 0.249
+   },
+   {
+    "bar": "2023-09-11 08:00:00+00:00",
+    "tps": 5,
+    "coins": [
+     "BNBUSDT",
+     "ETHUSDT",
+     "SOLUSDT"
+    ],
+    "pnl_pct": 0.136
+   },
+   {
+    "bar": "2023-10-02 16:00:00+00:00",
+    "tps": 9,
+    "coins": [
+     "ETHUSDT",
+     "SOLUSDT",
+     "XRPUSDT"
+    ],
+    "pnl_pct": 0.609
+   },
+   {
+    "bar": "2023-10-02 20:00:00+00:00",
+    "tps": 7,
+    "coins": [
+     "BTCUSDT",
+     "ETHUSDT",
+     "SOLUSDT"
+    ],
+    "pnl_pct": 0.4
+   },
+   {
+    "bar": "2023-10-04 00:00:00+00:00",
+    "tps": 7,
+    "coins": [
+     "ETHUSDT",
+     "SOLUSDT",
+     "XRPUSDT"
+    ],
+    "pnl_pct": 0.485
+   },
+   {
+    "bar": "2023-10-09 08:00:00+00:00",
+    "tps": 5,
+    "coins": [
+     "BNBUSDT",
+     "ETHUSDT",
+     "SOLUSDT",
+     "XRPUSDT"
+    ],
+    "pnl_pct": 0.311
+   },
+   {
+    "bar": "2023-10-24 12:00:00+00:00",
+    "tps": 8,
+    "coins": [
+     "ETHUSDT",
+     "SOLUSDT",
+     "XRPUSDT"
+    ],
+    "pnl_pct": 1.547
+   },
+   {
+    "bar": "2023-10-26 12:00:00+00:00",
+    "tps": 7,
+    "coins": [
+     "BNBUSDT",
+     "ETHUSDT",
+     "XRPUSDT"
+    ],
+    "pnl_pct": 1.529
+   },
+   {
+    "bar": "2023-10-27 16:00:00+00:00",
+    "tps": 7,
+    "coins": [
+     "BNBUSDT",
+     "ETHUSDT",
+     "XRPUSDT"
+    ],
+    "pnl_pct": 1.14
+   },
+   {
+    "bar": "2023-11-02 12:00:00+00:00",
+    "tps": 5,
+    "coins": [
+     "BNBUSDT",
+     "BTCUSDT",
+     "SOLUSDT",
+     "XRPUSDT"
+    ],
+    "pnl_pct": 0.747
+   },
+   {
+    "bar": "2023-11-09 16:00:00+00:00",
+    "tps": 10,
+    "coins": [
+     "BNBUSDT",
+     "BTCUSDT",
+     "ETHUSDT",
+     "SOLUSDT"
+    ],
+    "pnl_pct": 3.331
+   },
+   {
+    "bar": "2023-11-11 20:00:00+00:00",
+    "tps": 4,
+    "coins": [
+     "ETHUSDT",
+     "SOLUSDT",
+     "XRPUSDT"
+    ],
+    "pnl_pct": 0.625
+   },
+   {
+    "bar": "2023-11-13 20:00:00+00:00",
+    "tps": 4,
+    "coins": [
+     "BNBUSDT",
+     "ETHUSDT",
+     "SOLUSDT"
+    ],
+    "pnl_pct": 0.654
+   },
+   {
+    "bar": "2023-11-14 16:00:00+00:00",
+    "tps": 8,
+    "coins": [
+     "BNBUSDT",
+     "BTCUSDT",
+     "ETHUSDT",
+     "SOLUSDT",
+     "XRPUSDT"
+    ],
+    "pnl_pct": 2.097
+   },
+   {
+    "bar": "2023-11-16 12:00:00+00:00",
+    "tps": 7,
+    "coins": [
+     "BNBUSDT",
+     "BTCUSDT",
+     "ETHUSDT",
+     "XRPUSDT"
+    ],
+    "pnl_pct": 0.923
+   },
+   {
+    "bar": "2023-11-16 16:00:00+00:00",
+    "tps": 3,
+    "coins": [
+     "BTCUSDT",
+     "ETHUSDT",
+     "XRPUSDT"
+    ],
+    "pnl_pct": 0.412
+   },
+   {
+    "bar": "2023-11-21 12:00:00+00:00",
+    "tps": 9,
+    "coins": [
+     "BNBUSDT",
+     "BTCUSDT",
+     "ETHUSDT",
+     "SOLUSDT",
+     "XRPUSDT"
+    ],
+    "pnl_pct": 2.072
+   },
+   {
+    "bar": "2023-12-04 08:00:00+00:00",
+    "tps": 8,
+    "coins": [
+     "BNBUSDT",
+     "SOLUSDT",
+     "XRPUSDT"
+    ],
+    "pnl_pct": 1.194
+   },
+   {
+    "bar": "2023-12-14 12:00:00+00:00",
+    "tps": 13,
+    "coins": [
+     "BTCUSDT",
+     "ETHUSDT",
+     "SOLUSDT",
+     "XRPUSDT"
+    ],
+    "pnl_pct": 4.097
+   },
+   {
+    "bar": "2023-12-26 16:00:00+00:00",
+    "tps": 7,
+    "coins": [
+     "BNBUSDT",
+     "SOLUSDT",
+     "XRPUSDT"
+    ],
+    "pnl_pct": 2.192
+   },
+   {
+    "bar": "2024-01-03 12:00:00+00:00",
+    "tps": 9,
+    "coins": [
+     "BNBUSDT",
+     "BTCUSDT",
+     "ETHUSDT",
+     "SOLUSDT"
+    ],
+    "pnl_pct": 3.173
+   },
+   {
+    "bar": "2024-01-05 00:00:00+00:00",
+    "tps": 9,
+    "coins": [
+     "BTCUSDT",
+     "SOLUSDT",
+     "XRPUSDT"
+    ],
+    "pnl_pct": 1.249
+   },
+   {
+    "bar": "2024-01-09 12:00:00+00:00",
+    "tps": 6,
+    "coins": [
+     "BTCUSDT",
+     "ETHUSDT",
+     "XRPUSDT"
+    ],
+    "pnl_pct": 0.582
+   },
+   {
+    "bar": "2024-01-10 12:00:00+00:00",
+    "tps": 5,
+    "coins": [
+     "BNBUSDT",
+     "BTCUSDT",
+     "ETHUSDT",
+     "XRPUSDT"
+    ],
+    "pnl_pct": 0.79
+   },
+   {
+    "bar": "2024-01-12 16:00:00+00:00",
+    "tps": 5,
+    "coins": [
+     "BTCUSDT",
+     "ETHUSDT",
+     "XRPUSDT"
+    ],
+    "pnl_pct": 0.684
+   },
+   {
+    "bar": "2024-01-12 20:00:00+00:00",
+    "tps": 16,
+    "coins": [
+     "BNBUSDT",
+     "BTCUSDT",
+     "ETHUSDT",
+     "SOLUSDT",
+     "XRPUSDT"
+    ],
+    "pnl_pct": 3.691
+   },
+   {
+    "bar": "2024-02-13 12:00:00+00:00",
+    "tps": 5,
+    "coins": [
+     "BTCUSDT",
+     "ETHUSDT",
+     "XRPUSDT"
+    ],
+    "pnl_pct": 1.25
+   },
+   {
+    "bar": "2024-02-28 16:00:00+00:00",
+    "tps": 12,
+    "coins": [
+     "BNBUSDT",
+     "BTCUSDT",
+     "ETHUSDT",
+     "SOLUSDT"
+    ],
+    "pnl_pct": 2.809
+   },
+   {
+    "bar": "2024-02-29 20:00:00+00:00",
+    "tps": 6,
+    "coins": [
+     "BNBUSDT",
+     "ETHUSDT",
+     "SOLUSDT",
+     "XRPUSDT"
+    ],
+    "pnl_pct": 1.238
+   },
+   {
+    "bar": "2024-03-05 16:00:00+00:00",
+    "tps": 14,
+    "coins": [
+     "BNBUSDT",
+     "BTCUSDT",
+     "ETHUSDT",
+     "SOLUSDT",
+     "XRPUSDT"
+    ],
+    "pnl_pct": 3.598
+   },
+   {
+    "bar": "2024-03-06 12:00:00+00:00",
+    "tps": 7,
+    "coins": [
+     "BNBUSDT",
+     "BTCUSDT",
+     "ETHUSDT",
+     "XRPUSDT"
+    ],
+    "pnl_pct": 1.362
+   },
+   {
+    "bar": "2024-03-11 00:00:00+00:00",
+    "tps": 9,
+    "coins": [
+     "BNBUSDT",
+     "BTCUSDT",
+     "ETHUSDT",
+     "SOLUSDT",
+     "XRPUSDT"
+    ],
+    "pnl_pct": 2.378
+   },
+   {
+    "bar": "2024-03-12 16:00:00+00:00",
+    "tps": 14,
+    "coins": [
+     "BNBUSDT",
+     "BTCUSDT",
+     "ETHUSDT",
+     "SOLUSDT",
+     "XRPUSDT"
+    ],
+    "pnl_pct": 3.081
+   },
+   {
+    "bar": "2024-03-14 16:00:00+00:00",
+    "tps": 7,
+    "coins": [
+     "BNBUSDT",
+     "BTCUSDT",
+     "ETHUSDT",
+     "XRPUSDT"
+    ],
+    "pnl_pct": 1.469
+   },
+   {
+    "bar": "2024-03-15 00:00:00+00:00",
+    "tps": 6,
+    "coins": [
+     "BNBUSDT",
+     "BTCUSDT",
+     "ETHUSDT",
+     "XRPUSDT"
+    ],
+    "pnl_pct": 1.648
+   },
+   {
+    "bar": "2024-03-15 08:00:00+00:00",
+    "tps": 16,
+    "coins": [
+     "BNBUSDT",
+     "BTCUSDT",
+     "ETHUSDT",
+     "SOLUSDT",
+     "XRPUSDT"
+    ],
+    "pnl_pct": 4.073
+   },
+   {
+    "bar": "2024-03-17 04:00:00+00:00",
+    "tps": 4,
+    "coins": [
+     "BTCUSDT",
+     "ETHUSDT",
+     "XRPUSDT"
+    ],
+    "pnl_pct": 0.746
+   },
+   {
+    "bar": "2024-03-19 00:00:00+00:00",
+    "tps": 7,
+    "coins": [
+     "BNBUSDT",
+     "BTCUSDT",
+     "ETHUSDT",
+     "SOLUSDT",
+     "XRPUSDT"
+    ],
+    "pnl_pct": 1.169
+   },
+   {
+    "bar": "2024-03-19 04:00:00+00:00",
+    "tps": 4,
+    "coins": [
+     "BNBUSDT",
+     "BTCUSDT",
+     "ETHUSDT",
+     "XRPUSDT"
+    ],
+    "pnl_pct": 1.006
+   },
+   {
+    "bar": "2024-03-19 08:00:00+00:00",
+    "tps": 9,
+    "coins": [
+     "BNBUSDT",
+     "ETHUSDT",
+     "SOLUSDT",
+     "XRPUSDT"
+    ],
+    "pnl_pct": 2.514
+   },
+   {
+    "bar": "2024-04-12 16:00:00+00:00",
+    "tps": 5,
+    "coins": [
+     "BNBUSDT",
+     "BTCUSDT",
+     "ETHUSDT"
+    ],
+    "pnl_pct": 1.109
+   },
+   {
+    "bar": "2024-04-13 20:00:00+00:00",
+    "tps": 17,
+    "coins": [
+     "BNBUSDT",
+     "BTCUSDT",
+     "ETHUSDT",
+     "SOLUSDT",
+     "XRPUSDT"
+    ],
+    "pnl_pct": 2.53
+   },
+   {
+    "bar": "2024-04-15 16:00:00+00:00",
+    "tps": 3,
+    "coins": [
+     "BTCUSDT",
+     "ETHUSDT",
+     "SOLUSDT"
+    ],
+    "pnl_pct": 0.376
+   },
+   {
+    "bar": "2024-04-19 00:00:00+00:00",
+    "tps": 12,
+    "coins": [
+     "BNBUSDT",
+     "BTCUSDT",
+     "ETHUSDT",
+     "SOLUSDT",
+     "XRPUSDT"
+    ],
+    "pnl_pct": 1.728
+   },
+   {
+    "bar": "2024-05-23 12:00:00+00:00",
+    "tps": 6,
+    "coins": [
+     "BNBUSDT",
+     "ETHUSDT",
+     "XRPUSDT"
+    ],
+    "pnl_pct": 1.239
+   },
+   {
+    "bar": "2024-06-07 16:00:00+00:00",
+    "tps": 9,
+    "coins": [
+     "BNBUSDT",
+     "BTCUSDT",
+     "ETHUSDT",
+     "SOLUSDT"
+    ],
+    "pnl_pct": 3.137
+   },
+   {
+    "bar": "2024-06-18 00:00:00+00:00",
+    "tps": 11,
+    "coins": [
+     "BNBUSDT",
+     "BTCUSDT",
+     "ETHUSDT",
+     "XRPUSDT"
+    ],
+    "pnl_pct": 1.719
+   },
+   {
+    "bar": "2024-06-24 08:00:00+00:00",
+    "tps": 6,
+    "coins": [
+     "BTCUSDT",
+     "ETHUSDT",
+     "XRPUSDT"
+    ],
+    "pnl_pct": 1.169
+   },
+   {
+    "bar": "2024-07-04 00:00:00+00:00",
+    "tps": 14,
+    "coins": [
+     "BNBUSDT",
+     "BTCUSDT",
+     "ETHUSDT",
+     "SOLUSDT",
+     "XRPUSDT"
+    ],
+    "pnl_pct": 0.908
+   },
+   {
+    "bar": "2024-07-05 00:00:00+00:00",
+    "tps": 9,
+    "coins": [
+     "BTCUSDT",
+     "ETHUSDT",
+     "SOLUSDT",
+     "XRPUSDT"
+    ],
+    "pnl_pct": 0.458
+   },
+   {
+    "bar": "2024-07-05 04:00:00+00:00",
+    "tps": 10,
+    "coins": [
+     "BNBUSDT",
+     "BTCUSDT",
+     "ETHUSDT",
+     "XRPUSDT"
+    ],
+    "pnl_pct": 0.442
+   },
+   {
+    "bar": "2024-07-08 00:00:00+00:00",
+    "tps": 10,
+    "coins": [
+     "BNBUSDT",
+     "BTCUSDT",
+     "ETHUSDT",
+     "XRPUSDT"
+    ],
+    "pnl_pct": 0.9
+   },
+   {
+    "bar": "2024-07-08 12:00:00+00:00",
+    "tps": 17,
+    "coins": [
+     "BNBUSDT",
+     "BTCUSDT",
+     "ETHUSDT",
+     "SOLUSDT",
+     "XRPUSDT"
+    ],
+    "pnl_pct": 1.712
+   },
+   {
+    "bar": "2024-08-02 12:00:00+00:00",
+    "tps": 6,
+    "coins": [
+     "BNBUSDT",
+     "BTCUSDT",
+     "XRPUSDT"
+    ],
+    "pnl_pct": 1.385
+   },
+   {
+    "bar": "2024-08-04 16:00:00+00:00",
+    "tps": 7,
+    "coins": [
+     "BNBUSDT",
+     "BTCUSDT",
+     "ETHUSDT"
+    ],
+    "pnl_pct": 0.448
+   },
+   {
+    "bar": "2024-08-05 04:00:00+00:00",
+    "tps": 16,
+    "coins": [
+     "BNBUSDT",
+     "BTCUSDT",
+     "ETHUSDT",
+     "SOLUSDT",
+     "XRPUSDT"
+    ],
+    "pnl_pct": 3.635
+   },
+   {
+    "bar": "2024-08-05 08:00:00+00:00",
+    "tps": 9,
+    "coins": [
+     "BNBUSDT",
+     "BTCUSDT",
+     "ETHUSDT",
+     "SOLUSDT",
+     "XRPUSDT"
+    ],
+    "pnl_pct": 2.307
+   },
+   {
+    "bar": "2024-08-05 12:00:00+00:00",
+    "tps": 11,
+    "coins": [
+     "BNBUSDT",
+     "BTCUSDT",
+     "ETHUSDT",
+     "SOLUSDT",
+     "XRPUSDT"
+    ],
+    "pnl_pct": 2.165
+   },
+   {
+    "bar": "2024-08-27 20:00:00+00:00",
+    "tps": 5,
+    "coins": [
+     "BNBUSDT",
+     "BTCUSDT",
+     "ETHUSDT",
+     "XRPUSDT"
+    ],
+    "pnl_pct": 0.589
+   },
+   {
+    "bar": "2024-09-04 00:00:00+00:00",
+    "tps": 3,
+    "coins": [
+     "BNBUSDT",
+     "BTCUSDT",
+     "ETHUSDT"
+    ],
+    "pnl_pct": 0.295
+   },
+   {
+    "bar": "2024-10-01 16:00:00+00:00",
+    "tps": 6,
+    "coins": [
+     "BNBUSDT",
+     "ETHUSDT",
+     "XRPUSDT"
+    ],
+    "pnl_pct": 2.008
+   },
+   {
+    "bar": "2024-10-25 16:00:00+00:00",
+    "tps": 4,
+    "coins": [
+     "BTCUSDT",
+     "ETHUSDT",
+     "SOLUSDT"
+    ],
+    "pnl_pct": 0.325
+   },
+   {
+    "bar": "2024-10-25 20:00:00+00:00",
+    "tps": 12,
+    "coins": [
+     "BNBUSDT",
+     "ETHUSDT",
+     "SOLUSDT",
+     "XRPUSDT"
+    ],
+    "pnl_pct": 0.732
+   },
+   {
+    "bar": "2024-11-10 20:00:00+00:00",
+    "tps": 9,
+    "coins": [
+     "BNBUSDT",
+     "ETHUSDT",
+     "SOLUSDT",
+     "XRPUSDT"
+    ],
+    "pnl_pct": 2.068
+   },
+   {
+    "bar": "2024-11-12 00:00:00+00:00",
+    "tps": 11,
+    "coins": [
+     "BNBUSDT",
+     "BTCUSDT",
+     "ETHUSDT",
+     "XRPUSDT"
+    ],
+    "pnl_pct": 1.625
+   },
+   {
+    "bar": "2024-11-12 08:00:00+00:00",
+    "tps": 15,
+    "coins": [
+     "BNBUSDT",
+     "BTCUSDT",
+     "ETHUSDT",
+     "SOLUSDT"
+    ],
+    "pnl_pct": 2.374
+   },
+   {
+    "bar": "2024-11-13 16:00:00+00:00",
+    "tps": 6,
+    "coins": [
+     "BNBUSDT",
+     "BTCUSDT",
+     "ETHUSDT",
+     "XRPUSDT"
+    ],
+    "pnl_pct": 0.574
+   },
+   {
+    "bar": "2024-11-17 00:00:00+00:00",
+    "tps": 4,
+    "coins": [
+     "BNBUSDT",
+     "ETHUSDT",
+     "XRPUSDT"
+    ],
+    "pnl_pct": 0.625
+   },
+   {
+    "bar": "2024-11-25 12:00:00+00:00",
+    "tps": 11,
+    "coins": [
+     "BNBUSDT",
+     "BTCUSDT",
+     "ETHUSDT",
+     "SOLUSDT",
+     "XRPUSDT"
+    ],
+    "pnl_pct": 2.455
+   },
+   {
+    "bar": "2024-11-26 08:00:00+00:00",
+    "tps": 3,
+    "coins": [
+     "BNBUSDT",
+     "SOLUSDT",
+     "XRPUSDT"
+    ],
+    "pnl_pct": 0.681
+   },
+   {
+    "bar": "2024-12-02 16:00:00+00:00",
+    "tps": 4,
+    "coins": [
+     "BNBUSDT",
+     "BTCUSDT",
+     "ETHUSDT",
+     "SOLUSDT"
+    ],
+    "pnl_pct": 0.526
+   },
+   {
+    "bar": "2024-12-03 12:00:00+00:00",
+    "tps": 7,
+    "coins": [
+     "BNBUSDT",
+     "ETHUSDT",
+     "SOLUSDT",
+     "XRPUSDT"
+    ],
+    "pnl_pct": 1.078
+   },
+   {
+    "bar": "2024-12-04 16:00:00+00:00",
+    "tps": 5,
+    "coins": [
+     "BNBUSDT",
+     "SOLUSDT",
+     "XRPUSDT"
+    ],
+    "pnl_pct": 1.072
+   },
+   {
+    "bar": "2024-12-05 20:00:00+00:00",
+    "tps": 9,
+    "coins": [
+     "BTCUSDT",
+     "ETHUSDT",
+     "SOLUSDT"
+    ],
+    "pnl_pct": 1.123
+   },
+   {
+    "bar": "2024-12-09 20:00:00+00:00",
+    "tps": 13,
+    "coins": [
+     "BTCUSDT",
+     "ETHUSDT",
+     "SOLUSDT",
+     "XRPUSDT"
+    ],
+    "pnl_pct": 2.847
+   },
+   {
+    "bar": "2024-12-19 16:00:00+00:00",
+    "tps": 9,
+    "coins": [
+     "BNBUSDT",
+     "BTCUSDT",
+     "ETHUSDT",
+     "SOLUSDT"
+    ],
+    "pnl_pct": 1.869
+   },
+   {
+    "bar": "2025-01-08 16:00:00+00:00",
+    "tps": 3,
+    "coins": [
+     "BTCUSDT",
+     "ETHUSDT",
+     "SOLUSDT"
+    ],
+    "pnl_pct": 0.168
+   },
+   {
+    "bar": "2025-01-19 20:00:00+00:00",
+    "tps": 6,
+    "coins": [
+     "BTCUSDT",
+     "ETHUSDT",
+     "SOLUSDT",
+     "XRPUSDT"
+    ],
+    "pnl_pct": 1.717
+   },
+   {
+    "bar": "2025-01-20 16:00:00+00:00",
+    "tps": 9,
+    "coins": [
+     "BTCUSDT",
+     "ETHUSDT",
+     "SOLUSDT",
+     "XRPUSDT"
+    ],
+    "pnl_pct": 2.585
+   },
+   {
+    "bar": "2025-01-27 04:00:00+00:00",
+    "tps": 7,
+    "coins": [
+     "BNBUSDT",
+     "BTCUSDT",
+     "ETHUSDT",
+     "SOLUSDT",
+     "XRPUSDT"
+    ],
+    "pnl_pct": 3.663
+   },
+   {
+    "bar": "2025-02-02 16:00:00+00:00",
+    "tps": 11,
+    "coins": [
+     "BNBUSDT",
+     "ETHUSDT",
+     "SOLUSDT",
+     "XRPUSDT"
+    ],
+    "pnl_pct": 3.722
+   },
+   {
+    "bar": "2025-02-02 20:00:00+00:00",
+    "tps": 7,
+    "coins": [
+     "BNBUSDT",
+     "ETHUSDT",
+     "SOLUSDT",
+     "XRPUSDT"
+    ],
+    "pnl_pct": 2.663
+   },
+   {
+    "bar": "2025-02-03 00:00:00+00:00",
+    "tps": 9,
+    "coins": [
+     "BNBUSDT",
+     "BTCUSDT",
+     "SOLUSDT",
+     "XRPUSDT"
+    ],
+    "pnl_pct": 4.326
+   },
+   {
+    "bar": "2025-02-24 20:00:00+00:00",
+    "tps": 8,
+    "coins": [
+     "ETHUSDT",
+     "SOLUSDT",
+     "XRPUSDT"
+    ],
+    "pnl_pct": 2.685
+   },
+   {
+    "bar": "2025-02-25 04:00:00+00:00",
+    "tps": 5,
+    "coins": [
+     "BNBUSDT",
+     "BTCUSDT",
+     "ETHUSDT",
+     "XRPUSDT"
+    ],
+    "pnl_pct": 0.641
+   },
+   {
+    "bar": "2025-02-26 16:00:00+00:00",
+    "tps": 4,
+    "coins": [
+     "BTCUSDT",
+     "ETHUSDT",
+     "SOLUSDT"
+    ],
+    "pnl_pct": 0.866
+   },
+   {
+    "bar": "2025-02-28 00:00:00+00:00",
+    "tps": 5,
+    "coins": [
+     "BNBUSDT",
+     "BTCUSDT",
+     "ETHUSDT"
+    ],
+    "pnl_pct": 0.674
+   },
+   {
+    "bar": "2025-03-04 00:00:00+00:00",
+    "tps": 8,
+    "coins": [
+     "BNBUSDT",
+     "BTCUSDT",
+     "ETHUSDT",
+     "XRPUSDT"
+    ],
+    "pnl_pct": 1.732
+   },
+   {
+    "bar": "2025-03-10 12:00:00+00:00",
+    "tps": 6,
+    "coins": [
+     "BNBUSDT",
+     "BTCUSDT",
+     "ETHUSDT",
+     "SOLUSDT",
+     "XRPUSDT"
+    ],
+    "pnl_pct": 1.33
+   },
+   {
+    "bar": "2025-04-06 20:00:00+00:00",
+    "tps": 5,
+    "coins": [
+     "BTCUSDT",
+     "ETHUSDT",
+     "XRPUSDT"
+    ],
+    "pnl_pct": 0.62
+   },
+   {
+    "bar": "2025-04-07 04:00:00+00:00",
+    "tps": 8,
+    "coins": [
+     "BNBUSDT",
+     "ETHUSDT",
+     "SOLUSDT",
+     "XRPUSDT"
+    ],
+    "pnl_pct": 0.824
+   },
+   {
+    "bar": "2025-06-13 00:00:00+00:00",
+    "tps": 12,
+    "coins": [
+     "BNBUSDT",
+     "BTCUSDT",
+     "ETHUSDT",
+     "SOLUSDT",
+     "XRPUSDT"
+    ],
+    "pnl_pct": 1.277
+   },
+   {
+    "bar": "2025-06-21 20:00:00+00:00",
+    "tps": 7,
+    "coins": [
+     "ETHUSDT",
+     "SOLUSDT",
+     "XRPUSDT"
+    ],
+    "pnl_pct": 0.521
+   },
+   {
+    "bar": "2025-06-22 12:00:00+00:00",
+    "tps": 6,
+    "coins": [
+     "ETHUSDT",
+     "SOLUSDT",
+     "XRPUSDT"
+    ],
+    "pnl_pct": 0.274
+   },
+   {
+    "bar": "2025-07-23 12:00:00+00:00",
+    "tps": 5,
+    "coins": [
+     "BNBUSDT",
+     "SOLUSDT",
+     "XRPUSDT"
+    ],
+    "pnl_pct": 1.703
+   },
+   {
+    "bar": "2025-07-23 16:00:00+00:00",
+    "tps": 8,
+    "coins": [
+     "BNBUSDT",
+     "SOLUSDT",
+     "XRPUSDT"
+    ],
+    "pnl_pct": 1.543
+   },
+   {
+    "bar": "2025-07-24 04:00:00+00:00",
+    "tps": 6,
+    "coins": [
+     "ETHUSDT",
+     "SOLUSDT",
+     "XRPUSDT"
+    ],
+    "pnl_pct": 1.729
+   },
+   {
+    "bar": "2025-07-30 16:00:00+00:00",
+    "tps": 10,
+    "coins": [
+     "BNBUSDT",
+     "BTCUSDT",
+     "SOLUSDT",
+     "XRPUSDT"
+    ],
+    "pnl_pct": 1.47
+   },
+   {
+    "bar": "2025-08-01 20:00:00+00:00",
+    "tps": 4,
+    "coins": [
+     "BNBUSDT",
+     "SOLUSDT",
+     "XRPUSDT"
+    ],
+    "pnl_pct": 0.604
+   },
+   {
+    "bar": "2025-08-14 12:00:00+00:00",
+    "tps": 15,
+    "coins": [
+     "BNBUSDT",
+     "BTCUSDT",
+     "ETHUSDT",
+     "SOLUSDT",
+     "XRPUSDT"
+    ],
+    "pnl_pct": 4.956
+   },
+   {
+    "bar": "2025-09-22 04:00:00+00:00",
+    "tps": 13,
+    "coins": [
+     "BNBUSDT",
+     "BTCUSDT",
+     "ETHUSDT",
+     "SOLUSDT",
+     "XRPUSDT"
+    ],
+    "pnl_pct": 3.994
+   }
+  ],
+  "n_tp_cluster_bars": 172,
+  "total_tp_win_pct": 365.545,
+  "tp_cluster_share_of_tp_win": 0.682,
+  "tp_win_inside_sl_flush_bars_pct": 18.192
+ },
+ "q3_book_concentration": {
+  "outside": {
+   "bars": 6968,
+   "mean_gross": 0.4819,
+   "mean_net": 0.1835,
+   "mean_abs_net": 0.3692,
+   "mean_nlong": 2.722,
+   "mean_nshort": 2.0185
+  },
+  "episodes": [
+   {
+    "id": 0,
+    "bars": 40,
+    "mean_gross": 0.3291,
+    "max_gross": 0.3998,
+    "mean_net": 0.2923,
+    "max_abs_net": 0.3862,
+    "mean_nlong": 2.875,
+    "mean_nshort": 1.525,
+    "pre5d_mean_abs_net": 0.19,
+    "pre5d_max_abs_net": 0.3931
+   },
+   {
+    "id": 1,
+    "bars": 185,
+    "mean_gross": 0.24,
+    "max_gross": 0.6314,
+    "mean_net": 0.0869,
+    "max_abs_net": 0.6314,
+    "mean_nlong": 1.5568,
+    "mean_nshort": 2.3027,
+    "pre5d_mean_abs_net": 0.1904,
+    "pre5d_max_abs_net": 0.2849
+   },
+   {
+    "id": 2,
+    "bars": 181,
+    "mean_gross": 0.3866,
+    "max_gross": 0.9615,
+    "mean_net": 0.0106,
+    "max_abs_net": 0.9615,
+    "mean_nlong": 1.8232,
+    "mean_nshort": 3.1713,
+    "pre5d_mean_abs_net": 0.7821,
+    "pre5d_max_abs_net": 1.0601
+   },
+   {
+    "id": 3,
+    "bars": 36,
+    "mean_gross": 0.8208,
+    "max_gross": 1.7079,
+    "mean_net": 0.8208,
+    "max_abs_net": 1.7079,
+    "mean_nlong": 4.9722,
+    "mean_nshort": 0.0,
+    "pre5d_mean_abs_net": 0.9732,
+    "pre5d_max_abs_net": 1.7312
+   },
+   {
+    "id": 4,
+    "bars": 347,
+    "mean_gross": 0.6228,
+    "max_gross": 1.2129,
+    "mean_net": 0.1415,
+    "max_abs_net": 0.8737,
+    "mean_nlong": 2.9798,
+    "mean_nshort": 2.0029,
+    "pre5d_mean_abs_net": 0.5991,
+    "pre5d_max_abs_net": 0.6922
+   },
+   {
+    "id": 5,
+    "bars": 471,
+    "mean_gross": 0.3289,
+    "max_gross": 0.8047,
+    "mean_net": 0.104,
+    "max_abs_net": 0.6412,
+    "mean_nlong": 2.4246,
+    "mean_nshort": 2.2102,
+    "pre5d_mean_abs_net": 0.7244,
+    "pre5d_max_abs_net": 1.2469
+   },
+   {
+    "id": 6,
+    "bars": 1,
+    "mean_gross": 1.0119,
+    "max_gross": 1.0119,
+    "mean_net": 1.0119,
+    "max_abs_net": 1.0119,
+    "mean_nlong": 5.0,
+    "mean_nshort": 0.0,
+    "pre5d_mean_abs_net": 1.0179,
+    "pre5d_max_abs_net": 1.1428
+   },
+   {
+    "id": 7,
+    "bars": 1,
+    "mean_gross": 0.6985,
+    "max_gross": 0.6985,
+    "mean_net": 0.6985,
+    "max_abs_net": 0.6985,
+    "mean_nlong": 5.0,
+    "mean_nshort": 0.0,
+    "pre5d_mean_abs_net": 0.7855,
+    "pre5d_max_abs_net": 0.887
+   },
+   {
+    "id": 8,
+    "bars": 68,
+    "mean_gross": 0.6321,
+    "max_gross": 0.8189,
+    "mean_net": 0.3742,
+    "max_abs_net": 0.6601,
+    "mean_nlong": 3.5441,
+    "mean_nshort": 1.4559,
+    "pre5d_mean_abs_net": 0.6054,
+    "pre5d_max_abs_net": 0.8082
+   },
+   {
+    "id": 9,
+    "bars": 49,
+    "mean_gross": 0.7135,
+    "max_gross": 0.7897,
+    "mean_net": -0.6527,
+    "max_abs_net": 0.7897,
+    "mean_nlong": 0.2857,
+    "mean_nshort": 4.7143,
+    "pre5d_mean_abs_net": 0.7319,
+    "pre5d_max_abs_net": 0.8823
+   },
+   {
+    "id": 10,
+    "bars": 156,
+    "mean_gross": 0.1858,
+    "max_gross": 0.3144,
+    "mean_net": 0.0993,
+    "max_abs_net": 0.3144,
+    "mean_nlong": 3.8205,
+    "mean_nshort": 1.0705,
+    "pre5d_mean_abs_net": 0.2827,
+    "pre5d_max_abs_net": 0.3377
+   },
+   {
+    "id": 11,
+    "bars": 256,
+    "mean_gross": 0.7657,
+    "max_gross": 0.9347,
+    "mean_net": 0.3269,
+    "max_abs_net": 0.9014,
+    "mean_nlong": 2.1797,
+    "mean_nshort": 2.8086,
+    "pre5d_mean_abs_net": 0.9121,
+    "pre5d_max_abs_net": 0.958
+   }
+  ],
+  "top_decile": {
+   "abs_net_threshold": 0.7937,
+   "n_days": 146,
+   "mean_daily_pct": 0.863,
+   "median_daily_pct": 0.953,
+   "win_rate": 0.671,
+   "worst_day_pct": -4.87,
+   "best_day_pct": 8.12,
+   "dev_all_days": {
+    "n": 1460,
+    "mean_daily_pct": 0.218,
+    "win_rate": 0.551
+   }
+  }
+ },
+ "q4_counterfactuals": {
+  "a_vol_target": {
+   "monthly_dev4": 4.752,
+   "worst_dev_month_pct": 2.81,
+   "dev_dd": 17.3,
+   "dev_years": [
+    [
+     "2021",
+     41.21,
+     14.83
+    ],
+    [
+     "2022",
+     39.45,
+     17.3
+    ],
+    [
+     "2023",
+     103.85,
+     13.09
+    ],
+    [
+     "2024",
+     131.26,
+     14.87
+    ]
+   ],
+   "dev_book_win_rate": 0.508,
+   "dev_book_trades": 1014
+  },
+  "b_flush_skip": {
+   "monthly_dev4": 6.54,
+   "worst_dev_month_pct": 3.601,
+   "dev_dd": 17.27,
+   "dev_years": [
+    [
+     "2021",
+     52.89,
+     17.27
+    ],
+    [
+     "2022",
+     59.22,
+     16.51
+    ],
+    [
+     "2023",
+     194.23,
+     16.77
+    ],
+    [
+     "2024",
+     192.06,
+     14.86
+    ]
+   ],
+   "dev_book_win_rate": 0.506,
+   "dev_book_trades": 1021,
+   "flush_skipped": 43
+  },
+  "c_dd_budget": {
+   "monthly_dev4": 6.197,
+   "worst_dev_month_pct": 2.815,
+   "dev_dd": 18.92,
+   "dev_years": [
+    [
+     "2021",
+     39.54,
+     18.92
+    ],
+    [
+     "2022",
+     57.65,
+     17.33
+    ],
+    [
+     "2023",
+     183.19,
+     17.78
+    ],
+    [
+     "2024",
+     187.64,
+     14.47
+    ]
+   ],
+   "dev_book_win_rate": 0.51,
+   "dev_book_trades": 1020,
+   "dd_budget_bars": 1346
+  }
+ },
+ "ranking": [
+  {
+   "rule": "b_flush_skip3",
+   "dd_reduction": 0.06,
+   "dev4_loss": -0.013,
+   "dd_per_dev4": "free (no dev4 loss)",
+   "dev_dd": 17.27,
+   "dev4": 6.54,
+   "worst": 3.601,
+   "dev_win": 0.506
+  },
+  {
+   "rule": "a_vol_x0.5",
+   "dd_reduction": 0.03,
+   "dev4_loss": 1.775,
+   "dd_per_dev4": 0.02,
+   "dev_dd": 17.3,
+   "dev4": 4.752,
+   "worst": 2.81,
+   "dev_win": 0.508
+  },
+  {
+   "rule": "c_budget_0.13",
+   "dd_reduction": -1.59,
+   "dev4_loss": 0.33,
+   "dd_per_dev4": -4.82,
+   "dev_dd": 18.92,
+   "dev4": 6.197,
+   "worst": 2.815,
+   "dev_win": 0.51
+  }
+ ]
+}
