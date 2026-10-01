@@ -93,16 +93,31 @@
     return { close() { closed = true; try { ws.close(); } catch (e) { /* ignore */ } } };
   }
   let tickerWs = null;
+  let tickerLastMessageAt = 0;
   function startTicker() {
     if (tickerWs) return;
     const streams = SYMS.map((s) => s.toLowerCase() + "@miniTicker").join("/");
     tickerWs = openWs(`wss://fstream.binance.com/market/stream?streams=${streams}`, (m) => {
       const d = m.data; if (!d || !d.s) return;
+      tickerLastMessageAt = Date.now();
       const prev = state.live.prices[d.s]?.c;
       state.live.prices[d.s] = { c: +d.c, o: +d.o };
       updateTickerCells(d.s, prev);
     }, (ok) => { const el = $("wsState"); if (el) { el.textContent = ok ? "● realtime" : "○ mất kết nối"; el.style.color = ok ? "var(--up)" : "var(--down)"; } });
   }
+  function refreshTickerOnResume() {
+    if (document.hidden || !state.user || state.user.role === "pending") return;
+    // Browsers may suspend background tabs and their WebSockets. Reopen the stream
+    // after resume so the title and quote cells catch up from a fresh ticker event.
+    if (tickerWs && Date.now() - tickerLastMessageAt > 3000) {
+      tickerWs.close();
+      tickerWs = null;
+    }
+    startTicker();
+  }
+  document.addEventListener("visibilitychange", refreshTickerOnResume);
+  window.addEventListener("pageshow", refreshTickerOnResume);
+  window.addEventListener("online", refreshTickerOnResume);
 
   // ------------------------------------------------------------------ auth
   async function initGsi() {
