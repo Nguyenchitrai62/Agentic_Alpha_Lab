@@ -39,3 +39,34 @@ research/**/kaggle_error_output*/
 research/**/*_report.json
 research/**/log_*.json
 !.env.example
+
+# Local-only diagnostic and audit outputs (user rule 2026-09-26)
+research/diagnostics/
+research/mj_audit/*.csv
+research/mj_audit/*.json
+research/opencode_r82_ma_replication/replication.json
+research/vf_audit/replication.json
+
+# Per-version audit work products and one-off audit tests stay in the local research checkout
+research/parallel/rounds/**/v*_audit*/
+research/parallel/rounds/**/v*_reaudit*/
+research/parallel/rounds/**/analysis_rl_execution/
+tests/test_v*_audit.py
+
+# Generated round artifacts; keep experiment code/configs and the shared registry trackable
+research/parallel/rounds/**/registration.json
+research/parallel/rounds/**/cloud_submission.json
+research/parallel/rounds/**/backtest_results.json
+research/parallel/rounds/**/selection.json
+research/parallel/rounds/**/data_manifest.json
+research/parallel/rounds/**/package_manifest.json
+research/parallel/rounds/**/*_robustness.json
+research/parallel/rounds/**/*_bootstrap.json
+research/parallel/rounds/**/*_diagnostics.json
+research/parallel/rounds/**/*_frontier.json
+research/parallel/rounds/**/*_partial.json
+research/parallel/rounds/**/*_audit.json
+research/parallel/rounds/**/*_reaudit.json
+research/parallel/rounds/**/*_blocker.json
+research/parallel/rounds/**/analysis.json
+research/parallel/rounds/**/kaggle/dataset-metadata.json
