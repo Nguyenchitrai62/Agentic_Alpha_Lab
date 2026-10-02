@@ -50,7 +50,7 @@ Cả 5 pipeline vẫn xuất hiện với đầy đủ chỉ số đánh giá l�
 Ở trang **Admin → Thứ tự pipeline & quyền xem tín hiệu**, dùng ↑ ↓ để đổi thứ tự, khóa/mở từng pipeline rồi bấm **Lưu cấu hình pipeline**.
 Khóa/mở áp dụng cho tất cả viewer, độc lập với thứ tự; có thể mở cả 5 hoặc khóa cả 5. Admin luôn xem được tất cả.
 Để khóa thêm: tại dòng pipeline muốn khóa, bấm **Đang mở · Khóa tín hiệu**, rồi **Lưu cấu hình pipeline**.
-Để mở lại, bấm **🔒 Đang khóa · Mở khóa** rồi lưu. Link quản lý này cũng có ở dưới bảng đánh giá khi đăng nhập admin.
+Để mở lại, bấm **🔒 Đang khóa · Mở khóa** rồi lưu. Các nút quản lý chỉ nằm trong tab Admin.
 **Dùng thứ tự tự động** khôi phục xếp theo chỉ số, giữ trạng thái khóa đã chọn; cần bấm Lưu để áp dụng.
 Cấu hình được lưu trong SQLite, có hiệu lực với access token đang sử dụng và giữ nguyên sau khi khởi động lại.
 FE cập nhật quyền khi đổi tab và mỗi phút; BE kiểm tra quyền trên từng request. Nếu hai admin cùng sửa,
@@ -59,7 +59,8 @@ Scheduler luôn chạy cả 5, ưu tiên pipeline chưa hoàn thành rồi theo 
 Đặt `WEB_ADMIN_CONTACT_EMAIL` để đổi địa chỉ liên hệ. Liên kết chỉ mở email nháp, không gửi mail tự động.
 
 Chọn pipeline ở bảng đánh giá hoặc bộ chọn dùng chung cho Pipeline, Market, History và Performance.
-Phần **Quyền xem tín hiệu** hiển thị số pipeline được xem và nút chọn nhanh; pipeline bị khóa có liên kết yêu cầu mở quyền riêng.
+Admin và viewer dùng cùng bố cục các tab xem dữ liệu; admin có thêm tab Admin để quản lý. Không có banner quyền xem hoặc nhãn vai trò riêng trên các tab dữ liệu.
+Nhãn trader: **Train / chọn model (4 năm)**, **Test (1 năm)**, **DD**, **Win rate**. "Train / chọn model" gọi tên giai đoạn phát triển/chọn model; số liệu vẫn là kết quả walk-forward, mỗi mốc chỉ học từ dữ liệu trước mốc đó, không phải fit một model trên cả 4 năm rồi chấm lại cùng tập.
 Dòng **Đang xem** xác nhận lựa chọn hiện tại; bảng đánh giá vẫn so sánh cả 5 pipeline.
 Khi đổi lựa chọn, FE xóa kết quả cũ, tải dữ liệu mới và bỏ qua phản hồi trễ của lựa chọn trước.
 Kết quả paper của các pipeline có thể bằng nhau ở một thời điểm; đối chiếu tên pipeline và chỉ số lịch sử trên Performance.

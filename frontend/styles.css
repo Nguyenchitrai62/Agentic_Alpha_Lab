@@ -43,7 +43,6 @@ button { cursor: pointer; }
 .tabs button.active { color: var(--text-hi); background: var(--panel-2); }
 .user { display: flex; align-items: center; gap: 8px; margin-left: auto; white-space: nowrap; }
 .user img { width: 26px; height: 26px; border-radius: 50%; }
-.user .role { font-size: 10.5px; color: var(--muted); }
 .user .name { font-size: 12px; }
 
 /* ---------- common ---------- */
@@ -174,7 +173,7 @@ dl.kv dt { color: var(--muted); } dl.kv dd { margin: 0; text-align: right; font-
   .toolbar { gap: 6px; padding: 5px 6px; }
   .seg button { padding: 3px 7px; }
   .sep { display: none; }
-  .user .name, .user .role { display: none; }
+  .user .name { display: none; }
   .brand .tag { display: none; }
   .bottom { height: 240px; }
   .ostats { margin-left: 0; }
@@ -418,21 +417,6 @@ html { scroll-padding-top: calc(var(--top-h) + 16px); }
 .login-benefits span { color: var(--muted); font-size: 13px; margin-top: 4px; line-height: 1.5; }
 .account-actions { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; margin-top: 20px; }
 .account-actions .btn { display: inline-flex; align-items: center; justify-content: center; min-height: 44px; text-decoration: none; }
-.access-overview { padding: 20px; border: 1px solid var(--line-2); border-radius: 10px; background: var(--panel); margin-bottom: 16px; }
-.access-heading { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
-.access-heading .login-eyebrow { margin-bottom: 5px; }
-.access-heading h1 { margin: 0; font-size: 22px; line-height: 1.4; color: var(--text-hi); }
-.access-overview > p { font-size: 14px; line-height: 1.6; margin: 10px 0 16px; }
-.access-count { padding: 8px 12px; border: 1px solid var(--line-2); border-radius: 6px; white-space: nowrap; font-size: 13px; color: var(--text-hi); }
-.quick-pipelines { display: flex; flex-wrap: wrap; gap: 10px; }
-.quick-pipeline { display: flex; align-items: center; gap: 16px; min-height: 46px; padding: 10px 16px; background: var(--bg); border: 1px solid var(--line-2); border-radius: 7px; }
-.quick-pipeline b { font-size: 16px; color: var(--text-hi); }
-.quick-pipeline span { color: var(--muted); font-size: 12px; }
-.quick-pipeline:hover, .quick-pipeline.active { border-color: #90b8ff; background: #1b2540; }
-.quick-pipeline.active span { color: #b3ccff; }
-.locked-pipelines { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px; margin-top: 16px; color: var(--muted); font-size: 13px; }
-.locked-pipelines:empty { display: none; }
-.locked-pipelines a { color: #b3ccff; padding: 4px 0; text-underline-offset: 3px; }
 .pipeline-choice { display: inline-flex; align-items: center; gap: 12px; border: 0; background: transparent; color: var(--text-hi); padding: 5px 0; font-size: 14px; font-weight: 600; }
 .pipeline-choice span { color: #b3ccff; font-size: 11px; font-weight: 400; }
 .evid-panel .evid { table-layout: auto; min-width: 1380px; }
@@ -441,10 +425,6 @@ html { scroll-padding-top: calc(var(--top-h) + 16px); }
 #pipeSelectedNote { color: var(--text); }
 .fine { font-size: 12px; }
 @media (max-width: 720px) {
-  .access-overview { padding: 16px; }
-  .access-heading { align-items: flex-start; flex-direction: column; gap: 10px; }
-  .access-heading h1 { font-size: 20px; }
-  .quick-pipeline { flex: 1 1 110px; justify-content: space-between; padding: 10px 12px; }
   .login-card { padding: 24px 20px; }
   .login-card h1 { font-size: 24px; }
   .evid-panel .evid th:first-child { min-width: 170px; }

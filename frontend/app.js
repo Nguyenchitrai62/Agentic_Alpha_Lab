@@ -199,7 +199,7 @@
     H.candles = []; H.times = []; H.orders = []; H.pos = []; H.fills = []; H.posAt = [];
     H.series = null; H.wSeries = null; H.prim = null;
     for (const key of Object.keys(lineCharts)) { lineCharts[key].remove(); delete lineCharts[key]; }
-    for (const id of ["pipeEvid", "pipeBar", "board", "todoCards", "planPanel", "watchlist", "hPipe", "ordersTbl", "oStats", "perfKpis", "yearTbl", "coinTbl", "fwSummary", "pPipe", "pipelineSettingsTbl", "pipelineMode", "pipelineSaveStatus", "usersTbl", "jobsTbl", "quickPipelines", "lockedPipelines", "accessTitle", "accessDescription", "accessCount", "pipeSelectedNote"]) {
+    for (const id of ["pipeEvid", "pipeBar", "board", "todoCards", "planPanel", "watchlist", "hPipe", "ordersTbl", "oStats", "perfKpis", "yearTbl", "coinTbl", "fwSummary", "pPipe", "pipelineSettingsTbl", "pipelineMode", "pipelineSaveStatus", "usersTbl", "jobsTbl", "pipeSelectedNote"]) {
       const el = $(id); if (el) el.innerHTML = "";
     }
     if (tickerWs) { tickerWs.close(); tickerWs = null; }
@@ -214,7 +214,7 @@
   function enter() {
     const u = state.user;
     $("userBox").innerHTML = `${u.picture ? `<img src="${esc(u.picture)}" alt="" referrerpolicy="no-referrer">` : ""}
-      <div><div class="name">${esc(u.name || u.email)}</div><div class="role">${u.role === "admin" ? "Admin" : u.role === "viewer" ? "Người xem" : "Chờ duyệt"}</div></div>
+      <div class="name">${esc(u.name || u.email)}</div>
       ${u.local ? '<span class="tag">local</span>' : '<button class="btn sm" id="logoutBtn">Đăng xuất</button>'}`;
     if (!u.local) $("logoutBtn").onclick = logout;
     if (u.role === "pending") {
@@ -343,19 +343,6 @@
     return `<p class="muted">Các pipeline đang được khóa. Bạn vẫn xem được bảng đánh giá ở tab <a href="#todo">Pipeline</a>.
       <a href="mailto:${esc(encodeURIComponent(state.user?.admin_contact_email || ""))}">Liên hệ admin để mở quyền xem tín hiệu</a>.</p>`;
   }
-  function renderAccessOverview() {
-    const pipes = visiblePipes(), admin = state.user?.role === "admin", cur = planPipe();
-    $("accessTitle").textContent = admin ? "Bạn đang xem với quyền admin" : pipes.length ? "Đăng nhập thành công · sẵn sàng xem tín hiệu" : "Chưa có pipeline được mở quyền";
-    $("accessCount").textContent = `${pipes.length} / ${PIPES.length} pipeline ${admin ? "có thể xem" : "miễn phí"}`;
-    $("accessDescription").textContent = admin
-      ? "Bạn xem được cả 5 pipeline. Khóa/mở trong trang Admin áp dụng cho người dùng thường."
-      : pipes.length ? "Chọn pipeline bên dưới để xem kế hoạch lệnh. Lựa chọn được dùng chung khi chuyển sang Market, History và Performance."
-      : "Bạn vẫn xem được đầy đủ bảng đánh giá. Liên hệ admin để mở quyền xem tín hiệu.";
-    $("quickPipelines").innerHTML = pipes.map(p => `<button type="button" class="quick-pipeline${p.v === cur ? " active" : ""}" data-pipe="${p.v}" aria-pressed="${p.v === cur}"><b>${p.nm}</b><span>${p.v === cur ? "Đang xem" : "Xem tín hiệu"}</span></button>`).join("");
-    $("quickPipelines").onclick = e => { const b = e.target.closest("[data-pipe]"); if (b) setPlanPipe(b.dataset.pipe); };
-    const locked = Object.keys(state.evid || {}).filter(v => state.evid[v].locked);
-    $("lockedPipelines").innerHTML = locked.length ? `<span>${locked.length} pipeline cần liên hệ admin:</span> ` + locked.map(v => `<a href="mailto:${esc(encodeURIComponent(state.user?.admin_contact_email || ""))}?subject=${encodeURIComponent("Xin quyền xem pipeline " + PIPE_LABEL[v])}">${esc(PIPE_LABEL[v])} · Yêu cầu mở quyền</a>`).join("") : "";
-  }
   function renderEvidence() {
     const ev = state.evid; if (!ev) return;
     const cur = planPipe();
@@ -367,7 +354,7 @@
       const locked = ev[v].locked;
       const email = ev[v].admin_contact_email || state.user?.admin_contact_email || "";
       const contact = locked ? `<div class="pipe-access">🔒 Tín hiệu đang khóa · <a href="mailto:${esc(encodeURIComponent(email))}?subject=${encodeURIComponent("Xin quyền xem pipeline " + p.nm)}">Liên hệ admin qua email</a></div>`
-        : state.user?.role === "admin" && ev[v].locked_for_viewers ? '<div class="pipe-access">🔒 Đang khóa với người dùng thường</div>' : "";
+        : "";
       const s = ev[p.v]?.walkforward || {}, y = s.yearly || [];
       const dev = y.slice(0, 4).map((r) => mo(r[1]));
       const worst = dev.length ? Math.min(...dev) : null;
@@ -379,15 +366,13 @@
         <td>${pct(s.win_hidden)}</td><td>${f(s.monthly_dev4)}</td><td>${f(worst)}</td><td>${f(s.monthly_5y)}</td><td>${esc(s.losing_years ?? "—")}</td><td>${win}</td>
         <td>${esc(s.trades_dev ?? "—")} / ${esc(s.trades_hidden ?? "—")}</td><td>${f(s.dd_4h, 1)}% / ${f(s.dd_1m, 1)}%</td></tr>`;
     });
-    table($("pipeEvid"), ["Thứ tự / pipeline", "Năm kiểm chứng<br>(%/tháng)", "Sụt giảm vốn<br>tối đa", "Tỷ lệ thắng<br>năm kiểm chứng", "4 năm phát triển<br>(%/tháng)", "Năm yếu nhất<br>(%/tháng)", "Toàn bộ 5 năm<br>(%/tháng)", "Số năm<br>thua lỗ", "Tỷ lệ thắng<br>(phát triển / kiểm chứng)", "Số lệnh<br>(phát triển / kiểm chứng)", "Sụt giảm vốn<br>(nến 4h / từng phút)"], rows);
+    table($("pipeEvid"), ["Thứ tự / pipeline", "Test<br>(1 năm, %/tháng)", "DD<br>tối đa", "Win rate<br>Test", "Train / chọn model<br>(4 năm, %/tháng)", "Train: năm thấp nhất<br>(%/tháng)", "Toàn bộ 5 năm<br>(%/tháng)", "Số năm<br>thua lỗ", "Win rate<br>(Train / Test)", "Số lệnh<br>(Train / Test)", "DD<br>(nến 4h / từng phút)"], rows);
     $("pipeOrderNote").textContent = Object.values(ev)[0]?.automatic_order
-      ? "Thứ tự tự động: lợi nhuận/tháng năm kiểm chứng cao hơn → sụt giảm vốn thấp hơn → tỷ lệ thắng cao hơn."
+      ? "Thứ tự tự động: lợi nhuận/tháng Test cao hơn → DD thấp hơn → Win rate Test cao hơn."
       : "Thứ tự do admin sắp xếp. Trạng thái khóa do admin quản lý riêng cho từng pipeline.";
     $("pipeSelectedNote").textContent = cur
       ? `Đang xem: ${PIPE_LABEL[cur]}. Lựa chọn áp dụng cho Pipeline, Market, History và Performance; bảng trên luôn so sánh cả 5 pipeline.`
       : "Chưa có pipeline được mở quyền xem tín hiệu.";
-    $("pipelineAdminLink").hidden = state.user?.role !== "admin";
-    renderAccessOverview();
     $("pipeEvid").onclick = (e) => { const r = e.target.closest("[data-pipe]"); if (r) setPlanPipe(r.dataset.pipe); };
   }
 
@@ -750,7 +735,7 @@
     if (!lv) return "";
     return `<div class="conf"><div class="muted small">Lịch sử các lệnh cùng mức tin cậy "${esc(CONF[level] || level)}" (mô phỏng walk-forward, chưa trừ phí):</div>
       <table class="tbl compact"><thead><tr><th>Giai đoạn</th><th>Số lệnh</th><th>Thắng</th><th>TB thắng</th><th>TB thua</th><th>TB/lệnh</th></tr></thead>
-      <tbody>${confLine(lv.dev, "4 năm phát triển")}${confLine(lv.hidden, "Năm kiểm chứng")}</tbody></table>
+      <tbody>${confLine(lv.dev, "Train / chọn model · 4 năm")}${confLine(lv.hidden, "Test · 1 năm")}</tbody></table>
       <div class="muted small">Lưu ý: nhãn tin cậy hiện tại chưa phân biệt tốt (97% lệnh là "Thấp"); đang nghiên cứu điểm tin cậy mới.</div></div>`;
   }
 
@@ -779,7 +764,7 @@
     }
     const d = state.live.conf?.levels?.DIP;
     const note = $("dipNote") || Object.assign(document.createElement("div"), { id: "dipNote", className: "muted small" });
-    note.innerHTML = d ? `Lịch sử lệnh dip: thắng <b>${(100 * d.dev.win_rate).toFixed(0)}%</b> (${d.dev.n} lệnh, 4 năm phát triển) · năm kiểm chứng <b>${(100 * d.hidden.win_rate).toFixed(0)}%</b> (${d.hidden.n} lệnh) · TB thắng +${d.dev.avg_win_pct.toFixed(2)}% / thua ${d.dev.avg_loss_pct.toFixed(2)}%` : "";
+    note.innerHTML = d ? `Lịch sử lệnh dip: Win rate Train <b>${(100 * d.dev.win_rate).toFixed(0)}%</b> (${d.dev.n} lệnh, 4 năm) · Test <b>${(100 * d.hidden.win_rate).toFixed(0)}%</b> (${d.hidden.n} lệnh, 1 năm) · TB thắng +${d.dev.avg_win_pct.toFixed(2)}% / thua ${d.dev.avg_loss_pct.toFixed(2)}%` : "";
     $("dipTbl").after(note);
   }
 
@@ -1138,12 +1123,12 @@
       if (gen !== perfGeneration || pipe !== planPipe() || !state.user) return;
       const wf = ov.walkforward || {}, plan = ov.plan || {};
       $("perfKpis").innerHTML = [
-        [`${nm}: mô phỏng toàn bộ 5 năm`, wf.monthly_5y, "%/tháng (bình quân theo lãi kép)"], ["4 năm phát triển mô hình", wf.monthly_dev4, "%/tháng"],
-        ["Năm kiểm chứng sau khi chọn mô hình", wf.monthly_last_year, "%/tháng"], ["Sụt giảm vốn tối đa", wf.gate_dd, "% (mức lớn hơn: nến 4h / từng phút)"],
+        [`${nm}: mô phỏng toàn bộ 5 năm`, wf.monthly_5y, "%/tháng (bình quân theo lãi kép)"], ["Train / chọn model · 4 năm", wf.monthly_dev4, "%/tháng"],
+        ["Test · 1 năm", wf.monthly_last_year, "%/tháng"], ["Max DD", wf.gate_dd, "% (mức lớn hơn: nến 4h / từng phút)"],
         ["Số năm thua lỗ", wf.losing_years, "năm"],
       ].map(([k, v, s]) => `<div class="kpi"><div class="k">${k}</div><div class="v">${esc(v ?? "—")}</div><div class="s">${esc(s)}</div></div>`).join("");
-      table($("yearTbl"), ["Năm", "Lợi nhuận năm", "%/tháng", "Sụt giảm vốn (từng phút)"],
-        (wf.yearly || []).map(([a, net, dd], i, all) => `<tr><td>${esc(String(a).slice(0, 7))} → ${+String(a).slice(0, 4) + 1}${String(a).slice(4, 7)}${i === all.length - 1 ? ' <span class="pill">năm kiểm chứng</span>' : ""}</td>
+      table($("yearTbl"), ["Năm / giai đoạn", "Lợi nhuận năm", "%/tháng", "DD (từng phút)"],
+        (wf.yearly || []).map(([a, net, dd], i, all) => `<tr><td>${esc(String(a).slice(0, 7))} → ${+String(a).slice(0, 4) + 1}${String(a).slice(4, 7)} <span class="pill">${i === all.length - 1 ? "Test" : "Train / chọn model"}</span></td>
           <td>${sgn(net, 1)}</td><td>${sgn((Math.pow(1 + net / 100, 1 / 12) - 1) * 100)}</td><td>${esc(dd)}%</td></tr>`));
       const by = {};
       for (const r of st) {

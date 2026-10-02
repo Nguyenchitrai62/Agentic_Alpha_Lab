@@ -156,3 +156,18 @@ The exact 12-file follow-up scope passed whitespace and credential scans against
 Local rollout set automatic viewer access to true and restarted the idle backend. Runtime checks confirmed the old
 waiting account now has effective viewer access to three pipelines, two pipeline signal locks remain, and a request
 without a Bearer token through the public-host boundary receives 401. Health and public configuration returned 200.
+
+## Shared layout and trader labels follow-up
+
+Removed the access overview banner, role labels in the account header, and the extra admin management link/lock notes
+from data views. Admin and viewers share the same layout, with management controls confined to the Admin tab.
+Authorized pipeline selection and viewer lock/contact behavior remain enforced through the existing API client and BE.
+Historical metric labels now use Train / model selection (four years), Test (one year), DD and Win rate in both
+evaluation and Performance, including yearly stage badges. A short explanation identifies the four-year selection period;
+the displayed scores remain walk-forward results with each anchor trained only on earlier data. Values, research splits,
+ranking, scheduling, tokens and backend permissions were not changed by this follow-up.
+
+Validation: **1618 passed, 2 intentional skips**, 142 existing warnings, 463.38 seconds, with no exclusions;
+all **17 JavaScript behavior cases** passed. Isolated browser QA confirmed the shared viewer/admin layout,
+the additional Admin tab, pipeline selection, Train/Test headers and yearly badges with unchanged metric values.
+Desktop and 390px layouts were visually inspected. The exact six-file scope passed whitespace and credential scans.

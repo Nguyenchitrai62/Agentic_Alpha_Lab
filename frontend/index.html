@@ -9,11 +9,11 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="styles.css?v=20261002-viewer-access" />
+  <link rel="stylesheet" href="styles.css?v=20261002-shared-layout" />
   <script src="config.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/lightweight-charts@4.2.0/dist/lightweight-charts.standalone.production.js" defer></script>
   <script src="https://accounts.google.com/gsi/client" async defer></script>
-  <script src="app.js?v=20261002-viewer-access" defer></script>
+  <script src="app.js?v=20261002-shared-layout" defer></script>
 </head>
 <body>
   <header class="topbar">
@@ -40,7 +40,7 @@
         <p class="muted">BTC · ETH · SOL · BNB · XRP — Binance USD-M perpetual, quyết định mỗi nến 4h.</p>
         <div class="login-benefits">
           <div><b>Xem tín hiệu miễn phí</b><span id="loginAccessNote">Đăng nhập Google để xem ngay các pipeline đang mở.</span></div>
-          <div><b>So sánh cả 5 pipeline</b><span>Đầy đủ lợi nhuận, sụt giảm vốn và tỷ lệ thắng.</span></div>
+          <div><b>So sánh cả 5 pipeline</b><span>Đầy đủ lợi nhuận, DD và Win rate trên Train / Test.</span></div>
           <div><b>Pipeline nâng cao</b><span>Liên hệ admin nếu muốn xem tín hiệu đang khóa.</span></div>
         </div>
         <div id="gsiButton"></div>
@@ -64,12 +64,6 @@
 
     <!-- ===================== live market ===================== -->
     <section id="view-todo" class="view page todo" hidden>
-      <div class="access-overview" id="accessOverview">
-        <div class="access-heading"><div><div class="login-eyebrow">QUYỀN XEM TÍN HIỆU</div><h1 id="accessTitle">Đang tải quyền xem…</h1></div><span class="access-count" id="accessCount"></span></div>
-        <p class="muted" id="accessDescription"></p>
-        <div class="quick-pipelines" id="quickPipelines" aria-label="Chọn pipeline để xem tín hiệu"></div>
-        <div class="locked-pipelines" id="lockedPipelines"></div>
-      </div>
       <div class="todo-top">
         <div class="pipe-status" id="pipeStatus"></div>
         <label class="eq-in">Vốn của bạn <input type="number" id="eqInput" min="10" step="100" /> USDT</label>
@@ -78,14 +72,14 @@
         <div class="panel-h"><span>Chọn pipeline · bảng đánh giá hiệu quả</span>
           <span class="muted small">%/tháng · 2021-09 → 2026-09 · mô phỏng lệnh thật (limit, SL/TP, phí, funding)</span></div>
         <div class="table-wrap" tabindex="0" aria-label="Bảng đánh giá 5 pipeline, cuộn ngang để xem đầy đủ chỉ số"><table class="tbl compact evid" id="pipeEvid"></table></div>
-        <div class="muted small evid-note">4 năm phát triển (09/2021–09/2025): dùng để xây dựng và chọn mô hình.
-          Năm kiểm chứng (09/2025–09/2026): đánh giá sau khi đã chọn mô hình.
-          Sụt giảm vốn: mức giảm lớn nhất từ đỉnh vốn trước đó. Tỷ lệ thắng: tỷ lệ lệnh có lãi sau phí.
+        <div class="muted small evid-note">Train / chọn model: kết quả 4 năm (09/2021–09/2025) dùng để phát triển và chọn model.
+          Test: kết quả 1 năm (09/2025–09/2026) đánh giá model đã chọn.
+          Đây là kết quả mô phỏng walk-forward; tại mỗi mốc, model chỉ học từ dữ liệu trước mốc đó.
+          DD là drawdown tối đa; Win rate là tỷ lệ lệnh có lãi sau phí.
           Các cột %/tháng là lợi nhuận ròng bình quân theo lãi kép.
           Pipeline bị khóa vẫn hiện đầy đủ chỉ số đánh giá; liên hệ email trong bảng để hỏi quyền xem tín hiệu.</div>
         <div class="muted small evid-note" id="pipeOrderNote"></div>
         <div class="muted small evid-note" id="pipeSelectedNote" role="status" aria-live="polite"></div>
-        <div class="evid-note"><a id="pipelineAdminLink" href="#admin" hidden>Admin: quản lý khóa/mở và thứ tự pipeline</a></div>
       </div>
       <div class="panel board-panel">
         <div class="panel-h"><span>Việc cần làm ngay bây giờ</span><span class="muted small" id="boardMeta"></span>
@@ -158,7 +152,7 @@
       <div class="grid2">
         <div class="panel"><div class="panel-h"><span>Theo năm</span></div><table class="tbl" id="yearTbl"></table>
           <p class="fine">Phí Bybit: maker 0.02% (entry, TP), taker 0.055% (SL). Funding bất lợi: long trả 0.01%/8h, short 0.
-            Sụt giảm vốn tối đa lấy mức lớn hơn giữa nến 4h và từng phút. Chọn mô hình bằng 4 năm phát triển; năm kiểm chứng được đánh giá sau khi chọn.</p></div>
+            Max DD lấy mức lớn hơn giữa nến 4h và từng phút. Train / chọn model: 4 năm phát triển và chọn model; Test: 1 năm đánh giá model đã chọn.</p></div>
         <div class="panel"><div class="panel-h"><span>Thống kê lệnh theo coin</span></div><table class="tbl" id="coinTbl"></table></div>
       </div>
       <div class="grid2">

@@ -49,7 +49,7 @@ test('viewer selection ignores a saved restricted pipeline and only fetches allo
   const saved = storage(fresh); saved.setItem('planPipe6', 'v301');
   const paths = [];
   const ui = app(async p => { paths.push(p); return response(200, {}); }, saved);
-  assert.deepEqual(Array.from(ui.visiblePipes(), p => p.v), user.allowed_pipelines);
+  assert.deepEqual(Array.from(ui.visiblePipes(), p => p.v), Array.from(user.allowed_pipelines));
   assert.equal(ui.planPipe(), 'v285');
   await ui.loadPlans();
   assert.equal(paths.length, 4);
@@ -133,7 +133,7 @@ test('all locked pipelines keep their historical metrics visible and issue no pl
   assert.deepEqual(paths, ['/api/pipelines_summary']);
   const html = ui.$('pipeEvid').innerHTML;
   assert.ok(html.includes('6.71') && html.includes('200 / 55'));
-  assert.ok(html.includes('Năm kiểm chứng') && html.includes('4 năm phát triển'));
+  assert.ok(html.includes('Test<br>(1 năm, %/tháng)') && html.includes('Train / chọn model<br>(4 năm, %/tháng)'));
   assert.ok(html.includes('mailto:admin%40example.com'));
   assert.ok(!html.includes('data-pipe='));
 });
@@ -268,7 +268,6 @@ test('restricted selection sends no request and a lock change discards in-flight
   finish(response(200, { pipeline: 'revoked C4', coins: {} })); await pending;
   assert.equal(ui.state.live.plan, null);
   assert.equal(ui.planPipe(), 'v285');
-  assert.equal(ui.$('pipelineAdminLink').hidden, true);
 });
 
 test('admin can lock an additional free pipeline and save without changing the order', async () => {
@@ -292,7 +291,7 @@ test('admin can lock an additional free pipeline and save without changing the o
   await ui.$('savePipelineSettings').onclick();
   assert.deepEqual(submitted.locked, { ...initial.locked, v269: true });
   assert.equal(submitted.order, null); assert.equal(submitted.revision, 4);
-  assert.equal(ui.$('pipelineAdminLink').hidden, false);
+  assert.ok(!ui.$('pipeEvid').innerHTML.includes('Đang khóa với người dùng thường'));
 });
 
 const fivePipelines = () => Object.fromEntries(['v301','v295','v285','v269','v266'].map((p,i) => [p, {
@@ -317,11 +316,10 @@ test('ordinary Google login immediately renders three free choices and fetches o
   await new Promise(setImmediate);
   assert.equal(ui.$('tabs').hidden, false);
   assert.equal(ui.$('adminTab').hidden, true);
-  assert.ok(ui.$('accessTitle').textContent.includes('Đăng nhập thành công'));
-  assert.equal(ui.$('accessCount').textContent, '3 / 5 pipeline miễn phí');
-  for (const p of ['v285','v269','v266']) assert.ok(ui.$('quickPipelines').innerHTML.includes(`data-pipe="${p}"`));
-  assert.ok(!ui.$('quickPipelines').innerHTML.includes('v301'));
-  assert.ok(ui.$('lockedPipelines').innerHTML.includes('G2 · Yêu cầu mở quyền'));
+  for (const p of ['v285','v269','v266']) assert.ok(ui.$('pipeEvid').innerHTML.includes(`data-pipe="${p}"`));
+  assert.ok(!ui.$('pipeEvid').innerHTML.includes('data-pipe="v301"'));
+  assert.ok(ui.$('pipeEvid').innerHTML.includes('Liên hệ admin qua email'));
+  assert.ok(!ui.$('userBox').innerHTML.includes('class="role"'));
   assert.ok(paths.includes('/api/trade_plan?pipeline=v285'));
   assert.ok(paths.filter(p => p.includes('/api/trade_plan')).every(p => !/v301|v295/.test(p)));
   assert.ok(ui.$('pipeEvid').innerHTML.includes('aria-pressed="true"'));
@@ -339,7 +337,7 @@ test('pending user can recheck account access and enter the free dashboard witho
   assert.equal(ui.state.user.role, 'viewer');
   assert.equal(ui.$('tabs').hidden, false);
   assert.equal(ui.$('pendingRetry').disabled, false);
-  assert.equal(ui.$('accessCount').textContent, '3 / 5 pipeline miễn phí');
+  assert.deepEqual(Array.from(ui.visiblePipes(), p => p.v), Array.from(user.allowed_pipelines));
 });
 
 test('admin account revocation clears visible signals and explains how to restore access', async () => {
