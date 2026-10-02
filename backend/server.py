@@ -123,7 +123,8 @@ def health():
 
 @app.get("/api/public/config")
 def public_config():
-    return {"google_client_id": SETTINGS.google_client_id, "symbols": pipeline.SYMS, "pipeline": pipeline.PIPELINE}
+    return {"google_client_id": SETTINGS.google_client_id, "symbols": pipeline.SYMS, "pipeline": pipeline.PIPELINE,
+            "automatic_viewer_access": SETTINGS.allow_any_google_viewer, "admin_contact_email": SETTINGS.admin_contact_email}
 
 
 @app.post("/api/auth/google")
@@ -440,7 +441,11 @@ def admin_jobs(limit: int = Query(50, ge=1, le=500), user: dict = Depends(auth.r
 
 @app.get("/api/admin/users")
 def admin_users(user: dict = Depends(auth.require_admin)):
-    return db.rows("SELECT email, name, role, approved, first_seen, last_seen FROM users ORDER BY last_seen DESC")
+    users = db.rows("SELECT email, name, role, approved, access_revoked, first_seen, last_seen FROM users ORDER BY last_seen DESC")
+    for row in users:
+        row["role"] = auth.role_for(row["email"])
+        row["approved"] = row["role"] in ("admin", "viewer")
+    return users
 
 
 @app.post("/api/admin/users")
@@ -453,8 +458,9 @@ def admin_set_user(payload: dict = Body(...), user: dict = Depends(auth.require_
         raise HTTPException(400, "approved must be a boolean")
     role = "viewer"  # admins are defined only by ADMIN_EMAILS in the local .env
     with db.write() as c:
-        c.execute("INSERT INTO users(email, role, approved, first_seen, last_seen) VALUES(?,?,?,?,?) "
-                  "ON CONFLICT(email) DO UPDATE SET approved = excluded.approved", (email, role, approved, db.now_ms(), db.now_ms()))
+        c.execute("INSERT INTO users(email, role, approved, access_revoked, first_seen, last_seen) VALUES(?,?,?,?,?,?) "
+                  "ON CONFLICT(email) DO UPDATE SET approved = excluded.approved, access_revoked = excluded.access_revoked",
+                  (email, role, approved, 1 - approved, db.now_ms(), db.now_ms()))
     clear_cache()
     return {"email": email, "approved": bool(approved)}
 

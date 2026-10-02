@@ -101,6 +101,7 @@ def conn() -> sqlite3.Connection:
 
 # columns added after the first release: (table, column, type)
 MIGRATIONS = [
+    ("users", "access_revoked", "INTEGER NOT NULL DEFAULT 0"),  # explicit admin denial overrides automatic viewer access
     ("run_books", "held", "REAL"),        # position actually held after the bar (fraction of equity, signed)
     ("run_books", "avg_entry", "REAL"),   # average entry of that position
     ("run_books", "pos_sl", "REAL"),      # stop-loss / take-profit in force for it (move with avg entry and sigma)

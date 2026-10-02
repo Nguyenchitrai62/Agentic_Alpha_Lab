@@ -9,11 +9,11 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="styles.css?v=20261002-admin-pipelines" />
+  <link rel="stylesheet" href="styles.css?v=20261002-viewer-access" />
   <script src="config.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/lightweight-charts@4.2.0/dist/lightweight-charts.standalone.production.js" defer></script>
   <script src="https://accounts.google.com/gsi/client" async defer></script>
-  <script src="app.js?v=20261002-pipeline-selection" defer></script>
+  <script src="app.js?v=20261002-viewer-access" defer></script>
 </head>
 <body>
   <header class="topbar">
@@ -31,27 +31,45 @@
     <div class="user" id="userBox"></div>
   </header>
 
-  <main id="app">
+  <main id="app" tabindex="-1">
     <!-- ===================== login ===================== -->
     <section id="view-login" class="view center">
       <div class="login-card">
+        <div class="login-eyebrow">ALPHA LAB · PAPER TRADING</div>
         <h1>Gợi ý giao dịch crypto</h1>
         <p class="muted">BTC · ETH · SOL · BNB · XRP — Binance USD-M perpetual, quyết định mỗi nến 4h.</p>
+        <div class="login-benefits">
+          <div><b>Xem tín hiệu miễn phí</b><span id="loginAccessNote">Đăng nhập Google để xem ngay các pipeline đang mở.</span></div>
+          <div><b>So sánh cả 5 pipeline</b><span>Đầy đủ lợi nhuận, sụt giảm vốn và tỷ lệ thắng.</span></div>
+          <div><b>Pipeline nâng cao</b><span>Liên hệ admin nếu muốn xem tín hiệu đang khóa.</span></div>
+        </div>
         <div id="gsiButton"></div>
-        <p id="loginMsg" class="msg"></p>
+        <p id="loginMsg" class="msg" role="status" aria-live="polite"></p>
         <p class="fine">Chỉ là gợi ý nghiên cứu, không phải lời khuyên đầu tư. Hệ thống không đặt lệnh thật.</p>
       </div>
     </section>
     <section id="view-pending" class="view center" hidden>
       <div class="login-card">
-        <h1>Đang chờ duyệt</h1>
-        <p class="muted">Tài khoản <b id="pendingEmail"></b> đã đăng nhập nhưng chưa được admin cấp quyền xem.</p>
+        <h1 id="pendingTitle">Đang chờ duyệt</h1>
+        <p class="muted">Tài khoản <b id="pendingEmail"></b> đã đăng nhập.</p>
+        <p id="pendingReason" class="muted"></p>
+        <div class="account-actions">
+          <button class="btn primary" id="pendingRetry">Kiểm tra lại quyền xem</button>
+          <a class="btn" id="pendingContact">Liên hệ admin</a>
+        </div>
+        <p id="pendingMsg" class="msg" role="status" aria-live="polite"></p>
         <button class="btn" id="pendingLogout">Đăng xuất</button>
       </div>
     </section>
 
     <!-- ===================== live market ===================== -->
     <section id="view-todo" class="view page todo" hidden>
+      <div class="access-overview" id="accessOverview">
+        <div class="access-heading"><div><div class="login-eyebrow">QUYỀN XEM TÍN HIỆU</div><h1 id="accessTitle">Đang tải quyền xem…</h1></div><span class="access-count" id="accessCount"></span></div>
+        <p class="muted" id="accessDescription"></p>
+        <div class="quick-pipelines" id="quickPipelines" aria-label="Chọn pipeline để xem tín hiệu"></div>
+        <div class="locked-pipelines" id="lockedPipelines"></div>
+      </div>
       <div class="todo-top">
         <div class="pipe-status" id="pipeStatus"></div>
         <label class="eq-in">Vốn của bạn <input type="number" id="eqInput" min="10" step="100" /> USDT</label>
@@ -59,14 +77,14 @@
       <div class="panel evid-panel">
         <div class="panel-h"><span>Chọn pipeline · bảng đánh giá hiệu quả</span>
           <span class="muted small">%/tháng · 2021-09 → 2026-09 · mô phỏng lệnh thật (limit, SL/TP, phí, funding)</span></div>
-        <div class="table-wrap"><table class="tbl compact evid" id="pipeEvid"></table></div>
+        <div class="table-wrap" tabindex="0" aria-label="Bảng đánh giá 5 pipeline, cuộn ngang để xem đầy đủ chỉ số"><table class="tbl compact evid" id="pipeEvid"></table></div>
         <div class="muted small evid-note">4 năm phát triển (09/2021–09/2025): dùng để xây dựng và chọn mô hình.
           Năm kiểm chứng (09/2025–09/2026): đánh giá sau khi đã chọn mô hình.
           Sụt giảm vốn: mức giảm lớn nhất từ đỉnh vốn trước đó. Tỷ lệ thắng: tỷ lệ lệnh có lãi sau phí.
           Các cột %/tháng là lợi nhuận ròng bình quân theo lãi kép.
           Pipeline bị khóa vẫn hiện đầy đủ chỉ số đánh giá; liên hệ email trong bảng để hỏi quyền xem tín hiệu.</div>
         <div class="muted small evid-note" id="pipeOrderNote"></div>
-        <div class="muted small evid-note" id="pipeSelectedNote"></div>
+        <div class="muted small evid-note" id="pipeSelectedNote" role="status" aria-live="polite"></div>
         <div class="evid-note"><a id="pipelineAdminLink" href="#admin" hidden>Admin: quản lý khóa/mở và thứ tự pipeline</a></div>
       </div>
       <div class="panel board-panel">

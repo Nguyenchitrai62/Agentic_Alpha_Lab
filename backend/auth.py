@@ -83,8 +83,9 @@ def _new_refresh(c, sid: str, expires: int) -> str:
 
 
 def _user(email: str) -> dict:
-    u = db.one("SELECT name, picture FROM users WHERE email = ?", (email,)) or {}
+    u = db.one("SELECT name, picture, access_revoked FROM users WHERE email = ?", (email,)) or {}
     return catalog.with_permissions({"email": email, "role": role_for(email),
+                                     "access_revoked": bool(u.get("access_revoked")) and email not in SETTINGS.admin_emails,
                                      "name": u.get("name"), "picture": u.get("picture")})
 
 
@@ -135,9 +136,11 @@ def role_for(email: str) -> str:
     email = email.lower()
     if email in SETTINGS.admin_emails:
         return "admin"
+    u = db.one("SELECT approved, access_revoked FROM users WHERE email = ?", (email,))
+    if u and u["access_revoked"]:
+        return "pending"
     if email in SETTINGS.viewer_emails or SETTINGS.allow_any_google_viewer:
         return "viewer"
-    u = db.one("SELECT role, approved FROM users WHERE email = ?", (email,))
     if u and u["approved"]:
         return "viewer"  # admin comes only from ADMIN_EMAILS in .env, never from the database
     return "pending"
@@ -213,6 +216,8 @@ def require_viewer(user: dict | None = Depends(current_user)) -> dict:
     if user is None:
         raise HTTPException(401, "Sign in with Google.")
     if user["role"] not in ("viewer", "admin"):
+        if user.get("access_revoked"):
+            raise HTTPException(403, "Your account access has been revoked by the admin.")
         raise HTTPException(403, "Your account is waiting for admin approval.")
     return user
 

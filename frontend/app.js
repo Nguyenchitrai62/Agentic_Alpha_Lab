@@ -160,10 +160,13 @@
   // ------------------------------------------------------------------ auth
   async function initGsi() {
     let clientId = CFG.googleClientId;
-    if (!clientId) {
-      try { clientId = (await api("/api/public/config")).google_client_id; }
-      catch (e) { $("loginMsg").textContent = e.message; return; }
-    }
+    try {
+      const config = await api("/api/public/config");
+      clientId = clientId || config.google_client_id;
+      $("loginAccessNote").textContent = config.automatic_viewer_access
+        ? "Đăng nhập Google để xem ngay các pipeline đang mở. Không cần chờ duyệt."
+        : "Đăng nhập Google rồi liên hệ admin để được cấp quyền xem.";
+    } catch (e) { if (!clientId) { $("loginMsg").textContent = e.message; return; } }
     if (!clientId) { $("loginMsg").textContent = "Máy chủ chưa cấu hình GOOGLE_CLIENT_ID."; return; }
     await new Promise((res) => { const t = setInterval(() => { if (window.google?.accounts?.id) { clearInterval(t); res(); } }, 100); });
     google.accounts.id.initialize({ client_id: clientId, callback: onCredential, auto_select: false, ux_mode: "popup" });
@@ -196,7 +199,7 @@
     H.candles = []; H.times = []; H.orders = []; H.pos = []; H.fills = []; H.posAt = [];
     H.series = null; H.wSeries = null; H.prim = null;
     for (const key of Object.keys(lineCharts)) { lineCharts[key].remove(); delete lineCharts[key]; }
-    for (const id of ["pipeEvid", "pipeBar", "board", "todoCards", "planPanel", "watchlist", "hPipe", "ordersTbl", "oStats", "perfKpis", "yearTbl", "coinTbl", "fwSummary", "pPipe", "pipelineSettingsTbl", "pipelineMode", "pipelineSaveStatus", "usersTbl", "jobsTbl"]) {
+    for (const id of ["pipeEvid", "pipeBar", "board", "todoCards", "planPanel", "watchlist", "hPipe", "ordersTbl", "oStats", "perfKpis", "yearTbl", "coinTbl", "fwSummary", "pPipe", "pipelineSettingsTbl", "pipelineMode", "pipelineSaveStatus", "usersTbl", "jobsTbl", "quickPipelines", "lockedPipelines", "accessTitle", "accessDescription", "accessCount", "pipeSelectedNote"]) {
       const el = $(id); if (el) el.innerHTML = "";
     }
     if (tickerWs) { tickerWs.close(); tickerWs = null; }
@@ -214,7 +217,16 @@
       <div><div class="name">${esc(u.name || u.email)}</div><div class="role">${u.role === "admin" ? "Admin" : u.role === "viewer" ? "Người xem" : "Chờ duyệt"}</div></div>
       ${u.local ? '<span class="tag">local</span>' : '<button class="btn sm" id="logoutBtn">Đăng xuất</button>'}`;
     if (!u.local) $("logoutBtn").onclick = logout;
-    if (u.role === "pending") { $("pendingEmail").textContent = u.email; showOnly("pending"); $("tabs").hidden = true; return; }
+    if (u.role === "pending") {
+      clearPipelineData();
+      $("pendingEmail").textContent = u.email;
+      $("pendingTitle").textContent = u.access_revoked ? "Quyền xem đã được tạm khóa" : "Đang chờ duyệt";
+      $("pendingReason").textContent = u.access_revoked
+        ? "Admin đã thu hồi quyền xem của tài khoản này. Liên hệ admin để mở lại."
+        : "Máy chủ đang yêu cầu admin duyệt tài khoản. Sau khi được mở quyền, bấm kiểm tra lại để tiếp tục.";
+      $("pendingContact").href = `mailto:${encodeURIComponent(u.admin_contact_email || "")}`;
+      showOnly("pending"); $("tabs").hidden = true; return;
+    }
     $("tabs").hidden = false; $("adminTab").hidden = u.role !== "admin";
     state.h.pipe = null; state.perfPipe = null;
     startTicker();
@@ -234,6 +246,21 @@
   $("tabs").onclick = (e) => { const b = e.target.closest("button"); if (b) location.hash = b.dataset.view; };
   window.addEventListener("hashchange", () => state.user && state.user.role !== "pending" && route());
   $("pendingLogout").onclick = logout;
+  async function syncAccountAccess() {
+    if (!state.user) return;
+    const previous = state.user.role, user = await api("/api/auth/me");
+    state.user = user;
+    if (previous !== user.role) { clearPipelineData(); enter(); }
+    return user;
+  }
+  $("pendingRetry").onclick = async () => {
+    $("pendingRetry").disabled = true; $("pendingMsg").textContent = "Đang kiểm tra quyền xem…";
+    try {
+      const user = await syncAccountAccess();
+      $("pendingMsg").textContent = user?.role === "pending" ? "Quyền xem chưa được mở. Bạn có thể liên hệ admin qua email." : "";
+    } catch (e) { $("pendingMsg").textContent = e.message; }
+    finally { $("pendingRetry").disabled = false; }
+  };
 
   // ================================================================== LIVE
   let tvLoader = null;
@@ -316,6 +343,19 @@
     return `<p class="muted">Các pipeline đang được khóa. Bạn vẫn xem được bảng đánh giá ở tab <a href="#todo">Pipeline</a>.
       <a href="mailto:${esc(encodeURIComponent(state.user?.admin_contact_email || ""))}">Liên hệ admin để mở quyền xem tín hiệu</a>.</p>`;
   }
+  function renderAccessOverview() {
+    const pipes = visiblePipes(), admin = state.user?.role === "admin", cur = planPipe();
+    $("accessTitle").textContent = admin ? "Bạn đang xem với quyền admin" : pipes.length ? "Đăng nhập thành công · sẵn sàng xem tín hiệu" : "Chưa có pipeline được mở quyền";
+    $("accessCount").textContent = `${pipes.length} / ${PIPES.length} pipeline ${admin ? "có thể xem" : "miễn phí"}`;
+    $("accessDescription").textContent = admin
+      ? "Bạn xem được cả 5 pipeline. Khóa/mở trong trang Admin áp dụng cho người dùng thường."
+      : pipes.length ? "Chọn pipeline bên dưới để xem kế hoạch lệnh. Lựa chọn được dùng chung khi chuyển sang Market, History và Performance."
+      : "Bạn vẫn xem được đầy đủ bảng đánh giá. Liên hệ admin để mở quyền xem tín hiệu.";
+    $("quickPipelines").innerHTML = pipes.map(p => `<button type="button" class="quick-pipeline${p.v === cur ? " active" : ""}" data-pipe="${p.v}" aria-pressed="${p.v === cur}"><b>${p.nm}</b><span>${p.v === cur ? "Đang xem" : "Xem tín hiệu"}</span></button>`).join("");
+    $("quickPipelines").onclick = e => { const b = e.target.closest("[data-pipe]"); if (b) setPlanPipe(b.dataset.pipe); };
+    const locked = Object.keys(state.evid || {}).filter(v => state.evid[v].locked);
+    $("lockedPipelines").innerHTML = locked.length ? `<span>${locked.length} pipeline cần liên hệ admin:</span> ` + locked.map(v => `<a href="mailto:${esc(encodeURIComponent(state.user?.admin_contact_email || ""))}?subject=${encodeURIComponent("Xin quyền xem pipeline " + PIPE_LABEL[v])}">${esc(PIPE_LABEL[v])} · Yêu cầu mở quyền</a>`).join("") : "";
+  }
   function renderEvidence() {
     const ev = state.evid; if (!ev) return;
     const cur = planPipe();
@@ -334,7 +374,7 @@
       const last = s.monthly_last_year;
       const win = s.win_dev != null ? `${(100 * s.win_dev).toFixed(0)}% / ${(100 * (s.win_hidden ?? 0)).toFixed(0)}%` : "—";
       return `<tr class="${locked ? "locked" : cur === p.v ? "on" : ""}" ${locked ? 'data-locked="true"' : `data-pipe="${p.v}"`}><td><div class="pcell"><span class="radio"></span><div>
-        <div class="pn-name"><b>#${ev[v].rank} ${p.nm}</b></div><div class="pn-desc">${p.ds}</div>${contact}</div></div></td>
+        <div class="pn-name">${locked ? `<b>#${ev[v].rank} ${p.nm}</b>` : `<button type="button" class="pipeline-choice" data-pipe="${p.v}" aria-pressed="${cur === p.v}">#${ev[v].rank} ${p.nm}<span>${cur === p.v ? "Đang xem" : "Xem tín hiệu"}</span></button>`}</div><div class="pn-desc">${p.ds}</div>${contact}</div></div></td>
         <td class="${last >= 5 ? "up" : ""}"><b>${f(last)}</b></td><td class="${s.gate_dd > 20 ? "down" : ""}">${f(s.gate_dd, 1)}%</td>
         <td>${pct(s.win_hidden)}</td><td>${f(s.monthly_dev4)}</td><td>${f(worst)}</td><td>${f(s.monthly_5y)}</td><td>${esc(s.losing_years ?? "—")}</td><td>${win}</td>
         <td>${esc(s.trades_dev ?? "—")} / ${esc(s.trades_hidden ?? "—")}</td><td>${f(s.dd_4h, 1)}% / ${f(s.dd_1m, 1)}%</td></tr>`;
@@ -347,6 +387,7 @@
       ? `Đang xem: ${PIPE_LABEL[cur]}. Lựa chọn áp dụng cho Pipeline, Market, History và Performance; bảng trên luôn so sánh cả 5 pipeline.`
       : "Chưa có pipeline được mở quyền xem tín hiệu.";
     $("pipelineAdminLink").hidden = state.user?.role !== "admin";
+    renderAccessOverview();
     $("pipeEvid").onclick = (e) => { const r = e.target.closest("[data-pipe]"); if (r) setPlanPipe(r.dataset.pipe); };
   }
 
@@ -1224,8 +1265,8 @@
       const users = await api("/api/admin/users");
       table($("usersTbl"), ["Email", "Tên", "Quyền", "Lần cuối", ""], users.map((u) => {
         const admin = u.role === "admin";
-        return `<tr><td>${esc(u.email)}</td><td>${esc(u.name || "")}</td><td>${admin ? "Admin" : u.approved ? "Người xem" : "Chờ duyệt"}</td>
-          <td>${dt(u.last_seen)}</td><td>${admin ? "" : `<button class="btn sm" data-email="${esc(u.email)}" data-ap="${u.approved ? 0 : 1}">${u.approved ? "Thu hồi" : "Duyệt"}</button>`}</td></tr>`;
+        return `<tr><td>${esc(u.email)}</td><td>${esc(u.name || "")}</td><td>${admin ? "Admin" : u.approved ? "Người xem" : u.access_revoked ? "Đã thu hồi" : "Chờ duyệt"}</td>
+          <td>${dt(u.last_seen)}</td><td>${admin ? "" : `<button class="btn sm" data-email="${esc(u.email)}" data-ap="${u.approved ? 0 : 1}">${u.approved ? "Thu hồi" : u.access_revoked ? "Khôi phục" : "Duyệt"}</button>`}</td></tr>`;
       }));
       $("usersTbl").onclick = async (e) => {
         const b = e.target.closest("button[data-email]"); if (!b) return;
@@ -1238,7 +1279,9 @@
   // ------------------------------------------------------------------ boot
   setInterval(() => { if (state.view === "live" && state.user && state.user.role !== "pending" && !document.hidden) loadLive(); }, 120000);
   setInterval(async () => {
-    if (!state.user || state.user.role === "pending" || document.hidden) return;
+    if (!state.user || document.hidden) return;
+    try { await syncAccountAccess(); } catch (e) { toast(e.message); return; }
+    if (!state.user || state.user.role === "pending") return;
     const previous = JSON.stringify(state.user.allowed_pipelines);
     await loadEvidence();
     if (state.user && previous !== JSON.stringify(state.user.allowed_pipelines)) route();

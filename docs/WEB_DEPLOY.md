@@ -35,9 +35,11 @@ Xem `.env.example`. Các khoá quan trọng:
 Phân quyền:
 
 - **admin** (email trong `ADMIN_EMAILS`): xem mọi trang, chạy pipeline, duyệt người dùng.
-- **viewer**: email đã được admin duyệt ở trang Admin, hoặc có trong `VIEWER_EMAILS`; xem tín hiệu của những pipeline admin đã mở khóa (mặc định 3 pipeline cuối).
-- **pending**: tài khoản Google khác. Sau khi đăng nhập họ thấy trang "Đang chờ duyệt".
-- Đặt `ALLOW_ANY_GOOGLE_VIEWER=true` để mọi tài khoản Google đều xem được.
+- **viewer**: mặc định mọi tài khoản Google có email đã xác thực đều được xem ngay các pipeline admin mở khóa (mặc định CB, C4, C5), không cần admin duyệt tài khoản trước.
+- `ALLOW_ANY_GOOGLE_VIEWER=true` là mặc định mới. Với `.env` cũ đang đặt `false`, đổi thành `true` rồi khởi động lại BE để áp dụng.
+- Đặt `ALLOW_ANY_GOOGLE_VIEWER=false` nếu cần chế độ duyệt trước; lúc đó chỉ email đã duyệt hoặc có trong `VIEWER_EMAILS` được xem.
+- **pending**: tài khoản đang chờ duyệt ở chế độ duyệt trước, hoặc bị admin thu hồi quyền. FE phân biệt hai trường hợp, có nút **Kiểm tra lại quyền xem** và liên hệ admin.
+- **Admin → Người dùng → Thu hồi** chặn tài khoản ngay cả khi bật xem tự động hoặc có email trong `VIEWER_EMAILS`. **Khôi phục** mở lại quyền; token hiện tại được kiểm tra trên mỗi request.
 
 BE mặc định xếp 5 pipeline theo thứ tự: **lợi nhuận/tháng năm kiểm chứng giảm dần → sụt giảm vốn tăng dần → tỷ lệ thắng năm kiểm chứng giảm dần**;
 cuối cùng theo mã pipeline để thứ hạng ổn định khi hòa. Đọc `monthly_last_year`, `gate_dd`, `win_hidden` từ dashboard;
@@ -57,6 +59,7 @@ Scheduler luôn chạy cả 5, ưu tiên pipeline chưa hoàn thành rồi theo 
 Đặt `WEB_ADMIN_CONTACT_EMAIL` để đổi địa chỉ liên hệ. Liên kết chỉ mở email nháp, không gửi mail tự động.
 
 Chọn pipeline ở bảng đánh giá hoặc bộ chọn dùng chung cho Pipeline, Market, History và Performance.
+Phần **Quyền xem tín hiệu** hiển thị số pipeline được xem và nút chọn nhanh; pipeline bị khóa có liên kết yêu cầu mở quyền riêng.
 Dòng **Đang xem** xác nhận lựa chọn hiện tại; bảng đánh giá vẫn so sánh cả 5 pipeline.
 Khi đổi lựa chọn, FE xóa kết quả cũ, tải dữ liệu mới và bỏ qua phản hồi trễ của lựa chọn trước.
 Kết quả paper của các pipeline có thể bằng nhau ở một thời điểm; đối chiếu tên pipeline và chỉ số lịch sử trên Performance.

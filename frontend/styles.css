@@ -8,7 +8,7 @@
   --line-2: #363a45;
   --text: #d1d4dc;
   --text-hi: #f0f3fa;
-  --muted: #787b86;
+  --muted: #a0a8b8;
   --up: #089981;
   --down: #f23645;
   --accent: #2962ff;
@@ -403,3 +403,50 @@ details.adv summary .sub-line { display: block; margin: 2px 0 0 14px; font-weigh
 #pipelineSettingsTbl th:nth-child(2), #pipelineSettingsTbl td:nth-child(2) { text-align: left; }
 #pipelineSettingsTbl .note { display: block; white-space: normal; color: var(--muted); font-size: 11px; margin-top: 4px; }
 .btn:disabled { opacity: .4; cursor: default; }
+
+/* Clear account access and keyboard-friendly pipeline selection. */
+button, a, input, select { touch-action: manipulation; }
+:is(button, a, input, select, [tabindex]):focus-visible { outline: 2px solid #90b8ff; outline-offset: 3px; }
+html { scroll-padding-top: calc(var(--top-h) + 16px); }
+.login-card { width: min(520px, 92vw); padding: 32px; }
+.login-eyebrow { color: var(--muted); font-size: 11px; font-weight: 600; letter-spacing: .1em; margin-bottom: 10px; }
+.login-card h1 { font-size: 27px; line-height: 1.25; }
+.login-card > .muted { font-size: 14px; line-height: 1.6; }
+.login-benefits { display: grid; gap: 12px; text-align: left; margin-top: 24px; padding: 18px; background: var(--bg); border-radius: 8px; }
+.login-benefits b, .login-benefits span { display: block; }
+.login-benefits b { color: var(--text-hi); font-size: 14px; }
+.login-benefits span { color: var(--muted); font-size: 13px; margin-top: 4px; line-height: 1.5; }
+.account-actions { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; margin-top: 20px; }
+.account-actions .btn { display: inline-flex; align-items: center; justify-content: center; min-height: 44px; text-decoration: none; }
+.access-overview { padding: 20px; border: 1px solid var(--line-2); border-radius: 10px; background: var(--panel); margin-bottom: 16px; }
+.access-heading { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.access-heading .login-eyebrow { margin-bottom: 5px; }
+.access-heading h1 { margin: 0; font-size: 22px; line-height: 1.4; color: var(--text-hi); }
+.access-overview > p { font-size: 14px; line-height: 1.6; margin: 10px 0 16px; }
+.access-count { padding: 8px 12px; border: 1px solid var(--line-2); border-radius: 6px; white-space: nowrap; font-size: 13px; color: var(--text-hi); }
+.quick-pipelines { display: flex; flex-wrap: wrap; gap: 10px; }
+.quick-pipeline { display: flex; align-items: center; gap: 16px; min-height: 46px; padding: 10px 16px; background: var(--bg); border: 1px solid var(--line-2); border-radius: 7px; }
+.quick-pipeline b { font-size: 16px; color: var(--text-hi); }
+.quick-pipeline span { color: var(--muted); font-size: 12px; }
+.quick-pipeline:hover, .quick-pipeline.active { border-color: #90b8ff; background: #1b2540; }
+.quick-pipeline.active span { color: #b3ccff; }
+.locked-pipelines { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px; margin-top: 16px; color: var(--muted); font-size: 13px; }
+.locked-pipelines:empty { display: none; }
+.locked-pipelines a { color: #b3ccff; padding: 4px 0; text-underline-offset: 3px; }
+.pipeline-choice { display: inline-flex; align-items: center; gap: 12px; border: 0; background: transparent; color: var(--text-hi); padding: 5px 0; font-size: 14px; font-weight: 600; }
+.pipeline-choice span { color: #b3ccff; font-size: 11px; font-weight: 400; }
+.evid-panel .evid { table-layout: auto; min-width: 1380px; }
+.evid-panel .evid th:first-child { min-width: 280px; width: 24%; }
+.evid-panel .evid .pn-desc { font-size: 12px; }
+#pipeSelectedNote { color: var(--text); }
+.fine { font-size: 12px; }
+@media (max-width: 720px) {
+  .access-overview { padding: 16px; }
+  .access-heading { align-items: flex-start; flex-direction: column; gap: 10px; }
+  .access-heading h1 { font-size: 20px; }
+  .quick-pipeline { flex: 1 1 110px; justify-content: space-between; padding: 10px 12px; }
+  .login-card { padding: 24px 20px; }
+  .login-card h1 { font-size: 24px; }
+  .evid-panel .evid th:first-child { min-width: 170px; }
+  .pipeline-choice { flex-direction: column; align-items: flex-start; gap: 2px; }
+}

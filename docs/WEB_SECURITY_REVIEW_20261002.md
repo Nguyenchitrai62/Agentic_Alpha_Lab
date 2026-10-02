@@ -123,3 +123,36 @@ The complete repository suite passed without exclusions:
 `.venv/Scripts/python.exe -m pytest -o addopts='' -q --tb=short` — **1613 passed, 2 intentional skips**
 in 475.25 seconds, with the same 126 existing deprecation warnings. The five selected code/docs files passed whitespace
 and credential scans, including comparison against local `.env` secret values. No dependency changes were introduced.
+
+## Automatic free viewer access and UI follow-up
+
+Verified Google accounts now receive viewer access by default (`ALLOW_ANY_GOOGLE_VIEWER=true`). They can read only
+unlocked pipelines; anonymous requests, locked signal endpoints, and admin endpoints retain their authorization checks.
+An explicit `users.access_revoked` flag takes precedence over automatic access and VIEWER_EMAILS, while ADMIN_EMAILS
+remains the only source of admin privileges. Migration preserves existing users. Old waiting accounts become viewers in
+automatic mode; existing access/refresh sessions receive the current role and pipeline permissions on each request.
+Admin users listing reports effective access, so automatically admitted users can still be revoked/restored from the UI.
+
+The login page explains free access. The dashboard shows the allowed count, native buttons for free pipeline selection,
+and contact links for restricted pipelines. Revoked users see a distinct message and can recheck after admin restoration;
+the periodic account check clears private signal displays when access is revoked. Tokens still use Bearer headers,
+in-memory access storage, and rotating HttpOnly refresh cookies. No third-party scripts or dependencies were added.
+
+Applied [UI/UX Pro Max](https://github.com/nextlevelbuilder/ui-ux-pro-max-skill/blob/09170eec67eefd46a7ae85de61b40c194020f997/.claude/skills/ui-ux-pro-max/SKILL.md)
+guidance for authentication feedback, focus indicators, keyboard selection, contrast, and responsive layout.
+The skill was fetched into ignored local artifacts; it is not bundled with the deployed app.
+Browser QA used isolated data and a simulated Google credential provider, with real backend session/cookie handling:
+ordinary sign-in immediately showed CB/C4/C5 and all five evaluation rows; C4 selection changed the displayed plan;
+account revocation showed the blocked screen, and restoration plus recheck returned to the dashboard.
+Desktop and 390px layout were visually inspected. Mobile framing was permitted only in the isolated preview;
+production CSP/frame denial remains unchanged. The real Google provider's sign-in popup was not automated.
+
+Full validation: **1618 passed, 2 intentional skips**, 142 deprecation warnings, 467.13 seconds, with no exclusions.
+The JavaScript behavior adapter now runs **17 passing cases**. New backend cases cover automatic sign-in, migration,
+old pending sessions, locked/anonymous/admin denials, revocation despite automatic/allowlisted access, refresh and restore.
+`pip check` passed; no dependency versions changed.
+
+The exact 12-file follow-up scope passed whitespace and credential scans against local `.env` secret values.
+Local rollout set automatic viewer access to true and restarted the idle backend. Runtime checks confirmed the old
+waiting account now has effective viewer access to three pipelines, two pipeline signal locks remain, and a request
+without a Bearer token through the public-host boundary receives 401. Health and public configuration returned 200.

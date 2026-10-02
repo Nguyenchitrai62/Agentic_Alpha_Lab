@@ -2,6 +2,7 @@
 
 import importlib
 import sys
+from dataclasses import replace
 
 import pytest
 
@@ -119,6 +120,79 @@ def web_client(backend):
 
 def _bearer(auth, email):
     return {"Authorization": "Bearer " + auth.create_session(email)["access_token"]}
+
+
+def test_google_login_opens_free_pipelines_without_approval(web_client, monkeypatch):
+    client, server, (_, db, auth) = web_client
+    monkeypatch.setattr(auth, "SETTINGS", replace(auth.SETTINGS, allow_any_google_viewer=True))
+    monkeypatch.setattr(server, "SETTINGS", replace(server.SETTINGS, allow_any_google_viewer=True))
+    monkeypatch.setattr(auth, "verify_google", lambda _: {"email": "new@example.com", "name": "New viewer"})
+    response = client.post("/api/auth/google", headers={"Origin": "https://crypto.example.com"}, json={"credential": "verified-google"})
+    assert response.status_code == 200
+    pair = response.json()
+    assert pair["user"]["role"] == "viewer"
+    assert pair["user"]["allowed_pipelines"] == ["v285", "v269", "v266"]
+    assert "refresh_token" not in pair
+    assert "HttpOnly" in response.headers["set-cookie"]
+    headers = {"Authorization": "Bearer " + pair["access_token"]}
+    assert client.get("/api/pipelines_summary", headers=headers).status_code == 200
+    for pipe in ["v285", "v269", "v266"]:
+        assert client.get(f"/api/trade_plan?pipeline={pipe}", headers=headers).status_code == 200
+    for pipe in ["v301", "v295"]:
+        assert client.get(f"/api/trade_plan?pipeline={pipe}", headers=headers).status_code == 403
+    assert client.get("/api/admin/users", headers=headers).status_code == 403
+    assert client.get("/api/trade_plan?pipeline=v285").status_code == 401
+    assert client.get("/api/public/config").json()["automatic_viewer_access"] is True
+
+
+def test_existing_pending_session_gets_free_access_when_automatic_mode_enabled(web_client, monkeypatch):
+    client, _, (_, db, auth) = web_client
+    with db.write() as c:
+        c.execute("INSERT INTO users(email,role,approved) VALUES('waiting@example.com','viewer',0)")
+    pair = auth.create_session("waiting@example.com")
+    assert pair["user"]["role"] == "pending"
+    monkeypatch.setattr(auth, "SETTINGS", replace(auth.SETTINGS, allow_any_google_viewer=True))
+    headers = {"Authorization": "Bearer " + pair["access_token"]}
+    assert client.get("/api/trade_plan?pipeline=v285", headers=headers).status_code == 200
+    assert client.get("/api/auth/me", headers=headers).json()["role"] == "viewer"
+    renewed = client.post("/api/auth/refresh", headers={"Authorization": "Bearer " + pair["refresh_token"]}).json()
+    assert renewed["user"]["allowed_pipelines"] == ["v285", "v269", "v266"]
+
+
+@pytest.mark.parametrize("email", ["new@example.com", "viewer@example.com"])
+def test_admin_revocation_overrides_automatic_and_allowlisted_access(web_client, monkeypatch, email):
+    client, _, (_, _, auth) = web_client
+    monkeypatch.setattr(auth, "SETTINGS", replace(auth.SETTINGS, allow_any_google_viewer=True))
+    pair = auth.create_session(email)
+    headers = {"Authorization": "Bearer " + pair["access_token"]}
+    admin = _bearer(auth, "admin@example.com")
+    client.get("/api/trade_plan?pipeline=v285", headers=headers)  # warm cache
+    assert client.post("/api/admin/users", headers=admin, json={"email": email, "approved": False}).status_code == 200
+    assert client.get("/api/trade_plan?pipeline=v285", headers=headers).status_code == 403
+    blocked = client.get("/api/auth/me", headers=headers).json()
+    assert blocked["role"] == "pending" and blocked["access_revoked"] and blocked["allowed_pipelines"] == []
+    renewed = client.post("/api/auth/refresh", headers={"Authorization": "Bearer " + pair["refresh_token"]}).json()
+    assert renewed["user"]["allowed_pipelines"] == []
+    monkeypatch.setattr(auth, "verify_google", lambda _: {"email": email})
+    assert auth.login("verified-google")["user"]["access_revoked"]  # logging in again cannot undo denial
+    listed = next(u for u in client.get("/api/admin/users", headers=admin).json() if u["email"] == email)
+    assert listed["access_revoked"] and not listed["approved"]
+    assert client.post("/api/admin/users", headers=admin, json={"email": email, "approved": True}).status_code == 200
+    assert client.get("/api/trade_plan?pipeline=v285", headers=headers).status_code == 200
+    # SQL role/flags cannot revoke or create an ADMIN_EMAILS administrator.
+    client.post("/api/admin/users", headers=admin, json={"email": "admin@example.com", "approved": False})
+    assert client.get("/api/admin/users", headers=admin).status_code == 200
+
+
+def test_user_access_migration_preserves_legacy_waiting_and_approved_accounts(backend):
+    _, db, _ = backend
+    with db.write() as c:
+        c.execute("ALTER TABLE users DROP COLUMN access_revoked")
+        c.executemany("INSERT INTO users(email,role,approved) VALUES(?,'viewer',?)", [("waiting@example.com", 0), ("old@example.com", 1)])
+    db.init()
+    db.init()  # idempotent migration
+    assert db.rows("SELECT approved, access_revoked FROM users ORDER BY email") == [
+        {"approved": 1, "access_revoked": 0}, {"approved": 0, "access_revoked": 0}]
 
 
 def test_admin_order_and_locks_apply_to_existing_session_and_scheduler(web_client):

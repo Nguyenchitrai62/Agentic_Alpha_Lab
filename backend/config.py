@@ -33,7 +33,7 @@ class Settings:
     admin_emails: tuple[str, ...] = field(default_factory=lambda: _csv("ADMIN_EMAILS"))
     admin_contact_email: str = os.getenv("WEB_ADMIN_CONTACT_EMAIL", "trainguyenchi30@gmail.com").strip()
     viewer_emails: tuple[str, ...] = field(default_factory=lambda: _csv("VIEWER_EMAILS"))
-    allow_any_google_viewer: bool = _bool("ALLOW_ANY_GOOGLE_VIEWER", False)
+    allow_any_google_viewer: bool = _bool("ALLOW_ANY_GOOGLE_VIEWER", True)
     session_secret: str = os.getenv("AUTH_SESSION_SECRET", "")
     access_ttl_seconds: int = max(60, int(os.getenv("AUTH_ACCESS_TTL_SECONDS", "900")))
     refresh_ttl_seconds: int = max(60, int(os.getenv("AUTH_REFRESH_TTL_SECONDS", str(7 * 24 * 3600))))

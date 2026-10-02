@@ -6,7 +6,7 @@ const vm = require('node:vm');
 
 const source = fs.readFileSync(path.join(__dirname, '../frontend/app.js'), 'utf8').replace(
   '  boot();',
-  '  window.testing = { state, api, refreshSession, logout, visiblePipes, planPipe, setPlanPipe, histSource, histBoth, loadPerf, loadPlans, loadEvidence, renderEvidence, loadPipelineSettings, $ };');
+  '  window.testing = { state, api, refreshSession, logout, onCredential, syncAccountAccess, visiblePipes, planPipe, setPlanPipe, histSource, histBoth, loadPerf, loadPlans, loadEvidence, renderEvidence, loadPipelineSettings, $ };');
 const user = { email: 'viewer@example.com', role: 'viewer', allowed_pipelines: ['v285', 'v269', 'v266'] };
 const expired = { access_token: 'old', expires_at: 1, user };
 const fresh = { access_token: 'new', expires_at: Date.now() / 1000 + 900, user };
@@ -36,7 +36,7 @@ function app(fetch, localStorage = storage(), sharedLocks = locks()) {
     createChart: () => ({ remove() {}, addAreaSeries: () => ({ setData() {} }), timeScale: () => ({ fitContent() {} }) }),
   } };
   const context = { window, document: { getElementById, querySelectorAll: () => [], addEventListener() {} },
-    localStorage, navigator: { locks: sharedLocks }, fetch, setInterval() {}, setTimeout() {}, clearTimeout() {},
+    localStorage, navigator: { locks: sharedLocks }, fetch, WebSocket: class { close() {} }, setInterval() {}, setTimeout() {}, clearTimeout() {},
     location: { reload() {} }, google: { accounts: { id: { disableAutoSelect() {} } } }, console };
   vm.runInNewContext(source, context);
   window.testing.state.user = { ...user, allowed_pipelines: [...user.allowed_pipelines] };
@@ -293,4 +293,69 @@ test('admin can lock an additional free pipeline and save without changing the o
   assert.deepEqual(submitted.locked, { ...initial.locked, v269: true });
   assert.equal(submitted.order, null); assert.equal(submitted.revision, 4);
   assert.equal(ui.$('pipelineAdminLink').hidden, false);
+});
+
+const fivePipelines = () => Object.fromEntries(['v301','v295','v285','v269','v266'].map((p,i) => [p, {
+  rank:i+1, locked:i<2, automatic_order:true, walkforward:{}, admin_contact_email:'admin@example.com',
+}]));
+
+test('ordinary Google login immediately renders three free choices and fetches only allowed signals with a Bearer header', async () => {
+  const paths = [];
+  const ui = app(async (p, opts) => {
+    paths.push(p);
+    if (p === '/api/auth/google') {
+      assert.equal(opts.credentials, 'include');
+      assert.equal(JSON.parse(opts.body).credential, 'google-credential');
+      return response(200, fresh);
+    }
+    assert.equal(opts.headers.Authorization, 'Bearer new');
+    if (p === '/api/pipelines_summary') return response(200, fivePipelines());
+    return response(200, {});
+  }, storage(fresh));
+  ui.state.user = null; ui.state.token = ''; ui.state.session = null;
+  await ui.onCredential({ credential:'google-credential' });
+  await new Promise(setImmediate);
+  assert.equal(ui.$('tabs').hidden, false);
+  assert.equal(ui.$('adminTab').hidden, true);
+  assert.ok(ui.$('accessTitle').textContent.includes('Đăng nhập thành công'));
+  assert.equal(ui.$('accessCount').textContent, '3 / 5 pipeline miễn phí');
+  for (const p of ['v285','v269','v266']) assert.ok(ui.$('quickPipelines').innerHTML.includes(`data-pipe="${p}"`));
+  assert.ok(!ui.$('quickPipelines').innerHTML.includes('v301'));
+  assert.ok(ui.$('lockedPipelines').innerHTML.includes('G2 · Yêu cầu mở quyền'));
+  assert.ok(paths.includes('/api/trade_plan?pipeline=v285'));
+  assert.ok(paths.filter(p => p.includes('/api/trade_plan')).every(p => !/v301|v295/.test(p)));
+  assert.ok(ui.$('pipeEvid').innerHTML.includes('aria-pressed="true"'));
+});
+
+test('pending user can recheck account access and enter the free dashboard without signing in again', async () => {
+  const ui = app(async p => {
+    if (p === '/api/auth/me') return response(200, { ...user, admin_contact_email:'admin@example.com' });
+    if (p === '/api/pipelines_summary') return response(200, fivePipelines());
+    return response(200, {});
+  }, storage(fresh));
+  ui.state.user = { ...user, role:'pending', allowed_pipelines:[] };
+  await ui.$('pendingRetry').onclick();
+  await new Promise(setImmediate);
+  assert.equal(ui.state.user.role, 'viewer');
+  assert.equal(ui.$('tabs').hidden, false);
+  assert.equal(ui.$('pendingRetry').disabled, false);
+  assert.equal(ui.$('accessCount').textContent, '3 / 5 pipeline miễn phí');
+});
+
+test('admin account revocation clears visible signals and explains how to restore access', async () => {
+  const ui = app(async p => {
+    assert.equal(p, '/api/auth/me');
+    return response(200, { ...user, role:'pending', access_revoked:true, allowed_pipelines:[], admin_contact_email:'admin@example.com' });
+  }, storage(fresh));
+  ui.$('board').innerHTML = 'old private signals';
+  ui.$('perfKpis').innerHTML = 'old paper results';
+  ui.state.live.plan = { coins:{} };
+  await ui.syncAccountAccess();
+  assert.equal(ui.$('board').innerHTML, '');
+  assert.equal(ui.$('perfKpis').innerHTML, '');
+  assert.equal(ui.state.live.plan, null);
+  assert.equal(ui.$('tabs').hidden, true);
+  assert.equal(ui.$('pendingTitle').textContent, 'Quyền xem đã được tạm khóa');
+  assert.ok(ui.$('pendingReason').textContent.includes('thu hồi'));
+  assert.equal(ui.$('pendingContact').href, 'mailto:admin%40example.com');
 });
