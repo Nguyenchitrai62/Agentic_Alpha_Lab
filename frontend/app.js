@@ -399,6 +399,7 @@
     { v: "v266", nm: "C5", ds: "O1 + SL dip 5σ theo nến 5m + SL sàn 8σ" },
     { v: "v269", nm: "C4", ds: "O1 + SL dip 4σ theo nến 5m + SL sàn 8σ" },
     { v: "v285", nm: "CB", ds: "C4 + 20% model Coinbase premium" },
+    { v: "v321", nm: "R2", ds: "G2 + bậc dip 5σ, agent RL học từ mọi độ sâu (chọn walk-forward mọi năm)" },
   ];
   const PIPE_LABEL = Object.fromEntries(PIPES.map((p) => [p.v, p.nm]));
   function visiblePipes() {
@@ -748,8 +749,8 @@
     const sym = state.live.symbol;
     const rows = (state.live.latest?.sleeve || []).filter((r) => r.symbol === sym);
     // C4 / C5: the dip stop fires on a 5m CLOSE (bot) at 4 / 5 sigma, plus a native 8-sigma touch stop on the exchange
-    const closeK = { v301: 4, v295: 4, v285: 4, v269: 4, v266: 5 }[planPipe()];
-    const dsz = ["v295", "v301"].includes(planPipe()) ? (planOf(sym)?.dip_size || {}) : null;  // CS / G2: the agents' decision per rung
+    const closeK = { v321: 4, v301: 4, v295: 4, v285: 4, v269: 4, v266: 5 }[planPipe()];
+    const dsz = ["v295", "v301", "v321"].includes(planPipe()) ? (planOf(sym)?.dip_size || {}) : null;  // CS / G2: the agents' decision per rung
     const decOf = (r) => { if (!dsz) return null; const k = Object.keys(dsz).find((x) => Number(x) === Number(r.rung)); return k ? dsz[k] : null; };
     const mulOf = (r) => { const d = decOf(r); return d == null ? 1 : Number(typeof d === "object" ? d.size : d); };
     const tpOf = (r) => { const d = decOf(r); return d && typeof d === "object" ? Number(d.tp) : 1; };

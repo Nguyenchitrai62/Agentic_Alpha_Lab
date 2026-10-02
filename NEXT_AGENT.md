@@ -1,5 +1,9 @@
 # Handoff for the next coding agent
 
+ROUND parallel-20260906-r2 (2026-10-03): BOT paper pipelines G2 (v301) and R2 (v321, best walk-forward BOT); MANUAL best general M2 (v317 pullback, cap 2) ~3.2-3.8 %/month - floor 5% open; next registry version see `parallel_registry.py inventory` (v309-v313 ran outside the registry, prereg hashes kept).
+
+ROUND parallel-20260906-r2 (2026-10-02, newest): two products scored separately (AGENTS.md: MANUAL book-only floor 5%/DD<20/win55, BOT book+dip). Walk-forward evolution v306 (BOT), v307-v309 (MANUAL); Kaggle CPU runs via research/parallel/rounds/parallel-20260906-r2/kpack (see each version's cloud_submission.json); state in .claude/skills/alpha-lab-leader/research-map.md.
+
 ROUND parallel-20260906-r2 (2026-09-26, newest): use `/alpha-lab-leader`; state in .claude/skills/alpha-lab-leader/research-map.md.
 Evaluate with engine_real (audited); gate DD = max(4h-close, 1m-marked). Best: v178 dip-sleeve ladder 5.51%/month
 (1m DD 27.8%, fails), v179 budgeted 4.14% (1m DD 19.8%); v170 books 3.80%. Forward logs: advisor_shadow.py + dip_sleeve_forward.py.

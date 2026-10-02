@@ -70,3 +70,6 @@ research/parallel/rounds/**/*_reaudit.json
 research/parallel/rounds/**/*_blocker.json
 research/parallel/rounds/**/analysis.json
 research/parallel/rounds/**/kaggle/dataset-metadata.json
+research/parallel/rounds/**/eval_cache.jsonl
+research/parallel/rounds/**/cloud_submission.json
+research/parallel/rounds/**/prereg_sha256.txt

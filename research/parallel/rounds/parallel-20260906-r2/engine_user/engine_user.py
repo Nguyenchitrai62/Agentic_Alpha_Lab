@@ -73,11 +73,13 @@ def prepare(books, opens):
                 settle=settle_at_end, sig1h=sig1h)
 
 
-def simulate(books, opens, prep, m_sl=3.0, m_sleeve_sl=2.0, sleeve=True, target=0.25, cap=2.0, d_limit=D_LIMIT, win_end=60, sleeve_risk_budget=None, gap=0.02, m_sleeve_tp=1.0, rung_scale_fixed=None, size_mult=1.0, rungs=RUNGS, m_tp=None, hourly=False, align=None, events=None, bars=None, exec_policy=None, fixed_levels=False, attrib=None, trade=None, win_start=2, state_out=None, sleeve_filter=None, sleeve_tp=None, strat_vt=None, sleeve_start=16, risk_mult=None, sleeve_breaker=None, sleeve_stop_mode="touch", sleeve_backstop=None, sleeve_budget_sl=None, book_stop_mode="touch", book_backstop=None, sleeve_exit_agent=None, sleeve_lock_cut=False, sleeve_fill_size=None, path_out=None, book_size=None):
+def simulate(books, opens, prep, m_sl=3.0, m_sleeve_sl=2.0, sleeve=True, target=0.25, cap=2.0, d_limit=D_LIMIT, win_end=60, sleeve_risk_budget=None, gap=0.02, m_sleeve_tp=1.0, rung_scale_fixed=None, size_mult=1.0, rungs=RUNGS, m_tp=None, hourly=False, align=None, events=None, bars=None, exec_policy=None, fixed_levels=False, attrib=None, trade=None, win_start=2, state_out=None, sleeve_filter=None, sleeve_tp=None, strat_vt=None, sleeve_start=16, risk_mult=None, sleeve_breaker=None, sleeve_stop_mode="touch", sleeve_backstop=None, sleeve_budget_sl=None, book_stop_mode="touch", book_backstop=None, sleeve_exit_agent=None, sleeve_lock_cut=False, sleeve_fill_size=None, path_out=None, book_size=None, gov=None):
+    # gov: optional (dd_zero, width) of the drawdown governor g = clip((dd_zero - dd) / width, 0, 1) on the trailing 90-day peak
+    #   (default None = (0.20, 0.10), the audited governor: full size below DD 10%, zero at 20%).
     # book_size: trade mode only; optional callable (i, a, sgn) -> size multiplier of a NEW book entry order (0 = skip), decided when the
     #   order is issued (data up to the decision bar); the multiplier then scales the asset's target for the life of that order / position,
     #   so grid adds / reduces aim at the scaled target. None = unchanged results.
-    # path_out: optional dict; filled at the end with the bar index, equity (4h closes) and 1m-marked minimum per bar (no effect on results).
+    # path_out: optional dict; filled at the end with the bar index, equity (4h closes) and 1m-marked minimum / maximum per bar (no effect on results).
     # events: optional list; when given, every fill / stop / take-profit / sleeve rung is appended as a dict (no effect on results)
     # exec_policy: optional callable (i, a, dw, w_a, tgt_a, sig4_ia) -> ("limit", offset[, weight]) | ("market", 0[, weight]) | ("skip", 0)
     #   deciding how (and, with the optional weight, to which weight instead of the target)
@@ -434,11 +436,12 @@ def simulate(books, opens, prep, m_sl=3.0, m_sleeve_sl=2.0, sleeve=True, target=
             return carr, qarr, 0.0, np.nan
         return carr, qarr, cur_q, cur_e
 
+    gz, gw = (0.20, 0.10) if gov is None else gov
     for i in range(n):
         if i >= 2:
             j = i - 2
             peak = eq[max(0, j - 90 * PD + 1): j + 1].max()
-            g[i] = float(np.clip((0.20 - (1 - eq[j] / peak)) / 0.10, 0.0, 1.0))
+            g[i] = float(np.clip((gz - (1 - eq[j] / peak)) / gw, 0.0, 1.0))
         if strat_vt is not None and i >= 2 and live[i]:
             j = i - 2
             nl = int(live[:j + 1].sum())
@@ -743,7 +746,7 @@ def simulate(books, opens, prep, m_sl=3.0, m_sleeve_sl=2.0, sleeve=True, target=
         state_out.update({k: v.copy() for k, v in T.items()}, qty=q.copy(), entry=entry.copy(), equity=float(eq[-1]),
                          governor=float(g[-1]), last_i=int(n - 1))
     if path_out is not None:
-        path_out.update(t=idx, eq=eq.copy(), eq_min=eq_min.copy())
+        path_out.update(t=idx, eq=eq.copy(), eq_min=eq_min.copy(), eq_max=eq_max.copy())
     return summarize(idx, net, eq, eq_min, g, stats, eq_max)
 
 

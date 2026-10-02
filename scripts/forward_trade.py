@@ -79,9 +79,10 @@ def cs_size_hook(grid, cur_bar, start, now):
 
 
 G2_START = pd.Timestamp("2026-09-30T00:00:00Z")  # v301 G2 paper window (first bar after its deployment)
+R2_START = pd.Timestamp("2026-10-03T00:00:00Z")  # v321 R2 paper window (first bar after its deployment)
 
 
-def live_state(start, now):
+def live_state(start, now, cls=None):
     """4h opens (200 days) + 1m klines (2 days) of the majors -> v295 LiveState (shared by the CS and G2 agents)."""
     from agentic_alpha_lab.data.binance_usdm import fetch_klines
     from agentic_alpha_lab.data.coverage import require_closed_coverage
@@ -103,14 +104,14 @@ def live_state(start, now):
     if cur_bar not in o4.index:  # the bar in progress: its open is the first 1m open
         o4.loc[cur_bar] = [float(k1[s]["open"].get(cur_bar, np.nan)) for s in o4.columns]
         o4 = o4.sort_index()
-    return sa.LiveState(o4, k1)
+    return (cls or sa.LiveState)(o4, k1)
 
 
-def g2_hooks(grid, cur_bar, start, now):
-    """sleeve_fill_size + sleeve_tp hooks of the v301 G2 pipeline + the current bar's size / TP per coin and rung (for the plan)."""
-    ga = _load("v301_dip_agents_tm", ROOT / "scripts/v301_dip_agents.py")
+def g2_hooks(grid, cur_bar, start, now, agents="v301_dip_agents"):
+    """sleeve_fill_size + sleeve_tp hooks of the v301 G2 (or v321 R2) pipeline + the current bar's size / TP per coin and rung (for the plan)."""
+    ga = _load(f"{agents}_tm", ROOT / f"scripts/{agents}.py")
     fz = ga.load()
-    ls = live_state(start, now)
+    ls = live_state(start, now, getattr(ga, "LiveState", None))
     cache = {}
 
     def dec(s, T, r):
@@ -151,7 +152,7 @@ def current_dips(eu, prep, bars, events, p, kw, dip_size, cur_bar):
             continue
         tgt = float(b["target"][a])
         rows = []
-        for r, k in enumerate(eu.RUNGS):
+        for r, k in enumerate(kw.get("rungs", eu.RUNGS)):
             d = (dip_size or {}).get(s, {}).get(str(k))
             m_size = float(d["size"] if isinstance(d, dict) else d) if d is not None else 1.0
             m_tp = float(d["tp"]) if isinstance(d, dict) else 1.0
@@ -192,7 +193,7 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--policy", default=None, help="JSON with the policy parameters (default: v216 grid G2)")
     ap.add_argument("--from", dest="start", default=None, help="first traded holding bar (default FREEZE)")
-    ap.add_argument("--candidate", default="v151_deploy_v4", choices=["v151_deploy_v4", "v233_T3", "v236_W2", "v240_O1", "v266_B1", "v269_M1", "v285_D2", "v295_CS", "v301_G2"],
+    ap.add_argument("--candidate", default="v151_deploy_v4", choices=["v151_deploy_v4", "v233_T3", "v236_W2", "v240_O1", "v266_B1", "v269_M1", "v285_D2", "v295_CS", "v301_G2", "v321_R2"],
                     help="books: v205 (v151_deploy_v4 live rows, default), the v233 T3 or the v236 W2 foundation (their live rows)")
     args = ap.parse_args()
     cand = {"v151_deploy_v4": ("research_books", OUT, "v205 books + trade mode"),
@@ -208,7 +209,9 @@ def main():
             "v295_CS": ("research_books_d2", OUT.with_name("trade_plan_v295.json"),
                         "v295 CS: CB + learned dip-rung sizing (size agent trained on 35 coins, sized at the bar open)"),
             "v301_G2": ("research_books_d2", OUT.with_name("trade_plan_v301.json"),
-                        "v301 G2: CB + learned dip size AND take-profit (agents trained on 35 coins, decided at the bar open), dip budget 0.26")}
+                        "v301 G2: CB + learned dip size AND take-profit (agents trained on 35 coins, decided at the bar open), dip budget 0.26"),
+            "v321_R2": ("research_books_d2", OUT.with_name("trade_plan_v321.json"),
+                        "v321 R2: CB + dip ladder 2.5-5.0 sigma, size + take-profit agents trained on every rung depth (35 coins), budget 0.26")}
     rb_name, out_path, pipe_name = cand[args.candidate]
     p = dict(DEFAULT, **(json.loads(Path(args.policy).read_text()) if args.policy else {}))
     # per-pipeline policy overrides from audited research: O1 runs the v247 sleeve stop-risk budget 0.18 (since 2026-09-29)
@@ -223,10 +226,13 @@ def main():
                    "v295_CS": {"sleeve_risk_budget": 0.18, "sleeve_stop_mode": "close5", "sleeve_backstop": 8.0, "m_sleeve_sl": 4.0,
                                "name": "v295 CS: CB (v285 D2) + size agent x0.5 / x1 / x1.5 per dip rung, C4 rules"},
                    "v301_G2": {"sleeve_risk_budget": 0.26, "sleeve_stop_mode": "close5", "sleeve_backstop": 8.0, "m_sleeve_sl": 4.0,
-                               "name": "v301 G2: CB + dip size agent + dip take-profit agent, sleeve budget 0.26, C4 rules"}}.get(args.candidate, {}))
+                               "name": "v301 G2: CB + dip size agent + dip take-profit agent, sleeve budget 0.26, C4 rules"},
+                   "v321_R2": {"sleeve_risk_budget": 0.26, "sleeve_stop_mode": "close5", "sleeve_backstop": 8.0, "m_sleeve_sl": 4.0,
+                               "name": "v321 R2: CB + dip ladder 2.5/3/3.5/4/5 sigma, size + TP agents (all rung depths), budget 0.26, C4 rules"}}.get(args.candidate, {}))
     # D2's live Coinbase member is logged from 2026-09-29 21 UTC; its paper window starts at the next 4h bar
     start = pd.Timestamp(args.start, tz="UTC") if args.start else {"v285_D2": pd.Timestamp("2026-09-30T00:00:00Z"),
-                                                                     "v295_CS": CS_START, "v301_G2": G2_START}.get(args.candidate, FREEZE)
+                                                                     "v295_CS": CS_START, "v301_G2": G2_START,
+                                                                     "v321_R2": R2_START}.get(args.candidate, FREEZE)
     now = pd.Timestamp(datetime.now(timezone.utc))
     if now < start:  # before the first traded bar: publish an empty plan that says when trading starts
         out_path.write_text(json.dumps({"pipeline": pipe_name, "policy": p, "freeze": str(start), "generated_at": now.isoformat(),
@@ -239,7 +245,7 @@ def main():
     eu = _load("engine_user_tm", RD / "engine_user/engine_user.py")
     v212 = _load("v212_tm", RD / "v212/v212_trade_scaling.py")
     books = getattr(fw, rb_name)(eu)
-    if args.candidate in ("v285_D2", "v295_CS", "v301_G2"):  # 0.8 x the O1 advisor rows + 0.2 x the live Coinbase member (rows present in both)
+    if args.candidate in ("v285_D2", "v295_CS", "v301_G2", "v321_R2"):  # 0.8 x the O1 advisor rows + 0.2 x the live Coinbase member (rows present in both)
         lo1, lcb = fw.live_books("v240_O1"), fw.live_books("v285_CB")
         common = lo1.index.intersection(lcb.index)
         lb = 0.8 * lo1.loc[common] + 0.2 * lcb.loc[common]
@@ -278,6 +284,10 @@ def main():
     if args.candidate == "v301_G2":  # frozen v301 size + take-profit agents, decided once at the bar open
         size_hook, tp_hook, dip_size = g2_hooks(grid, cur_bar, start, now)
         kw["sleeve_fill_size"], kw["sleeve_tp"] = size_hook, tp_hook
+    if args.candidate == "v321_R2":  # frozen v321 R2 agents (fitted on every rung depth), ladder 2.5 .. 5.0 sigma, decided once at the bar open
+        size_hook, tp_hook, dip_size = g2_hooks(grid, cur_bar, start, now, "v321_r2_dip_agents")
+        kw["sleeve_fill_size"], kw["sleeve_tp"] = size_hook, tp_hook
+        kw["rungs"] = _load("v321_rungs_tm", ROOT / "scripts/v321_r2_dip_agents.py").RUNGS
     eu.simulate(books, opens.reindex(grid), prep, trade=trade, win_start=5, events=events, bars=bars, state_out=state, **kw)
     events = [e for e in events if e["t"] <= now]
     dips = current_dips(eu, prep, bars, events, p, kw, dip_size, cur_bar)

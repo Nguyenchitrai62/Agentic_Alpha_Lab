@@ -180,7 +180,7 @@ def test_stale_or_unstored_plan_does_not_complete_but_other_four_run(backend, tm
     monkeypatch.setattr(history, "store_paper", store)
     with pytest.raises(RuntimeError, match="v301"):
         pipe.job_trade_plan()
-    assert len(calls) == 5
+    assert len(calls) == len(pipe.catalog.PIPELINES)
     assert not db.kv_get("plan_status_v301") and not db.kv_get("trade_plan_v301")
     assert all(db.kv_get(f"plan_status_{p}")["completed_slot"] == slot for p in pipe.catalog.PIPELINES if p != "v301")
     assert pipe.plan_order(slot)[0] == "v301"

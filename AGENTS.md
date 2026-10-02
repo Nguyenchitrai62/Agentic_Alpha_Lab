@@ -63,6 +63,15 @@ modified from this project.
   trade win rate > 50% (after fees), general and leakage-free (walk-forward RL: a model for year Y learns only from data before
   Y minus an embargo).
 
+- Two products, scored separately (user, 2026-10-02):
+  * MANUAL (book orders only, a human can follow it): goal 1 = MANDATORY floor, every metric: >= 5%/month, DD < 20%, win rate >= 55%
+    (book trades); then goal 2 = 8%/month, DD < 15%, win rate >= 60%, easiest metric first. G2's books alone today: dev4 2.50, 2021 losing
+    (-3.6%), DD 16.4 dev / 19.6 full path, win ~51% (research/diagnostics/book_vs_bot).
+  * BOT (book + dip ladder, needs a bot): goal 8%/month, DD < 15%, win rate > 65% (all trades), easiest first; DD > 20 no automatic reject.
+    G2: dev4 6.50, 5y 6.27, last year 5.35, DD 17.1, all-trade win 66% dev (62% in 2021 and in the most recent year).
+  Evolutionary recombination of past components is allowed when judged walk-forward (v306: the GA for year Y sees only years before Y;
+  the most recent year is scored once for the finalist).
+
 ## Current execution assumptions (research engine `research/parallel/rounds/parallel-20260906-r2/engine_real`)
 
 - Binance USD-M perps BTCUSDT, ETHUSDT, SOLUSDT, BNBUSDT, XRPUSDT; decisions at closed 4h bars; execution and

@@ -204,7 +204,7 @@ def test_admin_order_and_locks_apply_to_existing_session_and_scheduler(web_clien
     # Warm both caches before changing policy; the same viewer access token must acquire/lose rights immediately.
     client.get("/api/pipelines_summary", headers=viewer)
     client.get("/api/trade_plan?pipeline=v285", headers=viewer)
-    order = ["v266", "v301", "v269", "v295", "v285"]
+    order = ["v266", "v301", "v269", "v295", "v285", "v321"]
     locks = {**original["locked"], "v301": False, "v285": True}
     payload = {"order": order, "locked": locks, "revision": 0}
     response = client.post("/api/admin/pipelines", headers=admin, json=payload)
@@ -262,8 +262,9 @@ def test_all_locked_and_all_unlocked_are_supported(web_client):
     for revision, locked in enumerate((True, False)):
         payload = {"order": policy["order"], "locked": {p: locked for p in policy["order"]}, "revision": revision}
         assert client.post("/api/admin/pipelines", headers=admin, json=payload).status_code == 200
-        assert len(client.get("/api/auth/me", headers=viewer).json()["allowed_pipelines"]) == (0 if locked else 5)
-        assert len(client.get("/api/pipelines_summary", headers=viewer).json()) == 5
+        n = len(policy["order"])
+        assert len(client.get("/api/auth/me", headers=viewer).json()["allowed_pipelines"]) == (0 if locked else n)
+        assert len(client.get("/api/pipelines_summary", headers=viewer).json()) == n
         for path in ("/api/trade_plan", "/api/overview"):
             assert client.get(path, headers=viewer).status_code == (403 if locked else 200)
             assert client.get(path, headers=admin).status_code == 200
@@ -302,12 +303,13 @@ def test_viewer_cannot_read_restricted_pipeline(web_client, path):
 def test_pipeline_permissions_and_cache_are_role_safe(web_client):
     client, _, (_, db, auth) = web_client
     admin, viewer = _bearer(auth, "admin@example.com"), _bearer(auth, "viewer@example.com")
-    for pipe in ("v301", "v295", "v285", "v269", "v266"):
+    for pipe in ("v321", "v301", "v295", "v285", "v269", "v266"):
         db.kv_set(f"trade_plan_{pipe}", {"pipeline": pipe, "coins": {"secret": pipe}})
-    assert len(client.get("/api/pipelines_summary", headers=admin).json()) == 5
+    assert len(client.get("/api/pipelines_summary", headers=admin).json()) == 6
     summary = client.get("/api/pipelines_summary", headers=viewer).json()
-    assert len(summary) == 5
-    assert [p for p in summary if summary[p]["locked"]] == ["v301", "v295"]
+    assert len(summary) == 6
+    # the pipeline added after the access rules (v321) starts admin-only; the top-two default still locks v301 / v295
+    assert [p for p in summary if summary[p]["locked"]] == ["v321", "v301", "v295"]
     assert summary["v301"]["paper_net_pct"] is None
     assert summary["v301"]["freeze"] is None
     assert client.get("/api/auth/me", headers=viewer).json()["allowed_pipelines"] == ["v285", "v269", "v266"]
@@ -494,9 +496,9 @@ def test_plan_priority_uses_product_rank_and_unfinished_cycle(backend):
     _, db, _ = backend
     pipe = importlib.import_module("backend.pipeline")
     slot = 100
-    assert pipe.plan_order(slot) == ["v301", "v295", "v285", "v269", "v266"]
+    assert pipe.plan_order(slot) == ["v321", "v301", "v295", "v285", "v269", "v266"]
     db.kv_set("plan_status_v301", {"completed_slot": slot})
-    assert pipe.plan_order(slot)[0] == "v295" and pipe.plan_order(slot)[-1] == "v301"
+    assert pipe.plan_order(slot)[0] == "v321" and pipe.plan_order(slot)[-1] == "v301"
     db.kv_set("summary_tm_v285", {"monthly_last_year": 9, "gate_dd": 15, "win_hidden": .6})
     assert pipe.plan_order(slot)[0] == "v285"
     assert pipe.plan_order(slot + pipe.H4_MS)[0] == "v285"
@@ -531,7 +533,7 @@ def test_plan_failure_still_attempts_all_five_and_retries_unfinished(backend, tm
     monkeypatch.setattr(pipe.subprocess, "run", execute)
     with pytest.raises(RuntimeError, match="v301"):
         pipe.job_trade_plan()
-    assert calls == ["v301_G2", "v295_CS", "v285_D2", "v269_M1", "v266_B1"]
+    assert calls == ["v321_R2", "v301_G2", "v295_CS", "v285_D2", "v269_M1", "v266_B1"]
     assert pipe.plan_order(db.now_ms() // pipe.H4_MS * pipe.H4_MS)[0] == "v301"
     assert not db.kv_get("plan_status_v301")
     assert db.kv_get("plan_status_v266")["completed_at"]
@@ -599,3 +601,14 @@ def test_access_permission_updates_when_ranking_changes(web_client):
     assert client.get("/api/trade_plan?pipeline=v285", headers=headers).status_code == 200
     db.kv_set("summary_tm_v285", {"monthly_last_year": 100, "gate_dd": 10, "win_hidden": .7})
     assert client.get("/api/trade_plan?pipeline=v285", headers=headers).status_code == 403
+
+
+def test_saved_policy_from_older_catalogue_appends_new_pipeline_locked(backend):
+    _, db, _ = backend
+    catalog = importlib.import_module("backend.catalog")
+    old = ["v266", "v301", "v269", "v295", "v285"]
+    db.kv_set("pipeline_access_policy", {"order": old, "locked": {p: p == "v301" for p in old}, "revision": 3})
+    pol = catalog.policy()
+    assert pol["order"][:5] == old and pol["order"][5:] == ["v321"]
+    assert pol["locked"]["v321"] is True and pol["locked"]["v301"] is True and not pol["locked"]["v285"]
+    assert catalog.allowed({"role": "viewer", "email": "nobody@example.com"}) == ["v266", "v269", "v295", "v285"]

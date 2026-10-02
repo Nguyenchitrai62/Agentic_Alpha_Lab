@@ -15,6 +15,7 @@ PIPELINES = {
     "v266": {"candidate": "v266_B1", "monthly_last_year": 4.464, "gate_dd": 19.7, "win_hidden": 0.541},
     "v269": {"candidate": "v269_M1", "monthly_last_year": 4.645, "gate_dd": 18.27, "win_hidden": 0.546},
     "v285": {"candidate": "v285_D2", "monthly_last_year": 5.167, "gate_dd": 18.39, "win_hidden": 0.558},
+    "v321": {"candidate": "v321_R2", "monthly_last_year": 5.655, "gate_dd": 18.39, "win_hidden": 0.560},
 }
 
 
@@ -34,6 +35,7 @@ def metric_order() -> list[str]:
     return sorted(PIPELINES, key=score)
 
 
+NEW_LOCKED = {"v321"}  # paper pipelines added 2026-10-03: admin-only until the admin unlocks them
 POLICY_KEY = "pipeline_access_policy"
 SUMMARY_FIELDS = ("monthly_5y", "monthly_dev4", "monthly_last_year", "dd_4h", "dd_1m", "gate_dd",
                   "losing_years", "yearly", "win_dev", "win_hidden", "trades_dev", "trades_hidden")
@@ -42,8 +44,17 @@ SUMMARY_FIELDS = ("monthly_5y", "monthly_dev4", "monthly_last_year", "dd_4h", "d
 def policy() -> dict:
     saved = db.kv_get(POLICY_KEY, {}) or {}
     automatic = saved.get("order") is None
-    order = metric_order() if automatic else saved["order"]
-    locks = saved.get("locked", {p: i < 2 for i, p in enumerate(order)})
+    ranking = metric_order()
+    if automatic:
+        order = ranking
+    else:  # a saved order from an older catalogue: drop retired pipelines, append new ones in metric order
+        order = [p for p in saved["order"] if p in PIPELINES] + [p for p in ranking if p not in saved["order"]]
+    # pipelines added after the access rules were set start LOCKED (admin-only); the top-two-locked default applies to the others
+    older = [p for p in order if p not in NEW_LOCKED]
+    default_locks = {p: p in NEW_LOCKED or older.index(p) < 2 for p in order}
+    saved_locks = saved.get("locked")
+    # a pipeline added after the locks were saved starts LOCKED (admin-only) until the admin decides
+    locks = default_locks if saved_locks is None else {p: bool(saved_locks.get(p, True)) for p in order}
     return {"order": order, "locked": locks, "automatic": automatic, "revision": saved.get("revision", 0)}
 
 
@@ -52,9 +63,9 @@ def save_policy(payload: dict, email: str) -> dict:
     if "order" not in payload or order is not None and (
             not isinstance(order, list) or len(order) != len(PIPELINES)
             or any(not isinstance(p, str) for p in order) or set(order) != set(PIPELINES)):
-        raise HTTPException(400, "order must contain all five pipelines exactly once, or null for automatic ranking.")
+        raise HTTPException(400, "order must contain every pipeline exactly once, or null for automatic ranking.")
     if not isinstance(locks, dict) or set(locks) != set(PIPELINES) or any(type(v) is not bool for v in locks.values()):
-        raise HTTPException(400, "locked must specify a boolean for each of the five pipelines.")
+        raise HTTPException(400, "locked must specify a boolean for every pipeline.")
     if type(revision) is not int or revision < 0:
         raise HTTPException(400, "revision must be a non-negative integer.")
     # Compare and save in one transaction: a second admin tab cannot silently overwrite newer changes.
