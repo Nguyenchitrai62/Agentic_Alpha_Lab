@@ -85,6 +85,23 @@ Pipeline chưa hoàn thành trong chu kỳ hiện tại chạy trước, theo th
 trạng thái hoàn thành từng pipeline lưu ở SQLite nên giữ được qua restart. Một plan lỗi vẫn thử các plan còn lại,
 đánh dấu cycle failed và thử lại sau 60 giây; startup chạy bù chu kỳ bị thiếu. Các job v205 cũ chỉ chạy khi admin yêu cầu.
 
+Ngay khi bật BE, scheduler luôn kiểm tra dữ liệu thực tế, kể cả khi marker cũ báo đã hoàn thành.
+Trước mỗi chu kỳ 4h và mỗi lần cập nhật 15 phút, nó kiểm tra khoảng trống trong nến và tải bù,
+cập nhật archive/live flow rồi bù các mốc quyết định O1/Coinbase thiếu từ lúc bắt đầu paper.
+Không còn giới hạn chạy bù 14 ngày; mốc mới nhất cũng được kiểm tra. Mỗi mốc chạy bù dùng `ADVISOR_ASOF`
+đúng thời điểm đó; dòng trễ hơn 6h được gắn `backfill`, không tính là bằng chứng prospective.
+Coinbase và Binance spot tải bù cả khoảng trống giữa dữ liệu; spot phân trang cho các đợt tắt BE dài.
+
+Flow archive và Coinbase/spot kiểm tra phần đầu vào cần cho paper hiện tại từ tháng 03/2026 (120 ngày recent + 90 ngày warmup trước freeze).
+Các khoảng trống nghiên cứu cũ hơn vẫn giữ nguyên. File nguồn bị thiếu hàng được tải lại và thay thế hàng cũ,
+không cộng trùng notional. Live flow lưu con trỏ khi còn backlog, báo lỗi để retry tiếp thay vì báo hoàn tất giả.
+Nến 4h/1m dùng cho replay và các agent phải đủ đến mốc đóng gần nhất; nến đang hình thành không bị coi là thiếu.
+
+Nếu đầu vào chưa đủ, chu kỳ báo lỗi và retry sau 60 giây trước khi tạo plan mới.
+Một plan lỗi vẫn thử bốn plan còn lại; chỉ đánh dấu hoàn tất sau khi plan đúng mốc và lịch sử paper đã lưu thành công.
+Khi máy thức dậy sau nhiều mốc đóng nến, scheduler chạy bù ngay thay vì chờ mốc kế tiếp.
+`/health.input_check` cho biết `checking`, `failed` (kèm bước lỗi) hoặc `complete`; chi tiết lỗi ở admin jobs/log.
+
 ## 3. Chạy backend
 
 **Cách nhanh:** double-click `run_backend.bat` ở gốc repo, hoặc chạy `.

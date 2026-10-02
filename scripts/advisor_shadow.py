@@ -7,6 +7,7 @@ after their bar closed are marked backfill and are not forward evidence.
 from __future__ import annotations
 
 import json
+import math
 import os
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -47,37 +48,92 @@ def _retry(fn, wait=45):
 
 
 FAST = (("v240_advisor", "v240_O1"), ("v285_cb_advisor", "v285_CB"))  # the member advisors all five site pipelines read
-BACKFILL_DAYS = 14
+# First decision closes needed by the deployed paper windows. Fresh logs must fill these too.
+PAPER_STARTS = {"v240_O1": "2026-09-28T07:59:59.999Z", "v285_CB": "2026-09-29T23:59:59.999Z"}
+
+
+def _row_key(rec):
+    return f'{rec.get("candidate")}|{pd.Timestamp(rec["decision_bar_close"]).isoformat()}'
+
+
+def _valid_row(rec):
+    if rec.get("error") or (rec.get("mode") == "backfill" and not rec.get("asof")):
+        return False
+    for key in ("perp_weight", "spot_weight"):
+        values = rec.get(key)
+        if not isinstance(values, dict):
+            return False
+        try:
+            if any(isinstance(v, bool) or not math.isfinite(v) for v in values.values()):
+                return False
+        except TypeError:
+            return False
+    return True
+
+
+def _read_rows():
+    rows = []
+    if LOG.exists():
+        for line in LOG.read_text(encoding="utf-8").splitlines():
+            if not line.strip():
+                continue
+            try:
+                row = json.loads(line)
+                if not isinstance(row, dict):
+                    continue
+                _row_key(row)
+                rows.append(row)
+            except (ValueError, TypeError, KeyError):
+                print("shadow log: ignoring an incomplete row; its decision will be repaired", flush=True)
+    return rows
+
+
+def _write_row(rec):
+    LOG.parent.mkdir(parents=True, exist_ok=True)
+    # A killed writer can leave a partial last line. Separate it from the next complete record.
+    separator = ""
+    if LOG.exists() and LOG.stat().st_size:
+        with LOG.open("rb") as f:
+            f.seek(-1, 2)
+            if f.read(1) != b"\n":
+                separator = "\n"
+    with LOG.open("a", encoding="utf-8") as f:
+        f.write(separator + json.dumps(rec, default=str) + "\n")
+
+
+def _member(mod, suffix=""):
+    import importlib.util as util
+    spec = util.spec_from_file_location(mod + suffix, Path(__file__).parent / f"{mod}.py")
+    member = util.module_from_spec(spec)
+    spec.loader.exec_module(member)
+    return member
 
 
 def backfill() -> int:
-    """Gap check + backfill of the advisors the trade plans read: every 4h decision bar of the last BACKFILL_DAYS (from each candidate's
+    """Gap check + backfill of the advisors the trade plans read: every required 4h decision bar (from each candidate's paper start or
     first row) that has no valid row gets one, computed AS OF that bar (ADVISOR_ASOF: only bars closed by then, funding up to then;
     the other inputs are joined on the bar time, so nothing after the bar reaches the features). Rows carry asof=True; rows logged more
-    than 6h after the bar are mode 'backfill' (not forward evidence, but the trade plans may replay them). The latest closed bar is
-    left to the regular fast run."""
-    import importlib.util as _u
-    rows = [json.loads(l) for l in LOG.read_text().splitlines() if l.strip()] if LOG.exists() else []
-    good = {f'{r.get("candidate")}|{r["decision_bar_close"]}' for r in rows if "perp_weight" in r}
+    than 6h after the bar are mode 'backfill' (not forward evidence, but the trade plans may replay them). Include the latest closed bar."""
+    rows = _read_rows()
+    good = {_row_key(r) for r in rows if _valid_row(r)}
     now = datetime.now(timezone.utc)
     latest = pd.Timestamp(now).floor("4h") - pd.Timedelta(milliseconds=1)          # close of the last closed 4h bar
     n_new, n_err = 0, 0
     for mod, cand in FAST:
-        mine = [pd.Timestamp(r["decision_bar_close"]) for r in rows if r.get("candidate") == cand and "perp_weight" in r]
-        if not mine:
-            continue
-        first = max(min(mine), latest - pd.Timedelta(days=BACKFILL_DAYS))
-        bars = pd.date_range(first, latest - pd.Timedelta(hours=4), freq="4h")
-        missing = [t for t in bars if f"{cand}|{t}" not in good]
+        mine = [pd.Timestamp(r["decision_bar_close"]) for r in rows if r.get("candidate") == cand and _valid_row(r)]
+        first = min([pd.Timestamp(PAPER_STARTS[cand]), *mine])
+        bars = pd.date_range(first, latest, freq="4h")
+        missing = [t for t in bars if _row_key(dict(candidate=cand, decision_bar_close=t)) not in good]
         if not missing:
             continue
-        spec = _u.spec_from_file_location(f"{mod}_bf", Path(__file__).parent / f"{mod}.py")
-        m = _u.module_from_spec(spec)
-        spec.loader.exec_module(m)
+        m = _member(mod, "_bf")
         for t in missing:
+            previous_asof = os.environ.get("ADVISOR_ASOF")
             os.environ["ADVISOR_ASOF"] = str(t)
             try:
                 rec = _retry(m.advise)
+                if rec.get("candidate") != cand or not _valid_row(rec):
+                    raise RuntimeError("Advisor returned an invalid member row")
                 if str(pd.Timestamp(rec["decision_bar_close"])) != str(t):
                     raise RuntimeError(f"as-of bar mismatch: got {rec['decision_bar_close']}, wanted {t}")
                 rec["decision_bar_close"] = str(t)
@@ -86,41 +142,47 @@ def backfill() -> int:
                 rec = dict(candidate=cand, decision_bar_close=str(t), error="backfill: " + repr(exc)[:300], asof=True)
                 n_err += 1
             finally:
-                os.environ.pop("ADVISOR_ASOF", None)
+                if previous_asof is None:
+                    os.environ.pop("ADVISOR_ASOF", None)
+                else:
+                    os.environ["ADVISOR_ASOF"] = previous_asof
             lag = now - pd.Timestamp(t).to_pydatetime()
             rec["logged_at"] = now.isoformat()
             rec["mode"] = "prospective" if lag <= PROSPECTIVE_MAX_LAG else "backfill"
-            with LOG.open("a") as f:
-                f.write(json.dumps(rec, default=str) + "\n")
-            n_new += "perp_weight" in rec
+            _write_row(rec)
+            n_new += _valid_row(rec)
             print("backfilled", cand, t, "ok" if "perp_weight" in rec else rec.get("error"), flush=True)
     print(f"backfill: {n_new} rows added, {n_err} errors")
-    return 0
+    return 1 if n_err else 0
 
 
 def main() -> int:
     now = datetime.now(timezone.utc)
+    LOG.parent.mkdir(parents=True, exist_ok=True)
+    if os.environ.get("ADVISOR_SHADOW_BACKFILL") == "1":
+        return backfill()
+    records = _read_rows()
+    fast_candidates = {cand for _, cand in FAST}
+    logged = {_row_key(r) for r in records if r.get("candidate") not in fast_candidates or _valid_row(r)}
     s = requests.Session()
+    if os.environ.get("ADVISOR_SHADOW_FAST") == "1":  # only the advisors the trade plans read (backend cycle, before its plans)
+        rows = []
+        latest = pd.Timestamp(now).floor("4h") - pd.Timedelta(milliseconds=1)
+        for mod, cand in FAST:
+            if _row_key(dict(candidate=cand, decision_bar_close=latest)) in logged:
+                continue
+            try:
+                _m = _member(mod)
+                rec = _retry(_m.advise)
+                if not _valid_row(rec) or rec.get("candidate") != cand or pd.Timestamp(rec["decision_bar_close"]) != latest:
+                    raise RuntimeError("Advisor did not produce the latest closed decision")
+                rows.append(rec)
+            except Exception as exc:  # logged, never silently skipped
+                rows.append(dict(candidate=cand, decision_bar_close=str(latest), error=repr(exc)[:300]))
+        _append(rows, logged, now)
+        return 1 if any(not _valid_row(r) for r in rows) else 0
     bars4h = fetch_klines("BTCUSDT", "4h", now - timedelta(days=500), session=s)
     daily = fetch_klines("BTCUSDT", "1d", now - timedelta(days=800), session=s)
-    logged = set()
-    if LOG.exists():
-        logged = {f'{r.get("candidate")}|{r["decision_bar_close"]}' for r in map(json.loads, filter(str.strip, LOG.read_text().splitlines()))}
-    LOG.parent.mkdir(parents=True, exist_ok=True)
-    if os.environ.get("ADVISOR_SHADOW_BACKFILL") == "1":  # gap check + as-of backfill of missed decision bars (backend cycle, first)
-        return backfill()
-    if os.environ.get("ADVISOR_SHADOW_FAST") == "1":  # only the advisors the trade plans read (backend cycle, before its plans)
-        import importlib.util as _u
-        rows = []
-        for mod, cand in FAST:
-            try:
-                _spec = _u.spec_from_file_location(mod, Path(__file__).parent / f"{mod}.py")
-                _m = _u.module_from_spec(_spec); _spec.loader.exec_module(_m)
-                rows.append(_retry(_m.advise))
-            except Exception as exc:  # logged, never silently skipped
-                rows.append(dict(candidate=cand, decision_bar_close=str(bars4h["close_time"].iloc[-1]), error=repr(exc)[:300]))
-        _append(rows, logged, now)
-        return 0
     funding = pd.DataFrame(s.get("https://fapi.binance.com/fapi/v1/fundingRate", params={"symbol": "BTCUSDT", "limit": 1000}, timeout=60).json())
     funding["fundingRate"] = funding["fundingRate"].astype(float)
     funding["fundingTime"] = pd.to_datetime(funding["fundingTime"], unit="ms", utc=True)
@@ -206,16 +268,16 @@ def main() -> int:
 
 def _append(recs, logged, now) -> None:
     for rec in recs:
-        key = f'{rec["candidate"]}|{rec["decision_bar_close"]}'
+        key = _row_key(rec)
         if key in logged:
             print("already logged", key)
             continue
         lag = now - datetime.fromisoformat(rec["decision_bar_close"])
         rec["logged_at"] = now.isoformat()
         rec["mode"] = "prospective" if lag <= PROSPECTIVE_MAX_LAG else "backfill"
-        with LOG.open("a") as f:
-            f.write(json.dumps(rec) + "\n")
-        logged.add(key)
+        _write_row(rec)
+        if _valid_row(rec) or rec["candidate"] not in PAPER_STARTS:
+            logged.add(key)
         print(json.dumps(rec, indent=1))
 
 
@@ -282,18 +344,54 @@ def portfolio_row(session: requests.Session, now: datetime) -> dict:
     return dict(candidate="portfolio_v1_3book", decision_bar_close=str(data["BTCUSDT"]["bars4h"]["close_time"].iloc[-1]), **t)
 
 
+def _pid_alive(pid: int) -> bool:
+    if pid <= 0:
+        return False
+    if os.name != "nt":
+        try:
+            os.kill(pid, 0)
+            return True
+        except ProcessLookupError:
+            return False
+        except PermissionError:
+            return True
+    # On Windows os.kill(pid, 0) can terminate a process: query its status through WinAPI instead.
+    import ctypes
+    from ctypes import wintypes
+    kernel = ctypes.WinDLL("kernel32", use_last_error=True)
+    kernel.OpenProcess.argtypes = (wintypes.DWORD, wintypes.BOOL, wintypes.DWORD)
+    kernel.OpenProcess.restype = wintypes.HANDLE
+    kernel.GetExitCodeProcess.argtypes = (wintypes.HANDLE, ctypes.POINTER(wintypes.DWORD))
+    kernel.CloseHandle.argtypes = (wintypes.HANDLE,)
+    handle = kernel.OpenProcess(0x1000, False, pid)
+    if not handle:
+        return ctypes.get_last_error() == 5  # access denied: conservatively assume alive
+    try:
+        code = wintypes.DWORD()
+        return not kernel.GetExitCodeProcess(handle, ctypes.byref(code)) or code.value == 259
+    finally:
+        kernel.CloseHandle(handle)
+
+
 def _locked_main() -> int:
     """Run main() under an exclusive lock file so concurrent loop copies cannot write duplicate rows."""
     import os
     import time
-    lock = Path(__file__).resolve().parents[1] / "artifacts/research/advisor_shadow/run.lock"
-    if lock.exists() and time.time() - lock.stat().st_mtime > 3600:
-        lock.unlink(missing_ok=True)  # stale lock from a crashed run
+    lock = LOG.resolve().with_name("run.lock")
+    lock.parent.mkdir(parents=True, exist_ok=True)
+    if lock.exists():
+        try:
+            owner = lock.read_text().strip()
+            alive = _pid_alive(int(owner))
+        except (ValueError, OSError):
+            alive = time.time() - lock.stat().st_mtime <= 3600
+        if not alive:
+            lock.unlink(missing_ok=True)  # recover immediately after a crashed/killed writer
     try:
         fd = os.open(lock, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
     except FileExistsError:
         print("another advisor_shadow run holds", lock, "- skipping")
-        return 0
+        return 3  # Busy is incomplete, never a successful gap repair.
     try:
         os.write(fd, str(os.getpid()).encode())
         os.close(fd)

@@ -336,7 +336,8 @@ def test_plan_failure_still_attempts_all_five_and_retries_unfinished(backend, tm
     folder = tmp_path / "artifacts/research/advisor_shadow"
     folder.mkdir(parents=True)
     for name in pipe.catalog.PIPELINES:
-        (folder / f"trade_plan_{name}.json").write_text(json.dumps({"coins": {}, "net_return_pct": 0, "bars": []}))
+        (folder / f"trade_plan_{name}.json").write_text(json.dumps({"coins": {}, "net_return_pct": 0, "bars": [],
+                                                                 "decision_bar": str(__import__("pandas").Timestamp.now(tz="UTC").floor("4h"))}))
     monkeypatch.setattr(pipe, "ROOT", tmp_path)
     monkeypatch.setattr(history, "store_paper", lambda *a: None)
     calls = []

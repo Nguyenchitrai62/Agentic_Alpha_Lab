@@ -91,10 +91,18 @@ def research_books_d2(eu):
 
 
 def live_books(candidate="v151_deploy_v4"):
-    rows = [json.loads(l) for l in open(ROOT / "artifacts/research/advisor_shadow/shadow.jsonl", encoding="utf-8") if l.strip()]
+    rows = []
+    with open(ROOT / "artifacts/research/advisor_shadow/shadow.jsonl", encoding="utf-8") as log:
+        for line in log:
+            try:
+                row = json.loads(line)
+                if isinstance(row, dict):
+                    rows.append(row)
+            except ValueError:  # a crashed writer's partial line is repaired by the shadow gap check
+                continue
     # prospective rows + as-of backfill rows of missed cycles (advisor_shadow.py backfill: computed only with data up to their bar);
     # a prospective row always wins over a backfill row of the same bar; error rows are skipped
-    rows = [r for r in rows if r.get("candidate") == candidate and "perp_weight" in r
+    rows = [r for r in rows if r.get("candidate") == candidate and not r.get("error") and "perp_weight" in r
             and (r.get("mode") == "prospective" or (r.get("mode") == "backfill" and r.get("asof")))]
     rows.sort(key=lambda r: r.get("mode") == "prospective")
     out = {}
@@ -107,14 +115,17 @@ def live_books(candidate="v151_deploy_v4"):
 
 def market(start, now):
     from agentic_alpha_lab.data.binance_usdm import fetch_klines
+    from agentic_alpha_lab.data.coverage import require_closed_coverage
     import requests
     sess = requests.Session()
     k4, k1 = {}, {}
     for s in SYMS:
         a = fetch_klines(s, "4h", (start - pd.Timedelta(days=100)).to_pydatetime(), now.to_pydatetime(), session=sess)
+        require_closed_coverage(a, start - pd.Timedelta(days=100), now, "4h")
         a["open_time"] = pd.to_datetime(a["open_time"], utc=True)
         k4[s] = a.set_index("open_time")["open"].astype(float)
         m = fetch_klines(s, "1m", (start - pd.Timedelta(hours=4)).to_pydatetime(), now.to_pydatetime(), session=sess)
+        require_closed_coverage(m, start - pd.Timedelta(hours=4), now, "1min")
         m["open_time"] = pd.to_datetime(m["open_time"], utc=True)
         k1[s] = m.drop_duplicates("open_time").set_index("open_time")[["open", "high", "low", "close"]].astype(float)
     return pd.DataFrame(k4), k1

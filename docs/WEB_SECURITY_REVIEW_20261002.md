@@ -69,3 +69,40 @@ Existing session tokens require sign-in again. The deployed site itself and the 
 Browsers blocking third-party cookies may block refresh on a Vercel domain; use the existing custom FE domain on the same site as the API.
 Local no-auth remains an explicit localhost option and rejects cross-site browser requests, forwarded headers and public Host values.
 This audit does not establish that the whole system has no security vulnerabilities.
+
+## Scheduler recovery follow-up
+
+Startup now always checks and repairs actual inputs before running the five plans. The 4h cycle and 15-minute refresh use
+the same ordered prerequisites: candles, archive/live flow, as-of member gap repair, member validation, then all five plans.
+Unfinished plans retain product/admin priority. A failed prerequisite blocks new plans and the scheduler retries after 60 seconds;
+a failed plan still allows the other four attempts. Stale plan artifacts and failed paper-history writes cannot complete a plan.
+Sleeping across multiple closes wakes into recovery immediately. `/health` exposes status and the failed step only, without signal
+payloads or private exception text in the new `input_check` field.
+
+Backfill includes every required decision from the frozen paper starts, without a 14-day cap, including a fresh/partially written
+log and the newest closed decision. Failed member rows remain retryable. As-of environment settings are restored after each attempt;
+delayed rows remain labelled backfill. The shadow writer checks lock-owner liveness: a crashed process can recover immediately,
+an active process retains its lock even after an hour, and a busy lock returns failure rather than false success.
+Windows process status uses WinAPI, avoiding the process-termination semantics of `os.kill(pid, 0)` on Windows.
+
+Candle checks cover internal gaps and tails. Coinbase/spot recovery repairs interior holes and paginates long outages.
+Flow and Coinbase/spot checks cover the frozen paper input/warmup range from March 2026 onward, preserving older research gaps.
+Missing archive rows invalidate manifest completeness; replaying a source replaces its aggregates rather than doubling them.
+REST backlog saves a cursor and fails until closed-data coverage is reached, even if the API returns a short page with gaps.
+A legacy partial JSON cursor is rebuilt from the archive end; new cursor writes use an atomic file replacement.
+Replay and agent inputs reject missing closed 4h/1m bars.
+
+Read-only local inspection found no missing closed candles in the web DB, three missing O1 decisions, and no pipeline completion
+markers yet. Flow archives also contain older research gaps; these are not fabricated or used to block the current frozen window.
+The inspection did not execute production recovery or inference. Local ignored details: `artifacts/web/scheduler_state_audit.json`.
+
+Added recovery tests cover startup despite current markers, sleep/resume, prerequisite failure, individual plan failure, old/fresh
+shadow gaps, partial log writes, lock recovery, live cursor continuation, source replacement, and Coinbase/spot pagination.
+No dependency or authentication configuration was changed by this follow-up. Actual runtime recovery requires restarting BE
+with the new code and `WEB_SCHEDULER_ENABLED=true`; upstream outages remain failures until those public sources are available.
+
+Final follow-up validation: **36 recovery tests passed**. The full suite, without exclusions, then passed:
+`.venv/Scripts/python.exe -m pytest -o addopts='' -q --tb=short` — **1613 passed, 2 intentional skips**,
+no failures (448.12 seconds). The 126 warnings are existing FastAPI/Starlette deprecations.
+`pip check` and the staged whitespace check passed. The exact 13-file follow-up scope was scanned against credential patterns
+and local `.env` secret values, with no matches. Models, downloaded data, audit outputs and unrelated research changes are excluded.

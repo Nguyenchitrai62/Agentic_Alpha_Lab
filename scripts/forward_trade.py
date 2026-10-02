@@ -43,6 +43,7 @@ CS_START = pd.Timestamp("2026-09-30T00:00:00Z")  # v295 CS paper window (first b
 def cs_size_hook(grid, cur_bar, start, now):
     """sleeve_fill_size hook of the v295 CS pipeline + the current bar's size per coin and rung (for the plan)."""
     from agentic_alpha_lab.data.binance_usdm import fetch_klines
+    from agentic_alpha_lab.data.coverage import require_closed_coverage
     import requests
     sa = _load("v295_size_agent_tm", ROOT / "scripts/v295_size_agent.py")
     frozen = sa.load()
@@ -50,9 +51,11 @@ def cs_size_hook(grid, cur_bar, start, now):
     o4, k1 = {}, {}
     for s in SYMS:
         a = fetch_klines(s, "4h", (start - pd.Timedelta(days=200)).to_pydatetime(), now.to_pydatetime(), session=sess)
+        require_closed_coverage(a, start - pd.Timedelta(days=200), now, "4h")
         a["open_time"] = pd.to_datetime(a["open_time"], utc=True)
         o4[s] = a.set_index("open_time")["open"].astype(float)
         m = fetch_klines(s, "1m", (start - pd.Timedelta(days=2)).to_pydatetime(), now.to_pydatetime(), session=sess)
+        require_closed_coverage(m, start - pd.Timedelta(days=2), now, "1min")
         m["open_time"] = pd.to_datetime(m["open_time"], utc=True)
         k1[s] = m.drop_duplicates("open_time").set_index("open_time")[["open", "high", "low", "close"]].astype(float)
     o4 = pd.DataFrame(o4)
@@ -81,15 +84,18 @@ G2_START = pd.Timestamp("2026-09-30T00:00:00Z")  # v301 G2 paper window (first b
 def live_state(start, now):
     """4h opens (200 days) + 1m klines (2 days) of the majors -> v295 LiveState (shared by the CS and G2 agents)."""
     from agentic_alpha_lab.data.binance_usdm import fetch_klines
+    from agentic_alpha_lab.data.coverage import require_closed_coverage
     import requests
     sa = _load("v295_size_agent_ls", ROOT / "scripts/v295_size_agent.py")
     sess = requests.Session()
     o4, k1 = {}, {}
     for s in SYMS:
         a = fetch_klines(s, "4h", (start - pd.Timedelta(days=200)).to_pydatetime(), now.to_pydatetime(), session=sess)
+        require_closed_coverage(a, start - pd.Timedelta(days=200), now, "4h")
         a["open_time"] = pd.to_datetime(a["open_time"], utc=True)
         o4[s] = a.set_index("open_time")["open"].astype(float)
         m = fetch_klines(s, "1m", (start - pd.Timedelta(days=2)).to_pydatetime(), now.to_pydatetime(), session=sess)
+        require_closed_coverage(m, start - pd.Timedelta(days=2), now, "1min")
         m["open_time"] = pd.to_datetime(m["open_time"], utc=True)
         k1[s] = m.drop_duplicates("open_time").set_index("open_time")[["open", "high", "low", "close"]].astype(float)
     o4 = pd.DataFrame(o4)

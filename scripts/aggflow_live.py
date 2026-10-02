@@ -15,6 +15,8 @@ reaches the features).
 from __future__ import annotations
 
 import json
+import os
+import tempfile
 import time
 from pathlib import Path
 
@@ -30,6 +32,9 @@ TNAME = ("lt10k", "10k_100k", "100k_1m", "ge1m")
 COLS = [f"{a}_{b}" for a in ("buy", "sell", "n") for b in TNAME]
 MAX_CALLS = 400  # per symbol per run (weight 20 each; a backlog continues on the next run)
 WEIGHT_PAUSE = 1200  # pause until the next minute when the IP's used weight (limit 2400/min) passes this, so the advisors never hit 429
+# Earliest frozen paper decision: 2026-09-28; its member features use 120 days of recent rows
+# plus 540 x 4h bars of flow warmup. Older research archive gaps must not block current paper runs.
+FLOW_CHECK_START = pd.Timestamp("2026-03-01", tz="UTC")
 
 
 def _base_url() -> str:
@@ -53,12 +58,37 @@ def _add(buckets, arch_end, t, n, sell):
             b[f"{k}_{tr}"] += float(row[k])
 
 
+def _save_state(path: Path, state: dict) -> None:
+    fd, name = tempfile.mkstemp(dir=path.parent, prefix=path.stem, suffix=".tmp")
+    temp = Path(name)
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            json.dump(state, f)
+        temp.replace(path)
+    finally:
+        temp.unlink(missing_ok=True)
+
+
 def update(sym: str, session: requests.Session, orders: bool = False) -> str:
     base = OUT_ORDERS if orders else OUT
     sp = base / f"live_state_{sym}.json"
     arch = _archive(sym, base)
-    arch_end = (arch.index.max() + pd.Timedelta(hours=4)) if len(arch) else pd.Timestamp.now(tz="UTC").floor("4h")
-    st = json.loads(sp.read_text()) if sp.exists() else {}
+    if arch.empty:
+        raise RuntimeError(f"{sym}: missing flow archive; run fetch_aggtrades_flow.py first")
+    from agentic_alpha_lab.data.coverage import missing_ranges
+    gaps = missing_ranges((t.value // 1_000_000 for t in arch.index),
+                          FLOW_CHECK_START.value // 1_000_000,
+                          arch.index.max().value // 1_000_000, 4 * 3600_000)
+    if gaps:
+        raise RuntimeError(f"{sym}: flow archive has missing bars; refresh its source files first")
+    arch_end = arch.index.max() + pd.Timedelta(hours=4)
+    try:
+        st = json.loads(sp.read_text()) if sp.exists() else {}
+    except ValueError:  # a legacy writer interrupted at shutdown: rebuild from the refreshed archive end
+        st = {}
+    # A refreshed archive can cover the old live cursor after long downtime. Resume REST from its new end.
+    if st and pd.Timestamp(st.get("updated_at", "1970-01-01T00:00:00Z")) <= arch_end:
+        st = {}
     url = f"{_base_url()}/fapi/v1/aggTrades"
     if not st.get("last_id"):
         start_ms = int(arch_end.timestamp() * 1000)
@@ -66,20 +96,24 @@ def update(sym: str, session: requests.Session, orders: bool = False) -> str:
         if isinstance(j, dict):  # e.g. -4166: the time search only reaches back 2 days -> refresh the archive first
             raise RuntimeError(f"{sym}: cannot locate the first live trade after {arch_end}: {j} (run fetch_aggtrades_flow.py first)")
         if not j:
+            if arch_end < pd.Timestamp.now(tz="UTC").floor("4h"):
+                raise RuntimeError(f"{sym}: live flow still missing after {arch_end}")
             return f"{sym}: no trades after {arch_end}"
         st = {"last_id": int(j[0]["a"]) - 1, "buckets": {}}
     buckets = {pd.Timestamp(k): v for k, v in st.get("buckets", {}).items()}
-    calls, n_new = 0, 0
+    calls, n_new, exhausted = 0, 0, False
     while calls < MAX_CALLS:
         r = session.get(url, params={"symbol": sym, "fromId": st["last_id"] + 1, "limit": 1000}, timeout=30)
         calls += 1
         if r.status_code == 429 or r.status_code == 418:
             time.sleep(60)
             continue
+        r.raise_for_status()
         if int(r.headers.get("X-MBX-USED-WEIGHT-1M", 0) or 0) > WEIGHT_PAUSE:
             time.sleep(61 - time.time() % 60)
         j = r.json()
         if not j:
+            exhausted = True
             break
         d = pd.DataFrame(j)
         n = d["p"].astype(float) * d["q"].astype(float)
@@ -99,14 +133,23 @@ def update(sym: str, session: requests.Session, orders: bool = False) -> str:
         else:
             _add(buckets, arch_end, pd.to_datetime(d["T"], unit="ms", utc=True).dt.floor("4h"), n, sell)
         st["last_id"] = int(d["a"].iloc[-1])
+        st["last_trade_ms"] = int(d["T"].iloc[-1])
         n_new += len(d)
         if len(d) < 1000:
+            exhausted = True
             break
     # drop buckets the archive now covers
     buckets = {k: v for k, v in buckets.items() if k >= arch_end}
     st["buckets"] = {str(k): v for k, v in sorted(buckets.items())}
     st["updated_at"] = pd.Timestamp.now(tz="UTC").isoformat()
-    sp.write_text(json.dumps(st))
+    closed_ms = int(pd.Timestamp.now(tz="UTC").floor("4h").timestamp() * 1000)
+    live_gaps = missing_ranges((t.value // 1_000_000 for t in buckets),
+                               arch_end.value // 1_000_000, closed_ms - 4 * 3600_000, 4 * 3600_000)
+    complete = (exhausted or st.get("last_trade_ms", 0) >= closed_ms) and not live_gaps
+    st["closed_coverage_complete"] = complete
+    _save_state(sp, st)
+    if not complete:
+        raise RuntimeError(f"{sym}: live flow backlog remains after {calls} calls; cursor saved for retry")
     return f"{sym}: +{n_new} aggTrades in {calls} calls, live buckets {len(buckets)} from {min(buckets) if buckets else '-'}"
 
 

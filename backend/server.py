@@ -118,7 +118,7 @@ def health():
     cyc = db.one("SELECT status, started_at, finished_at, triggered_by FROM jobs WHERE kind = 'cycle' ORDER BY id DESC LIMIT 1")
     return {"status": "ok", "version": APP_VERSION, "pipeline": pipeline.PIPELINE, "last_job": last, "last_cycle": cyc,
             "scheduler": SETTINGS.scheduler_enabled, "next_cycle_utc": _next_cycle["t"], "scheduler_heartbeat_utc": _heartbeat["t"],
-            "last_cycle_done_ms": _last_cycle_ms()}
+            "last_cycle_done_ms": _last_cycle_ms(), "input_check": db.kv_get("pipeline_input_check")}
 
 
 @app.get("/api/public/config")
@@ -490,24 +490,27 @@ def _run_cycle_until_done(trigger: str):
         trigger = "retry"
 
 
+def _due_slot(now_ms: int) -> int:
+    slot = now_ms // pipeline.H4_MS * pipeline.H4_MS
+    return slot - pipeline.H4_MS if now_ms < slot + SETTINGS.schedule_offset_minutes * 60_000 else slot
+
+
+def _cycle_incomplete(now_ms: int) -> bool:
+    slot = _due_slot(now_ms)
+    return any((db.kv_get(f"plan_status_{p}", {}) or {}).get("completed_slot", 0) < slot
+               or not db.kv_get(f"trade_plan_{p}") for p in catalog.PIPELINES)
+
+
 def _scheduler():
-    time.sleep(5)
     _keep_awake()
     _heartbeat["t"] = datetime.now(timezone.utc).isoformat()
-    if not db.one("SELECT 1 AS x FROM candles LIMIT 1"):
-        pipeline.run_job("candles", pipeline.job_candles, "startup")
-    # Startup/catch-up uses all five current plans; retired v205 jobs are admin-only.
-    now_ms = db.now_ms()
-    due_slot = now_ms // pipeline.H4_MS * pipeline.H4_MS
-    if now_ms < due_slot + SETTINGS.schedule_offset_minutes * 60_000:
-        due_slot -= pipeline.H4_MS
-    if _last_cycle_ms() < due_slot or any(
-            (db.kv_get(f"plan_status_{p}", {}) or {}).get("completed_slot", 0) < due_slot
-            for p in catalog.PIPELINES):
-        _run_cycle_until_done("catch-up")
-    clear_cache()
+    startup = True
     while True:
         try:
+            # Always inspect/repair inputs immediately at startup, even if completion markers look current.
+            if startup or _cycle_incomplete(db.now_ms()):
+                _run_cycle_until_done("startup" if startup else "catch-up")
+                startup = False
             now = datetime.now(timezone.utc)
             nxt = now.replace(minute=0, second=0, microsecond=0) + timedelta(hours=4 - now.hour % 4, minutes=SETTINGS.schedule_offset_minutes)
             if nxt - now > timedelta(hours=4):
@@ -515,12 +518,16 @@ def _scheduler():
             log.info("scheduler: next pipeline cycle at %s UTC (%s local); candles refresh every 15 min",
                      nxt.strftime("%Y-%m-%d %H:%M"), nxt.astimezone().strftime("%H:%M"))
             _next_cycle["t"] = nxt.isoformat()
-            while (wait := (nxt - datetime.now(timezone.utc)).total_seconds()) > 5:
+            while (wait := (nxt - datetime.now(timezone.utc)).total_seconds()) > 0:
                 _heartbeat["t"] = datetime.now(timezone.utc).isoformat()
                 time.sleep(min(wait, 900))
                 _heartbeat["t"] = datetime.now(timezone.utc).isoformat()
+                # A sleep/resume or long refresh may cross several closes. Repair now, without waiting for the next one.
+                if _due_slot(db.now_ms()) >= pipeline._ms(nxt) // pipeline.H4_MS * pipeline.H4_MS:
+                    break
                 if (nxt - datetime.now(timezone.utc)).total_seconds() > 60:
-                    pipeline.refresh_candles_quietly()  # keep candles <= 15 min old between cycles
+                    if not pipeline.refresh_candles_quietly():
+                        _run_cycle_until_done("refresh-retry")
                     clear_cache()
             _run_cycle_until_done("scheduler")
             clear_cache()

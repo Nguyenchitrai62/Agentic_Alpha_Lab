@@ -99,6 +99,25 @@ def aggregate(raw: bytes, store_1m: list | None = None) -> pd.DataFrame:
 MARKET = "futures/um"
 
 
+def source_complete(acc, key: str, listing_start=None) -> bool:
+    """A manifest entry is usable only while its closed 4h rows remain on disk."""
+    if acc is None or acc.empty:
+        return False
+    from agentic_alpha_lab.data.coverage import missing_ranges
+    stamp = re.search(r"-(\d{4}-\d{2})(-\d{2})?\.zip$", key)
+    first = pd.Timestamp(stamp.group(1) + (stamp.group(2) or "-01"), tz="UTC")
+    stop = first + (pd.Timedelta(days=1) if stamp.group(2) else pd.offsets.MonthBegin(1))
+    # A symbol's first monthly archive can begin mid-month at listing.
+    if first < pd.Timestamp("2026-03-01", tz="UTC"):
+        first = max(first, acc.index.min() if listing_start is None else listing_start)
+    last = min(stop, pd.Timestamp.now(tz="UTC").floor("4h")) - pd.Timedelta(hours=4)
+    if first > last:
+        return False
+    times = acc.index[(acc.index >= first) & (acc.index <= last)]
+    return not missing_ranges((t.value // 1_000_000 for t in times),
+                              first.value // 1_000_000, last.value // 1_000_000, 4 * 3600_000)
+
+
 def run(sym: str, only=None, since=None):
     OUT.mkdir(parents=True, exist_ok=True)
     path, man_p = OUT / f"{sym}_flow_4h.parquet", OUT / f"manifest_{sym}.json"  # one manifest per symbol (parallel runs)
@@ -108,12 +127,12 @@ def run(sym: str, only=None, since=None):
     last = max(re.search(r"(\d{4}-\d{2})\.zip", k).group(1) for k in monthly)
     daily = [k for k in keys(f"data/{MARKET}/daily/aggTrades/{sym}/")
              if re.search(r"-(\d{4}-\d{2})-\d{2}\.zip$", k) and re.search(r"-(\d{4}-\d{2})-\d{2}\.zip$", k).group(1) > last]
-    todo = [k for k in monthly + daily if k.rsplit("/", 1)[-1] not in done]
+    acc = pd.read_parquet(path) if path.exists() else None
+    todo = [k for k in monthly + daily if k.rsplit("/", 1)[-1] not in done or not source_complete(acc, k)]
     if only:
         todo = [k for k in todo if any(m in k for m in only)]
     if since:
         todo = [k for k in todo if re.search(r"-(\d{4}-\d{2})(-\d{2})?\.zip$", k).group(1) >= since]
-    acc = pd.read_parquet(path) if path.exists() else None
     for k in todo:
         t0 = time.time()
         raw = urllib.request.urlopen(BASE + k, timeout=600).read()
@@ -126,9 +145,14 @@ def run(sym: str, only=None, since=None):
             d1.mkdir(parents=True, exist_ok=True)
             m1.astype({c: ("int32" if c.startswith("n") else "float32") for c in m1.columns}).to_parquet(
                 d1 / (k.rsplit("/", 1)[-1].replace(".zip", ".parquet")), compression="zstd")
-        acc = g if acc is None else pd.concat([acc, g]).groupby(level=0).sum()
+        if not source_complete(g, k, acc.index.min() if acc is not None and len(acc) else None):
+            raise RuntimeError(f"{sym}: source archive has incomplete closed 4h bars: {k}")
+        # Re-fetching a damaged source must replace its rows, rather than doubling notionals.
+        acc = g if acc is None else pd.concat([acc.loc[~acc.index.isin(g.index)], g]).sort_index()
         acc.sort_index().to_parquet(path)
-        man["done"].setdefault(sym, []).append(k.rsplit("/", 1)[-1])
+        name = k.rsplit("/", 1)[-1]
+        if name not in man["done"].setdefault(sym, []):
+            man["done"][sym].append(name)
         man_p.write_text(json.dumps(man, indent=1))
         print(sym, k.rsplit("/", 1)[-1], f"{len(raw) / 1e6:.0f}MB", f"{time.time() - t0:.0f}s", flush=True)
 

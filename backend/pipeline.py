@@ -68,24 +68,39 @@ def run_job(kind: str, fn, triggered_by: str = "scheduler") -> dict:
 # ---------------------------------------------------------------- candles
 def job_candles() -> str:
     from agentic_alpha_lab.data.binance_usdm import fetch_klines
+    from agentic_alpha_lab.data.coverage import missing_ranges
     import requests
     sess = requests.Session()
     total = 0
     now = datetime.now(timezone.utc)
+    now_ms = _ms(now)
+    repaired = 0
     for sym in SYMS:
         for iv, step in INTERVALS.items():
             span = db.one("SELECT MIN(t) AS a, MAX(t) AS b FROM candles WHERE symbol = ? AND interval = ?", (sym, iv))
-            first = pd.Timestamp(HISTORY_START[iv], tz="UTC")
+            first = _ms(pd.Timestamp(HISTORY_START[iv], tz="UTC"))
+            last = now_ms // step * step - step
+            coverage_key = f"candle_start_{sym}_{iv}"
+            known_start = db.kv_get(coverage_key)
             ranges = []
-            if span["a"] and span["a"] > int(first.timestamp() * 1000) + step:  # backfill older history once
-                ranges.append((first, pd.Timestamp(span["a"] - step, unit="ms", tz="UTC")))
-            # re-fetch the newest stored candle: it may have been stored while still forming
-            ranges.append((pd.Timestamp(span["b"], unit="ms", tz="UTC") if span["b"] else first, pd.Timestamp(now)))
-            for a, b in ranges:
+            if known_start is None and span["a"] is not None and span["a"] > first:
+                ranges.append((first, span["a"] - step, True))  # historical prefix may precede listing
+            start = known_start if known_start is not None else (span["a"] if span["a"] is not None else first)
+            times = [r["t"] for r in db.rows("SELECT t FROM candles WHERE symbol=? AND interval=? ORDER BY t", (sym, iv))]
+            gaps = missing_ranges(times, start, last, step)
+            repaired += len(gaps)
+            ranges.extend((a, b, False) for a, b in gaps)
+            # Refresh the newest closed candle too, never a forming candle.
+            if last >= start and not any(a <= last <= b for a, b, _ in ranges):
+                ranges.append((last, last, False))
+            for a, b, before_listing in ranges:
                 try:
-                    k = fetch_klines(sym, iv, a.to_pydatetime(), b.to_pydatetime(), session=sess)
-                except RuntimeError:  # nothing in range (e.g. before the symbol was listed)
-                    continue
+                    k = fetch_klines(sym, iv, pd.Timestamp(a, unit="ms", tz="UTC").to_pydatetime(),
+                                     pd.Timestamp(b + step, unit="ms", tz="UTC").to_pydatetime(), session=sess)
+                except RuntimeError as exc:
+                    if before_listing and "returned no klines" in str(exc):
+                        continue
+                    raise
                 if k.empty:
                     continue
                 ot = pd.to_datetime(k["open_time"], utc=True)
@@ -94,7 +109,17 @@ def job_candles() -> str:
                 with db.write() as c:
                     c.executemany("INSERT OR REPLACE INTO candles(symbol, interval, t, o, h, l, c, v) VALUES(?,?,?,?,?,?,?,?)", recs)
                 total += len(recs)
-    return f"candles upserted: {total}"
+            times = [r["t"] for r in db.rows("SELECT t FROM candles WHERE symbol=? AND interval=? ORDER BY t", (sym, iv))]
+            if not times:
+                raise RuntimeError(f"{sym} {iv}: no closed candles available")
+            # Persist the listing/history boundary so later deletions at the front are detectable.
+            start = known_start if known_start is not None else min(times)
+            unresolved = missing_ranges(times, start, last, step)
+            if unresolved:
+                raise RuntimeError(f"{sym} {iv}: missing closed candles remain: {unresolved[:3]}")
+            db.kv_set(coverage_key, start)
+    db.kv_set("pipeline_candle_check", {"checked_at": db.now_ms(), "gap_ranges_repaired": repaired, "status": "complete"})
+    return f"candles upserted: {total}; gap ranges repaired: {repaired}"
 
 
 def job_aggflow(archive: bool = True) -> str:
@@ -102,38 +127,41 @@ def job_aggflow(archive: bool = True) -> str:
     env = {**__import__("os").environ, "PYTHONUTF8": "1"}
     msgs = []
     today = pd.Timestamp.now(tz="UTC")
-    if archive and today.hour >= 3 and db.kv_get("aggflow_archive_day", "") != str(today.date()):
-        p = subprocess.run([SETTINGS.python_exe, str(ROOT / "scripts/fetch_aggtrades_flow.py")], cwd=str(ROOT), capture_output=True,
+    failures = []
+    if archive and db.kv_get("aggflow_archive_day", "") != str(today.date()):
+        p = subprocess.run([SETTINGS.python_exe, str(ROOT / "scripts/fetch_aggtrades_flow.py"), "--since", "2026-03"], cwd=str(ROOT), capture_output=True,
                            text=True, encoding="utf-8", errors="replace", env=env, timeout=3600)
         if p.returncode == 0:  # the order-level archive (v240 O1) from the same daily files
-            p = subprocess.run([SETTINGS.python_exe, str(ROOT / "scripts/fetch_aggtrades_flow.py"), "--orders"], cwd=str(ROOT),
+            p = subprocess.run([SETTINGS.python_exe, str(ROOT / "scripts/fetch_aggtrades_flow.py"), "--orders", "--since", "2026-03"], cwd=str(ROOT),
                                capture_output=True, text=True, encoding="utf-8", errors="replace", env=env, timeout=3600)
         if p.returncode == 0:
             db.kv_set("aggflow_archive_day", str(today.date()))
         msgs.append(f"archive {'ok' if p.returncode == 0 else 'FAILED: ' + p.stderr[-200:]}")
+        if p.returncode != 0:
+            failures.append("archive")
     for extra in ([], ["--orders"]):
         p = subprocess.run([SETTINGS.python_exe, str(ROOT / "scripts/aggflow_live.py"), *extra], cwd=str(ROOT), capture_output=True,
                            text=True, encoding="utf-8", errors="replace", env=env, timeout=1800)
         msgs.append(("live orders " if extra else "live ") + ("ok" if p.returncode == 0 else "FAILED: " + p.stderr[-200:]))
+        if p.returncode != 0:
+            failures.append("live orders" if extra else "live")
+            if "missing flow archive" in p.stderr or "flow archive has missing" in p.stderr:
+                db.kv_set("aggflow_archive_day", "")  # force source repair on the next retry
+    if failures:
+        raise RuntimeError("aggflow incomplete: " + ", ".join(msgs))
     return "aggflow: " + ", ".join(msgs)
 
 
-def refresh_candles_quietly() -> None:
+def refresh_candles_quietly() -> bool:
     """Incremental candle (and large-order flow) refresh between cycles, without a jobs row; skipped while another job runs."""
     if not _job_lock.acquire(blocking=False):
-        return
+        return False
     try:
-        log.info("candles refreshed: %s", job_candles())
-    except Exception as exc:  # network hiccups are retried on the next tick
-        log.warning("candle refresh failed (retry in 15 min): %s", exc)
-    try:
-        log.info("%s", job_aggflow())
+        log.info("plans refreshed after gap checks: %s", job_cycle())
+        return True
     except Exception as exc:
-        log.warning("aggflow refresh failed (retry in 15 min): %s", exc)
-    try:  # replay the trade plans to now so stops / take-profits hit between cycles show up on the site
-        log.info("trade plans refreshed: %s", job_trade_plan())
-    except Exception as exc:
-        log.warning("trade plan refresh failed (retry in 15 min): %s", exc)
+        log.warning("refresh incomplete: %s", exc)
+        return False
     finally:
         _job_lock.release()
 
@@ -169,19 +197,17 @@ def job_signal(asof: str | None = None) -> str:
 
 
 # ---------------------------------------------------------------- gap check + backfill of missed cycles
-BACKFILL_DAYS = 14
-
-
 def job_backfill() -> str:
-    """Before every cycle: find the 4h decision bars of the last 14 days a missed cycle left without an advisor row of the member
+    """Before every cycle: find every required 4h decision bar a missed cycle left without an advisor row of the member
     advisors the five pipelines read (shadow.jsonl), and recompute each one AS OF its bar (ADVISOR_ASOF: only data up to that bar).
     Candles and the whale-flow feed resume from their last stored point, and the trade plans replay their whole window every run, so
     after this step nothing is missing."""
     env = {**__import__("os").environ, "PYTHONUTF8": "1", "ADVISOR_SHADOW_BACKFILL": "1"}
     p = subprocess.run([SETTINGS.python_exe, str(ROOT / "scripts/advisor_shadow.py")], cwd=str(ROOT), capture_output=True,
                        text=True, encoding="utf-8", errors="replace", env=env, timeout=3600)
-    msgs = [(p.stdout.strip().splitlines() or ["backfill: no output"])[-1] if p.returncode == 0 else f"shadow backfill FAILED: {p.stderr[-300:]}"]
-    return " | ".join(msgs)
+    if p.returncode != 0:
+        raise RuntimeError(f"shadow backfill failed ({p.returncode}): {p.stderr[-1000:]}")
+    return (p.stdout.strip().splitlines() or ["backfill: no output"])[-1]
 
 
 # ---------------------------------------------------------------- prospective log (all frozen advisors)
@@ -265,13 +291,12 @@ def job_trade_plan() -> str:
             if p.returncode != 0:
                 raise RuntimeError(f"trade plan failed ({p.returncode}): {p.stderr[-1500:]}")
             plan = json.loads((ROOT / "artifacts/research/advisor_shadow" / f"{key}.json").read_text(encoding="utf-8"))
+            if _ms(plan["decision_bar"]) < slot:
+                raise RuntimeError("trade plan artifact is older than the required decision bar")
             bars = plan.pop("bars", [])
+            from . import history_tm
+            history_tm.store_paper(pipe, dict(plan, bars=bars), db)
             db.kv_set(key, plan)
-            try:
-                from . import history_tm
-                history_tm.store_paper(pipe, dict(plan, bars=bars), db)
-            except Exception as exc:
-                log.warning("paper history for %s failed: %s", pipe, exc)
             msgs.append(f"{key}: " + ", ".join(f"{c['symbol'][:-4]} {c['state']}" for c in plan["coins"].values())
                         + f"; paper {plan['net_return_pct']}%")
             db.kv_set(f"plan_status_{pipe}", {"completed_slot": slot, "completed_at": db.now_ms()})
@@ -503,14 +528,18 @@ def job_cycle() -> str:
     (O1 flow set + Coinbase member) -> the five pipelines' trade plans. The retired research logs (full shadow log, v205 live signal,
     v205 forward, dip log) no longer run."""
     out, failures, t0 = [], [], datetime.now(timezone.utc)
-    for name, fn in (("candles", job_candles), ("aggflow", lambda: job_aggflow(archive=False)), ("backfill", job_backfill), ("shadow", job_shadow_fast), ("trade_plan", job_trade_plan)):
+    db.kv_set("pipeline_input_check", {"status": "checking", "started_at": db.now_ms()})
+    for name, fn in (("candles", job_candles), ("aggflow", job_aggflow), ("backfill", job_backfill), ("shadow", job_shadow_fast), ("trade_plan", job_trade_plan)):
         try:
             out.append(fn())
         except Exception as exc:
             out.append(f"{name} FAILED: {type(exc).__name__}: {exc}")
             failures.append(name)
+            db.kv_set("pipeline_input_check", {"status": "failed", "failed_step": name, "checked_at": db.now_ms()})
+            break  # Never compute new plans from incomplete inputs; retry the repair first.
         # minute of the bar at which the step finished (the trade plan must be out before minute 5)
         out[-1] += f" [{name} done at +{(datetime.now(timezone.utc) - t0).total_seconds() + (t0.hour % 4) * 3600 + t0.minute * 60 + t0.second:.0f}s into the bar]"
     if failures:
         raise RuntimeError(" | ".join(out))
+    db.kv_set("pipeline_input_check", {"status": "complete", "checked_at": db.now_ms()})
     return " | ".join(out)
