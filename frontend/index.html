@@ -4,16 +4,16 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Alpha Lab – Gợi ý giao dịch</title>
-  <meta name="description" content="Gợi ý giao dịch BTC/ETH/SOL/BNB/XRP từ pipeline v205: biểu đồ thời gian thực, lịch sử lệnh, hiệu suất." />
+  <meta name="description" content="Gợi ý giao dịch BTC/ETH/SOL/BNB/XRP từ 5 pipeline: biểu đồ thời gian thực, lịch sử lệnh, hiệu suất." />
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%231e222d'/%3E%3Cpath d='M6 22l6-7 5 4 9-11' stroke='%23089981' stroke-width='3' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="styles.css?v=20261001b" />
+  <link rel="stylesheet" href="styles.css?v=20261002-admin-pipelines" />
   <script src="config.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/lightweight-charts@4.2.0/dist/lightweight-charts.standalone.production.js" defer></script>
   <script src="https://accounts.google.com/gsi/client" async defer></script>
-  <script src="app.js?v=20261001b" defer></script>
+  <script src="app.js?v=20261002-admin-pipelines" defer></script>
 </head>
 <body>
   <header class="topbar">
@@ -57,11 +57,15 @@
         <label class="eq-in">Vốn của bạn <input type="number" id="eqInput" min="10" step="100" /> USDT</label>
       </div>
       <div class="panel evid-panel">
-        <div class="panel-h"><span>Chọn pipeline · kết quả huấn luyện (walk-forward)</span>
+        <div class="panel-h"><span>Chọn pipeline · bảng đánh giá hiệu quả</span>
           <span class="muted small">%/tháng · 2021-09 → 2026-09 · mô phỏng lệnh thật (limit, SL/TP, phí, funding)</span></div>
         <div class="table-wrap"><table class="tbl compact evid" id="pipeEvid"></table></div>
-        <div class="muted small evid-note">Dev 4 năm = 2021-09 → 2025-09 (dùng để chọn) · Năm giấu = 2025-09 → 2026-09 (chấm sau khi chọn) ·
-          DD = sụt giảm tối đa · Thắng = tỷ lệ lệnh có lãi sau phí.</div>
+        <div class="muted small evid-note">4 năm phát triển (09/2021–09/2025): dùng để xây dựng và chọn mô hình.
+          Năm kiểm chứng (09/2025–09/2026): đánh giá sau khi đã chọn mô hình.
+          Sụt giảm vốn: mức giảm lớn nhất từ đỉnh vốn trước đó. Tỷ lệ thắng: tỷ lệ lệnh có lãi sau phí.
+          Các cột %/tháng là lợi nhuận ròng bình quân theo lãi kép.
+          Pipeline bị khóa vẫn hiện đầy đủ chỉ số đánh giá; liên hệ email trong bảng để hỏi quyền xem tín hiệu.</div>
+        <div class="muted small evid-note" id="pipeOrderNote"></div>
       </div>
       <div class="panel board-panel">
         <div class="panel-h"><span>Việc cần làm ngay bây giờ</span><span class="muted small" id="boardMeta"></span>
@@ -134,7 +138,7 @@
       <div class="grid2">
         <div class="panel"><div class="panel-h"><span>Theo năm</span></div><table class="tbl" id="yearTbl"></table>
           <p class="fine">Phí Bybit: maker 0.02% (entry, TP), taker 0.055% (SL). Funding bất lợi: long trả 0.01%/8h, short 0.
-            DD = max(DD nến 4h, DD đánh dấu theo phút). Chọn mô hình chỉ bằng 4 năm đầu; năm giấu chấm một lần.</p></div>
+            Sụt giảm vốn tối đa lấy mức lớn hơn giữa nến 4h và từng phút. Chọn mô hình bằng 4 năm phát triển; năm kiểm chứng được đánh giá sau khi chọn.</p></div>
         <div class="panel"><div class="panel-h"><span>Thống kê lệnh theo coin</span></div><table class="tbl" id="coinTbl"></table></div>
       </div>
       <div class="grid2">
@@ -145,6 +149,18 @@
 
     <!-- ===================== admin ===================== -->
     <section id="view-admin" class="view page" hidden>
+      <div class="panel">
+        <div class="panel-h"><span>Thứ tự pipeline & quyền xem tín hiệu</span><span class="muted small" id="pipelineMode"></span></div>
+        <p class="fine">Dùng ↑ ↓ để sắp xếp. Khóa/mở áp dụng cho mọi người dùng thường; admin luôn xem được tất cả.
+          Bảng đánh giá vẫn hiện đầy đủ khi khóa. Backend vẫn chạy cả 5 pipeline, ưu tiên pipeline chưa chạy theo thứ tự đã lưu.</p>
+        <div class="table-wrap"><table class="tbl" id="pipelineSettingsTbl"></table></div>
+        <div class="toolbar flat pipeline-actions">
+          <button class="btn primary" id="savePipelineSettings">Lưu cấu hình pipeline</button>
+          <button class="btn" id="autoPipelineOrder">Dùng thứ tự tự động</button>
+          <button class="btn" id="reloadPipelineSettings">Tải lại cấu hình</button>
+          <span class="muted small" role="status" id="pipelineSaveStatus"></span>
+        </div>
+      </div>
       <div class="panel">
         <div class="panel-h"><span>Chạy pipeline</span><span class="muted small">Tự động 1 phút sau mỗi nến 4h đóng (kế hoạch lệnh có trước phút thứ 5); nến cập nhật mỗi 15 phút</span></div>
         <div class="toolbar flat">

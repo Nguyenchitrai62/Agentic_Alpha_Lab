@@ -224,11 +224,9 @@ def test_bundle_manifest_hash():
     assert set(man["grid"]["assets"]) == set(t.ASSETS)
 
 
-def test_smoke_run_cpu_subset():
-    out = V90 / "smoke_out"
-    if out.exists():
-        import shutil
-        shutil.rmtree(out)
+def test_smoke_run_cpu_subset(tmp_path):
+    # Isolate each test run and preserve existing research checkpoints.
+    out = tmp_path / "v90_smoke"
     cmd = [sys.executable, str(V90 / "kaggle" / "train_v90.py"),
            "--bundle", str(V90 / "majors_4h_bundle.npz"),
            "--manifest", str(V90 / "data_manifest.json"),

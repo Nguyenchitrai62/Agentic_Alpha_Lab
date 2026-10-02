@@ -19,16 +19,19 @@ from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import JSONResponse, ORJSONResponse, Response
 import orjson
 
-from . import auth, db, pipeline
+from . import auth, catalog, db, pipeline
 from .config import SETTINGS, log
+from .security import BodyLimitMiddleware
 
 APP_VERSION = "1.0.0"
 MAX_ROWS = 5000
 MAX_CANDLES = 30000
-app = FastAPI(title="Agentic Alpha Lab API", version=APP_VERSION, default_response_class=ORJSONResponse)
+app = FastAPI(title="Agentic Alpha Lab API", version=APP_VERSION, default_response_class=ORJSONResponse,
+              docs_url=None, redoc_url=None, openapi_url=None)
 app.add_middleware(GZipMiddleware, minimum_size=1024)
 app.add_middleware(CORSMiddleware, allow_origins=list(SETTINGS.cors_origins), allow_origin_regex=SETTINGS.cors_origin_regex or None,
-                   allow_credentials=False, allow_methods=["GET", "POST"], allow_headers=["Authorization", "Content-Type"], max_age=3600)
+                   allow_credentials=True, allow_methods=["GET", "POST"], allow_headers=["Authorization", "Content-Type"], max_age=3600)
+app.add_middleware(BodyLimitMiddleware)
 
 # ------------------------------------------------------------------ TTL cache of serialized (and pre-gzipped) responses
 # Hot reads never touch SQLite or re-serialize: each cache entry keeps the JSON bytes, their gzip and an ETag.
@@ -69,7 +72,14 @@ _bucket_lock = threading.Lock()
 
 @app.middleware("http")
 async def rate_limit(request: Request, call_next):
-    ip = request.headers.get("CF-Connecting-IP") or (request.client.host if request.client else "?")
+    import ipaddress
+    peer = request.client.host if request.client else "?"
+    ip = peer
+    if peer in ("127.0.0.1", "::1") and request.headers.get("cf-ray"):
+        try:
+            ip = str(ipaddress.ip_address(request.headers.get("cf-connecting-ip", "")))
+        except ValueError:
+            pass
     with _bucket_lock:
         if len(_buckets) > 20000:
             _buckets.clear()
@@ -88,7 +98,10 @@ def _ms_range(start: str | None, end: str | None) -> tuple[int, int]:
         if not x:
             return default
         return int(x) if x.isdigit() else int(datetime.fromisoformat(x.replace("Z", "+00:00")).replace(tzinfo=timezone.utc).timestamp() * 1000)
-    return p(start, 0), p(end, 4102444800000)
+    try:
+        return p(start, 0), p(end, 4102444800000)
+    except (ValueError, OverflowError) as exc:
+        raise HTTPException(400, "Invalid time range.") from exc
 
 
 def _check_symbol(symbol: str) -> str:
@@ -114,11 +127,11 @@ def public_config():
 
 
 @app.post("/api/auth/google")
-def auth_google(payload: dict = Body(...)):
+def auth_google(request: Request, payload: dict = Body(...)):
     cred = str(payload.get("credential", ""))
-    if not cred:
+    if not cred or len(cred) > 8192:
         raise HTTPException(400, "credential is required")
-    return auth.login(cred)
+    return _session_response(request, auth.login(cred))
 
 
 @app.get("/api/auth/me")
@@ -128,10 +141,73 @@ def auth_me(user: dict | None = Depends(auth.current_user)):
     return user
 
 
+REFRESH_COOKIE = "aal_refresh"
+
+
+def _trusted_origin(origin: str) -> bool:
+    import re
+    return origin in SETTINGS.cors_origins or bool(SETTINGS.cors_origin_regex and re.fullmatch(SETTINGS.cors_origin_regex, origin))
+
+
+def _refresh_token(request: Request) -> str:
+    header = request.headers.get("authorization", "")
+    if header.lower().startswith("bearer "):
+        token = header[7:].strip()  # API clients may send refresh credentials in the header.
+    else:
+        if not _trusted_origin(request.headers.get("origin", "")):
+            raise HTTPException(403, "Trusted Origin is required for cookie authentication.")
+        token = request.cookies.get(REFRESH_COOKIE)
+    if not isinstance(token, str) or not token or len(token) > 512:
+        raise HTTPException(401, "Refresh token is required.")
+    return token
+
+
+def _session_response(request: Request, pair: dict):
+    token = pair.pop("refresh_token")
+    response = ORJSONResponse(pair, headers={"Cache-Control": "no-store"})
+    local = auth.is_local_request(request)
+    response.set_cookie(REFRESH_COOKIE, token, httponly=True, secure=not local,
+                        samesite="lax" if local else "none", path="/",
+                        max_age=max(0, pair["refresh_expires_at"] - int(time.time())))
+    return response
+
+
+@app.post("/api/auth/refresh")
+def auth_refresh(request: Request):
+    return _session_response(request, auth.refresh_session(_refresh_token(request)))
+
+
+@app.post("/api/auth/logout")
+def auth_logout(request: Request):
+    auth.revoke_session(_refresh_token(request))
+    response = ORJSONResponse({"ok": True})
+    response.delete_cookie(REFRESH_COOKIE, path="/", httponly=True, secure=not auth.is_local_request(request),
+                           samesite="lax" if auth.is_local_request(request) else "none")
+    return response
+
+
+@app.middleware("http")
+async def auth_no_store(request: Request, call_next):
+    if request.method == "POST" and request.url.path.startswith("/api/"):
+        origin = request.headers.get("origin")
+        if origin and not _trusted_origin(origin):
+            return JSONResponse({"detail": "Origin is not allowed."}, status_code=403)
+    response = await call_next(request)
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Frame-Options"] = "DENY"
+    response.headers["Referrer-Policy"] = "no-referrer"
+    response.headers["Content-Security-Policy"] = "default-src 'none'; frame-ancestors 'none'"
+    if request.url.path.startswith(("/api/auth/", "/api/admin/")):
+        response.headers["Cache-Control"] = "no-store"
+    return response
+
+
 # ------------------------------------------------------------------ viewer
 @app.get("/api/overview")
 def overview(request: Request, pipeline: str | None = None, user: dict = Depends(auth.require_viewer)):
     """pipeline=v205/v233/v236/v240: the walk-forward summary of that executable trade-mode pipeline (history_tm)."""
+    pipeline = pipeline or catalog.default_pipeline(user)
+    catalog.require_pipeline(user, pipeline)
     if pipeline in ("v205", "v233", "v236", "v240", "v266", "v269", "v285", "v295", "v301"):
         return cached(request, f"overview:{pipeline}", 60, lambda: {"walkforward": db.kv_get(f"summary_tm_{pipeline}", {}),
                                                                    "plan": db.kv_get({"v205": "trade_plan"}.get(pipeline, f"trade_plan_{pipeline}"), {})})
@@ -150,28 +226,44 @@ def overview(request: Request, pipeline: str | None = None, user: dict = Depends
 @app.get("/api/pipelines_summary")
 def pipelines_summary(request: Request, user: dict = Depends(auth.require_viewer)):
     """Walk-forward summary of every paper pipeline (history_tm) + its paper result since the freeze, for the pipeline evidence table."""
-    keys = {"v301": "trade_plan_v301", "v295": "trade_plan_v295", "v266": "trade_plan_v266", "v269": "trade_plan_v269", "v285": "trade_plan_v285"}
+    settings = catalog.policy()
+    order = settings["order"]
+    permitted = set(order) if user["role"] == "admin" else {p for p in order if not settings["locked"][p]}
 
     def load():
         out = {}
-        for p, k in keys.items():
-            plan = db.kv_get(k, {}) or {}
-            out[p] = {"walkforward": db.kv_get(f"summary_tm_{p}", {}), "paper_net_pct": plan.get("net_return_pct"), "freeze": plan.get("freeze")}
+        for i, p in enumerate(order, 1):
+            raw = db.kv_get(f"summary_tm_{p}", {}) or {}
+            # Historical evaluation remains public to approved viewers; never serialize plans/signals here.
+            summary = {k: raw.get(k, catalog.PIPELINES[p].get(k)) for k in catalog.SUMMARY_FIELDS}
+            locked = p not in permitted
+            plan = (db.kv_get(f"trade_plan_{p}", {}) or {}) if not locked else {}
+            out[p] = {"rank": i, "locked": locked, "locked_for_viewers": settings["locked"][p],
+                      "automatic_order": settings["automatic"], "walkforward": summary,
+                      "paper_net_pct": plan.get("net_return_pct"), "freeze": plan.get("freeze"),
+                      "admin_contact_email": SETTINGS.admin_contact_email if locked else None}
         return out
-    return cached(request, "pipelines_summary", 60, load)
+    return cached(request, "pipelines_summary:" + str(settings["revision"]) + ":" + ",".join(order)
+                  + ":" + ",".join(sorted(permitted)), 60, load)
+
 
 
 @app.get("/api/trade_plan")
-def trade_plan(request: Request, pipeline: str = "v205", user: dict = Depends(auth.require_viewer)):
+def trade_plan(request: Request, pipeline: str | None = None, user: dict = Depends(auth.require_viewer)):
     """What a trader / bot should have on the exchange now (resting orders, positions with SL/TP) + the event log.
 
     pipeline=v205 (deployed, default), v233 (T3: TradingView indicator features) or v236 (W2: T3 + whale flow); paper comparison."""
+    pipeline = pipeline or catalog.default_pipeline(user)
+    catalog.require_pipeline(user, pipeline)
+    if pipeline not in catalog.PIPELINES and pipeline not in ("v205", "v233", "v236", "v240"):
+        raise HTTPException(400, "Unknown pipeline.")
     key = {"v233": "trade_plan_v233", "v236": "trade_plan_v236", "v240": "trade_plan_v240", "v266": "trade_plan_v266", "v269": "trade_plan_v269", "v285": "trade_plan_v285", "v295": "trade_plan_v295", "v301": "trade_plan_v301"}.get(pipeline, "trade_plan")
     return cached(request, key, 20, lambda: db.kv_get(key, {}))
 
 
 @app.get("/api/signals/latest")
 def signal_latest(request: Request, source: str = "live", user: dict = Depends(auth.require_viewer)):
+    catalog.require_source(user, source)
     def load():
         r = db.one("SELECT id, source, decision_time, created_at, scale, governor, gross, pipeline FROM runs WHERE source = ? "
                    "ORDER BY decision_time DESC LIMIT 1", (source,))
@@ -185,6 +277,7 @@ def signal_latest(request: Request, source: str = "live", user: dict = Depends(a
 @app.get("/api/signals")
 def signals(request: Request, source: str = "live", symbol: str | None = None, start: str | None = None, end: str | None = None,
             limit: int = Query(200, ge=1, le=MAX_ROWS), user: dict = Depends(auth.require_viewer)):
+    catalog.require_source(user, source)
     a, b = _ms_range(start, end)
     if symbol:
         sym = _check_symbol(symbol)
@@ -201,6 +294,7 @@ def signals(request: Request, source: str = "live", symbol: str | None = None, s
 
 @app.get("/api/signals/at")
 def signal_at(request: Request, t: str, source: str = "walkforward", user: dict = Depends(auth.require_viewer)):
+    catalog.require_source(user, source)
     """The run in force at time t (latest decision_time <= t)."""
     ts = _ms_range(t, None)[0]
     r = db.one("SELECT id FROM runs WHERE source = ? AND decision_time <= ? ORDER BY decision_time DESC LIMIT 1", (source, ts))
@@ -211,6 +305,11 @@ def signal_at(request: Request, t: str, source: str = "walkforward", user: dict 
 
 @app.get("/api/signals/{run_id}")
 def signal_detail(request: Request, run_id: int, user: dict = Depends(auth.require_viewer)):
+    access = db.one("SELECT pipeline, source FROM runs WHERE id=?", (run_id,))
+    if not access:
+        raise HTTPException(404, "run not found")
+    catalog.require_pipeline(user, access["pipeline"].split("_")[0])
+    catalog.require_source(user, access["source"])
     def load():
         r = db.one("SELECT id, source, decision_time, created_at, scale, governor, gross, pipeline FROM runs WHERE id = ?", (run_id,))
         if not r:
@@ -236,6 +335,7 @@ def candles(request: Request, symbol: str, interval: str = "4h", start: str | No
 @app.get("/api/positions")
 def positions(request: Request, symbol: str, source: str = "walkforward", start: str | None = None, end: str | None = None,
               limit: int = Query(3000, ge=1, le=MAX_CANDLES), user: dict = Depends(auth.require_viewer)):
+    catalog.require_source(user, source)
     sym = _check_symbol(symbol)
     a, b = _ms_range(start, end)
     key = f"pos:{source}:{sym}:{a}:{b}:{limit}"
@@ -248,6 +348,7 @@ def positions(request: Request, symbol: str, source: str = "walkforward", start:
 @app.get("/api/trades")
 def trades(request: Request, symbol: str, source: str = "walkforward", start: str | None = None, end: str | None = None,
            limit: int = Query(2000, ge=1, le=MAX_CANDLES), user: dict = Depends(auth.require_viewer)):
+    catalog.require_source(user, source)
     sym = _check_symbol(symbol)
     a, b = _ms_range(start, end)
     key = f"trades:{source}:{sym}:{a}:{b}:{limit}"
@@ -260,6 +361,7 @@ def trades(request: Request, symbol: str, source: str = "walkforward", start: st
 def orders(request: Request, symbol: str | None = None, source: str = "walkforward", kind: str | None = None,
            start: str | None = None, end: str | None = None, limit: int = Query(5000, ge=1, le=MAX_CANDLES),
            user: dict = Depends(auth.require_viewer)):
+    catalog.require_source(user, source)
     """Orders (position episodes / dip bids) with signal time, entry, SL, TP, exit and result, newest first."""
     a, b = _ms_range(start, end)
     where, args = ["source = ?", "entry_t BETWEEN ? AND ?"], [source, a, b]
@@ -275,6 +377,7 @@ def orders(request: Request, symbol: str | None = None, source: str = "walkforwa
 
 @app.get("/api/orders/stats")
 def orders_stats(request: Request, source: str = "walkforward", user: dict = Depends(auth.require_viewer)):
+    catalog.require_source(user, source)
     """Order counts, win rate and average result per symbol / kind / exit reason."""
     return cached(request, f"ostats:{source}", 300, lambda: db.rows(
         "SELECT symbol, kind, exit_reason, COUNT(*) AS n, AVG(pnl_pct) AS avg_pnl, AVG(pnl_pct > 0) AS win, AVG(size) AS avg_size, "
@@ -283,6 +386,7 @@ def orders_stats(request: Request, source: str = "walkforward", user: dict = Dep
 
 @app.get("/api/confidence")
 def confidence(request: Request, user: dict = Depends(auth.require_viewer)):
+    catalog.require_pipeline(user, "v205")
     """Historical win rate per confidence level (first four walk-forward years vs the hidden year)."""
     return cached(request, "confidence", 300, lambda: db.kv_get("confidence_stats", {}))
 
@@ -290,6 +394,7 @@ def confidence(request: Request, user: dict = Depends(auth.require_viewer)):
 @app.get("/api/equity")
 def equity(request: Request, source: str = "walkforward", start: str | None = None, end: str | None = None, points: int = Query(1500, ge=10, le=MAX_ROWS),
            user: dict = Depends(auth.require_viewer)):
+    catalog.require_source(user, source)
     a, b = _ms_range(start, end)
 
     def load():
@@ -300,13 +405,25 @@ def equity(request: Request, source: str = "walkforward", start: str | None = No
 
 
 # ------------------------------------------------------------------ admin
+@app.get("/api/admin/pipelines")
+def admin_pipelines(user: dict = Depends(auth.require_admin)):
+    return catalog.policy()
+
+
+@app.post("/api/admin/pipelines")
+def admin_set_pipelines(payload: dict = Body(...), user: dict = Depends(auth.require_admin)):
+    settings = catalog.save_policy(payload, user["email"])
+    clear_cache()
+    return settings
+
+
 @app.post("/api/admin/run")
 def admin_run(payload: dict = Body(...), user: dict = Depends(auth.require_admin)):
     kind = payload.get("kind", "cycle")
     fns = {"cycle": pipeline.job_cycle, "signal": pipeline.job_signal, "candles": pipeline.job_candles, "trade_plan": pipeline.job_trade_plan, "shadow": pipeline.job_shadow,
            "forward": pipeline.job_forward, "walkforward": pipeline.job_walkforward,
            "walkforward_tm": pipeline.job_walkforward_tm}
-    if kind not in fns:
+    if not isinstance(kind, str) or kind not in fns:
         raise HTTPException(400, f"kind must be one of {list(fns)}")
 
     def work():
@@ -332,6 +449,8 @@ def admin_set_user(payload: dict = Body(...), user: dict = Depends(auth.require_
     if not email:
         raise HTTPException(400, "email is required")
     approved = 1 if payload.get("approved", True) else 0
+    if not isinstance(payload.get("approved", True), bool):
+        raise HTTPException(400, "approved must be a boolean")
     role = "viewer"  # admins are defined only by ADMIN_EMAILS in the local .env
     with db.write() as c:
         c.execute("INSERT INTO users(email, role, approved, first_seen, last_seen) VALUES(?,?,?,?,?) "
@@ -360,20 +479,32 @@ def _last_cycle_ms() -> int:
     return int(r["finished_at"]) if r and r.get("finished_at") else 0
 
 
+def _run_cycle_until_done(trigger: str):
+    while True:
+        _heartbeat["t"] = datetime.now(timezone.utc).isoformat()
+        result = pipeline.run_job("cycle", pipeline.job_cycle, trigger)
+        clear_cache()
+        if result["status"] == "done":
+            return
+        time.sleep(60)
+        trigger = "retry"
+
+
 def _scheduler():
     time.sleep(5)
     _keep_awake()
     _heartbeat["t"] = datetime.now(timezone.utc).isoformat()
     if not db.one("SELECT 1 AS x FROM candles LIMIT 1"):
         pipeline.run_job("candles", pipeline.job_candles, "startup")
-    if not db.one("SELECT 1 AS x FROM runs WHERE source = 'live' LIMIT 1"):
-        pipeline.run_job("cycle", pipeline.job_cycle, "startup")
-    if not db.one("SELECT 1 AS x FROM runs WHERE source = 'walkforward' LIMIT 1"):
-        pipeline.run_job("walkforward", pipeline.job_walkforward, "startup")
-    # catch-up: a restart / reboot / sleep after a 4h close would otherwise wait up to 4 hours for the next cycle
-    if db.now_ms() - _last_cycle_ms() > (4 * 3600 + 10 * 60) * 1000:
-        log.info("scheduler: the last completed cycle is older than 4h10m - running a catch-up cycle now")
-        pipeline.run_job("cycle", pipeline.job_cycle, "catch-up")
+    # Startup/catch-up uses all five current plans; retired v205 jobs are admin-only.
+    now_ms = db.now_ms()
+    due_slot = now_ms // pipeline.H4_MS * pipeline.H4_MS
+    if now_ms < due_slot + SETTINGS.schedule_offset_minutes * 60_000:
+        due_slot -= pipeline.H4_MS
+    if _last_cycle_ms() < due_slot or any(
+            (db.kv_get(f"plan_status_{p}", {}) or {}).get("completed_slot", 0) < due_slot
+            for p in catalog.PIPELINES):
+        _run_cycle_until_done("catch-up")
     clear_cache()
     while True:
         try:
@@ -391,7 +522,7 @@ def _scheduler():
                 if (nxt - datetime.now(timezone.utc)).total_seconds() > 60:
                     pipeline.refresh_candles_quietly()  # keep candles <= 15 min old between cycles
                     clear_cache()
-            pipeline.run_job("cycle", pipeline.job_cycle, "scheduler")
+            _run_cycle_until_done("scheduler")
             clear_cache()
             db.optimize()
         except Exception:  # never let one error kill the scheduler thread silently

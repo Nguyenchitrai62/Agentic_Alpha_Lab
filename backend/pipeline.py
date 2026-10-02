@@ -19,7 +19,7 @@ from datetime import datetime, timezone
 import numpy as np
 import pandas as pd
 
-from . import db
+from . import catalog, db
 from .config import ROOT, SETTINGS, log
 
 SYMS = ["BTCUSDT", "ETHUSDT", "SOLUSDT", "BNBUSDT", "XRPUSDT"]
@@ -40,26 +40,29 @@ def run_job(kind: str, fn, triggered_by: str = "scheduler") -> dict:
     if not _job_lock.acquire(blocking=False):
         log.warning("job %s skipped: another pipeline job is running", kind)
         return {"status": "busy", "message": "another pipeline job is running"}
-    started = db.now_ms()
-    log.info("job %s started (by %s)", kind, triggered_by)
-    with db.write() as c:
-        job_id = c.execute("INSERT INTO jobs(kind, status, started_at, triggered_by) VALUES(?, 'running', ?, ?)",
-                           (kind, started, triggered_by)).lastrowid
     try:
-        msg = fn()
-        status = "done"
-    except Exception as exc:  # keep the service alive; the error is visible in the admin page
-        msg, status = f"{type(exc).__name__}: {exc}\n{traceback.format_exc()[-2000:]}", "failed"
+        started = db.now_ms()
+        log.info("job %s started (by %s)", kind, triggered_by)
+        with db.write() as c:
+            job_id = c.execute("INSERT INTO jobs(kind, status, started_at, triggered_by) VALUES(?, 'running', ?, ?)",
+                               (kind, started, triggered_by)).lastrowid
+        try:
+            msg = fn()
+            status = "done"
+        except Exception as exc:
+            msg, status = f"{type(exc).__name__}: {exc}\n{traceback.format_exc()[-2000:]}", "failed"
+        with db.write() as c:
+            c.execute("UPDATE jobs SET status = ?, finished_at = ?, message = ? WHERE id = ?",
+                      (status, db.now_ms(), str(msg)[:4000], job_id))
+        secs = (db.now_ms() - started) / 1000
+        if status == "done":
+            log.info("job %s done in %.0fs: %s", kind, secs, str(msg)[:300])
+        else:
+            log.error("job %s FAILED after %.0fs: %s", kind, secs, str(msg)[:1500])
+        return {"status": status, "message": msg, "job_id": job_id}
     finally:
         _job_lock.release()
-    with db.write() as c:
-        c.execute("UPDATE jobs SET status = ?, finished_at = ?, message = ? WHERE id = ?", (status, db.now_ms(), str(msg)[:4000], job_id))
-    secs = (db.now_ms() - started) / 1000
-    if status == "done":
-        log.info("job %s done in %.0fs: %s", kind, secs, str(msg)[:300])
-    else:
-        log.error("job %s FAILED after %.0fs: %s", kind, secs, str(msg)[:1500])
-    return {"status": status, "message": msg, "job_id": job_id}
+
 
 
 # ---------------------------------------------------------------- candles
@@ -232,39 +235,52 @@ def job_forward() -> str:
 
 
 # ---------------------------------------------------------------- executable trade plan (trade mode)
-# the five pipelines the site shows (2026-09-30: only the best five are computed; older paper pipelines and research logs are retired)
-PLAN_PIPELINES = (("v301_G2", "trade_plan_v301", "trade_plan_v301.json"), ("v295_CS", "trade_plan_v295", "trade_plan_v295.json"),
-                  ("v266_B1", "trade_plan_v266", "trade_plan_v266.json"), ("v269_M1", "trade_plan_v269", "trade_plan_v269.json"),
-                  ("v285_D2", "trade_plan_v285", "trade_plan_v285.json"))
+PLAN_PIPELINES = tuple((v["candidate"], f"trade_plan_{p}", f"trade_plan_{p}.json")
+                       for p, v in catalog.PIPELINES.items())
+H4_MS = 4 * 3600_000
+
+
+def plan_order(slot: int) -> list[str]:
+    """Unfinished plans for this 4h cycle first; configured pipeline priority within each group."""
+    rank = catalog.ranked()
+    return sorted(rank, key=lambda p: (
+        (db.kv_get(f"plan_status_{p}", {}) or {}).get("completed_slot") == slot,
+        rank.index(p)))
 
 
 def job_trade_plan() -> str:
-    """Current orders / positions / SL-TP of the executable trade-mode pipeline and its paper log since its freeze.
-
-    Two plans: the deployed v205 books (kv 'trade_plan') and the v233 T3 foundation (kv 'trade_plan_v233', paper comparison)."""
-    msgs = []
-    for cand, key, fname in PLAN_PIPELINES:
-        cmd = [SETTINGS.python_exe, str(ROOT / "scripts/forward_trade.py"), "--candidate", cand]
-        cfg = ROOT / "configs/trade_policy.json"
-        if cfg.exists():
-            cmd += ["--policy", str(cfg)]
-        p = subprocess.run(cmd, cwd=str(ROOT), capture_output=True, text=True, encoding="utf-8", errors="replace",
-                           env={**__import__("os").environ, "PYTHONUTF8": "1"}, timeout=1800)
-        if p.returncode != 0:
-            if key == "trade_plan_v301":
-                raise RuntimeError(f"trade plan failed ({p.returncode}): {p.stderr[-1500:]}")
-            msgs.append(f"{key} FAILED: {p.stderr[-300:]}")
-            continue
-        plan = json.loads((ROOT / "artifacts/research/advisor_shadow" / fname).read_text(encoding="utf-8"))
-        bars = plan.pop("bars", [])  # per-bar paper state goes to the history tables, not to the cached plan
-        db.kv_set(key, plan)
+    """Refresh all five plans, prioritizing unfinished plans in the configured order."""
+    msgs, failures = [], []
+    slot = db.now_ms() // H4_MS * H4_MS
+    for pipe in plan_order(slot):
+        key = f"trade_plan_{pipe}"
         try:
-            from . import history_tm
-            history_tm.store_paper({"v151_deploy_v4": "v205"}.get(cand, cand.split("_")[0]), dict(plan, bars=bars), db)
-        except Exception as exc:  # the plan itself is stored; the history copy is best effort
-            log.warning("paper history for %s failed: %s", cand, exc)
-        msgs.append(f"{key}: " + ", ".join(f"{c['symbol'][:-4]} {c['state']}" for c in plan["coins"].values())
-                    + f"; paper {plan['net_return_pct']}%")
+            cmd = [SETTINGS.python_exe, str(ROOT / "scripts/forward_trade.py"),
+                   "--candidate", catalog.PIPELINES[pipe]["candidate"]]
+            cfg = ROOT / "configs/trade_policy.json"
+            if cfg.exists():
+                cmd += ["--policy", str(cfg)]
+            p = subprocess.run(cmd, cwd=str(ROOT), capture_output=True, text=True, encoding="utf-8", errors="replace",
+                               env={**__import__("os").environ, "PYTHONUTF8": "1"}, timeout=1800)
+            if p.returncode != 0:
+                raise RuntimeError(f"trade plan failed ({p.returncode}): {p.stderr[-1500:]}")
+            plan = json.loads((ROOT / "artifacts/research/advisor_shadow" / f"{key}.json").read_text(encoding="utf-8"))
+            bars = plan.pop("bars", [])
+            db.kv_set(key, plan)
+            try:
+                from . import history_tm
+                history_tm.store_paper(pipe, dict(plan, bars=bars), db)
+            except Exception as exc:
+                log.warning("paper history for %s failed: %s", pipe, exc)
+            msgs.append(f"{key}: " + ", ".join(f"{c['symbol'][:-4]} {c['state']}" for c in plan["coins"].values())
+                        + f"; paper {plan['net_return_pct']}%")
+            db.kv_set(f"plan_status_{pipe}", {"completed_slot": slot, "completed_at": db.now_ms()})
+        except Exception as exc:
+            msg = f"{key} FAILED: {type(exc).__name__}: {exc}"
+            log.error("%s", msg)
+            failures.append(msg)
+    if failures:
+        raise RuntimeError(" | ".join(msgs + failures))
     return " | ".join(msgs)
 
 
@@ -486,12 +502,15 @@ def job_cycle() -> str:
     """Scheduled cycle after each 4h close: candles + whale flow -> gap check + as-of backfill of missed bars -> the member advisors
     (O1 flow set + Coinbase member) -> the five pipelines' trade plans. The retired research logs (full shadow log, v205 live signal,
     v205 forward, dip log) no longer run."""
-    out, t0 = [], datetime.now(timezone.utc)
+    out, failures, t0 = [], [], datetime.now(timezone.utc)
     for name, fn in (("candles", job_candles), ("aggflow", lambda: job_aggflow(archive=False)), ("backfill", job_backfill), ("shadow", job_shadow_fast), ("trade_plan", job_trade_plan)):
         try:
             out.append(fn())
         except Exception as exc:
             out.append(f"{name} FAILED: {type(exc).__name__}: {exc}")
+            failures.append(name)
         # minute of the bar at which the step finished (the trade plan must be out before minute 5)
         out[-1] += f" [{name} done at +{(datetime.now(timezone.utc) - t0).total_seconds() + (t0.hour % 4) * 3600 + t0.minute * 60 + t0.second:.0f}s into the bar]"
+    if failures:
+        raise RuntimeError(" | ".join(out))
     return " | ".join(out)

@@ -17,7 +17,7 @@
     set(k, v) { try { localStorage.setItem("aal_" + k, JSON.stringify(v)); } catch (e) { /* private mode */ } },
   };
   const state = {
-    token: store.get("token", ""), user: null, view: "live",
+    token: "", session: null, user: null, view: "live",
     live: { symbol: store.get("liveSym", "BTCUSDT"), latest: null, prices: {}, tvSym: null },
     h: { symbol: store.get("hSym", "BTCUSDT"), interval: store.get("hIv", "4h"), range: store.get("hRange2", "3Th"),
          kind: "book", result: "all", selected: null },
@@ -35,10 +35,10 @@
   const CONF = { CAO: "Cao", "TRUNG BINH": "Trung bình", THAP: "Thấp" };
   const REASON = { TP: "Chạm TP", SL: "Chạm SL", "SL hoà vốn": "SL hoà vốn", "Đóng limit": "Đóng bằng limit", "Hết giờ": "Hết giờ (dip)", "Hết dữ liệu mô phỏng": "Hết dữ liệu mô phỏng (23/09)",
                   "Rebalance về 0": "Đóng (rebalance)", "Đảo chiều": "Đảo chiều", "Đang mở": "Đang mở", "Hết 4h (market)": "Hết 4h" };
-  const histSource = () => `tm_${state.h.pipe || "v301"}`;
+  const histSource = () => `tm_${state.h.pipe || planPipe()}`;
   // walk-forward replay (until the research data end) + the prospective paper window (since the freeze), oldest first per endpoint order
   async function histBoth(kind, symbol) {
-    const pipe = state.h.pipe || "v301";
+    const pipe = state.h.pipe || planPipe();
     const [a, b] = await Promise.all([api(`/api/${kind}?symbol=${symbol}&source=tm_${pipe}&limit=30000`),
       api(`/api/${kind}?symbol=${symbol}&source=paper_${pipe}&limit=30000`).catch(() => [])]);
     return kind === "orders" ? b.concat(a) : a.concat(b);  // orders come newest first, positions / trades oldest first
@@ -52,15 +52,52 @@
     clearTimeout(toast._t); toast._t = setTimeout(() => (el.hidden = true), ms);
   }
 
+  let refreshFlight = null, authEpoch = 0;
+  function applySession(out) {
+    state.session = out; state.token = out.access_token; state.user = out.user;
+    // Access tokens stay in memory; the backend owns the HttpOnly refresh cookie.
+  }
+  async function refreshSession() {
+    if (refreshFlight) return refreshFlight;
+    const epoch = authEpoch;
+    const run = async () => {
+      if (epoch !== authEpoch) throw new Error("Phiên đăng nhập đã thay đổi.");
+      let r;
+      try { r = await fetch(API + "/api/auth/refresh", { method: "POST", cache: "no-store", credentials: "include" }); }
+      catch { throw new Error("Không kết nối được máy chủ API."); }
+      if (epoch !== authEpoch) throw new Error("Phiên đăng nhập đã thay đổi.");
+      if (r.status === 401) { logout(false); throw new Error("Phiên đăng nhập hết hạn."); }
+      if (!r.ok) throw new Error("Không thể làm mới phiên đăng nhập.");
+      const out = await r.json();
+      if (epoch !== authEpoch) throw new Error("Phiên đăng nhập đã thay đổi.");
+      applySession(out);
+    };
+    refreshFlight = (navigator.locks ? navigator.locks.request("aal-auth-refresh", run) : run())
+      .finally(() => { refreshFlight = null; });
+    return refreshFlight;
+  }
   async function api(path, opts = {}) {
-    const headers = { ...(opts.headers || {}) };
-    if (state.token) headers.Authorization = "Bearer " + state.token;
-    if (opts.body) headers["Content-Type"] = "application/json";
-    let r;
-    try { r = await fetch(API + path, { ...opts, headers, body: opts.body ? JSON.stringify(opts.body) : undefined }); }
-    catch (e) { throw new Error("Không kết nối được máy chủ API."); }
-    if (r.status === 401 && state.token) { logout(); throw new Error("Phiên đăng nhập hết hạn."); }
+    const sessionRequest = path === "/api/auth/google" || path.startsWith("/api/public/");
+    if (!sessionRequest && state.session && state.session.expires_at * 1000 <= Date.now() + 30000) await refreshSession();
+    const epoch = authEpoch;
+    const send = async () => {
+      const headers = { ...(opts.headers || {}) };
+      if (state.token && !sessionRequest) headers.Authorization = "Bearer " + state.token;
+      if (opts.body) headers["Content-Type"] = "application/json";
+      try { return await fetch(API + path, { ...opts, cache: "no-store", credentials: path === "/api/auth/google" ? "include" : "omit", headers, body: opts.body ? JSON.stringify(opts.body) : undefined }); }
+      catch { throw new Error("Không kết nối được máy chủ API."); }
+    };
+    const sentToken = state.token;
+    let r = await send();
+    if (epoch !== authEpoch) throw new Error("Phiên đăng nhập đã thay đổi.");
+    if (r.status === 401 && !sessionRequest && state.session) {
+      if (sentToken === state.token) await refreshSession();
+      r = await send(); // retry exactly once
+    }
+    if (epoch !== authEpoch) throw new Error("Phiên đăng nhập đã thay đổi.");
+    if (r.status === 401 && state.token && !sessionRequest) { logout(); throw new Error("Phiên đăng nhập hết hạn."); }
     const data = await r.json().catch(() => ({}));
+    if (epoch !== authEpoch) throw new Error("Phiên đăng nhập đã thay đổi.");
     if (!r.ok) throw new Error(typeof data.detail === "string" ? data.detail : `Lỗi ${r.status}`);
     return data;
   }
@@ -136,17 +173,35 @@
     $("loginMsg").textContent = "Đang đăng nhập…";
     try {
       const out = await api("/api/auth/google", { method: "POST", body: { credential: resp.credential } });
-      state.token = out.token; store.set("token", out.token);
+      authEpoch++; applySession(out);
       state.user = out.user; $("loginMsg").textContent = "";
       enter();
     } catch (e) { $("loginMsg").textContent = e.message; }
   }
 
-  function logout() {
-    state.token = ""; state.user = null; store.set("token", "");
+  function logout(revoke = true) {
+    const hadSession = Boolean(state.session);
+    const wasSignedIn = Boolean(state.user);
+    authEpoch++;
+    state.token = ""; state.session = null; state.user = null;
+    store.set("token", ""); store.set("session", null);
+    state.live.plan = null; state.live.paper = []; state.live.conf = null; state.evid = null;
+    pipelineDraft = null;
+    state.h.pipe = null; state.perfPipe = null;
+    H.gen++;
+    if (H.ws) { H.ws.close(); H.ws = null; }
+    if (H.chart) { H.chart.remove(); H.chart = null; }
+    H.candles = []; H.times = []; H.orders = []; H.pos = []; H.fills = []; H.posAt = [];
+    H.series = null; H.wSeries = null; H.prim = null;
+    for (const key of Object.keys(lineCharts)) { lineCharts[key].remove(); delete lineCharts[key]; }
+    for (const id of ["pipeEvid", "pipeBar", "board", "todoCards", "planPanel", "watchlist", "hPipe", "ordersTbl", "oStats", "perfKpis", "yearTbl", "coinTbl", "fwSummary", "pPipe", "pipelineSettingsTbl", "pipelineMode", "pipelineSaveStatus", "usersTbl", "jobsTbl"]) {
+      const el = $(id); if (el) el.innerHTML = "";
+    }
+    if (tickerWs) { tickerWs.close(); tickerWs = null; }
+    if (revoke && hadSession) fetch(API + "/api/auth/logout", { method: "POST", cache: "no-store", keepalive: true, credentials: "include" }).catch(() => {});
     try { google.accounts.id.disableAutoSelect(); } catch (e) { /* not loaded */ }
     showOnly("login"); $("tabs").hidden = true; $("userBox").innerHTML = "";
-    if (!$("gsiButton").childElementCount) initGsi();
+    if (wasSignedIn && !$("gsiButton").childElementCount) initGsi();
   }
 
   function showOnly(view) { document.querySelectorAll(".view").forEach((v) => (v.hidden = v.id !== "view-" + view)); }
@@ -159,6 +214,7 @@
     if (!u.local) $("logoutBtn").onclick = logout;
     if (u.role === "pending") { $("pendingEmail").textContent = u.email; showOnly("pending"); $("tabs").hidden = true; return; }
     $("tabs").hidden = false; $("adminTab").hidden = u.role !== "admin";
+    state.h.pipe = null; state.perfPipe = null;
     startTicker();
     route();
   }
@@ -204,15 +260,17 @@
 
   async function loadPlans() {
     state.live.latest = null;  // the retired v205 live signal is no longer computed; everything comes from the selected pipeline's plan
+    if (!planPipe()) { state.live.plan = null; state.live.paper = []; return; }
     state.live.plan = await api(`/api/trade_plan?pipeline=${planPipe()}`).catch(() => null);
-    if (!state.live.conf) state.live.conf = await api("/api/confidence").catch(() => null);
+    if (state.user?.role === "admin" && !state.live.conf) state.live.conf = await api("/api/confidence").catch(() => null);
     // paper results of the four pipelines side by side (prospective evidence)
-    state.live.paper = await Promise.all(PIPES.map((p) => p.v).map((v) =>
+    state.live.paper = await Promise.all(visiblePipes().map((p) => p.v).map((v) =>
       api(`/api/trade_plan?pipeline=${v}`).then((pl) => [v, pl]).catch(() => [v, null])));
   }
   async function loadLive() {
     mountTv(state.live.symbol);
     try {
+      await loadEvidence();
       await loadPlans();
       renderWatchlist(); renderPlan(); updateTitle();
     } catch (e) { toast(e.message); }
@@ -228,34 +286,63 @@
   }
   // ---- evidence table: the walk-forward record of every paper pipeline
   async function loadEvidence() {
-    try { state.evid = await api("/api/pipelines_summary"); renderEvidence(); } catch (e) { /* the table is optional */ }
+    try {
+      const evidence = await api("/api/pipelines_summary");
+      const permitted = Object.keys(evidence).sort((a, b) => evidence[a].rank - evidence[b].rank).filter((p) => !evidence[p].locked);
+      if (state.user.allowed_pipelines?.some((p) => !permitted.includes(p))) clearPipelineData();
+      state.user.allowed_pipelines = permitted;
+      state.evid = evidence; renderEvidence();
+    } catch (e) { toast(e.message); }
+  }
+  function clearPipelineData() {
+    state.live.plan = null; state.live.paper = []; state.h.pipe = null; state.h.selected = null; state.perfPipe = null;
+    ++H.gen;
+    if (H.chart) { H.chart.remove(); H.chart = null; }
+    if (H.ws) { H.ws.close(); H.ws = null; }
+    H.orders = []; H.pos = []; H.fills = []; H.candles = []; H.times = [];
+    for (const key of Object.keys(lineCharts)) { lineCharts[key].remove(); delete lineCharts[key]; }
+    for (const id of ["board", "todoCards", "planPanel", "watchlist", "hLegend", "hPipe", "ordersTbl", "oStats", "perfKpis", "yearTbl", "coinTbl", "fwSummary", "pPipe"]) $(id).innerHTML = "";
+  }
+  function accessMessage() {
+    return `<p class="muted">Các pipeline đang được khóa. Bạn vẫn xem được bảng đánh giá ở tab <a href="#todo">Pipeline</a>.
+      <a href="mailto:${esc(encodeURIComponent(state.user?.admin_contact_email || ""))}">Liên hệ admin để mở quyền xem tín hiệu</a>.</p>`;
   }
   function renderEvidence() {
     const ev = state.evid; if (!ev) return;
     const cur = planPipe();
     const mo = (net) => (Math.pow(1 + net / 100, 1 / 12) - 1) * 100;
     const f = (x, d = 2) => x == null || !isFinite(x) ? "—" : Number(x).toFixed(d);
-    const rows = PIPES.map((p) => {
+    const rows = Object.keys(ev).sort((a, b) => ev[a].rank - ev[b].rank).map((v) => {
+      const p = PIPES.find((p) => p.v === v);
+      if (!p) return "";
+      const locked = ev[v].locked;
+      const email = ev[v].admin_contact_email || state.user?.admin_contact_email || "";
+      const contact = locked ? `<div class="pipe-access">🔒 Tín hiệu đang khóa · <a href="mailto:${esc(encodeURIComponent(email))}?subject=${encodeURIComponent("Xin quyền xem pipeline " + p.nm)}">Liên hệ admin qua email</a></div>`
+        : state.user?.role === "admin" && ev[v].locked_for_viewers ? '<div class="pipe-access">🔒 Đang khóa với người dùng thường</div>' : "";
       const s = ev[p.v]?.walkforward || {}, y = s.yearly || [];
       const dev = y.slice(0, 4).map((r) => mo(r[1]));
       const worst = dev.length ? Math.min(...dev) : null;
       const last = s.monthly_last_year;
       const win = s.win_dev != null ? `${(100 * s.win_dev).toFixed(0)}% / ${(100 * (s.win_hidden ?? 0)).toFixed(0)}%` : "—";
-      return `<tr class="${cur === p.v ? "on" : ""}" data-pipe="${p.v}"><td><div class="pcell"><span class="radio"></span><div>
-        <div class="pn-name"><b>${p.nm}</b>${p.star ? ` <span class="star">★ ${p.star}</span>` : ""}</div><div class="pn-desc">${p.ds}</div></div></div></td>
-        <td>${f(s.monthly_dev4)}</td><td>${f(worst)}</td><td class="${s.gate_dd > 20 ? "down" : ""}">${f(s.gate_dd, 1)}%</td>
-        <td>${f(s.monthly_5y)}</td><td class="${last >= 5 ? "up" : ""}"><b>${f(last)}</b></td><td>${s.losing_years ?? "—"}</td><td>${win}</td></tr>`;
+      return `<tr class="${locked ? "locked" : cur === p.v ? "on" : ""}" ${locked ? 'data-locked="true"' : `data-pipe="${p.v}"`}><td><div class="pcell"><span class="radio"></span><div>
+        <div class="pn-name"><b>#${ev[v].rank} ${p.nm}</b></div><div class="pn-desc">${p.ds}</div>${contact}</div></div></td>
+        <td class="${last >= 5 ? "up" : ""}"><b>${f(last)}</b></td><td class="${s.gate_dd > 20 ? "down" : ""}">${f(s.gate_dd, 1)}%</td>
+        <td>${pct(s.win_hidden)}</td><td>${f(s.monthly_dev4)}</td><td>${f(worst)}</td><td>${f(s.monthly_5y)}</td><td>${esc(s.losing_years ?? "—")}</td><td>${win}</td>
+        <td>${esc(s.trades_dev ?? "—")} / ${esc(s.trades_hidden ?? "—")}</td><td>${f(s.dd_4h, 1)}% / ${f(s.dd_1m, 1)}%</td></tr>`;
     });
-    table($("pipeEvid"), ["Pipeline", "Dev 4 năm", "Năm dev tệ nhất", "DD", "5 năm", "Năm giấu", "Năm lỗ", "Thắng (dev / giấu)"], rows);
+    table($("pipeEvid"), ["Thứ tự / pipeline", "Năm kiểm chứng<br>(%/tháng)", "Sụt giảm vốn<br>tối đa", "Tỷ lệ thắng<br>năm kiểm chứng", "4 năm phát triển<br>(%/tháng)", "Năm yếu nhất<br>(%/tháng)", "Toàn bộ 5 năm<br>(%/tháng)", "Số năm<br>thua lỗ", "Tỷ lệ thắng<br>(phát triển / kiểm chứng)", "Số lệnh<br>(phát triển / kiểm chứng)", "Sụt giảm vốn<br>(nến 4h / từng phút)"], rows);
+    $("pipeOrderNote").textContent = Object.values(ev)[0]?.automatic_order
+      ? "Thứ tự tự động: lợi nhuận/tháng năm kiểm chứng cao hơn → sụt giảm vốn thấp hơn → tỷ lệ thắng cao hơn."
+      : "Thứ tự do admin sắp xếp. Trạng thái khóa do admin quản lý riêng cho từng pipeline.";
     $("pipeEvid").onclick = (e) => { const r = e.target.closest("[data-pipe]"); if (r) setPlanPipe(r.dataset.pipe); };
   }
 
   async function loadTodo() {
     try {
       renderPipeStatus();
+      await loadEvidence();
       await loadPlans();
       renderPipeBar(); renderBoard(); renderCards(); updateTitle();
-      loadEvidence();
     } catch (e) { toast(e.message); }
   }
 
@@ -270,10 +357,17 @@
     { v: "v285", nm: "CB", ds: "C4 + 20% model Coinbase premium" },
   ];
   const PIPE_LABEL = Object.fromEntries(PIPES.map((p) => [p.v, p.nm]));
+  function visiblePipes() {
+    const ids = state.user?.allowed_pipelines || [];
+    return ids.map((v) => PIPES.find((p) => p.v === v)).filter(Boolean);
+  }
   function planPipe() {
-    try { const v = localStorage.getItem("planPipe6"); return PIPES.some((p) => p.v === v) ? v : "v301"; } catch { return "v301"; }
+    const pipes = visiblePipes(), fallback = pipes[0]?.v;
+    try { const v = localStorage.getItem("planPipe6"); return pipes.some((p) => p.v === v) ? v : fallback; }
+    catch { return fallback; }
   }
   async function setPlanPipe(v) {
+    if (!visiblePipes().some((p) => p.v === v)) return;
     try { localStorage.setItem("planPipe6", v); } catch { /* per-viewer convenience only */ }
     const cached = (state.live.paper || []).find(([k]) => k === v);
     state.live.plan = cached?.[1] || await api(`/api/trade_plan?pipeline=${v}`).catch(() => null);
@@ -282,7 +376,7 @@
   function renderPipeBar() {
     if (!$("pipeBar")) return;  // the Pipeline tab now selects pipelines in the training-results table
     const cur = planPipe(), paper = Object.fromEntries(state.live.paper || []);
-    $("pipeBar").innerHTML = PIPES.map((p) => {
+    $("pipeBar").innerHTML = visiblePipes().map((p) => {
       const pl = paper[p.v];
       const pn = pl && pl.freeze ? `paper từ ${String(pl.freeze).slice(5, 10).split("-").reverse().join("/")}: ${sgn(pl.net_return_pct)}` : "paper: chưa có";
       return `<button class="pipebtn${cur === p.v ? " on" : ""}" data-pipe="${p.v}">
@@ -392,6 +486,7 @@
       <div class="muted small">${c.order ? `Lệnh chờ: limit ${c.order.side === "BUY" ? "mua" : "bán"} @ ${fmtPx(c.order.price)}` : "Không cần làm gì thêm"}</div></div>`;
   }
   function renderPlan() {
+    if (!planPipe()) { $("planPanel").innerHTML = accessMessage(); return; }
     const sym = state.live.symbol, plan = state.live.plan;
     $("planPanel").innerHTML = `<div class="panel-h"><span>${coin(sym)} · ${PIPE_LABEL[planPipe()] || ""}</span>
       <span class="muted small">${plan?.next_decision ? "cập nhật kế tiếp " + dt(Date.parse(plan.next_decision)) : ""}</span></div>${compactPlan(sym)}
@@ -399,6 +494,7 @@
   }
   function renderCards() {
     const el = $("todoCards"); if (!el) return;
+    if (!planPipe()) { el.innerHTML = accessMessage(); return; }
     const plan = state.live.plan, nm = PIPE_LABEL[planPipe()] || "";
     el.innerHTML = SYMS.map((s) => {
       const p = state.live.prices[s];
@@ -463,6 +559,7 @@
   }
   function renderBoard() {
     const el = $("board"); if (!el) return;
+    if (!planPipe()) { el.innerHTML = ""; $("boardMeta").textContent = "Chưa có pipeline được mở quyền xem tín hiệu."; return; }
     wireEquity();
     if (el.hidden) {  // the pipeline tab shows cards only; keep the meta line
       const plan = state.live.plan;
@@ -585,7 +682,7 @@
     if (!lv) return "";
     return `<div class="conf"><div class="muted small">Lịch sử các lệnh cùng mức tin cậy "${esc(CONF[level] || level)}" (mô phỏng walk-forward, chưa trừ phí):</div>
       <table class="tbl compact"><thead><tr><th>Giai đoạn</th><th>Số lệnh</th><th>Thắng</th><th>TB thắng</th><th>TB thua</th><th>TB/lệnh</th></tr></thead>
-      <tbody>${confLine(lv.dev, "4 năm đầu")}${confLine(lv.hidden, "Năm giấu")}</tbody></table>
+      <tbody>${confLine(lv.dev, "4 năm phát triển")}${confLine(lv.hidden, "Năm kiểm chứng")}</tbody></table>
       <div class="muted small">Lưu ý: nhãn tin cậy hiện tại chưa phân biệt tốt (97% lệnh là "Thấp"); đang nghiên cứu điểm tin cậy mới.</div></div>`;
   }
 
@@ -614,7 +711,7 @@
     }
     const d = state.live.conf?.levels?.DIP;
     const note = $("dipNote") || Object.assign(document.createElement("div"), { id: "dipNote", className: "muted small" });
-    note.innerHTML = d ? `Lịch sử lệnh dip: thắng <b>${(100 * d.dev.win_rate).toFixed(0)}%</b> (${d.dev.n} lệnh, 4 năm đầu) · năm giấu <b>${(100 * d.hidden.win_rate).toFixed(0)}%</b> (${d.hidden.n} lệnh) · TB thắng +${d.dev.avg_win_pct.toFixed(2)}% / thua ${d.dev.avg_loss_pct.toFixed(2)}%` : "";
+    note.innerHTML = d ? `Lịch sử lệnh dip: thắng <b>${(100 * d.dev.win_rate).toFixed(0)}%</b> (${d.dev.n} lệnh, 4 năm phát triển) · năm kiểm chứng <b>${(100 * d.hidden.win_rate).toFixed(0)}%</b> (${d.hidden.n} lệnh) · TB thắng +${d.dev.avg_win_pct.toFixed(2)}% / thua ${d.dev.avg_loss_pct.toFixed(2)}%` : "";
     $("dipTbl").after(note);
   }
 
@@ -713,12 +810,14 @@
   }
 
   let histInit = false;
-  function initHistory() {
+  async function initHistory() {
+    await loadEvidence();
+    if (!visiblePipes().length) { $("hPipe").innerHTML = accessMessage(); return; }
+    if (!visiblePipes().some((p) => p.v === state.h.pipe)) state.h.pipe = planPipe();
+    seg($("hPipe"), visiblePipes().map((p) => p.v), state.h.pipe, (v) => { state.h.pipe = v; loadHistory(); },
+      (v) => PIPES.find((p) => p.v === v).nm);
     if (!histInit) {
       histInit = true;
-      state.h.pipe = planPipe();
-      seg($("hPipe"), PIPES.map((p) => p.v), state.h.pipe, (v) => { state.h.pipe = v; loadHistory(); },
-        (v) => PIPES.find((p) => p.v === v).nm + (v === "v301" ? " ★" : ""));
       seg($("hSymbols"), SYMS, state.h.symbol, (v) => { state.h.symbol = v; store.set("hSym", v); loadHistory(); updateTitle(); }, coin);
       seg($("hIntervals"), ["1h", "4h", "1d"], state.h.interval, (v) => { state.h.interval = v; store.set("hIv", v); loadHistory(); }, (x) => IV_LABEL[x]);
       seg($("hRanges"), Object.keys(RANGES), state.h.range, (v) => { state.h.range = v; store.set("hRange2", v); applyRange(); });
@@ -739,7 +838,7 @@
       };
       initResizer();
       loadHistory();
-    } else if (H.chart) { H.prim && H.prim.update(); }
+    } else { loadHistory(); }
   }
 
   function initResizer() {
@@ -960,20 +1059,22 @@
   // ================================================================== PERFORMANCE
   async function loadPerf() {
     try {
-      const pipe = state.perfPipe || planPipe(), src = `tm_${pipe}`, nm = PIPES.find((p) => p.v === pipe).nm;
-      seg($("pPipe"), PIPES.map((p) => p.v), pipe, (v) => { state.perfPipe = v; loadPerf(); },
+      await loadEvidence();
+      if (!visiblePipes().length) { $("pPipe").innerHTML = accessMessage(); return; }
+      const pipe = visiblePipes().some((p) => p.v === state.perfPipe) ? state.perfPipe : planPipe(), src = `tm_${pipe}`, nm = PIPES.find((p) => p.v === pipe).nm;
+      seg($("pPipe"), visiblePipes().map((p) => p.v), pipe, (v) => { state.perfPipe = v; loadPerf(); },
         (v) => PIPES.find((p) => p.v === v).nm + " — " + PIPES.find((p) => p.v === v).ds);
       const [ov, wfEq, st] = await Promise.all([api(`/api/overview?pipeline=${pipe}`), api(`/api/equity?source=${src}&points=3000`),
         api(`/api/orders/stats?source=${src}`)]);
       const wf = ov.walkforward || {}, plan = ov.plan || {};
       $("perfKpis").innerHTML = [
-        [`${nm}: 5 năm walk-forward`, wf.monthly_5y, "%/tháng (TB hình học)"], ["4 năm đầu (dùng để chọn)", wf.monthly_dev4, "%/tháng"],
-        ["Năm gần nhất (năm giấu)", wf.monthly_last_year, "%/tháng"], ["DD toàn giai đoạn", wf.gate_dd, "% (max 4h / 1 phút)"],
-        ["Năm lỗ", wf.losing_years, "năm"],
-      ].map(([k, v, s]) => `<div class="kpi"><div class="k">${k}</div><div class="v">${v ?? "—"}</div><div class="s">${s}</div></div>`).join("");
-      table($("yearTbl"), ["Năm", "Lợi nhuận năm", "%/tháng", "DD (1 phút)"],
-        (wf.yearly || []).map(([a, net, dd], i, all) => `<tr><td>${esc(String(a).slice(0, 7))} → ${+String(a).slice(0, 4) + 1}${String(a).slice(4, 7)}${i === all.length - 1 ? ' <span class="pill">năm giấu</span>' : ""}</td>
-          <td>${sgn(net, 1)}</td><td>${sgn((Math.pow(1 + net / 100, 1 / 12) - 1) * 100)}</td><td>${dd}%</td></tr>`));
+        [`${nm}: mô phỏng toàn bộ 5 năm`, wf.monthly_5y, "%/tháng (bình quân theo lãi kép)"], ["4 năm phát triển mô hình", wf.monthly_dev4, "%/tháng"],
+        ["Năm kiểm chứng sau khi chọn mô hình", wf.monthly_last_year, "%/tháng"], ["Sụt giảm vốn tối đa", wf.gate_dd, "% (mức lớn hơn: nến 4h / từng phút)"],
+        ["Số năm thua lỗ", wf.losing_years, "năm"],
+      ].map(([k, v, s]) => `<div class="kpi"><div class="k">${k}</div><div class="v">${esc(v ?? "—")}</div><div class="s">${esc(s)}</div></div>`).join("");
+      table($("yearTbl"), ["Năm", "Lợi nhuận năm", "%/tháng", "Sụt giảm vốn (từng phút)"],
+        (wf.yearly || []).map(([a, net, dd], i, all) => `<tr><td>${esc(String(a).slice(0, 7))} → ${+String(a).slice(0, 4) + 1}${String(a).slice(4, 7)}${i === all.length - 1 ? ' <span class="pill">năm kiểm chứng</span>' : ""}</td>
+          <td>${sgn(net, 1)}</td><td>${sgn((Math.pow(1 + net / 100, 1 / 12) - 1) * 100)}</td><td>${esc(dd)}%</td></tr>`));
       const by = {};
       for (const r of st) {
         const k = r.symbol + "|" + r.kind; const a = by[k] || (by[k] = { symbol: r.symbol, kind: r.kind, n: 0, w: 0, s: 0, tp: 0, sl: 0, nd: 0 });
@@ -1016,6 +1117,7 @@
   // ================================================================== ADMIN
   let jobsTimer = null;
   async function loadAdmin() {
+    loadPipelineSettings();
     document.querySelectorAll("[data-run]").forEach((b) => (b.onclick = async () => {
       if (b.dataset.run === "walkforward" && !confirm("Tính lại toàn bộ walk-forward 5 năm và bảng lệnh?")) return;
       try { await api("/api/admin/run", { method: "POST", body: { kind: b.dataset.run } }); toast("Đã bắt đầu: " + b.dataset.run); setTimeout(loadJobs, 800); }
@@ -1027,6 +1129,53 @@
       catch (e) { toast(e.message); }
     };
     loadJobs(); loadUsers();
+  }
+
+  let pipelineDraft = null;
+  async function loadPipelineSettings() {
+    try { pipelineDraft = await api("/api/admin/pipelines"); renderPipelineSettings(); }
+    catch (e) { toast(e.message); }
+  }
+  function renderPipelineSettings() {
+    const draft = pipelineDraft;
+    $("pipelineMode").textContent = draft.automatic ? "Thứ tự tự động theo kết quả đánh giá" : "Thứ tự do admin sắp xếp";
+    table($("pipelineSettingsTbl"), ["Vị trí", "Pipeline", "Đổi thứ tự", "Quyền xem tín hiệu"], draft.order.map((p, i) => `<tr>
+      <td>${i + 1}</td><td><b>${esc(PIPE_LABEL[p])}</b><span class="note">${esc(PIPES.find((x) => x.v === p).ds)}</span></td>
+      <td><button class="btn sm" data-move="${i}" data-delta="-1" aria-label="Đưa ${esc(PIPE_LABEL[p])} lên" ${i === 0 ? "disabled" : ""}>↑</button>
+        <button class="btn sm" data-move="${i}" data-delta="1" aria-label="Đưa ${esc(PIPE_LABEL[p])} xuống" ${i === draft.order.length - 1 ? "disabled" : ""}>↓</button></td>
+      <td><button class="btn sm" data-lock="${p}" aria-pressed="${draft.locked[p]}">${draft.locked[p] ? "🔒 Đang khóa · Mở khóa" : "Đang mở · Khóa tín hiệu"}</button></td></tr>`));
+    $("pipelineSettingsTbl").onclick = (e) => {
+      const lock = e.target.closest("[data-lock]"), move = e.target.closest("[data-move]");
+      if (lock) draft.locked[lock.dataset.lock] = !draft.locked[lock.dataset.lock];
+      else if (move) {
+        const i = Number(move.dataset.move), next = i + Number(move.dataset.delta);
+        if (next < 0 || next >= draft.order.length) return;
+        [draft.order[i], draft.order[next]] = [draft.order[next], draft.order[i]]; draft.automatic = false;
+      } else return;
+      renderPipelineSettings(); $("pipelineSaveStatus").textContent = "Có thay đổi chưa lưu.";
+    };
+    $("reloadPipelineSettings").onclick = async () => { await loadPipelineSettings(); $("pipelineSaveStatus").textContent = "Đã tải lại cấu hình."; };
+    $("autoPipelineOrder").onclick = async () => {
+      try {
+        const current = await api("/api/pipelines_summary");
+        draft.order = Object.keys(current).sort((a, b) => {
+          const x = current[a].walkforward, y = current[b].walkforward;
+          return y.monthly_last_year - x.monthly_last_year || x.gate_dd - y.gate_dd || y.win_hidden - x.win_hidden || a.localeCompare(b);
+        });
+        draft.automatic = true; renderPipelineSettings(); $("pipelineSaveStatus").textContent = "Thứ tự tự động; trạng thái khóa được giữ nguyên. Bấm Lưu để áp dụng.";
+      } catch (e) { toast(e.message); }
+    };
+    $("savePipelineSettings").onclick = async () => {
+      const button = $("savePipelineSettings"); button.disabled = true;
+      try {
+        pipelineDraft = await api("/api/admin/pipelines", { method: "POST", body: {
+          order: draft.automatic ? null : draft.order, locked: draft.locked, revision: draft.revision,
+        } });
+        renderPipelineSettings(); await loadEvidence();
+        $("pipelineSaveStatus").textContent = "Đã lưu. Quyền xem có hiệu lực ngay; thứ tự áp dụng từ lượt chạy tiếp theo.";
+      } catch (e) { $("pipelineSaveStatus").textContent = e.message; }
+      finally { button.disabled = false; }
+    };
   }
 
   async function loadJobs() {
@@ -1059,15 +1208,22 @@
 
   // ------------------------------------------------------------------ boot
   setInterval(() => { if (state.view === "live" && state.user && state.user.role !== "pending" && !document.hidden) loadLive(); }, 120000);
+  setInterval(async () => {
+    if (!state.user || state.user.role === "pending" || document.hidden) return;
+    const previous = JSON.stringify(state.user.allowed_pipelines);
+    await loadEvidence();
+    if (state.user && previous !== JSON.stringify(state.user.allowed_pipelines)) route();
+  }, 60000);
 
   async function boot() {
-    if (state.token) {
-      try { state.user = await api("/api/auth/me"); enter(); return; }
-      catch (e) { if (state.token) logout(); return; }
-    }
-    try { // on the server machine itself the backend signs in as the local admin (no Google login)
+    // Remove credentials persisted by older frontend versions.
+    try { localStorage.removeItem("aal_token"); localStorage.removeItem("aal_session"); } catch { /* private mode */ }
+    try {
+      await refreshSession(); enter(); return;
+    } catch { /* no valid cookie: local admin or Google sign-in */ }
+    try {
       state.user = await api("/api/auth/me"); enter(); return;
-    } catch (e) { /* not local: Google sign-in */ }
+    } catch { /* not local */ }
     showOnly("login");
     initGsi();
   }

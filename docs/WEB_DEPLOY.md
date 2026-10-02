@@ -6,7 +6,7 @@ Trình duyệt ──► Vercel (frontend/, tĩnh) ──fetch──► https://
                                                      ▼
                                    máy này: uvicorn backend.server:app @ 127.0.0.1:8724
                                    ├─ SQLite WAL  artifacts/web/app.db  (gitignored)
-                                   └─ scheduler: sau mỗi nến 4h đóng (+8 phút) chạy nến → tín hiệu v205 → paper trading
+                                   └─ scheduler: sau mỗi nến 4h đóng (+1 phút) cập nhật dữ liệu → cả 5 trade plan
 ```
 
 API chỉ đọc DB, không bao giờ chạy pipeline khi có request. Pipeline chạy theo lịch hoặc khi admin bấm nút.
@@ -30,14 +30,60 @@ Xem `.env.example`. Các khoá quan trọng:
 - `ADMIN_EMAILS=trainguyenchi30@gmail.com`: admin cố định, chỉ khai báo ở đây.
 - `AUTH_SESSION_SECRET`: chuỗi ngẫu nhiên dài, đã được tạo sẵn.
 - `GOOGLE_CLIENT_ID`: lấy ở bước 1.
-- `CORS_ALLOW_ORIGINS=https://crypto.nguyenchitrai.id.vn`: domain FE. Mặc định đã chấp nhận `*.vercel.app` và `*.nguyenchitrai.id.vn` qua regex.
+- `CORS_ALLOW_ORIGINS=https://crypto.nguyenchitrai.id.vn`: domain FE. Chỉ chấp nhận các origin được liệt kê chính xác; thêm domain Vercel cụ thể nếu sử dụng.
 
 Phân quyền:
 
 - **admin** (email trong `ADMIN_EMAILS`): xem mọi trang, chạy pipeline, duyệt người dùng.
-- **viewer**: email đã được admin duyệt ở trang Admin, hoặc có trong `VIEWER_EMAILS`.
+- **viewer**: email đã được admin duyệt ở trang Admin, hoặc có trong `VIEWER_EMAILS`; xem tín hiệu của những pipeline admin đã mở khóa (mặc định 3 pipeline cuối).
 - **pending**: tài khoản Google khác. Sau khi đăng nhập họ thấy trang "Đang chờ duyệt".
 - Đặt `ALLOW_ANY_GOOGLE_VIEWER=true` để mọi tài khoản Google đều xem được.
+
+BE mặc định xếp 5 pipeline theo thứ tự: **lợi nhuận/tháng năm kiểm chứng giảm dần → sụt giảm vốn tăng dần → tỷ lệ thắng năm kiểm chứng giảm dần**;
+cuối cùng theo mã pipeline để thứ hạng ổn định khi hòa. Đọc `monthly_last_year`, `gate_dd`, `win_hidden` từ dashboard;
+thiếu số liệu thì dùng snapshot trong `backend/catalog.py`. Đây là thứ hạng sản phẩm/hiển thị và lịch chạy theo yêu cầu
+người dùng 2026-10-02, không dùng để huấn luyện, thay đổi tham số hay lựa chọn model nghiên cứu.
+Với số liệu hiện tại, admin giữ riêng **G2/v301** và **CS/v295**; viewer xem **CB/v285**, **C4/v269**, **C5/v266**.
+Cả 5 pipeline vẫn xuất hiện với đầy đủ chỉ số đánh giá lịch sử, kể cả pipeline bị khóa, kèm liên kết mail admin.
+Ở trang **Admin → Thứ tự pipeline & quyền xem tín hiệu**, dùng ↑ ↓ để đổi thứ tự, khóa/mở từng pipeline rồi bấm **Lưu cấu hình pipeline**.
+Khóa/mở áp dụng cho tất cả viewer, độc lập với thứ tự; có thể mở cả 5 hoặc khóa cả 5. Admin luôn xem được tất cả.
+**Dùng thứ tự tự động** khôi phục xếp theo chỉ số, giữ trạng thái khóa đã chọn; cần bấm Lưu để áp dụng.
+Cấu hình được lưu trong SQLite, có hiệu lực với access token đang sử dụng và giữ nguyên sau khi khởi động lại.
+FE cập nhật quyền khi đổi tab và mỗi phút; BE kiểm tra quyền trên từng request. Nếu hai admin cùng sửa,
+phiên bản cũ bị từ chối bằng HTTP 409; dùng **Tải lại cấu hình** trước khi chỉnh và lưu lại.
+Scheduler luôn chạy cả 5, ưu tiên pipeline chưa hoàn thành rồi theo thứ tự admin đã lưu (hoặc thứ tự tự động).
+Đặt `WEB_ADMIN_CONTACT_EMAIL` để đổi địa chỉ liên hệ. Liên kết chỉ mở email nháp, không gửi mail tự động.
+
+API kiểm tra quyền trước cache cho trade plan, overview, signal/ID, orders, positions, trades và equity;
+dữ liệu pipeline cũ chỉ dành cho admin. `/api/auth/me` trả `allowed_pipelines` để FE chọn đúng danh sách.
+Không trả signal, vị thế, kế hoạch lệnh, đường vốn hay kết quả paper của pipeline bị khóa.
+
+Đăng nhập Google tạo access JWT mặc định 15 phút (`AUTH_ACCESS_TTL_SECONDS=900`) và refresh token ngẫu nhiên
+có thời hạn tuyệt đối 7 ngày (`AUTH_REFRESH_TTL_SECONDS=604800`). Access token chỉ ở bộ nhớ FE,
+mọi API dữ liệu nhận `Authorization: Bearer <access_token>`; không nhận token trong URL hay cookie thay cho header.
+Refresh token không trả trong JSON và không lưu trong localStorage/sessionStorage: BE đặt cookie host-only
+`HttpOnly; Secure; SameSite=None`, thời hạn 7 ngày. Cục bộ dùng cookie không Secure với SameSite=Lax;
+FE/API phải dùng cùng hostname (localhost hoặc 127.0.0.1). Chỉ lưu SHA-256 refresh token trong SQLite.
+
+FE gọi `POST /api/auth/refresh` / `POST /api/auth/logout` với `credentials: include` và Origin hợp lệ;
+API client có thể gửi refresh token qua `Authorization: Bearer <refresh_token>`. Token refresh cũ dùng lại sẽ thu hồi
+cả phiên. Logout thu hồi access và refresh. Quyền được đọc lại trên mỗi request. FE tự refresh trước hết hạn
+hoặc retry một lần khi 401; gộp refresh trong tab và dùng Web Locks để tuần tự giữa các tab.
+Response auth có `Cache-Control: no-store`. Session token cũ phải đăng nhập lại sau nâng cấp.
+Triển khai BE và FE cùng đợt; trên domain Vercel khác site, trình duyệt chặn third-party cookie có thể ngăn refresh:
+ưu tiên domain FE `crypto.nguyenchitrai.id.vn`, cùng site với API.
+
+CORS mặc định chỉ cho localhost và domain FE chính, không còn cho toàn bộ `*.vercel.app`.
+`CORS_ALLOW_ORIGINS` phải liệt kê chính xác domain bạn sở hữu; không dùng wildcard.
+Nếu `.env` cũ có `CORS_ALLOW_ORIGIN_REGEX` rộng, bỏ giá trị đó hoặc đặt trống khi nâng cấp.
+API cookie refresh/logout kiểm tra Origin chống CSRF; `/api/auth/google` cũng chặn Origin lạ.
+Headers bảo mật/CSP có ở BE và cả hai cấu hình Vercel. Body POST tối đa 64 KiB, kể cả chunked body.
+OpenAPI/docs public tắt; endpoint admin vẫn luôn kiểm tra role. Secret và DB không nằm trong static frontend.
+
+Scheduler mặc định chạy đủ 5 pipeline mỗi 4h và cập nhật plan giữa chu kỳ mỗi 15 phút.
+Pipeline chưa hoàn thành trong chu kỳ hiện tại chạy trước, theo thứ hạng sản phẩm;
+trạng thái hoàn thành từng pipeline lưu ở SQLite nên giữ được qua restart. Một plan lỗi vẫn thử các plan còn lại,
+đánh dấu cycle failed và thử lại sau 60 giây; startup chạy bù chu kỳ bị thiếu. Các job v205 cũ chỉ chạy khi admin yêu cầu.
 
 ## 3. Chạy backend
 
@@ -59,8 +105,8 @@ powershell -ExecutionPolicy Bypass -File deploy\start_backend.ps1          # ch�
 powershell -ExecutionPolicy Bypass -File deploy\install_autostart.ps1      # (tuỳ chọn) tự chạy khi đăng nhập Windows
 ```
 
-Lần chạy đầu, nếu DB trống, scheduler tự tải nến, chạy tín hiệu hiện tại và backfill walk-forward 2021–2026
-(khoảng 1 phút). Log nằm ở `artifacts/web/backend.log`. Kiểm tra bằng `http://127.0.0.1:8724/health`.
+Lần chạy đầu, nếu DB trống, scheduler tự tải nến và chạy cả 5 trade plan. Backfill walk-forward dùng job admin
+`walkforward_tm` khi cần. Log nằm ở `artifacts/web/backend.log`. Kiểm tra bằng `http://127.0.0.1:8724/health`.
 
 ### Xem web trên chính máy server, không cần đăng nhập
 
@@ -100,7 +146,7 @@ Public hostname: `api-crypto.nguyenchitrai.id.vn` → `HTTP` → `localhost:8724
 
 ## API
 
-- **Công khai:** `GET /health`, `GET /api/public/config`, `POST /api/auth/google`, `GET /api/auth/me`.
+- **Công khai:** `GET /health`, `GET /api/public/config`, `POST /api/auth/google`. `GET /api/auth/me` cần Bearer access token (hoặc chế độ local admin).
 - **Viewer:**
   - `/api/overview`
   - `/api/signals/latest`
@@ -115,6 +161,7 @@ Public hostname: `api-crypto.nguyenchitrai.id.vn` → `HTTP` → `localhost:8724
   - `POST /api/admin/run {kind: cycle|signal|candles|forward|walkforward}`
   - `GET /api/admin/jobs`
   - `GET|POST /api/admin/users`
+  - `GET|POST /api/admin/pipelines`: `order` (đủ 5 mã, không trùng; `null` = tự động), `locked` (boolean cho từng mã), `revision` (phiên bản GET gần nhất).
 
 ## Hiệu năng
 

@@ -393,3 +393,13 @@ details.adv summary .sub-line { display: block; margin: 2px 0 0 14px; font-weigh
 .view.page > * { max-width: none; }
 @media (min-width: 2200px) { .view.page > * { max-width: none; } }
 @media (min-width: 2600px) { .view.page > * { max-width: 2400px; } }
+.evid tr.locked { cursor: default; background: rgba(255, 193, 7, .04); }
+.evid tr.locked .radio { visibility: hidden; }
+.pipe-access { color: #d6b85b; font-size: 12px; margin-top: 6px; }
+.pipe-access a { color: #90b8ff; text-decoration: underline; }
+.evid-panel .evid th { white-space: normal; line-height: 1.35; min-width: 85px; }
+.evid-panel .evid th:first-child { min-width: 220px; }
+.pipeline-actions { flex-wrap: wrap; }
+#pipelineSettingsTbl th:nth-child(2), #pipelineSettingsTbl td:nth-child(2) { text-align: left; }
+#pipelineSettingsTbl .note { display: block; white-space: normal; color: var(--muted); font-size: 11px; margin-top: 4px; }
+.btn:disabled { opacity: .4; cursor: default; }

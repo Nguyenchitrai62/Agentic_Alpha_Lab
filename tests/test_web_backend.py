@@ -13,6 +13,11 @@ def backend(tmp_path, monkeypatch):
     monkeypatch.setenv("VIEWER_EMAILS", "viewer@example.com")
     monkeypatch.setenv("ALLOW_ANY_GOOGLE_VIEWER", "false")
     monkeypatch.setenv("AUTH_SESSION_SECRET", "test-secret")
+    monkeypatch.setenv("WEB_SCHEDULER_ENABLED", "false")
+    monkeypatch.setenv("AUTH_ACCESS_TTL_SECONDS", "900")
+    monkeypatch.setenv("AUTH_REFRESH_TTL_SECONDS", "604800")
+    monkeypatch.setenv("CORS_ALLOW_ORIGINS", "https://crypto.example.com")
+    monkeypatch.setenv("CORS_ALLOW_ORIGIN_REGEX", "")
     for m in [m for m in sys.modules if m == "backend" or m.startswith("backend.")]:
         del sys.modules[m]
     config = importlib.import_module("backend.config")
@@ -103,3 +108,312 @@ def test_build_orders_episodes(backend):
     short = book[1]
     assert short[2] == "SHORT" and short[12] == "Rebalance về 0" and short[13] > 0  # 120 -> 118 on a short
     assert dip[0][12] == "SL" and dip[0][13] < 0
+
+
+@pytest.fixture()
+def web_client(backend):
+    from fastapi.testclient import TestClient
+    server = importlib.import_module("backend.server")
+    return TestClient(server.app, base_url="https://testserver"), server, backend
+
+
+def _bearer(auth, email):
+    return {"Authorization": "Bearer " + auth.create_session(email)["access_token"]}
+
+
+def test_admin_order_and_locks_apply_to_existing_session_and_scheduler(web_client):
+    client, _, (_, db, auth) = web_client
+    admin, viewer = _bearer(auth, "admin@example.com"), _bearer(auth, "viewer@example.com")
+    original = client.get("/api/admin/pipelines", headers=admin).json()
+    assert client.get("/api/admin/pipelines", headers=admin).headers["cache-control"] == "no-store"
+    assert original["automatic"] and original["revision"] == 0
+    # Warm both caches before changing policy; the same viewer access token must acquire/lose rights immediately.
+    client.get("/api/pipelines_summary", headers=viewer)
+    client.get("/api/trade_plan?pipeline=v285", headers=viewer)
+    order = ["v266", "v301", "v269", "v295", "v285"]
+    locks = {**original["locked"], "v301": False, "v285": True}
+    payload = {"order": order, "locked": locks, "revision": 0}
+    response = client.post("/api/admin/pipelines", headers=admin, json=payload)
+    assert response.status_code == 200
+    assert response.json() == {"order": order, "locked": locks, "automatic": False, "revision": 1}
+    assert client.get("/api/trade_plan?pipeline=v301", headers=viewer).status_code == 200
+    assert client.get("/api/trade_plan?pipeline=v285", headers=viewer).status_code == 403
+    assert client.get("/api/auth/me", headers=viewer).json()["allowed_pipelines"] == ["v266", "v301", "v269"]
+    summary = client.get("/api/pipelines_summary", headers=viewer).json()
+    assert list(summary) == order and summary["v285"]["locked"] and not summary["v301"]["locked"]
+    assert client.get("/api/pipelines_summary", headers=admin).json()["v285"]["locked_for_viewers"]
+    assert all(not p["locked"] for p in client.get("/api/pipelines_summary", headers=admin).json().values())
+    catalog = importlib.reload(importlib.import_module("backend.catalog"))
+    assert catalog.ranked() == order  # persisted, not process-local UI state
+    pipeline = importlib.import_module("backend.pipeline")
+    db.kv_set("plan_status_v266", {"completed_slot": "slot"})
+    assert pipeline.plan_order("slot") == order[1:] + order[:1]
+    # A stale admin tab cannot silently undo the change.
+    assert client.post("/api/admin/pipelines", headers=admin, json=payload).status_code == 409
+    assert catalog.ranked() == order
+    # Switching back to automatic ranking keeps locks independently configured.
+    payload.update(order=None, revision=1)
+    assert client.post("/api/admin/pipelines", headers=admin, json=payload).status_code == 200
+    assert catalog.policy()["automatic"] and catalog.policy()["locked"] == locks
+
+
+@pytest.mark.parametrize("email", [None, "viewer@example.com", "pending@example.com"])
+def test_pipeline_settings_require_admin(web_client, email):
+    client, _, (_, db, auth) = web_client
+    headers = _bearer(auth, email) if email else {}
+    for method in (client.get, client.post):
+        assert method("/api/admin/pipelines", headers=headers).status_code in (401, 403)
+    assert db.kv_get("pipeline_access_policy") is None
+
+
+@pytest.mark.parametrize("invalid", [
+    {"order": ["v301"]}, {"order": ["v301"] * 5}, {"order": {}},
+    {"order": ["v301", "v295", "v285", "v269", {}]}, {"order": ["v301", "v295", "v285", "v269", "unknown"]},
+    {"locked": {"v301": True}}, {"locked": {p: "false" for p in ("v301", "v295", "v285", "v269", "v266")}},
+    {"revision": True}, {"revision": -1},
+])
+def test_pipeline_policy_validates_before_mutation(web_client, invalid):
+    client, _, (_, db, auth) = web_client
+    admin = _bearer(auth, "admin@example.com")
+    policy = client.get("/api/admin/pipelines", headers=admin).json()
+    payload = {"order": policy["order"], "locked": policy["locked"], "revision": 0, **invalid}
+    assert client.post("/api/admin/pipelines", headers=admin, json=payload).status_code == 400
+    assert db.kv_get("pipeline_access_policy") is None
+
+
+def test_all_locked_and_all_unlocked_are_supported(web_client):
+    client, _, (_, _, auth) = web_client
+    admin, viewer = _bearer(auth, "admin@example.com"), _bearer(auth, "viewer@example.com")
+    policy = client.get("/api/admin/pipelines", headers=admin).json()
+    for revision, locked in enumerate((True, False)):
+        payload = {"order": policy["order"], "locked": {p: locked for p in policy["order"]}, "revision": revision}
+        assert client.post("/api/admin/pipelines", headers=admin, json=payload).status_code == 200
+        assert len(client.get("/api/auth/me", headers=viewer).json()["allowed_pipelines"]) == (0 if locked else 5)
+        assert len(client.get("/api/pipelines_summary", headers=viewer).json()) == 5
+        for path in ("/api/trade_plan", "/api/overview"):
+            assert client.get(path, headers=viewer).status_code == (403 if locked else 200)
+            assert client.get(path, headers=admin).status_code == 200
+
+
+def test_locked_pipeline_shows_full_historical_evaluation_without_signals(web_client):
+    client, _, (_, db, auth) = web_client
+    metrics = {"monthly_5y": 6.3, "monthly_dev4": 6.7, "monthly_last_year": 5.349,
+               "gate_dd": 17.09, "dd_4h": 16.2, "dd_1m": 17.09, "win_dev": .61, "win_hidden": .558,
+               "trades_dev": 200, "trades_hidden": 55, "losing_years": 0, "yearly": [["2021-09-24", 80, 17.09]]}
+    db.kv_set("summary_tm_v301", {**metrics, "coins": {"BTCUSDT": "SECRET"}, "events": ["SECRET"]})
+    db.kv_set("trade_plan_v301", {"coins": {"BTCUSDT": "SECRET"}, "net_return_pct": 12, "freeze": "SECRET"})
+    response = client.get("/api/pipelines_summary", headers=_bearer(auth, "viewer@example.com"))
+    assert response.json()["v301"]["walkforward"] == metrics
+    assert response.json()["v301"]["locked"]
+    assert "SECRET" not in response.text and response.json()["v301"]["paper_net_pct"] is None
+
+
+@pytest.mark.parametrize("path", [
+    "/api/trade_plan?pipeline=v301", "/api/overview?pipeline=v295",
+    "/api/signals/latest?source=tm_v301", "/api/signals?source=paper_v295",
+    "/api/signals?source=tm_v301&symbol=BTCUSDT",
+    "/api/signals/at?source=paper_v301&t=999999",
+    "/api/positions?symbol=BTCUSDT&source=tm_v295",
+    "/api/trades?symbol=BTCUSDT&source=paper_v301",
+    "/api/orders?source=tm_v301", "/api/orders/stats?source=paper_v295",
+    "/api/equity?source=tm_v301", "/api/confidence",
+    "/api/signals?source=live", "/api/orders?source=walkforward", "/api/equity?source=forward",
+    "/api/trade_plan?pipeline=unknown", "/api/orders?source=paper_v301_G2",
+])
+def test_viewer_cannot_read_restricted_pipeline(web_client, path):
+    client, _, (_, _, auth) = web_client
+    assert client.get(path, headers=_bearer(auth, "viewer@example.com")).status_code == 403
+
+
+def test_pipeline_permissions_and_cache_are_role_safe(web_client):
+    client, _, (_, db, auth) = web_client
+    admin, viewer = _bearer(auth, "admin@example.com"), _bearer(auth, "viewer@example.com")
+    for pipe in ("v301", "v295", "v285", "v269", "v266"):
+        db.kv_set(f"trade_plan_{pipe}", {"pipeline": pipe, "coins": {"secret": pipe}})
+    assert len(client.get("/api/pipelines_summary", headers=admin).json()) == 5
+    summary = client.get("/api/pipelines_summary", headers=viewer).json()
+    assert len(summary) == 5
+    assert [p for p in summary if summary[p]["locked"]] == ["v301", "v295"]
+    assert summary["v301"]["paper_net_pct"] is None
+    assert summary["v301"]["freeze"] is None
+    assert client.get("/api/auth/me", headers=viewer).json()["allowed_pipelines"] == ["v285", "v269", "v266"]
+    for pipe in ("v285", "v269", "v266"):
+        assert client.get(f"/api/trade_plan?pipeline={pipe}", headers=viewer).json()["pipeline"] == pipe
+    assert client.get("/api/trade_plan", headers=viewer).json()["pipeline"] == "v285"
+    assert client.get("/api/trade_plan?pipeline=v301", headers=admin).status_code == 200
+    assert client.get("/api/trade_plan?pipeline=v301", headers=viewer).status_code == 403
+    assert client.get("/api/pipelines_summary", headers=_bearer(auth, "pending@example.com")).status_code == 403
+
+
+@pytest.mark.parametrize("source", ["tm_v301", "paper_v301", "live"])
+def test_signal_id_cache_cannot_bypass_permissions(web_client, source):
+    client, _, (_, db, auth) = web_client
+    with db.write() as c:
+        run_id = c.execute("INSERT INTO runs(source, decision_time, pipeline, created_at) VALUES(?,1,'v301',1)",
+                           (source,)).lastrowid
+    path = f"/api/signals/{run_id}"
+    warmed = client.get(path, headers=_bearer(auth, "admin@example.com"))
+    assert warmed.status_code == 200
+    response = client.get(path, headers={**_bearer(auth, "viewer@example.com"), "If-None-Match": warmed.headers["etag"]})
+    assert response.status_code == 403
+
+
+def test_expired_access_refresh_rotation_and_replay(web_client, monkeypatch):
+    client, _, (_, db, auth) = web_client
+    now = int(auth.time.time())
+    monkeypatch.setattr(auth.time, "time", lambda: now)
+    pair = auth.create_session("viewer@example.com")
+    assert pair["expires_at"] == now + 900
+    assert not db.one("SELECT 1 AS x FROM auth_refresh_tokens WHERE token_hash=?", (pair["refresh_token"],))
+    monkeypatch.setattr(auth.time, "time", lambda: now + 901)
+    assert client.get("/api/auth/me", headers={"Authorization": "Bearer " + pair["access_token"]}).status_code == 401
+    response = client.post("/api/auth/refresh", headers={"Authorization": "Bearer " + pair["refresh_token"]})
+    assert response.status_code == 200 and response.headers["cache-control"] == "no-store"
+    renewed = response.json()
+    assert "refresh_token" not in renewed
+    rotated_refresh = client.cookies.get("aal_refresh")
+    assert rotated_refresh != pair["refresh_token"]
+    headers = {"Authorization": "Bearer " + renewed["access_token"]}
+    assert client.get("/api/auth/me", headers=headers).status_code == 200
+    assert client.get("/api/auth/me", headers={"Authorization": "Bearer " + rotated_refresh}).status_code == 401
+    assert client.post("/api/auth/refresh", headers={"Authorization": "Bearer " + pair["refresh_token"]}).status_code == 401
+    assert client.get("/api/auth/me", headers=headers).status_code == 401
+    assert client.post("/api/auth/refresh", headers={"Authorization": "Bearer " + rotated_refresh}).status_code == 401
+
+
+def test_logout_revokes_access_and_refresh(web_client):
+    client, _, (_, _, auth) = web_client
+    pair = auth.create_session("viewer@example.com")
+    assert client.post("/api/auth/logout", headers={"Authorization": "Bearer " + pair["refresh_token"]}).status_code == 200
+    assert client.get("/api/auth/me", headers={"Authorization": "Bearer " + pair["access_token"]}).status_code == 401
+    assert client.post("/api/auth/refresh", headers={"Authorization": "Bearer " + pair["refresh_token"]}).status_code == 401
+
+
+def test_role_is_rechecked_for_access_and_refresh(web_client):
+    client, _, (_, db, auth) = web_client
+    with db.write() as c:
+        c.execute("INSERT INTO users(email,role,approved) VALUES('approved@example.com','viewer',1)")
+    pair = auth.create_session("approved@example.com")
+    with db.write() as c:
+        c.execute("UPDATE users SET approved=0 WHERE email='approved@example.com'")
+    assert client.get("/api/trade_plan", headers={"Authorization": "Bearer " + pair["access_token"]}).status_code == 403
+    renewed = client.post("/api/auth/refresh", headers={"Authorization": "Bearer " + pair["refresh_token"]}).json()
+    assert renewed["user"]["role"] == "pending" and renewed["user"]["allowed_pipelines"] == []
+
+
+@pytest.mark.parametrize("token", ["garbage", "a.b.c", "a.b.☃", "", "a.b.c.d"])
+def test_malformed_tokens_are_unauthorized(web_client, token):
+    client, _, _ = web_client
+    # HTTP headers themselves must be ASCII.
+    if token.isascii():
+        assert client.get("/api/auth/me", headers={"Authorization": "Bearer " + token}).status_code == 401
+
+
+def test_plan_priority_uses_product_rank_and_unfinished_cycle(backend):
+    _, db, _ = backend
+    pipe = importlib.import_module("backend.pipeline")
+    slot = 100
+    assert pipe.plan_order(slot) == ["v301", "v295", "v285", "v269", "v266"]
+    db.kv_set("plan_status_v301", {"completed_slot": slot})
+    assert pipe.plan_order(slot)[0] == "v295" and pipe.plan_order(slot)[-1] == "v301"
+    db.kv_set("summary_tm_v285", {"monthly_last_year": 9, "gate_dd": 15, "win_hidden": .6})
+    assert pipe.plan_order(slot)[0] == "v285"
+    assert pipe.plan_order(slot + pipe.H4_MS)[0] == "v285"
+    # DD and then win break return ties; dev4 results cannot affect the product rank.
+    for p in pipe.catalog.PIPELINES:
+        db.kv_set(f"summary_tm_{p}", {"monthly_last_year": 5, "gate_dd": 20, "win_hidden": .5})
+    db.kv_set("summary_tm_v269", {"monthly_last_year": 5, "gate_dd": 19, "win_hidden": .5})
+    db.kv_set("summary_tm_v266", {"monthly_last_year": 5, "gate_dd": 19, "win_hidden": .6, "monthly_dev4": -99})
+    assert pipe.catalog.ranked()[:2] == ["v266", "v269"]
+
+
+def test_plan_failure_still_attempts_all_five_and_retries_unfinished(backend, tmp_path, monkeypatch):
+    import json
+    import subprocess
+    _, db, _ = backend
+    pipe = importlib.import_module("backend.pipeline")
+    history = importlib.import_module("backend.history_tm")
+    folder = tmp_path / "artifacts/research/advisor_shadow"
+    folder.mkdir(parents=True)
+    for name in pipe.catalog.PIPELINES:
+        (folder / f"trade_plan_{name}.json").write_text(json.dumps({"coins": {}, "net_return_pct": 0, "bars": []}))
+    monkeypatch.setattr(pipe, "ROOT", tmp_path)
+    monkeypatch.setattr(history, "store_paper", lambda *a: None)
+    calls = []
+    def execute(cmd, **kwargs):
+        candidate = cmd[cmd.index("--candidate") + 1]
+        calls.append(candidate)
+        if candidate == "v301_G2":
+            raise subprocess.TimeoutExpired(cmd, 1800)
+        return subprocess.CompletedProcess(cmd, 0, "", "")
+    monkeypatch.setattr(pipe.subprocess, "run", execute)
+    with pytest.raises(RuntimeError, match="v301"):
+        pipe.job_trade_plan()
+    assert calls == ["v301_G2", "v295_CS", "v285_D2", "v269_M1", "v266_B1"]
+    assert pipe.plan_order(db.now_ms() // pipe.H4_MS * pipe.H4_MS)[0] == "v301"
+    assert not db.kv_get("plan_status_v301")
+    assert db.kv_get("plan_status_v266")["completed_at"]
+
+
+def test_cookie_refresh_is_httponly_and_requires_trusted_origin(web_client):
+    client, _, (_, _, auth) = web_client
+    pair = auth.create_session("viewer@example.com")
+    response = client.post("/api/auth/refresh", headers={"Authorization": "Bearer " + pair["refresh_token"]})
+    cookie = response.headers["set-cookie"]
+    assert "HttpOnly" in cookie and "Secure" in cookie and "SameSite=none" in cookie
+    assert "refresh_token" not in response.json()
+    assert client.post("/api/auth/refresh", headers={"Origin": "https://evil.example.com"}).status_code == 403
+    assert client.post("/api/auth/refresh").status_code == 403
+    assert client.post("/api/auth/refresh", headers={"Origin": "https://crypto.example.com"}).status_code == 200
+    assert client.post("/api/auth/logout", headers={"Origin": "https://crypto.example.com"}).status_code == 200
+    assert client.post("/api/auth/refresh", headers={"Origin": "https://crypto.example.com"}).status_code == 401
+
+
+def test_tokens_in_query_or_cookie_cannot_authorize_signal_api(web_client):
+    client, _, (_, _, auth) = web_client
+    pair = auth.create_session("viewer@example.com")
+    assert client.get("/api/trade_plan?token=" + pair["access_token"]).status_code == 401
+    client.cookies.set("access_token", pair["access_token"])
+    assert client.get("/api/trade_plan").status_code == 401
+
+
+def test_cors_security_headers_and_request_limits(web_client):
+    client, _, _ = web_client
+    for origin, allowed in (("https://crypto.example.com", True), ("https://attacker.vercel.app", False)):
+        response = client.options("/api/auth/refresh", headers={"Origin": origin, "Access-Control-Request-Method": "POST"})
+        assert (response.headers.get("access-control-allow-origin") == origin) == allowed
+    response = client.get("/health")
+    assert response.headers["x-content-type-options"] == "nosniff"
+    assert response.headers["x-frame-options"] == "DENY"
+    assert client.get("/docs").status_code == 404
+    assert client.get("/openapi.json").status_code == 404
+    assert client.post("/api/auth/google", content=b"x" * 65537).status_code == 413
+    # Chunked bodies are bounded too, without relying on Content-Length.
+    assert client.post("/api/auth/google", content=iter([b"x" * 40000, b"x" * 40000])).status_code == 413
+
+
+def test_client_cannot_spoof_cf_ip_to_bypass_rate_limits(web_client):
+    client, server, _ = web_client
+    import time
+    server._buckets["testclient"] = [0, time.time()]
+    assert client.get("/health", headers={"CF-Connecting-IP": "1.2.3.4", "CF-Ray": "fake"}).status_code == 429
+
+
+def test_scheduler_retries_failed_and_busy_cycles(backend, monkeypatch):
+    server = importlib.import_module("backend.server")
+    statuses, triggers, pauses = iter(["failed", "busy", "done"]), [], []
+    def run(kind, fn, trigger):
+        triggers.append(trigger)
+        return {"status": next(statuses)}
+    monkeypatch.setattr(server.pipeline, "run_job", run)
+    monkeypatch.setattr(server.time, "sleep", pauses.append)
+    server._run_cycle_until_done("catch-up")
+    assert triggers == ["catch-up", "retry", "retry"] and pauses == [60, 60]
+
+
+def test_access_permission_updates_when_ranking_changes(web_client):
+    client, _, (_, db, auth) = web_client
+    headers = _bearer(auth, "viewer@example.com")
+    assert client.get("/api/trade_plan?pipeline=v285", headers=headers).status_code == 200
+    db.kv_set("summary_tm_v285", {"monthly_last_year": 100, "gate_dd": 10, "win_hidden": .7})
+    assert client.get("/api/trade_plan?pipeline=v285", headers=headers).status_code == 403
