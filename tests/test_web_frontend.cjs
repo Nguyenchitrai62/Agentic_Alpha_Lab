@@ -6,7 +6,7 @@ const vm = require('node:vm');
 
 const source = fs.readFileSync(path.join(__dirname, '../frontend/app.js'), 'utf8').replace(
   '  boot();',
-  '  window.testing = { state, api, refreshSession, logout, onCredential, syncAccountAccess, visiblePipes, planPipe, setPlanPipe, histSource, histBoth, loadPerf, loadPlans, loadEvidence, renderEvidence, loadPipelineSettings, $ };');
+  '  window.testing = { state, api, refreshSession, logout, onCredential, syncAccountAccess, visiblePipes, planPipe, setPlanPipe, histSource, histBoth, loadPerf, loadPlans, loadEvidence, renderEvidence, loadPipelineSettings, loadUsers, route, location, $ };');
 const user = { email: 'viewer@example.com', role: 'viewer', allowed_pipelines: ['v285', 'v269', 'v266'] };
 const expired = { access_token: 'old', expires_at: 1, user };
 const fresh = { access_token: 'new', expires_at: Date.now() / 1000 + 900, user };
@@ -356,4 +356,69 @@ test('admin account revocation clears visible signals and explains how to restor
   assert.equal(ui.$('pendingTitle').textContent, 'Quyền xem đã được tạm khóa');
   assert.ok(ui.$('pendingReason').textContent.includes('thu hồi'));
   assert.equal(ui.$('pendingContact').href, 'mailto:admin%40example.com');
+});
+
+test('only admin sees the Admin tab; viewer admin hash and logout cannot retain admin controls', async () => {
+  const paths = [];
+  const adminUser = { ...user, role:'admin', allowed_pipelines:['v301','v295',...user.allowed_pipelines] };
+  const ui = app(async p => {
+    paths.push(p);
+    if (p === '/api/auth/google') return response(200, { ...fresh, user:adminUser });
+    if (p === '/api/auth/me') return response(200, user);
+    if (p === '/api/pipelines_summary') return response(200, fivePipelines());
+    return response(200, {});
+  }, storage(fresh));
+  await ui.onCredential({credential:'admin-google'});
+  await new Promise(setImmediate);
+  assert.equal(ui.$('adminTab').hidden, false);
+  await ui.syncAccountAccess();
+  assert.equal(ui.$('adminTab').hidden, true);
+  paths.length = 0;
+  ui.location.hash = '#admin';
+  ui.route();
+  await new Promise(setImmediate);
+  assert.ok(!paths.some(p => p.startsWith('/api/admin/')));
+  ui.logout(false);
+  assert.equal(ui.$('adminTab').hidden, true);
+  assert.equal(ui.$('tabs').hidden, true);
+});
+
+test('admin saves only the checked individual pipeline grants through a Bearer request', async () => {
+  let submitted;
+  const ui = app(async (p, options) => {
+    assert.equal(p, '/api/admin/users');
+    assert.equal(options.headers.Authorization, 'Bearer new');
+    if (options.method === 'POST') { submitted = JSON.parse(options.body); return response(200, {}); }
+    return response(200, [{email:user.email, approved:true, role:'viewer', granted_pipelines:['v301']}]);
+  }, storage(fresh));
+  ui.state.user.role = 'admin';
+  await ui.loadUsers();
+  assert.ok(ui.$('usersTbl').innerHTML.includes('data-grant="v301" checked'));
+  const row = { querySelectorAll: selector => {
+    assert.equal(selector, 'input[data-grant]:checked');
+    return [{dataset:{grant:'v295'}}];
+  } };
+  const button = {dataset:{saveGrants:user.email}, closest: () => row};
+  await ui.$('usersTbl').onclick({target:{closest: selector => selector === 'button[data-save-grants]' ? button : null}});
+  assert.deepEqual(submitted, {email:user.email, pipelines:['v295']});
+  assert.equal(button.disabled, false);
+});
+
+test('revoking a VIP grant clears already displayed private data and falls back to free pipelines', async () => {
+  const ui = app(async p => {
+    if (p === '/api/auth/me') return response(200, { ...user, allowed_pipelines:[...user.allowed_pipelines] });
+    if (p === '/api/pipelines_summary') return response(200, fivePipelines());
+    return response(200, {});
+  }, storage(fresh));
+  ui.state.user.allowed_pipelines = ['v301',...user.allowed_pipelines];
+  ui.state.selectedPipeline = 'v301';
+  ui.state.live.plan = {pipeline:'private VIP'};
+  ui.$('board').innerHTML = 'private VIP signals';
+  ui.$('perfKpis').innerHTML = 'private VIP paper results';
+  await ui.syncAccountAccess();
+  assert.equal(ui.$('board').innerHTML, '');
+  assert.equal(ui.$('perfKpis').innerHTML, '');
+  assert.notEqual(ui.state.live.plan?.pipeline, 'private VIP');
+  assert.equal(ui.planPipe(), 'v285');
+  assert.equal(ui.state.user.role, 'viewer');
 });

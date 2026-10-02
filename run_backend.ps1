@@ -57,7 +57,7 @@ if ($Stop) { Stop-All; Write-Host "Stopped backend and tunnel connector."; retur
 if ($Status) {
     $p = Get-Procs
     Write-Host ("Backend processes: {0} (background supervisor: {1}) | tunnel connectors: {2}" -f $p.Servers.Count, $p.Supervisors.Count, $p.Tunnels.Count)
-    try { $h = Invoke-RestMethod "http://127.0.0.1:$port/health" -TimeoutSec 5; Write-Host ("Local  OK  - last job: {0} {1} | next cycle (UTC): {2}" -f $h.last_job.kind, $h.last_job.status, $h.next_cycle_utc) }
+    try { $h = Invoke-RestMethod "http://127.0.0.1:$port/health" -TimeoutSec 5; Write-Host ("Local health: {0}. Đăng nhập dashboard để xem chi tiết scheduler." -f $h.status) }
     catch { Write-Host "Local  http://127.0.0.1:$port/health : NOT RESPONDING" -ForegroundColor Red }
     Write-Host ("Public {0} : {1}" -f $publicUrl, $(if (Test-Url $publicUrl 15) { "OK" } else { "NOT REACHABLE" }))
     return
@@ -68,8 +68,7 @@ if ($Ensure) {
     $healthy = $false
     try {
         $h = Invoke-RestMethod "http://127.0.0.1:$port/health" -TimeoutSec 10
-        $hb = if ($h.scheduler_heartbeat_utc) { [datetime]::Parse($h.scheduler_heartbeat_utc).ToUniversalTime() } else { [datetime]::MinValue }
-        $healthy = ((Get-Date).ToUniversalTime() - $hb).TotalMinutes -lt 40
+        $healthy = $h.status -eq "ok" # BE returns 503 if the scheduler heartbeat is stale (>40 minutes).
     } catch { $healthy = $false }
     if (-not $healthy) {
         Add-Content $ensureLog ("{0}  backend down or scheduler stale -> restarting" -f (Get-Date -Format s))

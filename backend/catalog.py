@@ -79,7 +79,13 @@ def allowed(user: dict) -> list[str]:
     order = settings["order"]
     if user["role"] == "admin":
         return order
-    return [p for p in order if not settings["locked"][p]] if user["role"] == "viewer" else []
+    grants = set(granted(user["email"])) if user["role"] == "viewer" else set()
+    return [p for p in order if not settings["locked"][p] or p in grants] if user["role"] == "viewer" else []
+
+
+def granted(email: str) -> list[str]:
+    return [r["pipeline"] for r in db.rows("SELECT pipeline FROM user_pipeline_access WHERE email=? ORDER BY pipeline", (email,))
+            if r["pipeline"] in PIPELINES]
 
 
 def default_pipeline(user: dict) -> str:
@@ -91,7 +97,7 @@ def default_pipeline(user: dict) -> str:
 
 def require_pipeline(user: dict, pipe: str) -> str:
     if user["role"] != "admin" and pipe not in allowed(user):
-        raise HTTPException(403, "This pipeline is available to admins only.")
+        raise HTTPException(403, "This pipeline requires an admin access grant.")
     return pipe
 
 

@@ -200,8 +200,6 @@ def is_local_request(request: Request) -> bool:
 def current_user(request: Request) -> dict | None:
     auth = request.headers.get("Authorization", "")
     if not auth.lower().startswith("bearer "):
-        if SETTINGS.local_no_auth and SETTINGS.admin_emails and is_local_request(request):
-            return catalog.with_permissions({"email": SETTINGS.admin_emails[0], "role": "admin", "name": "Local admin", "picture": None, "local": True})
         return None
     payload = _session_payload(auth[7:].strip())
     if not isinstance(payload.get("sid"), str) or len(payload["sid"]) > 128:
@@ -228,3 +226,18 @@ def require_admin(user: dict | None = Depends(current_user)) -> dict:
     if user["role"] != "admin":
         raise HTTPException(403, "Admin only.")
     return user
+
+
+def require_api_access(request: Request) -> None:
+    # Session establishment/rotation has its own credential validation. All other
+    # endpoints require a header access token, including routes added in the future.
+    public = {("GET", "/health"), ("GET", "/api/public/config"),
+              ("POST", "/api/auth/google"), ("POST", "/api/auth/refresh"), ("POST", "/api/auth/logout")}
+    if (request.method, request.url.path) in public:
+        return
+    user = current_user(request)
+    if request.url.path == "/api/auth/me":
+        if user is None:
+            raise HTTPException(401, "Sign in with Google.")
+        return
+    require_viewer(user)

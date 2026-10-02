@@ -205,7 +205,7 @@
     if (tickerWs) { tickerWs.close(); tickerWs = null; }
     if (revoke && hadSession) fetch(API + "/api/auth/logout", { method: "POST", cache: "no-store", keepalive: true, credentials: "include" }).catch(() => {});
     try { google.accounts.id.disableAutoSelect(); } catch (e) { /* not loaded */ }
-    showOnly("login"); $("tabs").hidden = true; $("userBox").innerHTML = "";
+    showOnly("login"); $("tabs").hidden = true; $("adminTab").hidden = true; $("userBox").innerHTML = "";
     if (wasSignedIn && !$("gsiButton").childElementCount) initGsi();
   }
 
@@ -213,6 +213,7 @@
 
   function enter() {
     const u = state.user;
+    $("adminTab").hidden = u.role !== "admin";
     $("userBox").innerHTML = `${u.picture ? `<img src="${esc(u.picture)}" alt="" referrerpolicy="no-referrer">` : ""}
       <div class="name">${esc(u.name || u.email)}</div>
       ${u.local ? '<span class="tag">local</span>' : '<button class="btn sm" id="logoutBtn">Đăng xuất</button>'}`;
@@ -248,9 +249,13 @@
   $("pendingLogout").onclick = logout;
   async function syncAccountAccess() {
     if (!state.user) return;
-    const previous = state.user.role, user = await api("/api/auth/me");
+    const previous = state.user.role, permissions = JSON.stringify(state.user.allowed_pipelines), user = await api("/api/auth/me");
     state.user = user;
     if (previous !== user.role) { clearPipelineData(); enter(); }
+    else if (permissions !== JSON.stringify(user.allowed_pipelines)) {
+      clearPipelineData();
+      if (user.role !== "pending") route();
+    }
     return user;
   }
   $("pendingRetry").onclick = async () => {
@@ -312,7 +317,7 @@
   async function renderPipeStatus() {
     const el = $("pipeStatus"); if (!el) return;
     try {
-      const h = await api("/health"), c = h.last_cycle, ok = c && c.status === "done";
+      const h = await api("/api/status"), c = h.last_cycle, ok = c && c.status === "done";
       el.innerHTML = `<span><i class="dot ${ok ? "" : "bad"}"></i>Pipeline tự chạy mỗi 4h (1 phút sau khi nến 4h đóng) · lệnh cập nhật lại mỗi 15 phút</span>
         <span>Lần chạy gần nhất: <b>${c ? dt(c.started_at) : "—"}</b> (${c ? (ok ? "xong" : c.status) : "—"})</span>
         <span>Lần tới: <b>${h.next_cycle_utc ? dt(Date.parse(h.next_cycle_utc)) : "—"}</b></span>`;
@@ -1172,6 +1177,7 @@
   // ================================================================== ADMIN
   let jobsTimer = null;
   async function loadAdmin() {
+    if (state.user?.role !== "admin") return;
     loadPipelineSettings();
     document.querySelectorAll("[data-run]").forEach((b) => (b.onclick = async () => {
       if (b.dataset.run === "walkforward" && !confirm("Tính lại toàn bộ walk-forward 5 năm và bảng lệnh?")) return;
@@ -1248,12 +1254,24 @@
   async function loadUsers() {
     try {
       const users = await api("/api/admin/users");
-      table($("usersTbl"), ["Email", "Tên", "Quyền", "Lần cuối", ""], users.map((u) => {
+      table($("usersTbl"), ["Email", "Tên", "Quyền", "Cấp riêng pipeline", "Lần cuối", ""], users.map((u) => {
         const admin = u.role === "admin";
-        return `<tr><td>${esc(u.email)}</td><td>${esc(u.name || "")}</td><td>${admin ? "Admin" : u.approved ? "Người xem" : u.access_revoked ? "Đã thu hồi" : "Chờ duyệt"}</td>
+        const grants = admin ? "Tất cả pipeline" : PIPES.map(p => `<label class="grant-choice"><input type="checkbox" data-grant="${esc(p.v)}" ${u.granted_pipelines?.includes(p.v) ? "checked" : ""}>${esc(p.nm)}</label>`).join("") + `<button class="btn sm" data-save-grants="${esc(u.email)}">Lưu quyền pipeline</button>`;
+        return `<tr><td>${esc(u.email)}</td><td>${esc(u.name || "")}</td><td>${admin ? "Admin" : u.approved ? "Người xem" : u.access_revoked ? "Đã thu hồi" : "Chờ duyệt"}</td><td>${grants}</td>
           <td>${dt(u.last_seen)}</td><td>${admin ? "" : `<button class="btn sm" data-email="${esc(u.email)}" data-ap="${u.approved ? 0 : 1}">${u.approved ? "Thu hồi" : u.access_revoked ? "Khôi phục" : "Duyệt"}</button>`}</td></tr>`;
       }));
       $("usersTbl").onclick = async (e) => {
+        const save = e.target.closest("button[data-save-grants]");
+        if (save) {
+          save.disabled = true;
+          const pipelines = Array.from(save.closest("tr").querySelectorAll("input[data-grant]:checked"), input => input.dataset.grant);
+          try {
+            await api("/api/admin/users", { method: "POST", body: { email: save.dataset.saveGrants, pipelines } });
+            toast("Đã lưu quyền pipeline cho " + save.dataset.saveGrants); await loadUsers();
+          } catch (err) { toast(err.message); }
+          finally { save.disabled = false; }
+          return;
+        }
         const b = e.target.closest("button[data-email]"); if (!b) return;
         try { await api("/api/admin/users", { method: "POST", body: { email: b.dataset.email, approved: b.dataset.ap === "1" } }); loadUsers(); }
         catch (err) { toast(err.message); }

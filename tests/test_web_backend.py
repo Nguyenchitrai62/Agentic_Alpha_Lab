@@ -69,11 +69,11 @@ def _request(client_host, headers):
     return Request(scope)
 
 
-def test_local_requests_skip_login_but_tunnel_does_not(backend):
+def test_every_host_requires_header_authentication(backend):
     _, _, auth = backend
     local = auth.current_user(_request("127.0.0.1", {"host": "127.0.0.1:8724"}))
-    assert local and local["role"] == "admin" and local["email"] == "admin@example.com"
-    assert auth.current_user(_request("127.0.0.1", {"host": "localhost:8724"}))["role"] == "admin"
+    assert local is None
+    assert auth.current_user(_request("127.0.0.1", {"host": "localhost:8724"})) is None
     # via cloudflared: loopback client but Cloudflare headers and the public host
     assert auth.current_user(_request("127.0.0.1", {"host": "api-crypto.nguyenchitrai.id.vn", "cf-connecting-ip": "1.2.3.4",
                                                     "cf-ray": "x"})) is None
@@ -317,6 +317,113 @@ def test_pipeline_permissions_and_cache_are_role_safe(web_client):
     assert client.get("/api/trade_plan?pipeline=v301", headers=admin).status_code == 200
     assert client.get("/api/trade_plan?pipeline=v301", headers=viewer).status_code == 403
     assert client.get("/api/pipelines_summary", headers=_bearer(auth, "pending@example.com")).status_code == 403
+
+
+@pytest.mark.parametrize("path", [
+    "/api/overview", "/api/pipelines_summary", "/api/trade_plan", "/api/status", "/api/auth/me",
+    "/api/signals/latest", "/api/signals", "/api/signals/at?t=1", "/api/signals/1",
+    "/api/candles?symbol=BTCUSDT", "/api/positions?symbol=BTCUSDT", "/api/trades?symbol=BTCUSDT",
+    "/api/orders", "/api/orders/stats", "/api/confidence", "/api/equity",
+    "/api/admin/users", "/api/admin/jobs", "/api/admin/pipelines",
+])
+def test_data_api_rejects_missing_header_even_with_other_credentials(web_client, path):
+    client, _, (_, _, auth) = web_client
+    pair = auth.create_session("admin@example.com")
+    client.cookies.set("aal_refresh", pair["refresh_token"])
+    client.cookies.set("access_token", pair["access_token"])
+    response = client.get(path, params={"token": pair["access_token"]},
+                          headers={"X-Role": "admin", "X-User-Email": "admin@example.com"})
+    assert response.status_code == 401
+
+
+def test_new_routes_are_protected_by_default_and_health_has_no_data(web_client):
+    client, server, (_, _, auth) = web_client
+    @server.app.get("/api/new-data")
+    def newly_added():
+        return {"private": True}
+    assert client.get("/api/new-data").status_code == 401
+    assert client.get("/api/new-data", headers=_bearer(auth, "viewer@example.com")).status_code == 200
+    assert client.get("/health").json() == {"status": "ok"}
+
+
+@pytest.mark.parametrize("path", [
+    "/api/trade_plan?pipeline=v301", "/api/overview?pipeline=v301",
+    "/api/signals/latest?source=tm_v301", "/api/signals?source=paper_v301",
+    "/api/positions?symbol=BTCUSDT&source=tm_v301", "/api/trades?symbol=BTCUSDT&source=paper_v301",
+    "/api/orders?source=tm_v301", "/api/orders/stats?source=paper_v301", "/api/equity?source=tm_v301",
+])
+def test_individual_vip_grant_and_revocation_apply_to_existing_header_and_cache(web_client, path):
+    client, _, (_, db, auth) = web_client
+    admin = _bearer(auth, "admin@example.com")
+    first, second = _bearer(auth, "viewer@example.com"), _bearer(auth, "other@example.com")
+    client.post("/api/admin/users", headers=admin, json={"email": "other@example.com", "approved": True})
+    db.kv_set("trade_plan_v301", {"pipeline": "v301", "coins": {}})
+    assert client.get(path, headers=first).status_code == 403
+    assert client.post("/api/admin/users", headers=first, json={"email": "viewer@example.com", "pipelines": ["v301"]}).status_code == 403
+    grant = {"email": "viewer@example.com", "pipelines": ["v301"]}
+    assert client.post("/api/admin/users", headers=admin, json=grant).status_code == 200
+    db.init()  # schema initialization preserves grants
+    assert client.get("/api/auth/me", headers=first).json()["allowed_pipelines"] == ["v301", "v285", "v269", "v266"]
+    assert not client.get("/api/pipelines_summary", headers=first).json()["v301"]["locked"]
+    assert client.get("/api/pipelines_summary", headers=second).json()["v301"]["locked"]
+    assert client.get(path, headers=second).status_code == 403
+    warmed = client.get(path, headers=first)
+    assert warmed.status_code == 200
+    assert client.get("/api/trade_plan?pipeline=v295", headers=first).status_code == 403
+    assert client.post("/api/admin/users", headers=admin, json={**grant, "pipelines": []}).status_code == 200
+    assert client.get(path, headers={**first, "If-None-Match": warmed.headers["etag"]}).status_code == 403
+    assert client.get("/api/trade_plan?pipeline=v285", headers=first).status_code == 200
+
+
+def test_account_revocation_overrides_individual_grants_and_refresh(web_client):
+    client, _, (_, _, auth) = web_client
+    admin = _bearer(auth, "admin@example.com")
+    pair = auth.create_session("viewer@example.com")
+    headers = {"Authorization": "Bearer " + pair["access_token"]}
+    payload = {"email": "viewer@example.com", "pipelines": ["v301"]}
+    client.post("/api/admin/users", headers=admin, json=payload)
+    client.post("/api/admin/users", headers=admin, json={"email": payload["email"], "approved": False})
+    client.post("/api/admin/users", headers=admin, json=payload)  # editing grants must not restore a revoked account
+    assert client.get("/api/trade_plan?pipeline=v301", headers=headers).status_code == 403
+    renewed = client.post("/api/auth/refresh", headers={"Authorization": "Bearer " + pair["refresh_token"]})
+    assert renewed.status_code == 200 and renewed.json()["user"]["allowed_pipelines"] == []
+    assert renewed.json()["user"]["role"] == "pending"
+
+
+def test_vip_grant_covers_signal_ids_without_unlocking_legacy_sources(web_client):
+    client, _, (_, db, auth) = web_client
+    admin, viewer = _bearer(auth, "admin@example.com"), _bearer(auth, "viewer@example.com")
+    with db.write() as c:
+        run_id = c.execute("INSERT INTO runs(source,decision_time,pipeline,created_at) VALUES('tm_v301',1,'v301',1)").lastrowid
+    client.post("/api/admin/users", headers=admin, json={"email": "viewer@example.com", "pipelines": ["v301"]})
+    assert client.get(f"/api/signals/{run_id}", headers=viewer).status_code == 200
+    assert client.get("/api/signals/at?source=tm_v301&t=2024-01-01T00:00:00Z", headers=viewer).status_code == 200
+    assert client.get("/api/signals?source=live", headers=viewer).status_code == 403
+    client.post("/api/admin/users", headers=admin, json={"email": "viewer@example.com", "pipelines": []})
+    assert client.get(f"/api/signals/{run_id}", headers=viewer).status_code == 403
+
+
+def test_health_watchdog_staleness_preserves_private_details(web_client, monkeypatch):
+    client, server, (config, _, _) = web_client
+    monkeypatch.setattr(server, "SETTINGS", replace(config.SETTINGS, scheduler_enabled=True))
+    monkeypatch.setattr(server, "_heartbeat", {"t": None})
+    monkeypatch.setattr(server, "_started_at", server.time.time() - 2401)
+    response = client.get("/health")
+    assert response.status_code == 503 and response.json() == {"status": "unhealthy"}
+    from datetime import datetime, timezone
+    server._heartbeat["t"] = datetime.now(timezone.utc).isoformat()
+    assert client.get("/health").status_code == 200
+
+
+@pytest.mark.parametrize("grants", [None, "v301", ["v301", "v301"], ["unknown"], [1], {"v301": True}])
+def test_invalid_grants_leave_existing_permissions_unchanged(web_client, grants):
+    client, _, (_, _, auth) = web_client
+    admin = _bearer(auth, "admin@example.com")
+    payload = {"email": "viewer@example.com", "pipelines": ["v301"]}
+    assert client.post("/api/admin/users", headers=admin, json=payload).status_code == 200
+    assert client.post("/api/admin/users", headers=admin, json={**payload, "pipelines": grants}).status_code == 400
+    users = client.get("/api/admin/users", headers=admin).json()
+    assert next(u for u in users if u["email"] == payload["email"])["granted_pipelines"] == ["v301"]
 
 
 @pytest.mark.parametrize("source", ["tm_v301", "paper_v301", "live"])

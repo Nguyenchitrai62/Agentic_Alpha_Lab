@@ -171,3 +171,42 @@ Validation: **1618 passed, 2 intentional skips**, 142 existing warnings, 463.38 
 all **17 JavaScript behavior cases** passed. Isolated browser QA confirmed the shared viewer/admin layout,
 the additional Admin tab, pipeline selection, Train/Test headers and yearly badges with unchanged metric values.
 Desktop and 390px layouts were visually inspected. The exact six-file scope passed whitespace and credential scans.
+
+## Header enforcement and individual VIP grants
+
+Every data route now inherits a default authorization dependency; a newly registered route without its own
+dependency still rejects anonymous requests. Access credentials are accepted only in the Authorization Bearer
+header, including on loopback; removed the former local admin bypass and its configuration option.
+Role headers, query tokens and cookies do not confer data access. Admin endpoints retain their additional role check.
+This follows the [OWASP authorization guidance](https://cheatsheetseries.owasp.org/cheatsheets/Authorization_Cheat_Sheet.html)
+to deny by default and validate permissions on every request.
+
+Session bootstrap endpoints validate Google credentials or rotating refresh credentials separately; cookie refresh
+still requires a trusted Origin and uses HttpOnly/Secure cookies. The public health probe now returns only a liveness
+status, with 503 on a stale scheduler heartbeat; authenticated `/api/status` carries scheduler/job details.
+The local watchdog consumes the minimal health result, preserving restart detection without public operational data.
+
+Admin can replace a user's individual pipeline grants in the Users table. SQLite persists the grants with the granting
+admin and timestamp. Viewer access is free pipelines plus explicitly granted pipelines; it never grants the Admin role
+or legacy sources. Account revocation overrides both free access and individual grants. Editing grants preserves the
+existing revoked/approved state unless approved is explicitly provided. Pipeline permissions are checked before cached
+data or conditional responses; the summary cache key includes the effective permitted set.
+
+The Admin tab is hidden for viewers, pending users and logout, and a manually entered admin hash returns to Pipeline.
+The periodic account check clears already displayed private data and reloads an allowed pipeline when grants change.
+Integration cases cover anonymous/header spoof denials for every data route, individual grants, another viewer's denial,
+cached/ETag revocation, signal IDs, legacy source denials, invalid grant rollback, account revocation and refresh.
+
+Validation: full repository **1656 passed, 2 intentional skips**, 239 existing/deprecation warnings, 460.75 seconds;
+the JavaScript adapter passed **20 cases**. Browser QA used isolated sessions/SQLite: admin granted G2 to the test viewer,
+the viewer selected G2 and saw its plan while CS stayed locked, no Admin tab appeared, and an entered admin hash
+returned to Pipeline. PowerShell syntax and the exact 14-file whitespace/credential scans passed.
+
+Runtime observation before rollout: the existing scheduler retry reports missing Coinbase 1h candles in May 2026.
+The input gate correctly blocks new plans and retries repair. This access-control change does not suppress that gate
+or synthesize replacement candles; live completion of the five pipelines remains limited by this missing input.
+
+Rollout restarted only the verified idle BE through its existing supervisor. On both local and public origins, all
+19 data/admin GET routes rejected missing Bearer credentials with 401 despite a spoofed role header. Public runtime
+verification confirmed the existing viewer had three allowed plans (200), two VIP denials (403) and an admin API denial
+(403); the admin had all five plans and admin APIs (200). Temporary verification sessions were revoked immediately.

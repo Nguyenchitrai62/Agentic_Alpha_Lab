@@ -44,8 +44,6 @@ class Settings:
     schedule_offset_minutes: int = int(os.getenv("WEB_SCHEDULE_OFFSET_MINUTES", "1"))
     default_equity_usdt: float = float(os.getenv("WEB_DEFAULT_EQUITY_USDT", "10000"))
     python_exe: str = os.getenv("WEB_PYTHON_EXE", str(ROOT / ".venv/Scripts/python.exe"))
-    # requests made on this machine (not through the Cloudflare tunnel) are treated as the admin without Google sign-in
-    local_no_auth: bool = _bool("WEB_LOCAL_NO_AUTH", True)
 
 
 SETTINGS = Settings()

@@ -51,6 +51,9 @@ Cả 5 pipeline vẫn xuất hiện với đầy đủ chỉ số đánh giá l�
 Khóa/mở áp dụng cho tất cả viewer, độc lập với thứ tự; có thể mở cả 5 hoặc khóa cả 5. Admin luôn xem được tất cả.
 Để khóa thêm: tại dòng pipeline muốn khóa, bấm **Đang mở · Khóa tín hiệu**, rồi **Lưu cấu hình pipeline**.
 Để mở lại, bấm **🔒 Đang khóa · Mở khóa** rồi lưu. Các nút quản lý chỉ nằm trong tab Admin.
+Để cấp VIP riêng cho một tài khoản: **Admin → Người dùng**, tích pipeline ở cột **Cấp riêng pipeline** rồi bấm **Lưu quyền pipeline**.
+Quyền riêng cộng thêm vào các pipeline miễn phí; bỏ tích rồi lưu để thu hồi quyền riêng. Khóa toàn cục không thu hồi quyền riêng đã cấp.
+**Thu hồi** tài khoản chặn toàn bộ dữ liệu, kể cả VIP; chỉnh quyền pipeline không tự khôi phục tài khoản đã thu hồi.
 **Dùng thứ tự tự động** khôi phục xếp theo chỉ số, giữ trạng thái khóa đã chọn; cần bấm Lưu để áp dụng.
 Cấu hình được lưu trong SQLite, có hiệu lực với access token đang sử dụng và giữ nguyên sau khi khởi động lại.
 FE cập nhật quyền khi đổi tab và mỗi phút; BE kiểm tra quyền trên từng request. Nếu hai admin cùng sửa,
@@ -111,7 +114,7 @@ Nến 4h/1m dùng cho replay và các agent phải đủ đến mốc đóng g�
 Nếu đầu vào chưa đủ, chu kỳ báo lỗi và retry sau 60 giây trước khi tạo plan mới.
 Một plan lỗi vẫn thử bốn plan còn lại; chỉ đánh dấu hoàn tất sau khi plan đúng mốc và lịch sử paper đã lưu thành công.
 Khi máy thức dậy sau nhiều mốc đóng nến, scheduler chạy bù ngay thay vì chờ mốc kế tiếp.
-`/health.input_check` cho biết `checking`, `failed` (kèm bước lỗi) hoặc `complete`; chi tiết lỗi ở admin jobs/log.
+`/api/status.input_check` (cần Bearer access token) cho biết `checking`, `failed` (kèm bước lỗi) hoặc `complete`; chi tiết lỗi ở admin jobs/log.
 
 ## 3. Chạy backend
 
@@ -136,13 +139,12 @@ powershell -ExecutionPolicy Bypass -File deploy\install_autostart.ps1      # (tu
 Lần chạy đầu, nếu DB trống, scheduler tự tải nến và chạy cả 5 trade plan. Backfill walk-forward dùng job admin
 `walkforward_tm` khi cần. Log nằm ở `artifacts/web/backend.log`. Kiểm tra bằng `http://127.0.0.1:8724/health`.
 
-### Xem web trên chính máy server, không cần đăng nhập
+### Xem web trên chính máy server
 
 Double-click `run_frontend.bat` (hoặc chạy `.
 un_frontend.ps1`) để mở `http://localhost:5500`.
-- Khi request đi thẳng vào `127.0.0.1:8724` từ máy này, backend coi là admin và không cần Google.
-- Request đi qua tunnel luôn phải đăng nhập, vì chúng mang header Cloudflare và host public.
-- Tắt chế độ này bằng `WEB_LOCAL_NO_AUTH=false`.
+- Cả truy cập local và qua tunnel đều phải đăng nhập; API dữ liệu chỉ nhận access token trong header `Authorization: Bearer ...`.
+- Không còn chế độ local tự nhận quyền admin. Vai trò admin chỉ lấy từ `ADMIN_EMAILS`, không nhận từ FE/header vai trò.
 
 ## 4. Cloudflare Tunnel
 
@@ -174,8 +176,12 @@ Public hostname: `api-crypto.nguyenchitrai.id.vn` → `HTTP` → `localhost:8724
 
 ## API
 
-- **Công khai:** `GET /health`, `GET /api/public/config`, `POST /api/auth/google`. `GET /api/auth/me` cần Bearer access token (hoặc chế độ local admin).
+- **Khởi tạo phiên:** `GET /api/public/config` chỉ chứa cấu hình đăng nhập; `POST /api/auth/google` xác thực Google credential. Refresh/logout xác thực refresh token trong header hoặc cookie HttpOnly kèm Origin tin cậy.
+- **Health:** `GET /health` chỉ trả trạng thái sống `ok`/`unhealthy`, không có dữ liệu pipeline/job; trả 503 nếu heartbeat scheduler quá 40 phút để watchdog phục hồi.
+- Mọi API dữ liệu dùng Bearer access token, có kiểm tra phiên và quyền mới nhất ở BE. Lớp kiểm tra mặc định áp dụng cả route mới.
+- `GET /api/auth/me` cần Bearer token; tài khoản bị thu hồi vẫn được đọc trạng thái quyền của chính mình.
 - **Viewer:**
+  - `/api/status`: chi tiết scheduler sau đăng nhập
   - `/api/overview`
   - `/api/signals/latest`
   - `/api/signals?source=live|walkforward&symbol=&start=&end=&limit=`
@@ -189,6 +195,7 @@ Public hostname: `api-crypto.nguyenchitrai.id.vn` → `HTTP` → `localhost:8724
   - `POST /api/admin/run {kind: cycle|signal|candles|forward|walkforward}`
   - `GET /api/admin/jobs`
   - `GET|POST /api/admin/users`
+    - `POST {email, pipelines: ["v301", ...]}` thay toàn bộ quyền pipeline cấp riêng; `[]` thu hồi hết quyền riêng. Không gửi `approved` thì giữ trạng thái tài khoản.
   - `GET|POST /api/admin/pipelines`: `order` (đủ 5 mã, không trùng; `null` = tự động), `locked` (boolean cho từng mã), `revision` (phiên bản GET gần nhất).
 
 ## Hiệu năng

@@ -9,11 +9,11 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="styles.css?v=20261002-shared-layout" />
+  <link rel="stylesheet" href="styles.css?v=20261002-vip-grants" />
   <script src="config.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/lightweight-charts@4.2.0/dist/lightweight-charts.standalone.production.js" defer></script>
   <script src="https://accounts.google.com/gsi/client" async defer></script>
-  <script src="app.js?v=20261002-shared-layout" defer></script>
+  <script src="app.js?v=20261002-vip-grants" defer></script>
 </head>
 <body>
   <header class="topbar">
@@ -188,6 +188,7 @@
       </div>
       <div class="panel">
         <div class="panel-h"><span>Người dùng</span></div>
+        <p class="fine">Tích pipeline và bấm Lưu quyền pipeline để cấp riêng cho tài khoản đó, kể cả pipeline VIP đang khóa. Bỏ tích rồi lưu để thu hồi quyền riêng; các pipeline miễn phí vẫn xem được. Thu hồi tài khoản chặn mọi dữ liệu.</p>
         <div class="toolbar flat"><input type="email" id="newEmail" placeholder="email@gmail.com" /><button class="btn" id="addUser">Cấp quyền xem</button></div>
         <table class="tbl" id="usersTbl"></table>
       </div>

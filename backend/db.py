@@ -66,6 +66,11 @@ CREATE TABLE IF NOT EXISTS jobs(
   id INTEGER PRIMARY KEY, kind TEXT NOT NULL, status TEXT NOT NULL, started_at INTEGER, finished_at INTEGER,
   message TEXT, triggered_by TEXT
 );
+CREATE TABLE IF NOT EXISTS user_pipeline_access(
+  email TEXT NOT NULL REFERENCES users(email) ON DELETE CASCADE,
+  pipeline TEXT NOT NULL, granted_by TEXT NOT NULL, granted_at INTEGER NOT NULL,
+  PRIMARY KEY(email, pipeline)
+) WITHOUT ROWID;
 CREATE INDEX IF NOT EXISTS jobs_time ON jobs(started_at DESC);
 CREATE TABLE IF NOT EXISTS kv(k TEXT PRIMARY KEY, v TEXT) WITHOUT ROWID;
 CREATE TABLE IF NOT EXISTS auth_sessions(

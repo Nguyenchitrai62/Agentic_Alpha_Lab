@@ -24,10 +24,11 @@ from .config import SETTINGS, log
 from .security import BodyLimitMiddleware
 
 APP_VERSION = "1.0.0"
+_started_at = time.time()
 MAX_ROWS = 5000
 MAX_CANDLES = 30000
 app = FastAPI(title="Agentic Alpha Lab API", version=APP_VERSION, default_response_class=ORJSONResponse,
-              docs_url=None, redoc_url=None, openapi_url=None)
+              docs_url=None, redoc_url=None, openapi_url=None, dependencies=[Depends(auth.require_api_access)])
 app.add_middleware(GZipMiddleware, minimum_size=1024)
 app.add_middleware(CORSMiddleware, allow_origins=list(SETTINGS.cors_origins), allow_origin_regex=SETTINGS.cors_origin_regex or None,
                    allow_credentials=True, allow_methods=["GET", "POST"], allow_headers=["Authorization", "Content-Type"], max_age=3600)
@@ -114,6 +115,15 @@ def _check_symbol(symbol: str) -> str:
 # ------------------------------------------------------------------ public
 @app.get("/health")
 def health():
+    heartbeat = _heartbeat["t"]
+    last_seen = datetime.fromisoformat(heartbeat).timestamp() if heartbeat else _started_at
+    stale = SETTINGS.scheduler_enabled and time.time() - last_seen >= 2400
+    return ORJSONResponse({"status": "unhealthy" if stale else "ok"}, status_code=503 if stale else 200,
+                         headers={"Cache-Control": "no-store"})
+
+
+@app.get("/api/status")
+def system_status(user: dict = Depends(auth.require_viewer)):
     last = db.one("SELECT kind, status, started_at, finished_at FROM jobs ORDER BY id DESC LIMIT 1")
     cyc = db.one("SELECT status, started_at, finished_at, triggered_by FROM jobs WHERE kind = 'cycle' ORDER BY id DESC LIMIT 1")
     return {"status": "ok", "version": APP_VERSION, "pipeline": pipeline.PIPELINE, "last_job": last, "last_cycle": cyc,
@@ -229,7 +239,7 @@ def pipelines_summary(request: Request, user: dict = Depends(auth.require_viewer
     """Walk-forward summary of every paper pipeline (history_tm) + its paper result since the freeze, for the pipeline evidence table."""
     settings = catalog.policy()
     order = settings["order"]
-    permitted = set(order) if user["role"] == "admin" else {p for p in order if not settings["locked"][p]}
+    permitted = set(catalog.allowed(user))
 
     def load():
         out = {}
@@ -445,24 +455,35 @@ def admin_users(user: dict = Depends(auth.require_admin)):
     for row in users:
         row["role"] = auth.role_for(row["email"])
         row["approved"] = row["role"] in ("admin", "viewer")
+        row["granted_pipelines"] = catalog.granted(row["email"])
     return users
 
 
 @app.post("/api/admin/users")
 def admin_set_user(payload: dict = Body(...), user: dict = Depends(auth.require_admin)):
     email = str(payload.get("email", "")).lower().strip()
-    if not email:
-        raise HTTPException(400, "email is required")
+    if not email or len(email) > 254 or email.count("@") != 1 or any(ch.isspace() for ch in email):
+        raise HTTPException(400, "A valid email is required")
+    grants = payload.get("pipelines")
+    if "pipelines" in payload and (not isinstance(grants, list) or any(
+            not isinstance(p, str) or p not in catalog.PIPELINES for p in grants) or len(set(grants)) != len(grants)):
+        raise HTTPException(400, "pipelines must contain unique known pipeline IDs")
     approved = 1 if payload.get("approved", True) else 0
     if not isinstance(payload.get("approved", True), bool):
         raise HTTPException(400, "approved must be a boolean")
     role = "viewer"  # admins are defined only by ADMIN_EMAILS in the local .env
     with db.write() as c:
+        update = "DO UPDATE SET approved = excluded.approved, access_revoked = excluded.access_revoked" if "approved" in payload else "DO NOTHING"
         c.execute("INSERT INTO users(email, role, approved, access_revoked, first_seen, last_seen) VALUES(?,?,?,?,?,?) "
-                  "ON CONFLICT(email) DO UPDATE SET approved = excluded.approved, access_revoked = excluded.access_revoked",
+                  "ON CONFLICT(email) " + update,
                   (email, role, approved, 1 - approved, db.now_ms(), db.now_ms()))
+        if grants is not None:
+            c.execute("DELETE FROM user_pipeline_access WHERE email=?", (email,))
+            c.executemany("INSERT INTO user_pipeline_access(email,pipeline,granted_by,granted_at) VALUES(?,?,?,?)",
+                          [(email, p, user["email"], db.now_ms()) for p in grants])
     clear_cache()
-    return {"email": email, "approved": bool(approved)}
+    return {"email": email, "approved": auth.role_for(email) in ("admin", "viewer"),
+            "granted_pipelines": catalog.granted(email)}
 
 
 # ------------------------------------------------------------------ scheduler
