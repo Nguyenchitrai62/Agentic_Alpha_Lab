@@ -2,7 +2,7 @@
   "schema_version": 1,
   "project": "Agentic Alpha Lab BTC swing research",
   "created_at": "2026-09-06T00:00:00Z",
-  "next_version": 320,
+  "next_version": 327,
   "control": {
     "coordinator_model": "gpt-5.6-sol",
     "coordinator_reasoning": "high",
@@ -54,7 +54,7 @@
     "expected_workers": 3,
     "version_range": [
       45,
-      319
+      326
     ],
     "parent_commit": "1ecf947baddd5ef78444670330e9db62128dad50",
     "cloud_snapshot": {
@@ -13034,7 +13034,7 @@
       "version": "v306",
       "track": "A",
       "direction_key": "v306-walkforward-evolution",
-      "status": "running",
+      "status": "rejected",
       "parent_versions": [
         "v304"
       ],
@@ -13047,9 +13047,36 @@
       "write_scope": "research/parallel/rounds/parallel-20260906-r2/v306",
       "worker_agent_id": "01a07792-4a6b-7fc3-a08a-af2923b1778a",
       "worker_host_id": "local",
-      "result_manifest": null,
+      "result_manifest": "research\\parallel\\rounds\\parallel-20260906-r2\\v306\\result_manifest.json",
       "registered_at": "2026-10-02T14:24:38.779151Z",
-      "assigned_at": "2026-10-02T14:24:38.779151Z"
+      "assigned_at": "2026-10-02T14:24:38.779151Z",
+      "result_manifest_sha256": "ff5a5344803a923e2bf22c87954fcada5221c08e317c237da37b2779455baff2",
+      "result_summary": {
+        "scenarios": {
+          "normal": {
+            "monthly_geometric_net_percent": 7.415,
+            "max_drawdown_percent": 16.47,
+            "fills": 5615,
+            "months": 48
+          },
+          "fee_stress": {
+            "monthly_geometric_net_percent": 7.415,
+            "max_drawdown_percent": 16.47,
+            "fills": 5615,
+            "months": 48
+          },
+          "execution_stress": {
+            "monthly_geometric_net_percent": 7.415,
+            "max_drawdown_percent": 16.47,
+            "fills": 5615,
+            "months": 48
+          }
+        },
+        "independent_test": false,
+        "live_approved": false,
+        "audit_notes": "evaluation + protocol audit: seeds and random cached genomes re-simulated, gene-table slice and member refits reproduced, fold / transfer / final numbers replicated; fitness reads only training years, most recent year only for the finalist (v306_v308_v319_audit/COMPARISON.md)"
+      },
+      "audited_at": "2026-10-02T20:00:21.969826Z"
     },
     {
       "version": "v307",
@@ -13103,7 +13130,7 @@
       "version": "v308",
       "track": "C",
       "direction_key": "v308-manual-book-leverage-evolution",
-      "status": "running",
+      "status": "rejected",
       "parent_versions": [
         "v305"
       ],
@@ -13116,9 +13143,36 @@
       "write_scope": "research/parallel/rounds/parallel-20260906-r2/v308",
       "worker_agent_id": "01a07748-5adc-7061-8052-0ed36705a8a8",
       "worker_host_id": "local",
-      "result_manifest": null,
+      "result_manifest": "research\\parallel\\rounds\\parallel-20260906-r2\\v308\\result_manifest.json",
       "registered_at": "2026-10-02T15:47:18.319954Z",
-      "assigned_at": "2026-10-02T15:47:18.319954Z"
+      "assigned_at": "2026-10-02T15:47:18.319954Z",
+      "result_manifest_sha256": "1da52c716015df6205024ef7ca880e558f484c4f773de094b6c2d6fba843f0f2",
+      "result_summary": {
+        "scenarios": {
+          "normal": {
+            "monthly_geometric_net_percent": 5.607,
+            "max_drawdown_percent": 19.96,
+            "fills": 910,
+            "months": 48
+          },
+          "fee_stress": {
+            "monthly_geometric_net_percent": 5.607,
+            "max_drawdown_percent": 19.96,
+            "fills": 910,
+            "months": 48
+          },
+          "execution_stress": {
+            "monthly_geometric_net_percent": 5.607,
+            "max_drawdown_percent": 19.96,
+            "fills": 910,
+            "months": 48
+          }
+        },
+        "independent_test": false,
+        "live_approved": false,
+        "audit_notes": "evaluation + protocol audit: seeds and random cached genomes re-simulated, gene-table slice and member refits reproduced, fold / transfer / final numbers replicated; fitness reads only training years, most recent year only for the finalist (v306_v308_v319_audit/COMPARISON.md)"
+      },
+      "audited_at": "2026-10-02T20:00:21.696265Z"
     },
     {
       "version": "v314",
@@ -13364,7 +13418,7 @@
       "version": "v319",
       "track": "B",
       "direction_key": "v319-pooled-path-flow-members",
-      "status": "running",
+      "status": "rejected",
       "parent_versions": [
         "v318"
       ],
@@ -13377,10 +13431,292 @@
       "write_scope": "research/parallel/rounds/parallel-20260906-r2/v319",
       "worker_agent_id": "01a07791-eecb-7053-8866-dcdbe31e84d7",
       "worker_host_id": "local",
-      "result_manifest": null,
+      "result_manifest": "research\\parallel\\rounds\\parallel-20260906-r2\\v319\\result_manifest.json",
       "registered_at": "2026-10-02T19:13:54.173274Z",
-      "assigned_at": "2026-10-02T19:13:54.173274Z"
+      "assigned_at": "2026-10-02T19:13:54.173274Z",
+      "result_manifest_sha256": "53062de6ade0040e6aa3862ab5d7c7d2ebef158687cc0a61808e2e81b2b6dd4e",
+      "result_summary": {
+        "scenarios": {
+          "normal": {
+            "monthly_geometric_net_percent": 3.011,
+            "max_drawdown_percent": 17.95,
+            "fills": 995,
+            "months": 48
+          },
+          "fee_stress": {
+            "monthly_geometric_net_percent": 3.011,
+            "max_drawdown_percent": 17.95,
+            "fills": 995,
+            "months": 48
+          },
+          "execution_stress": {
+            "monthly_geometric_net_percent": 3.011,
+            "max_drawdown_percent": 17.95,
+            "fills": 995,
+            "months": 48
+          }
+        },
+        "independent_test": false,
+        "live_approved": false,
+        "audit_notes": "evaluation + protocol audit: seeds and random cached genomes re-simulated, gene-table slice and member refits reproduced, fold / transfer / final numbers replicated; fitness reads only training years, most recent year only for the finalist (v306_v308_v319_audit/COMPARISON.md)"
+      },
+      "audited_at": "2026-10-02T20:00:22.235462Z"
+    },
+    {
+      "version": "v320",
+      "track": "C",
+      "direction_key": "v320-member-weight-evolution",
+      "status": "rejected",
+      "parent_versions": [
+        "v308"
+      ],
+      "model_family": "genetic-algorithm-member-weights",
+      "objective": "MANUAL: walk-forward evolution of nine member weights, rules fixed",
+      "data_contract": "audited walk-forward caches; fits before anchor - embargo; most recent year once",
+      "policy_contract": "MANUAL pullback rules cap 2",
+      "hypothesis": "evolved member weights beat the best member mix on unseen dev years (ran before registration; prereg_sha256.txt)",
+      "parent_commit": "1ecf947baddd5ef78444670330e9db62128dad50",
+      "write_scope": "research/parallel/rounds/parallel-20260906-r2/v320",
+      "worker_agent_id": "01a07748-5adc-7061-8052-0ed36705a8a8",
+      "worker_host_id": "local",
+      "result_manifest": "research\\parallel\\rounds\\parallel-20260906-r2\\v320\\result_manifest.json",
+      "registered_at": "2026-10-02T20:00:21.696265Z",
+      "assigned_at": "2026-10-02T20:00:21.696265Z",
+      "result_manifest_sha256": "403e0f33af822194cf833a05cd64e1da4a1667299ac54b56c73883085352fcf3",
+      "result_summary": {
+        "scenarios": {
+          "normal": {
+            "monthly_geometric_net_percent": 3.114,
+            "max_drawdown_percent": 19.13,
+            "fills": 1020,
+            "months": 48
+          },
+          "fee_stress": {
+            "monthly_geometric_net_percent": 3.114,
+            "max_drawdown_percent": 19.13,
+            "fills": 1020,
+            "months": 48
+          },
+          "execution_stress": {
+            "monthly_geometric_net_percent": 3.114,
+            "max_drawdown_percent": 19.13,
+            "fills": 1020,
+            "months": 48
+          }
+        },
+        "independent_test": false,
+        "live_approved": false,
+        "audit_notes": "rows, fold choices, transfer deltas and final rows replicated independently (no mismatch); no most-recent-year number in any choice (v320_v323_audit/COMPARISON.md)"
+      },
+      "audited_at": "2026-10-02T20:18:53.341417Z"
+    },
+    {
+      "version": "v321",
+      "track": "A",
+      "direction_key": "v321-bot-walkforward-seed-choice",
+      "status": "audited",
+      "parent_versions": [
+        "v306"
+      ],
+      "model_family": "walkforward-pipeline-choice",
+      "objective": "BOT: walk-forward best-existing-pipeline choice, most recent year once",
+      "data_contract": "audited walk-forward caches; fits before anchor - embargo; most recent year once",
+      "policy_contract": "BOT G2 bar-open machinery",
+      "hypothesis": "the WF-chosen BOT pipeline (R2 in every dev fold) holds on the most recent year (ran before registration)",
+      "parent_commit": "1ecf947baddd5ef78444670330e9db62128dad50",
+      "write_scope": "research/parallel/rounds/parallel-20260906-r2/v321",
+      "worker_agent_id": "01a07792-4a6b-7fc3-a08a-af2923b1778a",
+      "worker_host_id": "local",
+      "result_manifest": "research\\parallel\\rounds\\parallel-20260906-r2\\v321\\result_manifest.json",
+      "registered_at": "2026-10-02T20:00:21.969826Z",
+      "assigned_at": "2026-10-02T20:00:21.969826Z",
+      "result_manifest_sha256": "e5c740a974ca5a105d57635d131432de270d229608b0638aeca2784ce1370c36",
+      "result_summary": {
+        "scenarios": {
+          "normal": {
+            "monthly_geometric_net_percent": 6.793,
+            "max_drawdown_percent": 18.39,
+            "fills": 6785,
+            "months": 60
+          },
+          "fee_stress": {
+            "monthly_geometric_net_percent": 6.793,
+            "max_drawdown_percent": 18.39,
+            "fills": 6785,
+            "months": 60
+          },
+          "execution_stress": {
+            "monthly_geometric_net_percent": 6.793,
+            "max_drawdown_percent": 18.39,
+            "fills": 6785,
+            "months": 60
+          }
+        },
+        "independent_test": false,
+        "live_approved": false,
+        "audit_notes": "rows, fold choices, transfer deltas and final rows replicated independently (no mismatch); no most-recent-year number in any choice (v320_v323_audit/COMPARISON.md)"
+      },
+      "audited_at": "2026-10-02T20:18:53.604917Z"
+    },
+    {
+      "version": "v322",
+      "track": "B",
+      "direction_key": "v322-manual-theta-target",
+      "status": "rejected",
+      "parent_versions": [
+        "v319"
+      ],
+      "model_family": "grid-walkforward-choice",
+      "objective": "MANUAL: theta x target walk-forward on M2",
+      "data_contract": "audited walk-forward caches; fits before anchor - embargo; most recent year once",
+      "policy_contract": "MANUAL pullback rules cap 2",
+      "hypothesis": "a stronger signal threshold allows more risk at equal DD (ran before registration)",
+      "parent_commit": "1ecf947baddd5ef78444670330e9db62128dad50",
+      "write_scope": "research/parallel/rounds/parallel-20260906-r2/v322",
+      "worker_agent_id": "01a07791-eecb-7053-8866-dcdbe31e84d7",
+      "worker_host_id": "local",
+      "result_manifest": "research\\parallel\\rounds\\parallel-20260906-r2\\v322\\result_manifest.json",
+      "registered_at": "2026-10-02T20:00:22.235462Z",
+      "assigned_at": "2026-10-02T20:00:22.235462Z",
+      "result_manifest_sha256": "e18dacf026a40748f331f8f078b72bbc2b2c4cd47462c71e6fe04680e4de7869",
+      "result_summary": {
+        "scenarios": {
+          "normal": {
+            "monthly_geometric_net_percent": 3.614,
+            "max_drawdown_percent": 21.59,
+            "fills": 1015,
+            "months": 48
+          },
+          "fee_stress": {
+            "monthly_geometric_net_percent": 3.614,
+            "max_drawdown_percent": 21.59,
+            "fills": 1015,
+            "months": 48
+          },
+          "execution_stress": {
+            "monthly_geometric_net_percent": 3.614,
+            "max_drawdown_percent": 21.59,
+            "fills": 1015,
+            "months": 48
+          }
+        },
+        "independent_test": false,
+        "live_approved": false,
+        "audit_notes": "rows, fold choices, transfer deltas and final rows replicated independently (no mismatch); no most-recent-year number in any choice (v320_v323_audit/COMPARISON.md)"
+      },
+      "audited_at": "2026-10-02T20:18:53.855121Z"
+    },
+    {
+      "version": "v323",
+      "track": "C",
+      "direction_key": "v323-bot-r2-book-management",
+      "status": "rejected",
+      "parent_versions": [
+        "v320"
+      ],
+      "model_family": "grid-walkforward-choice",
+      "objective": "BOT: R2 + MANUAL book components",
+      "data_contract": "audited walk-forward caches; fits before anchor - embargo; most recent year once",
+      "policy_contract": "BOT R2 machinery",
+      "hypothesis": "pullback entry / loss_act tighten improve R2 out of sample (ran before registration)",
+      "parent_commit": "1ecf947baddd5ef78444670330e9db62128dad50",
+      "write_scope": "research/parallel/rounds/parallel-20260906-r2/v323",
+      "worker_agent_id": "01a07748-5adc-7061-8052-0ed36705a8a8",
+      "worker_host_id": "local",
+      "result_manifest": "research\\parallel\\rounds\\parallel-20260906-r2\\v323\\result_manifest.json",
+      "registered_at": "2026-10-02T20:18:53.341417Z",
+      "assigned_at": "2026-10-02T20:18:53.341417Z",
+      "result_manifest_sha256": "1928797ea2c7548e38cb52328a6cebd4a58a985be1291da567fff9a4eb64e47a",
+      "result_summary": {
+        "scenarios": {
+          "normal": {
+            "monthly_geometric_net_percent": 7.079,
+            "max_drawdown_percent": 18.39,
+            "fills": 5341,
+            "months": 48
+          },
+          "fee_stress": {
+            "monthly_geometric_net_percent": 7.079,
+            "max_drawdown_percent": 18.39,
+            "fills": 5341,
+            "months": 48
+          },
+          "execution_stress": {
+            "monthly_geometric_net_percent": 7.079,
+            "max_drawdown_percent": 18.39,
+            "fills": 5341,
+            "months": 48
+          }
+        },
+        "independent_test": false,
+        "live_approved": false,
+        "audit_notes": "rows, fold choices, transfer deltas and final rows replicated independently (no mismatch); no most-recent-year number in any choice (v320_v323_audit/COMPARISON.md)"
+      },
+      "audited_at": "2026-10-02T20:18:54.119078Z"
+    },
+    {
+      "version": "v324",
+      "track": "A",
+      "direction_key": "v324-pooled-trend-regime-overlay",
+      "status": "running",
+      "parent_versions": [
+        "v321"
+      ],
+      "model_family": "hist-gradient-boosting",
+      "objective": "MANUAL: pooled efficiency-ratio overlay on M2",
+      "data_contract": "audited walk-forward caches; fits before anchor - embargo; most recent year once",
+      "policy_contract": "MANUAL pullback rules cap 2",
+      "hypothesis": "predicted trendiness tilts the book toward profitable regimes (ran before registration)",
+      "parent_commit": "1ecf947baddd5ef78444670330e9db62128dad50",
+      "write_scope": "research/parallel/rounds/parallel-20260906-r2/v324",
+      "worker_agent_id": "01a07792-4a6b-7fc3-a08a-af2923b1778a",
+      "worker_host_id": "local",
+      "result_manifest": null,
+      "registered_at": "2026-10-02T20:18:53.600767Z",
+      "assigned_at": "2026-10-02T20:18:53.600767Z"
+    },
+    {
+      "version": "v325",
+      "track": "B",
+      "direction_key": "v325-r2-wide77-agents",
+      "status": "running",
+      "parent_versions": [
+        "v322"
+      ],
+      "model_family": "hist-gradient-boosting",
+      "objective": "BOT: R2 dip agents from the 77-coin pool",
+      "data_contract": "audited walk-forward caches; fits before anchor - embargo; most recent year once",
+      "policy_contract": "BOT R2 machinery",
+      "hypothesis": "more dip experience improves R2 out of sample (ran before registration)",
+      "parent_commit": "1ecf947baddd5ef78444670330e9db62128dad50",
+      "write_scope": "research/parallel/rounds/parallel-20260906-r2/v325",
+      "worker_agent_id": "01a07791-eecb-7053-8866-dcdbe31e84d7",
+      "worker_host_id": "local",
+      "result_manifest": null,
+      "registered_at": "2026-10-02T20:18:53.852012Z",
+      "assigned_at": "2026-10-02T20:18:53.852012Z"
+    },
+    {
+      "version": "v326",
+      "track": "C",
+      "direction_key": "v326-pooled-gru-member",
+      "status": "running",
+      "parent_versions": [
+        "v323"
+      ],
+      "model_family": "gru-sequence-model",
+      "objective": "MANUAL: pooled 77-coin GRU sequence member (Kaggle GPU, 5 seeds)",
+      "data_contract": "audited walk-forward caches; fits before anchor - embargo; most recent year once",
+      "policy_contract": "MANUAL pullback rules cap 2",
+      "hypothesis": "a sequence model trained on pooled experience adds information to the M2 book (Kaggle run started after the prereg hash)",
+      "parent_commit": "1ecf947baddd5ef78444670330e9db62128dad50",
+      "write_scope": "research/parallel/rounds/parallel-20260906-r2/v326",
+      "worker_agent_id": "01a07748-5adc-7061-8052-0ed36705a8a8",
+      "worker_host_id": "local",
+      "result_manifest": null,
+      "registered_at": "2026-10-02T20:18:54.115011Z",
+      "assigned_at": "2026-10-02T20:18:54.115011Z"
     }
   ],
-  "updated_at": "2026-10-02T19:13:54.180482Z"
+  "updated_at": "2026-10-02T20:18:54.119078Z"
 }
