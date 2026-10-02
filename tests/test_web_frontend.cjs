@@ -133,7 +133,7 @@ test('all locked pipelines keep their historical metrics visible and issue no pl
   assert.deepEqual(paths, ['/api/pipelines_summary']);
   const html = ui.$('pipeEvid').innerHTML;
   assert.ok(html.includes('6.71') && html.includes('200 / 55'));
-  assert.ok(html.includes('Test<br>(1 năm, %/tháng)') && html.includes('Train / chọn model<br>(4 năm, %/tháng)'));
+  assert.ok(html.includes('Test · 1 năm<br>Lãi ròng/tháng (%)') && html.includes('Train / chọn model<br>4 năm · Lãi ròng/tháng (%)'));
   assert.ok(html.includes('mailto:admin%40example.com'));
   assert.ok(!html.includes('data-pipe='));
 });

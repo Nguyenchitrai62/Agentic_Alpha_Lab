@@ -9,11 +9,11 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="styles.css?v=20261002-vip-grants" />
+  <link rel="stylesheet" href="styles.css?v=20261002-monthly-profit" />
   <script src="config.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/lightweight-charts@4.2.0/dist/lightweight-charts.standalone.production.js" defer></script>
   <script src="https://accounts.google.com/gsi/client" async defer></script>
-  <script src="app.js?v=20261002-vip-grants" defer></script>
+  <script src="app.js?v=20261002-monthly-profit" defer></script>
 </head>
 <body>
   <header class="topbar">
@@ -70,13 +70,13 @@
       </div>
       <div class="panel evid-panel">
         <div class="panel-h"><span>Chọn pipeline · bảng đánh giá hiệu quả</span>
-          <span class="muted small">%/tháng · 2021-09 → 2026-09 · mô phỏng lệnh thật (limit, SL/TP, phí, funding)</span></div>
+          <span class="muted small">Lãi ròng/tháng (%) · 2021-09 → 2026-09 · mô phỏng lệnh thật (limit, SL/TP, phí, funding)</span></div>
         <div class="table-wrap" tabindex="0" aria-label="Bảng đánh giá 5 pipeline, cuộn ngang để xem đầy đủ chỉ số"><table class="tbl compact evid" id="pipeEvid"></table></div>
         <div class="muted small evid-note">Train / chọn model: kết quả 4 năm (09/2021–09/2025) dùng để phát triển và chọn model.
           Test: kết quả 1 năm (09/2025–09/2026) đánh giá model đã chọn.
           Đây là kết quả mô phỏng walk-forward; tại mỗi mốc, model chỉ học từ dữ liệu trước mốc đó.
           DD là drawdown tối đa; Win rate là tỷ lệ lệnh có lãi sau phí.
-          Các cột %/tháng là lợi nhuận ròng bình quân theo lãi kép.
+          Lãi ròng/tháng (%) là lợi nhuận bình quân mỗi tháng theo lãi kép, đã trừ phí và funding; ví dụ 5% nghĩa là lãi bình quân 5%/tháng.
           Pipeline bị khóa vẫn hiện đầy đủ chỉ số đánh giá; liên hệ email trong bảng để hỏi quyền xem tín hiệu.</div>
         <div class="muted small evid-note" id="pipeOrderNote"></div>
         <div class="muted small evid-note" id="pipeSelectedNote" role="status" aria-live="polite"></div>
