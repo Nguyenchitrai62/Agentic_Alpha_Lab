@@ -47,12 +47,19 @@ Với số liệu hiện tại, admin giữ riêng **G2/v301** và **CS/v295**; 
 Cả 5 pipeline vẫn xuất hiện với đầy đủ chỉ số đánh giá lịch sử, kể cả pipeline bị khóa, kèm liên kết mail admin.
 Ở trang **Admin → Thứ tự pipeline & quyền xem tín hiệu**, dùng ↑ ↓ để đổi thứ tự, khóa/mở từng pipeline rồi bấm **Lưu cấu hình pipeline**.
 Khóa/mở áp dụng cho tất cả viewer, độc lập với thứ tự; có thể mở cả 5 hoặc khóa cả 5. Admin luôn xem được tất cả.
+Để khóa thêm: tại dòng pipeline muốn khóa, bấm **Đang mở · Khóa tín hiệu**, rồi **Lưu cấu hình pipeline**.
+Để mở lại, bấm **🔒 Đang khóa · Mở khóa** rồi lưu. Link quản lý này cũng có ở dưới bảng đánh giá khi đăng nhập admin.
 **Dùng thứ tự tự động** khôi phục xếp theo chỉ số, giữ trạng thái khóa đã chọn; cần bấm Lưu để áp dụng.
 Cấu hình được lưu trong SQLite, có hiệu lực với access token đang sử dụng và giữ nguyên sau khi khởi động lại.
 FE cập nhật quyền khi đổi tab và mỗi phút; BE kiểm tra quyền trên từng request. Nếu hai admin cùng sửa,
 phiên bản cũ bị từ chối bằng HTTP 409; dùng **Tải lại cấu hình** trước khi chỉnh và lưu lại.
 Scheduler luôn chạy cả 5, ưu tiên pipeline chưa hoàn thành rồi theo thứ tự admin đã lưu (hoặc thứ tự tự động).
 Đặt `WEB_ADMIN_CONTACT_EMAIL` để đổi địa chỉ liên hệ. Liên kết chỉ mở email nháp, không gửi mail tự động.
+
+Chọn pipeline ở bảng đánh giá hoặc bộ chọn dùng chung cho Pipeline, Market, History và Performance.
+Dòng **Đang xem** xác nhận lựa chọn hiện tại; bảng đánh giá vẫn so sánh cả 5 pipeline.
+Khi đổi lựa chọn, FE xóa kết quả cũ, tải dữ liệu mới và bỏ qua phản hồi trễ của lựa chọn trước.
+Kết quả paper của các pipeline có thể bằng nhau ở một thời điểm; đối chiếu tên pipeline và chỉ số lịch sử trên Performance.
 
 API kiểm tra quyền trước cache cho trade plan, overview, signal/ID, orders, positions, trades và equity;
 dữ liệu pipeline cũ chỉ dành cho admin. `/api/auth/me` trả `allowed_pipelines` để FE chọn đúng danh sách.

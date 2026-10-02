@@ -17,11 +17,12 @@
     set(k, v) { try { localStorage.setItem("aal_" + k, JSON.stringify(v)); } catch (e) { /* private mode */ } },
   };
   const state = {
-    token: "", session: null, user: null, view: "live",
+    token: "", session: null, user: null, view: "live", selectedPipeline: null,
     live: { symbol: store.get("liveSym", "BTCUSDT"), latest: null, prices: {}, tvSym: null },
     h: { symbol: store.get("hSym", "BTCUSDT"), interval: store.get("hIv", "4h"), range: store.get("hRange2", "3Th"),
          kind: "book", result: "all", selected: null },
   };
+  let planGeneration = 0, perfGeneration = 0;
 
   // ------------------------------------------------------------------ helpers
   const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
@@ -35,10 +36,10 @@
   const CONF = { CAO: "Cao", "TRUNG BINH": "Trung bình", THAP: "Thấp" };
   const REASON = { TP: "Chạm TP", SL: "Chạm SL", "SL hoà vốn": "SL hoà vốn", "Đóng limit": "Đóng bằng limit", "Hết giờ": "Hết giờ (dip)", "Hết dữ liệu mô phỏng": "Hết dữ liệu mô phỏng (23/09)",
                   "Rebalance về 0": "Đóng (rebalance)", "Đảo chiều": "Đảo chiều", "Đang mở": "Đang mở", "Hết 4h (market)": "Hết 4h" };
-  const histSource = () => `tm_${state.h.pipe || planPipe()}`;
+  const histSource = () => `tm_${planPipe()}`;
   // walk-forward replay (until the research data end) + the prospective paper window (since the freeze), oldest first per endpoint order
   async function histBoth(kind, symbol) {
-    const pipe = state.h.pipe || planPipe();
+    const pipe = planPipe();
     const [a, b] = await Promise.all([api(`/api/${kind}?symbol=${symbol}&source=tm_${pipe}&limit=30000`),
       api(`/api/${kind}?symbol=${symbol}&source=paper_${pipe}&limit=30000`).catch(() => [])]);
     return kind === "orders" ? b.concat(a) : a.concat(b);  // orders come newest first, positions / trades oldest first
@@ -184,6 +185,7 @@
     const wasSignedIn = Boolean(state.user);
     authEpoch++;
     state.token = ""; state.session = null; state.user = null;
+    state.selectedPipeline = null; planGeneration++; perfGeneration++;
     store.set("token", ""); store.set("session", null);
     state.live.plan = null; state.live.paper = []; state.live.conf = null; state.evid = null;
     pipelineDraft = null;
@@ -259,13 +261,18 @@
   }
 
   async function loadPlans() {
+    const gen = ++planGeneration, pipe = planPipe();
     state.live.latest = null;  // the retired v205 live signal is no longer computed; everything comes from the selected pipeline's plan
-    if (!planPipe()) { state.live.plan = null; state.live.paper = []; return; }
-    state.live.plan = await api(`/api/trade_plan?pipeline=${planPipe()}`).catch(() => null);
-    if (state.user?.role === "admin" && !state.live.conf) state.live.conf = await api("/api/confidence").catch(() => null);
-    // paper results of the four pipelines side by side (prospective evidence)
-    state.live.paper = await Promise.all(visiblePipes().map((p) => p.v).map((v) =>
-      api(`/api/trade_plan?pipeline=${v}`).then((pl) => [v, pl]).catch(() => [v, null])));
+    if (!pipe) { state.live.plan = null; state.live.paper = []; state.live.planLoading = false; return; }
+    state.live.planLoading = true;
+    const [plan, paper] = await Promise.all([
+      api(`/api/trade_plan?pipeline=${pipe}`).catch(() => null),
+      Promise.all(visiblePipes().map((p) => p.v).map((v) =>
+        api(`/api/trade_plan?pipeline=${v}`).then((pl) => [v, pl]).catch(() => [v, null]))),
+    ]);
+    if (gen !== planGeneration || pipe !== planPipe() || !state.user) return;
+    state.live.plan = plan; state.live.paper = paper; state.live.planLoading = false;
+    if (state.user.role === "admin" && !state.live.conf) state.live.conf = await api("/api/confidence").catch(() => null);
   }
   async function loadLive() {
     mountTv(state.live.symbol);
@@ -295,7 +302,9 @@
     } catch (e) { toast(e.message); }
   }
   function clearPipelineData() {
+    planGeneration++; perfGeneration++;
     state.live.plan = null; state.live.paper = []; state.h.pipe = null; state.h.selected = null; state.perfPipe = null;
+    state.live.planLoading = false;
     ++H.gen;
     if (H.chart) { H.chart.remove(); H.chart = null; }
     if (H.ws) { H.ws.close(); H.ws = null; }
@@ -334,6 +343,10 @@
     $("pipeOrderNote").textContent = Object.values(ev)[0]?.automatic_order
       ? "Thứ tự tự động: lợi nhuận/tháng năm kiểm chứng cao hơn → sụt giảm vốn thấp hơn → tỷ lệ thắng cao hơn."
       : "Thứ tự do admin sắp xếp. Trạng thái khóa do admin quản lý riêng cho từng pipeline.";
+    $("pipeSelectedNote").textContent = cur
+      ? `Đang xem: ${PIPE_LABEL[cur]}. Lựa chọn áp dụng cho Pipeline, Market, History và Performance; bảng trên luôn so sánh cả 5 pipeline.`
+      : "Chưa có pipeline được mở quyền xem tín hiệu.";
+    $("pipelineAdminLink").hidden = state.user?.role !== "admin";
     $("pipeEvid").onclick = (e) => { const r = e.target.closest("[data-pipe]"); if (r) setPlanPipe(r.dataset.pipe); };
   }
 
@@ -363,14 +376,26 @@
   }
   function planPipe() {
     const pipes = visiblePipes(), fallback = pipes[0]?.v;
+    if (pipes.some((p) => p.v === state.selectedPipeline)) return state.selectedPipeline;
     try { const v = localStorage.getItem("planPipe6"); return pipes.some((p) => p.v === v) ? v : fallback; }
     catch { return fallback; }
   }
   async function setPlanPipe(v) {
     if (!visiblePipes().some((p) => p.v === v)) return;
+    state.selectedPipeline = v;
     try { localStorage.setItem("planPipe6", v); } catch { /* per-viewer convenience only */ }
-    const cached = (state.live.paper || []).find(([k]) => k === v);
-    state.live.plan = cached?.[1] || await api(`/api/trade_plan?pipeline=${v}`).catch(() => null);
+    clearPipelineData();
+    const gen = ++planGeneration;
+    state.live.planLoading = true;
+    renderPipeBar(); renderBoard(); renderCards(); renderWatchlist(); renderPlan(); renderEvidence();
+    if (state.view === "history") initHistory();
+    else if (state.view === "perf") loadPerf();
+    const plan = await api(`/api/trade_plan?pipeline=${v}`).catch((e) => {
+      if (gen === planGeneration) toast(e.message);
+      return null;
+    });
+    if (gen !== planGeneration || v !== planPipe() || !state.user) return;
+    state.live.plan = plan; state.live.planLoading = false;
     renderPipeBar(); renderBoard(); renderCards(); renderWatchlist(); renderPlan(); renderEvidence();
   }
   function renderPipeBar() {
@@ -456,6 +481,8 @@
       <div class="muted small">Mỗi bậc: 1 lệnh limit mua riêng, kèm TP limit + SL sàn đặt sẵn; bot đóng lệnh nếu nến 5m đóng dưới "SL bot"; lệnh còn mở tới cuối nến thì đóng ở giá mở nến sau.</div></details>`;
   }
   function compactPlan(sym) {
+    if (state.live.planLoading) return '<p class="muted">Đang tải kế hoạch lệnh…</p>';
+    if (!state.live.plan) return `<p class="muted">Chưa có dữ liệu kế hoạch lệnh cho ${esc(PIPE_LABEL[planPipe()] || "pipeline này")}.</p>`;
     return compactPlanCore(sym) + dipBlock(sym);
   }
   function compactPlanCore(sym) {
@@ -813,8 +840,7 @@
   async function initHistory() {
     await loadEvidence();
     if (!visiblePipes().length) { $("hPipe").innerHTML = accessMessage(); return; }
-    if (!visiblePipes().some((p) => p.v === state.h.pipe)) state.h.pipe = planPipe();
-    seg($("hPipe"), visiblePipes().map((p) => p.v), state.h.pipe, (v) => { state.h.pipe = v; loadHistory(); },
+    seg($("hPipe"), visiblePipes().map((p) => p.v), planPipe(), (v) => { setPlanPipe(v); },
       (v) => PIPES.find((p) => p.v === v).nm);
     if (!histInit) {
       histInit = true;
@@ -1058,14 +1084,17 @@
 
   // ================================================================== PERFORMANCE
   async function loadPerf() {
+    const gen = ++perfGeneration;
     try {
       await loadEvidence();
+      if (gen !== perfGeneration) return;
       if (!visiblePipes().length) { $("pPipe").innerHTML = accessMessage(); return; }
-      const pipe = visiblePipes().some((p) => p.v === state.perfPipe) ? state.perfPipe : planPipe(), src = `tm_${pipe}`, nm = PIPES.find((p) => p.v === pipe).nm;
-      seg($("pPipe"), visiblePipes().map((p) => p.v), pipe, (v) => { state.perfPipe = v; loadPerf(); },
+      const pipe = planPipe(), src = `tm_${pipe}`, nm = PIPES.find((p) => p.v === pipe).nm;
+      seg($("pPipe"), visiblePipes().map((p) => p.v), pipe, (v) => { setPlanPipe(v); },
         (v) => PIPES.find((p) => p.v === v).nm + " — " + PIPES.find((p) => p.v === v).ds);
       const [ov, wfEq, st] = await Promise.all([api(`/api/overview?pipeline=${pipe}`), api(`/api/equity?source=${src}&points=3000`),
         api(`/api/orders/stats?source=${src}`)]);
+      if (gen !== perfGeneration || pipe !== planPipe() || !state.user) return;
       const wf = ov.walkforward || {}, plan = ov.plan || {};
       $("perfKpis").innerHTML = [
         [`${nm}: mô phỏng toàn bộ 5 năm`, wf.monthly_5y, "%/tháng (bình quân theo lãi kép)"], ["4 năm phát triển mô hình", wf.monthly_dev4, "%/tháng"],
@@ -1096,7 +1125,7 @@
         <dt>Số nến 4h đã chạy</dt><dd>${curve.length}</dd></dl>
         <p class="fine">Paper trading tiến cứu: dữ liệu sau thời điểm đóng băng mô hình, là bằng chứng sạch duy nhất (mô hình chưa từng thấy).
           Còn quá ít nến để kết luận.</p>` : `<p class="muted">Chưa có dữ liệu paper trading.</p>`;
-    } catch (e) { toast(e.message); }
+    } catch (e) { if (gen === perfGeneration) toast(e.message); }
   }
 
   const lineCharts = {};

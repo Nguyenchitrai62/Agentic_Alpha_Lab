@@ -106,3 +106,20 @@ Final follow-up validation: **36 recovery tests passed**. The full suite, withou
 no failures (448.12 seconds). The 126 warnings are existing FastAPI/Starlette deprecations.
 `pip check` and the staged whitespace check passed. The exact 13-file follow-up scope was scanned against credential patterns
 and local `.env` secret values, with no matches. Models, downloaded data, audit outputs and unrelated research changes are excluded.
+
+## Frontend pipeline selection follow-up
+
+The four views now share one pipeline selection. Switching clears previous signal/performance data, fetches a fresh plan,
+and ignores late plan or KPI responses from the previous selection. A permissions change invalidates pending responses;
+restricted selections send no data request. Bearer access headers and refresh handling remain in the existing API client.
+The evaluation table retains all five historical rows, with an explicit selected-pipeline note and an admin management link.
+
+All **14 JavaScript behavior tests passed**, covering rapid switches, background refresh, private storage, permission
+revocation during a request, and admin locking an additional free pipeline with the Authorization header and policy revision.
+Browser QA on an isolated database verified C4/C5 performance changes, History-to-Pipeline selection, and C4 lock/save
+persistence after reloading. Production access policy was not changed for this QA.
+
+The complete repository suite passed without exclusions:
+`.venv/Scripts/python.exe -m pytest -o addopts='' -q --tb=short` — **1613 passed, 2 intentional skips**
+in 475.25 seconds, with the same 126 existing deprecation warnings. The five selected code/docs files passed whitespace
+and credential scans, including comparison against local `.env` secret values. No dependency changes were introduced.

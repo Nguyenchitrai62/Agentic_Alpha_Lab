@@ -6,7 +6,7 @@ const vm = require('node:vm');
 
 const source = fs.readFileSync(path.join(__dirname, '../frontend/app.js'), 'utf8').replace(
   '  boot();',
-  '  window.testing = { state, api, refreshSession, logout, visiblePipes, planPipe, loadPlans, loadEvidence, renderEvidence, loadPipelineSettings, $ };');
+  '  window.testing = { state, api, refreshSession, logout, visiblePipes, planPipe, setPlanPipe, histSource, histBoth, loadPerf, loadPlans, loadEvidence, renderEvidence, loadPipelineSettings, $ };');
 const user = { email: 'viewer@example.com', role: 'viewer', allowed_pipelines: ['v285', 'v269', 'v266'] };
 const expired = { access_token: 'old', expires_at: 1, user };
 const fresh = { access_token: 'new', expires_at: Date.now() / 1000 + 900, user };
@@ -27,10 +27,14 @@ function locks() {
 function app(fetch, localStorage = storage(), sharedLocks = locks()) {
   const elements = new Map();
   const getElementById = id => {
-    if (!elements.has(id)) elements.set(id, { innerHTML: '', childElementCount: 1, hidden: false });
+    if (!elements.has(id)) elements.set(id, { innerHTML: '', childElementCount: 1, hidden: false,
+      dataset: {}, style: {}, querySelectorAll: () => [], classList: { toggle() {}, add() {}, remove() {} } });
     return elements.get(id);
   };
-  const window = { APP_CONFIG: {}, addEventListener() {} };
+  const window = { APP_CONFIG: {}, addEventListener() {}, LightweightCharts: {
+    PriceScaleMode: { Logarithmic: 1, Normal: 0 },
+    createChart: () => ({ remove() {}, addAreaSeries: () => ({ setData() {} }), timeScale: () => ({ fitContent() {} }) }),
+  } };
   const context = { window, document: { getElementById, querySelectorAll: () => [], addEventListener() {} },
     localStorage, navigator: { locks: sharedLocks }, fetch, setInterval() {}, setTimeout() {}, clearTimeout() {},
     location: { reload() {} }, google: { accounts: { id: { disableAutoSelect() {} } } }, console };
@@ -160,4 +164,133 @@ test('admin moves pipeline without changing locks and saves with a Bearer header
   assert.ok(ui.$('pipelineSaveStatus').textContent.startsWith('Đã lưu.'));
   ui.logout(false);
   assert.equal(ui.$('pipelineSettingsTbl').innerHTML, '');
+});
+
+test('pipeline selection is shared by signal, history and performance, including private storage', async () => {
+  const saved = storage(fresh);
+  saved.setItem = () => { throw new Error('private storage'); };
+  const paths = [];
+  const ui = app(async p => {
+    paths.push(p);
+    if (p.includes('/api/trade_plan')) return response(200, { pipeline: 'new C4', coins: {} });
+    return response(200, []);
+  }, saved);
+  ui.state.view = 'todo';
+  ui.state.h.pipe = 'v285'; ui.state.perfPipe = 'v285';
+  ui.state.live.paper = [['v269', { pipeline: 'stale cached C4', coins: {} }]];
+  await ui.setPlanPipe('v269');
+  assert.equal(ui.planPipe(), 'v269');
+  assert.equal(ui.histSource(), 'tm_v269');
+  await ui.histBoth('orders', 'BTCUSDT');
+  assert.ok(paths.includes('/api/orders?symbol=BTCUSDT&source=tm_v269&limit=30000'));
+  assert.ok(paths.includes('/api/orders?symbol=BTCUSDT&source=paper_v269&limit=30000'));
+  assert.equal(ui.state.live.plan.pipeline, 'new C4');
+  assert.ok(!ui.$('boardMeta').textContent.includes('CB'));
+});
+
+test('fast pipeline switches discard the old plan response and clear old results while loading', async () => {
+  let finish;
+  const ui = app(async p => {
+    if (p.endsWith('pipeline=v269')) return new Promise(resolve => { finish = resolve; });
+    return response(200, { pipeline: 'C5', coins: {} });
+  }, storage(fresh));
+  ui.state.view = 'todo'; ui.state.live.plan = { pipeline: 'old CB', coins: {} };
+  ui.$('perfKpis').innerHTML = 'old CB performance';
+  const old = ui.setPlanPipe('v269');
+  assert.equal(ui.state.live.plan, null);
+  assert.equal(ui.$('perfKpis').innerHTML, '');
+  assert.ok(ui.$('todoCards').innerHTML.includes('Đang tải kế hoạch lệnh'));
+  await ui.setPlanPipe('v266');
+  finish(response(200, { pipeline: 'late C4', coins: {} }));
+  await old;
+  assert.equal(ui.planPipe(), 'v266');
+  assert.equal(ui.state.live.plan.pipeline, 'C5');
+  assert.equal(ui.state.live.planLoading, false);
+});
+
+test('background plan refresh cannot overwrite a later selection', async () => {
+  let delay = true;
+  const pending = [];
+  const ui = app(async p => {
+    if (delay) return new Promise(resolve => pending.push(() => resolve(response(200, { pipeline: 'old CB', coins: {} }))));
+    return response(200, { pipeline: 'C4', coins: {} });
+  }, storage(fresh));
+  ui.state.view = 'todo';
+  const old = ui.loadPlans();
+  await Promise.resolve();
+  delay = false;
+  await ui.setPlanPipe('v269');
+  pending.forEach(resolve => resolve()); await old;
+  assert.equal(ui.planPipe(), 'v269');
+  assert.equal(ui.state.live.plan.pipeline, 'C4');
+});
+
+const evidence = () => Object.fromEntries(['v285', 'v269', 'v266'].map((p, i) => [p, {
+  rank: i+1, locked: false, automatic_order: true, walkforward: {},
+}]));
+
+test('performance loads the globally selected pipeline and discards late KPI responses', async () => {
+  let finishOld, markReady;
+  const ready = new Promise(resolve => { markReady = resolve; });
+  const paths = [];
+  const ui = app(async p => {
+    paths.push(p);
+    if (p === '/api/pipelines_summary') return response(200, evidence());
+    if (p === '/api/overview?pipeline=v285') {
+      markReady(); return new Promise(resolve => { finishOld = resolve; });
+    }
+    if (p === '/api/overview?pipeline=v269') return response(200, { walkforward: { monthly_5y: 222 }, plan: {} });
+    if (p.includes('/api/trade_plan')) return response(200, { coins: {} });
+    return response(200, []);
+  }, storage(fresh));
+  ui.state.view = 'todo';
+  const old = ui.loadPerf(); await ready;
+  await ui.setPlanPipe('v269'); await ui.loadPerf();
+  assert.ok(paths.includes('/api/equity?source=tm_v269&points=3000'));
+  assert.ok(paths.includes('/api/orders/stats?source=tm_v269'));
+  finishOld(response(200, { walkforward: { monthly_5y: 111 }, plan: {} })); await old;
+  assert.ok(ui.$('perfKpis').innerHTML.includes('222'));
+  assert.ok(!ui.$('perfKpis').innerHTML.includes('111'));
+  assert.ok(ui.$('pipeSelectedNote').textContent.startsWith('Đang xem: C4'));
+});
+
+test('restricted selection sends no request and a lock change discards in-flight signals', async () => {
+  let finish; const paths = [];
+  const ui = app(async p => {
+    paths.push(p);
+    if (p === '/api/pipelines_summary') return response(200, { ...evidence(), v269: { rank: 2, locked: true, walkforward: {} } });
+    return new Promise(resolve => { finish = resolve; });
+  }, storage(fresh));
+  ui.state.view = 'todo';
+  await ui.setPlanPipe('v301'); assert.equal(paths.length, 0);
+  const pending = ui.setPlanPipe('v269');
+  await ui.loadEvidence();
+  finish(response(200, { pipeline: 'revoked C4', coins: {} })); await pending;
+  assert.equal(ui.state.live.plan, null);
+  assert.equal(ui.planPipe(), 'v285');
+  assert.equal(ui.$('pipelineAdminLink').hidden, true);
+});
+
+test('admin can lock an additional free pipeline and save without changing the order', async () => {
+  const initial = { order: ['v301','v295','v285','v269','v266'], automatic: true, revision: 4,
+    locked: { v301: true, v295: true, v285: false, v269: false, v266: false } };
+  let submitted;
+  const ui = app(async (p, opts) => {
+    assert.equal(opts.headers.Authorization, 'Bearer new');
+    if (p === '/api/admin/pipelines' && opts.method === 'POST') {
+      submitted = JSON.parse(opts.body); return response(200, { ...initial, ...submitted, revision: 5 });
+    }
+    if (p === '/api/admin/pipelines') return response(200, structuredClone(initial));
+    return response(200, Object.fromEntries(initial.order.map((p,i) => [p, { rank:i+1, locked:false,
+      locked_for_viewers: submitted.locked[p], walkforward:{} }])));
+  }, storage(fresh));
+  ui.state.user.role = 'admin';
+  await ui.loadPipelineSettings();
+  const lock = { dataset: { lock: 'v269' } };
+  ui.$('pipelineSettingsTbl').onclick({ target: { closest: s => s === '[data-lock]' ? lock : null } });
+  assert.ok(ui.$('pipelineSaveStatus').textContent.includes('chưa lưu'));
+  await ui.$('savePipelineSettings').onclick();
+  assert.deepEqual(submitted.locked, { ...initial.locked, v269: true });
+  assert.equal(submitted.order, null); assert.equal(submitted.revision, 4);
+  assert.equal(ui.$('pipelineAdminLink').hidden, false);
 });
