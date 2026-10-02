@@ -1,0 +1,17 @@
+# R2 robustness (BOT R2 v321 vs deployed G2 v301, bar-open) - summary
+G2 base reproduces: dev4 6.504, 5y 6.272, last 5.349, gate DD 17.09, 0 losing years; all-win dev 0.6622 (5109), hidden 0.6343 (1444 in v321). R2 base reproduces: 7.079/6.793/5.655/18.39, 0 losing; all-win dev 0.6716 (5344).
+G2 vs R2 per row (dev4 / 5y / last / DD / lose / allwin-dev):
+base 6.504/7.079, 6.272/6.793, 5.349/5.655, 17.09/18.39, 0/0, 0.6622/0.6716 | cost 5.563/6.129, 5.382/5.894, 4.663/4.956, 18.55/19.71, 0/0, 0.6387/0.6507.
+lat15 6.291/6.884, 6.086/6.620, 5.267/5.568, 18.21/18.77, 0/0, 0.6605/0.6715 | lat30 5.850/6.549, 5.675/6.297, 4.977/5.296, 19.88/18.90, 0/0, 0.6580/0.6690.
+lat60 5.300/5.842, 5.221/5.724, 4.905/5.252, 19.97/21.18, 0/0, 0.6574/0.6663 | band_lo 6.349/7.032, 6.089/6.710, 5.056/5.436, 17.83/18.89, 0/0, 0.6604/0.6708.
+band_hi 6.302/6.923, 6.117/6.691, 5.380/5.771, 18.08/19.06, 0/0, 0.6614/0.6714 | cool3 6.486/7.073, 6.239/6.780, 5.255/5.614, 18.68/18.57, 0/0, 0.6597/0.6703.
+cool12 6.363/7.098, 6.108/6.773, 5.096/5.480, 18.24/19.78, 0/0, 0.6600/0.6708 | sleeve0.22 6.326/6.998, 6.130/6.728, 5.349/5.655, 18.16/18.39, 0/0, 0.6615/0.6716.
+sleeve0.30 6.509/7.075, 6.276/6.790, 5.349/5.655, 17.03/18.39, 0/0, 0.6623/0.6713 | offset0.15 6.513/7.118, 6.307/6.866, 5.490/5.865, 17.89/18.71, 0/0, 0.6583/0.6683.
+offset0.40 6.388/6.913, 6.222/6.723, 5.562/5.968, 18.08/20.66, 0/0, 0.6658/0.6766 | outage_backstop_only (touch 8sg, no close) G2 6.114/6.009/5.592/DD 18.13/0/0.6637, R2 6.337/6.230/5.803/DD 22.15/0/0.6742.
+close_1m (close1+back8, m_sleeve_sl 4.0) G2 6.121/5.945/5.244/DD 17.20/0/0.6597, R2 6.670/6.441/5.526/DD 19.19/0/0.6688. sleeve_start_21 (ladder +5m) G2 6.450/6.270/5.557/DD 17.39/0/0.6595, R2 6.926/6.723/5.915/DD 18.86/0/0.6685; sleeve_start_31 (+15m) G2 5.815/5.738/5.430/DD 20.31/0/0.6536, R2 6.582/6.425/5.796/DD 19.18/0/0.6623.
+Every yearly net is positive in all 34 rows (no losing year anywhere); R2 dev4 beats G2 in all 17 shared rows (by +0.2 to +0.8pp), 5y and last-year also in all 17; R2 all-trade dev win beats G2 in all 17 (0.65-0.68 vs 0.64-0.67); G2 holds DD<=20 in 16/17 (only sleeve_start_31 20.31 breaches) vs R2 in 14/17 (lat60 21.18, offset0.40 20.66, outage 22.15 breach).
+Bootstrap (base daily, first 4y, 30d blocks, 2000 draws, seed 0): G2 monthly p5/p50/p95 = 1.60/6.17/12.67, P(>=5)=0.651, P(loss y)=0.009, DD p50/p95 = 12.64/21.30, P(DD>20)=0.074.
+R2 monthly p5/p50/p95 = 2.04/6.72/13.42, P(>=5)=0.708, P(loss y)=0.006, DD p50/p95 = 12.20/20.64, P(DD>20)=0.066: higher return quantiles and a thinner DD tail.
+Small account (Bybit lots, most recent year): 1000 USDT G2 book 506/563 (0.899), rungs 946/1083 (0.874); R2 book 507/564 (0.899), rungs 992/1135 (0.874). 2000 USDT G2 book 557/563 (0.989), rungs 1048/1083 (0.968); R2 book 558/564 (0.989), rungs 1097/1135 (0.967): identical placeability.
+R2 at least as robust as G2: NO - R2 wins every return/win-rate row and the bootstrap odds with no losing year anywhere, but holds DD<=20 in fewer rows (14/17 vs 16/17), breaching on lat60 (21.18), offset0.40 (20.66) and outage_backstop_only (22.15) while G2 breaches only sleeve_start_31 (20.31).
+Method: CB books (2A+2B+D)/5 = 0.8C4+0.2(D+Dq)/2, v301 G2 / v321 R2 lookup hooks bar-open (T=decision+4h, sym, rung), rungs G2 (2.5,3,3.5,4) / R2 (2.5,3,3.5,4,5), budget 0.26, size_mult 1.75, align (1.5,0.5), close5/m_sleeve_sl-4/backstop-8, grid_policy(0.03,0.40), win_start 5; rows per template; bootstrap/small-account per S1 template.
