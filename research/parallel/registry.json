@@ -2,7 +2,7 @@
   "schema_version": 1,
   "project": "Agentic Alpha Lab BTC swing research",
   "created_at": "2026-09-06T00:00:00Z",
-  "next_version": 358,
+  "next_version": 359,
   "control": {
     "coordinator_model": "gpt-5.6-sol",
     "coordinator_reasoning": "high",
@@ -54,7 +54,7 @@
     "expected_workers": 3,
     "version_range": [
       45,
-      357
+      358
     ],
     "parent_commit": "1ecf947baddd5ef78444670330e9db62128dad50",
     "cloud_snapshot": {
@@ -15146,7 +15146,7 @@
       "version": "v355",
       "track": "B",
       "direction_key": "v355-hedged-dip-bot",
-      "status": "running",
+      "status": "rejected",
       "parent_versions": [
         "v353"
       ],
@@ -15159,9 +15159,36 @@
       "write_scope": "research/parallel/rounds/parallel-20260906-r2/v355",
       "worker_agent_id": "01a07791-eecb-7053-8866-dcdbe31e84d7",
       "worker_host_id": "local",
-      "result_manifest": null,
+      "result_manifest": "research\\parallel\\rounds\\parallel-20260906-r2\\v355\\result_manifest.json",
       "registered_at": "2026-10-03T07:16:09.816149Z",
-      "assigned_at": "2026-10-03T07:16:09.816149Z"
+      "assigned_at": "2026-10-03T07:16:09.816149Z",
+      "result_manifest_sha256": "4cd3c1f144ba6e4321497c892450495569cd8c415d7b4b2d2ad30e0fb145ebb9",
+      "result_summary": {
+        "scenarios": {
+          "normal": {
+            "monthly_geometric_net_percent": 7.079,
+            "max_drawdown_percent": 18.39,
+            "fills": 5341,
+            "months": 48
+          },
+          "fee_stress": {
+            "monthly_geometric_net_percent": 7.079,
+            "max_drawdown_percent": 18.39,
+            "fills": 5341,
+            "months": 48
+          },
+          "execution_stress": {
+            "monthly_geometric_net_percent": 7.079,
+            "max_drawdown_percent": 18.39,
+            "fills": 5341,
+            "months": 48
+          }
+        },
+        "independent_test": false,
+        "live_approved": false,
+        "audit_notes": "COMPARISON.md verdict PASS"
+      },
+      "audited_at": "2026-10-03T08:19:54.397769Z"
     },
     {
       "version": "v356",
@@ -15204,7 +15231,28 @@
       "result_manifest": null,
       "registered_at": "2026-10-03T08:04:44.084485Z",
       "assigned_at": "2026-10-03T08:04:44.084485Z"
+    },
+    {
+      "version": "v358",
+      "track": "B",
+      "direction_key": "v358-m3-risk-level",
+      "status": "running",
+      "parent_versions": [
+        "v357"
+      ],
+      "model_family": "hist-gradient-boosting",
+      "objective": "overall risk level (vol target) of the deployed MANUAL pipeline M3",
+      "data_contract": "kpack inputs",
+      "policy_contract": "M3 target 0.25 vs T27 vs T29 (cap 2); folds k=2,3; last year once",
+      "hypothesis": "M3 has DD headroom; a modest risk step may lift return within DD 20",
+      "parent_commit": "1ecf947baddd5ef78444670330e9db62128dad50",
+      "write_scope": "research/parallel/rounds/parallel-20260906-r2/v358",
+      "worker_agent_id": "01a07791-eecb-7053-8866-dcdbe31e84d7",
+      "worker_host_id": "local",
+      "result_manifest": null,
+      "registered_at": "2026-10-03T08:19:54.392698Z",
+      "assigned_at": "2026-10-03T08:19:54.392698Z"
     }
   ],
-  "updated_at": "2026-10-03T08:04:44.088655Z"
+  "updated_at": "2026-10-03T08:19:54.397769Z"
 }
