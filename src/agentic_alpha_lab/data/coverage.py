@@ -27,3 +27,20 @@ def require_closed_coverage(frame, start, now, interval: str) -> None:
                           int(first.value // 1_000_000), int(last.value // 1_000_000), int(step.value // 1_000_000))
     if gaps:
         raise RuntimeError(f"Missing closed {interval} candles: {len(gaps)} ranges, first {gaps[0]}")
+
+
+def require_closed_coverage_after_refetch(frame, start, now, interval: str) -> list[tuple[int, int]]:
+    """Coverage check for a frame whose every missing range was just re-requested from the exchange.
+
+    Interior ranges that are still missing were confirmed empty by the exchange (a venue outage, e.g. Coinbase
+    2026-05-08 02:00-05:00 UTC) and are returned instead of raising; a missing tail (the latest closed candle) is
+    never tolerated, so stale data still fails loudly.
+    """
+    step = pd.Timedelta(interval)
+    first = pd.Timestamp(start).floor(interval)
+    last = int((pd.Timestamp(now).floor(interval) - step).value // 1_000_000)
+    gaps = missing_ranges((int(t.value // 1_000_000) for t in pd.to_datetime(frame["open_time"], utc=True)),
+                          int(first.value // 1_000_000), last, int(step.value // 1_000_000))
+    if gaps and gaps[-1][1] == last:
+        raise RuntimeError(f"Missing closed {interval} candles at the tail (latest closed bar): {gaps[-1]}")
+    return gaps

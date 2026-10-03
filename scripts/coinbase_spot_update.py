@@ -11,7 +11,7 @@ from pathlib import Path
 
 import pandas as pd
 import requests
-from agentic_alpha_lab.data.coverage import missing_ranges, require_closed_coverage
+from agentic_alpha_lab.data.coverage import missing_ranges, require_closed_coverage, require_closed_coverage_after_refetch
 
 ROOT = Path(__file__).resolve().parents[1]
 CB = ROOT / "data/raw/coinbase_20260925"
@@ -47,7 +47,8 @@ def update_coinbase(product: str, s: requests.Session) -> int:
     d = d[(d.open_time >= start) & (d.open_time < end)][["open_time", "open", "high", "low", "close", "volume"]]
     full = pd.concat([old, d], ignore_index=True).drop_duplicates("open_time", keep="first").sort_values("open_time") if len(d) else old
     full.to_parquet(f, index=False)
-    require_closed_coverage(full, start, end, "1h")
+    # every remaining interior hole was just re-requested and returned empty: a Coinbase outage, not stale data
+    require_closed_coverage_after_refetch(full, start, end, "1h")
     return len(d)
 
 
