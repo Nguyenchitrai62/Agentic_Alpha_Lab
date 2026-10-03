@@ -73,7 +73,24 @@ def prepare(books, opens):
                 settle=settle_at_end, sig1h=sig1h)
 
 
-def simulate(books, opens, prep, m_sl=3.0, m_sleeve_sl=2.0, sleeve=True, target=0.25, cap=2.0, d_limit=D_LIMIT, win_end=60, sleeve_risk_budget=None, gap=0.02, m_sleeve_tp=1.0, rung_scale_fixed=None, size_mult=1.0, rungs=RUNGS, m_tp=None, hourly=False, align=None, events=None, bars=None, exec_policy=None, fixed_levels=False, attrib=None, trade=None, win_start=2, state_out=None, sleeve_filter=None, sleeve_tp=None, strat_vt=None, sleeve_start=16, risk_mult=None, sleeve_breaker=None, sleeve_stop_mode="touch", sleeve_backstop=None, sleeve_budget_sl=None, book_stop_mode="touch", book_backstop=None, sleeve_exit_agent=None, sleeve_lock_cut=False, sleeve_fill_size=None, path_out=None, book_size=None, gov=None, sleeve_hedge=None):
+def simulate(books, opens, prep, m_sl=3.0, m_sleeve_sl=2.0, sleeve=True, target=0.25, cap=2.0, d_limit=D_LIMIT, win_end=60, sleeve_risk_budget=None, gap=0.02, m_sleeve_tp=1.0, rung_scale_fixed=None, size_mult=1.0, rungs=RUNGS, m_tp=None, hourly=False, align=None, events=None, bars=None, exec_policy=None, fixed_levels=False, attrib=None, trade=None, win_start=2, state_out=None, sleeve_filter=None, sleeve_tp=None, strat_vt=None, sleeve_start=16, risk_mult=None, sleeve_breaker=None, sleeve_stop_mode="touch", sleeve_backstop=None, sleeve_budget_sl=None, book_stop_mode="touch", book_backstop=None, sleeve_exit_agent=None, sleeve_lock_cut=False, sleeve_fill_size=None, path_out=None, book_size=None, gov=None, sleeve_hedge=None,
+             sleeve_fill_minute_stop=False, fill_through_bps=0.0, stop_slip=0.0, timeout_exit_minute=0, funding_rates=None):
+    # Execution-realism stress hooks (system audit 2026-10-03; every default reproduces the audited results bit-for-bit):
+    # sleeve_fill_minute_stop: True -> a dip rung's touch stop (touch mode) / native backstop (close modes) is also checked in the
+    #   FILL minute itself: if that minute's low <= the level, the rung exits at the level as a taker stop in the fill minute
+    #   (default False: exits are checked from the minute after the fill).
+    # fill_through_bps: every LIMIT fill (book entry orders, in-position add / reduce / close limits, book take-profits and partials,
+    #   dip-rung bids, dip take-profits) needs the price to trade through the limit by this many extra basis points (buy: low <
+    #   limit * (1 - x); sell: high > limit * (1 + x)); the fill price stays the limit (queue position, Binance-vs-Bybit basis).
+    # stop_slip: market stop fills (book stops, rung stops, native backstops, close-triggered stops, agent cuts) move further into
+    #   the fill minute's range: long fill = px - stop_slip * max(0, px - minute low), short fill = px + stop_slip * max(0, high - px);
+    #   a close-triggered stop filled at the next 4h open uses minute 0 of the next holding bar.
+    # timeout_exit_minute: dip rungs still open at the 4h bar end exit (taker) at the open of this minute of the NEXT holding bar
+    #   (human latency) instead of its minute-0 open; falls back to the minute-0 open when the next bar's 1m data are missing.
+    #   The 1m DD path of the next bar does not include the extra minutes (they are a few minutes of one rung).
+    # funding_rates: optional DataFrame (index = settlement times UTC, columns = symbols, actual signed rate) -> at every settlement
+    #   inside a holding bar (T, T + 4h] longs pay rate * notional and shorts receive it (book on the end-of-bar quantity, dip rungs
+    #   held to the timeout pay rate on their notional), replacing the flat adverse FUND_LONG on longs. Labelled side row only.
     # sleeve_hedge: optional (fraction h, hedge asset index b): every dip rung of another asset is paired with a short of h x its notional in
     #   asset b, opened at the fill minute's close and closed at the rung's exit minute close (next bar open for a time exit), taker both legs,
     #   no funding on the short; the rung's return becomes the paired return. Bot-only (needs a market order at the fill). None = unchanged.
@@ -134,6 +151,37 @@ def simulate(books, opens, prep, m_sl=3.0, m_sleeve_sl=2.0, sleeve=True, target=
     sig_sl = prep.get("sig4_sleeve", sig4)
     B = books.to_numpy()
     na, n = len(cols), len(idx)
+    ft = float(fill_through_bps) * 1e-4  # extra trade-through for limit fills (0 -> x * (1 - 0.0) == x exactly)
+    nxt_ok = np.zeros(n, bool)  # the cube row i + 1 is the next holding bar (consecutive 4h decisions)
+    if n > 1:
+        nxt_ok[:-1] = np.diff(idx.asi8) == 4 * 3600 * 10**9
+
+    def _nb(i, a, X, k):
+        """Minute k of the NEXT holding bar of asset a from the cube (nan when unavailable)."""
+        if i + 1 < n and nxt_ok[i]:
+            v = float(X[i + 1, k, a])
+            return v if np.isfinite(v) else np.nan
+        return np.nan
+
+    def _slip(px, side, lo, hi):
+        """Stop fill moved further into the minute's range (side = +1 long position stopped by a sell)."""
+        if not stop_slip:
+            return px
+        if side > 0:
+            return px - stop_slip * max(0.0, px - lo) if np.isfinite(lo) else px
+        return px + stop_slip * max(0.0, hi - px) if np.isfinite(hi) else px
+
+    fr_bar = None
+    if funding_rates is not None:  # actual signed funding per holding bar (T, T + 4h], T = idx + 4h
+        fr = funding_rates.reindex(columns=cols).fillna(0.0)
+        ts = pd.DatetimeIndex(fr.index).floor("min")
+        t1 = (idx + pd.Timedelta(hours=8)).asi8
+        t0 = (idx + pd.Timedelta(hours=4)).asi8
+        pos_ = np.searchsorted(t1, ts.asi8, side="left")
+        ok = pos_ < n
+        ok[ok] &= t0[pos_[ok]] < ts.asi8[ok]
+        fr_bar = np.zeros((n, na))
+        np.add.at(fr_bar, pos_[ok], fr.to_numpy()[ok])
     o = opens.reindex(idx)[cols]
     realized = v99.W_BOOKS * (books.shift(2) * (o / o.shift(1) - 1)).sum(axis=1)
     vol = (realized.rolling(60 * PD, min_periods=20 * PD).std() * np.sqrt(PD * 365)).to_numpy()
@@ -223,7 +271,7 @@ def simulate(books, opens, prep, m_sl=3.0, m_sleeve_sl=2.0, sleeve=True, target=
             if ps == 0:
                 return carr, qarr, 0.0, np.nan
             px = T["px"][a]
-            hit = La[start:240] < px if ps > 0 else Ha[start:240] > px
+            hit = La[start:240] < px * (1 - ft) if ps > 0 else Ha[start:240] > px * (1 + ft)
             if not hit.any():
                 return carr, qarr, 0.0, np.nan
             m0 = start + int(np.argmax(hit))
@@ -328,16 +376,16 @@ def simulate(books, opens, prep, m_sl=3.0, m_sleeve_sl=2.0, sleeve=True, target=
                     hsb = Ls <= slb if side > 0 else Hs >= slb
                 else:
                     hsb = none
-            ht = Hs > tp if side > 0 else Ls < tp
+            ht = Hs > tp * (1 + ft) if side > 0 else Ls < tp * (1 - ft)
             tp1 = ent * (1 + side * P["partial_k"] * sdv) if P.get("partial_k") and not T["part"][a] else None
-            hp = none if tp1 is None else (Hs > tp1 if side > 0 else Ls < tp1)
+            hp = none if tp1 is None else (Hs > tp1 * (1 + ft) if side > 0 else Ls < tp1 * (1 - ft))
             trig = ent * (1 + side * P["be_k"] * sdv) if P.get("be_k") and not T["be"][a] else None
             hb = none if trig is None else (Hs >= trig if side > 0 else Ls <= trig)
             hx = none
             if T["ak"][a] != 0:
                 apx = T["apx"][a]
                 buy = T["ak"][a] * side > 0  # add to a long / reduce a short = a buy limit
-                hx = (Ls < apx) if buy else (Hs > apx)
+                hx = (Ls < apx * (1 - ft)) if buy else (Hs > apx * (1 + ft))
                 first = (win_start if T["aiss"][a] == i else 0) - m  # a new order waits for the minute-5 rule
                 if first > 0:
                     hx = hx.copy()
@@ -350,6 +398,8 @@ def simulate(books, opens, prep, m_sl=3.0, m_sleeve_sl=2.0, sleeve=True, target=
             if book_stop_mode != "touch" and not hsb[k] and hs[k]:  # close-triggered stop: market at the next minute's open
                 ex = mm + 1
                 px = float(Oa[ex]) if ex < 240 else float(o2[i][a])
+                if stop_slip:
+                    px = _slip(px, side, *((La[ex], Ha[ex]) if ex < 240 else (_nb(i, a, L, 0), _nb(i, a, H, 0))))
                 mm = min(ex, 239)
                 carr[mm:] += cur_q * px - abs(cur_q) * px * TAKER
                 stats["fees"] += abs(cur_q) * px * TAKER
@@ -361,6 +411,7 @@ def simulate(books, opens, prep, m_sl=3.0, m_sleeve_sl=2.0, sleeve=True, target=
                 if hsb[k]:
                     sl = slb
                 px = min(sl, Oa[mm]) if side > 0 else max(sl, Oa[mm])
+                px = _slip(px, side, La[mm], Ha[mm])
                 carr[mm:] += cur_q * px - abs(cur_q) * px * TAKER
                 stats["fees"] += abs(cur_q) * px * TAKER
                 stats["stops"] += 1
@@ -491,7 +542,7 @@ def simulate(books, opens, prep, m_sl=3.0, m_sleeve_sl=2.0, sleeve=True, target=
                         stats["skipped"] += 1
                     else:
                         lim = Oa[0] * (1 - off) if dw > 0 else Oa[0] * (1 + off)
-                        win = La[win_start:win_end] < lim if dw > 0 else Ha[win_start:win_end] > lim
+                        win = La[win_start:win_end] < lim * (1 - ft) if dw > 0 else Ha[win_start:win_end] > lim * (1 + ft)
                         fill_type = f"limit {100 * off:.2f}%"
                         if win.any():
                             fill_min, fill_px = win_start + int(np.argmax(win)), lim
@@ -521,7 +572,7 @@ def simulate(books, opens, prep, m_sl=3.0, m_sleeve_sl=2.0, sleeve=True, target=
                         return None
                     Ls, Hs = La[lo_m:hi_m], Ha[lo_m:hi_m]
                     hs = Ls <= sl if qq > 0 else Hs >= sl
-                    ht = Hs > tp if qq > 0 else Ls < tp
+                    ht = Hs > tp * (1 + ft) if qq > 0 else Ls < tp * (1 - ft)
                     hit = hs | ht
                     if not hit.any():
                         return None
@@ -529,6 +580,7 @@ def simulate(books, opens, prep, m_sl=3.0, m_sleeve_sl=2.0, sleeve=True, target=
                     mm = lo_m + k
                     if hs[k]:
                         px = min(sl, Oa[mm]) if qq > 0 else max(sl, Oa[mm])
+                        px = _slip(px, 1 if qq > 0 else -1, La[mm], Ha[mm])
                         return mm, px, TAKER, "stops"
                     return mm, tp, MAKER, "tps"
 
@@ -571,7 +623,10 @@ def simulate(books, opens, prep, m_sl=3.0, m_sleeve_sl=2.0, sleeve=True, target=
             val_path = carr + qarr * Ca - qa * o1[i][a]
             pnl_cash = carr[-1]
             end_val = pnl_cash + cur_q * o2[i][a]
-            fund = FUND_LONG * max(cur_q, 0.0) * o2[i][a] if settle[i] else 0.0
+            if fr_bar is not None:  # actual signed funding (side row): longs pay, shorts receive rate * notional
+                fund = fr_bar[i, a] * cur_q * o2[i][a]
+            else:
+                fund = FUND_LONG * max(cur_q, 0.0) * o2[i][a] if settle[i] else 0.0
             stats["funding"] += fund
             path += val_path
             cash += end_val - qa * o1[i][a] - fund
@@ -587,7 +642,7 @@ def simulate(books, opens, prep, m_sl=3.0, m_sleeve_sl=2.0, sleeve=True, target=
                     if not np.isfinite(sig_sl[i][a]):
                         continue
                     lv = o1[i][a] * (1 - k * sig_sl[i][a])
-                    hit = L[i, sleeve_start:239, a].astype(float) < lv
+                    hit = L[i, sleeve_start:239, a].astype(float) < lv * (1 - ft)
                     if hit.any():
                         fills.append((sleeve_start + int(np.argmax(hit)), 0, r, a, lv, sig_sl[i][a], 240))
             if hourly and "sig1h" in prep:
@@ -599,7 +654,7 @@ def simulate(books, opens, prep, m_sl=3.0, m_sleeve_sl=2.0, sleeve=True, target=
                             if not np.isfinite(s1[a]) or not np.isfinite(O[i, 60 * h, a]):
                                 continue
                             lv = float(O[i, 60 * h, a]) * (1 - k * s1[a])
-                            hit = L[i, a0:a1 + 1, a].astype(float) < lv
+                            hit = L[i, a0:a1 + 1, a].astype(float) < lv * (1 - ft)
                             if hit.any():
                                 fills.append((a0 + int(np.argmax(hit)), 1, r, a, lv, s1[a], 60 * (h + 1)))
             fills.sort(key=lambda t: t[:4])
@@ -640,11 +695,23 @@ def simulate(books, opens, prep, m_sl=3.0, m_sleeve_sl=2.0, sleeve=True, target=
                 tp = lv * (1 + (m_sleeve_tp if sleeve_tp is None else float(sleeve_tp(i, a, r, f))) * sg)
                 sl = lv * (1 - m_sleeve_sl * sg)
                 x, ret, xk = end_m, None, "rung_timeout"
-                if f + 1 < end_m and sleeve_stop_mode != "touch":
+                fm_lv = None  # sleeve_fill_minute_stop: the touch stop / native backstop checked in the fill minute itself
+                if sleeve_fill_minute_stop:
+                    if sleeve_stop_mode == "touch":
+                        fm_lv = sl
+                    elif sleeve_backstop is not None:
+                        fm_lv = lv * (1 - sleeve_backstop * sg)
+                if fm_lv is not None and La[f] <= fm_lv:
+                    x = f
+                    ret = _slip(fm_lv, 1, La[f], Ha[f]) / lv - 1 - MAKER - TAKER
+                    stats["rung_stops"] += 1
+                    stats["fill_minute_stops"] = stats.get("fill_minute_stops", 0) + 1
+                    xk = "rung_sl"
+                elif f + 1 < end_m and sleeve_stop_mode != "touch":
                     step = 1 if sleeve_stop_mode == "close1" else 5
                     mi_ = np.arange(f + 1, end_m)
                     trig = (Ca[f + 1:end_m] <= sl) & ((mi_ + 1) % step == 0)
-                    ht = Ha[f + 1:end_m] > tp
+                    ht = Ha[f + 1:end_m] > tp * (1 + ft)
                     ks = int(np.argmax(trig)) if trig.any() else None
                     kt = int(np.argmax(ht)) if ht.any() else None
                     kb = None
@@ -664,13 +731,15 @@ def simulate(books, opens, prep, m_sl=3.0, m_sleeve_sl=2.0, sleeve=True, target=
                             locked.append((ag + 1, rn * (m_sleeve_sl * sg + gap)))
                         x = ag + 1
                         px_ = Oa[x] if x < 240 else o2[i][a]
+                        if stop_slip:
+                            px_ = _slip(px_, 1, La[x] if x < 240 else _nb(i, a, L, 0), np.nan)
                         x = min(x, 240)
                         ret = px_ / lv - 1 - MAKER - TAKER
                         stats["rung_stops"] += 1
                         xk = "rung_sl"
                     elif kb is not None and (ks is None or kb <= ks) and (kt is None or kb <= kt):
                         x = f + 1 + kb
-                        ret = min(bl, Oa[x]) / lv - 1 - MAKER - TAKER
+                        ret = _slip(min(bl, Oa[x]), 1, La[x], np.nan) / lv - 1 - MAKER - TAKER
                         stats["rung_stops"] += 1
                         xk = "rung_sl"
                     elif kt is not None and (ks is None or kt < ks):
@@ -684,27 +753,36 @@ def simulate(books, opens, prep, m_sl=3.0, m_sleeve_sl=2.0, sleeve=True, target=
                             x, px_ = km + 1, Oa[km + 1]
                         else:
                             x, px_ = 240, o2[i][a]
+                        if stop_slip:
+                            px_ = _slip(px_, 1, La[x] if x < 240 else _nb(i, a, L, 0), np.nan)
                         ret = px_ / lv - 1 - MAKER - TAKER
                         stats["rung_stops"] += 1
                         xk = "rung_sl"
                 elif f + 1 < end_m:
                     hs = La[f + 1:end_m] <= sl
-                    ht = Ha[f + 1:end_m] > tp
+                    ht = Ha[f + 1:end_m] > tp * (1 + ft)
                     hit = hs | ht
                     if hit.any():
                         k = int(np.argmax(hit))
                         x = f + 1 + k
                         if hs[k]:
-                            ret = min(sl, Oa[x]) / lv - 1 - MAKER - TAKER
+                            ret = _slip(min(sl, Oa[x]), 1, La[x], np.nan) / lv - 1 - MAKER - TAKER
                             stats["rung_stops"] += 1
                             xk = "rung_sl"
                         else:
                             ret = tp / lv - 1 - 2 * MAKER
                             stats["rung_tps"] += 1
                             xk = "rung_tp"
+                late = 0  # timeout_exit_minute: minutes into the next bar of a late (human) timeout exit
                 if ret is None:
                     if end_m >= 240:
-                        ret = o2[i][a] / lv - 1 - MAKER - TAKER - (FUND_LONG if settle[i] else 0.0)
+                        px_ = o2[i][a]
+                        if timeout_exit_minute:
+                            pl = _nb(i, a, O, int(timeout_exit_minute))
+                            if np.isfinite(pl):
+                                px_, late = pl, int(timeout_exit_minute)
+                        fu = fr_bar[i, a] if fr_bar is not None else (FUND_LONG if settle[i] else 0.0)
+                        ret = px_ / lv - 1 - MAKER - TAKER - fu
                     else:
                         ret = Oa[end_m] / lv - 1 - MAKER - TAKER
                 hseg = None
@@ -721,7 +799,7 @@ def simulate(books, opens, prep, m_sl=3.0, m_sleeve_sl=2.0, sleeve=True, target=
                     t0 = idx[i] + pd.Timedelta(hours=4)
                     events.append(dict(t=t0 + pd.Timedelta(minutes=int(f)), symbol=cols[a], kind="rung_fill", side="buy", price=float(lv),
                                        weight=float(rn), rung=float(rungs[r])))
-                    events.append(dict(t=t0 + pd.Timedelta(minutes=int(min(x, 240))), symbol=cols[a], kind=xk, side="sell",
+                    events.append(dict(t=t0 + pd.Timedelta(minutes=int(min(x, 240)) + late), symbol=cols[a], kind=xk, side="sell",
                                        price=float(lv * (1 + ret)), weight=float(rn), ret=float(ret)))
                 seg = np.zeros(240)
                 end = min(x, 240)

@@ -6,7 +6,7 @@ const vm = require('node:vm');
 
 const source = fs.readFileSync(path.join(__dirname, '../frontend/app.js'), 'utf8').replace(
   '  boot();',
-  '  window.testing = { state, api, refreshSession, logout, onCredential, syncAccountAccess, visiblePipes, planPipe, setPlanPipe, histSource, histBoth, loadPerf, loadPlans, loadEvidence, renderEvidence, loadPipelineSettings, loadUsers, route, location, $, product, renderGoals, renderProductPanels, loadTodo };');
+  '  window.testing = { state, api, refreshSession, logout, onCredential, syncAccountAccess, visiblePipes, planPipe, setPlanPipe, histSource, histBoth, loadPerf, loadPlans, loadEvidence, renderEvidence, loadPipelineSettings, loadUsers, route, location, $, product, renderGoals, renderProductPanels, loadTodo, renderCards };');
 const user = { email: 'viewer@example.com', role: 'viewer', allowed_pipelines: ['v342', 'v362', 'v315'] };
 const expired = { access_token: 'old', expires_at: 1, user };
 const fresh = { access_token: 'new', expires_at: Date.now() / 1000 + 900, user };
@@ -459,4 +459,14 @@ test('Manual tab shows the MANUAL plan cards (locked ones offer unlock) and the 
   assert.ok(main.includes('data-pipe="v321"') && main.includes('data-pipe="v295"') && !main.includes('data-pipe="v367"') && main.includes('Win mọi lệnh'));
   assert.ok(ui.$('goalPanel').innerHTML.includes('Mục tiêu BOT') && ui.$('goalPanel').innerHTML.includes('chưa đạt'));
   assert.equal(ui.$('botNote').hidden, false);
+});
+
+test('a paper pipeline before its start shows "not started yet" instead of flat coins', async () => {
+  const ui = app(async () => response(200, {}), storage(fresh));
+  ui.state.user.allowed_pipelines = ['v367'];
+  ui.state.selectedPipeline = 'v367';
+  ui.state.live.plan = { freeze: new Date(Date.now() + 3600e3).toISOString(), coins: { BTCUSDT: { state: 'flat', note: 'chưa tới giờ bắt đầu' } } };
+  ui.state.live.planLoading = false;
+  ui.renderCards();
+  assert.ok(ui.$('todoCards').innerHTML.includes('chưa tới giờ bắt đầu') && !ui.$('todoCards').innerHTML.includes('ĐỨNG NGOÀI'));
 });

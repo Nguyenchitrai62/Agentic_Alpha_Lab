@@ -720,6 +720,12 @@
   function renderCards() {
     const el = $("todoCards"); if (!el) return;
     if (!planPipe()) { el.innerHTML = accessMessage(); return; }
+    const st = state.live.plan?.freeze ? Date.parse(state.live.plan.freeze) : NaN;
+    if (!state.live.planLoading && st > Date.now()) {  // a new paper pipeline before its first traded bar: no orders yet
+      el.innerHTML = `<p class="note-bar"><b>${esc(PIPE_LABEL[planPipe()] || "")} chưa tới giờ bắt đầu</b>
+        <span>Pipeline bắt đầu chạy paper lúc ${dt(st)}; lệnh đầu tiên có sau khi nến 4h đó đóng.</span></p>`;
+      return;
+    }
     el.innerHTML = SYMS.map((s) => {
       const p = state.live.prices[s];
       return `<article class="coin-card" id="card-${s}">
