@@ -19,6 +19,7 @@ PIPELINES = {
     "v315": {"candidate": "v315_M1", "monthly_last_year": 3.289, "gate_dd": 18.47, "win_hidden": 0.550},
     "v342": {"candidate": "v342_M3", "monthly_last_year": 4.704, "gate_dd": 17.73, "win_hidden": 0.556},
     "v362": {"candidate": "v362_M4", "monthly_last_year": 5.04, "gate_dd": 16.96, "win_hidden": 0.556},
+    "v367": {"candidate": "v367_M5", "monthly_last_year": 5.22, "gate_dd": 18.62, "win_hidden": 0.686},
 }
 
 
@@ -38,7 +39,7 @@ def metric_order() -> list[str]:
     return sorted(PIPELINES, key=score)
 
 
-NEW_LOCKED = {"v321", "v315", "v342", "v362"}  # paper pipelines added 2026-10-03: admin-only until the admin unlocks them
+NEW_LOCKED = {"v321", "v315", "v342", "v362", "v367"}  # paper pipelines added 2026-10-03: admin-only until the admin unlocks them
 POLICY_KEY = "pipeline_access_policy"
 SUMMARY_FIELDS = ("monthly_5y", "monthly_dev4", "monthly_last_year", "dd_4h", "dd_1m", "gate_dd",
                   "losing_years", "yearly", "win_dev", "win_hidden", "trades_dev", "trades_hidden")

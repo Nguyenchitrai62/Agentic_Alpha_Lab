@@ -219,7 +219,7 @@ def overview(request: Request, pipeline: str | None = None, user: dict = Depends
     """pipeline=v205/v233/v236/v240: the walk-forward summary of that executable trade-mode pipeline (history_tm)."""
     pipeline = pipeline or catalog.default_pipeline(user)
     catalog.require_pipeline(user, pipeline)
-    if pipeline in ("v205", "v233", "v236", "v240", "v266", "v269", "v285", "v295", "v301", "v321", "v315", "v342", "v362"):
+    if pipeline in ("v205", "v233", "v236", "v240", "v266", "v269", "v285", "v295", "v301", "v321", "v315", "v342", "v362", "v367"):
         return cached(request, f"overview:{pipeline}", 60, lambda: {"walkforward": db.kv_get(f"summary_tm_{pipeline}", {}),
                                                                    "plan": db.kv_get({"v205": "trade_plan"}.get(pipeline, f"trade_plan_{pipeline}"), {})})
 
@@ -273,7 +273,7 @@ def trade_plan(request: Request, pipeline: str | None = None, user: dict = Depen
     catalog.require_pipeline(user, pipeline)
     if pipeline not in catalog.PIPELINES and pipeline not in ("v205", "v233", "v236", "v240"):
         raise HTTPException(400, "Unknown pipeline.")
-    key = {"v233": "trade_plan_v233", "v236": "trade_plan_v236", "v240": "trade_plan_v240", "v266": "trade_plan_v266", "v269": "trade_plan_v269", "v285": "trade_plan_v285", "v295": "trade_plan_v295", "v301": "trade_plan_v301", "v321": "trade_plan_v321", "v315": "trade_plan_v315", "v342": "trade_plan_v342", "v362": "trade_plan_v362"}.get(pipeline, "trade_plan")
+    key = {"v233": "trade_plan_v233", "v236": "trade_plan_v236", "v240": "trade_plan_v240", "v266": "trade_plan_v266", "v269": "trade_plan_v269", "v285": "trade_plan_v285", "v295": "trade_plan_v295", "v301": "trade_plan_v301", "v321": "trade_plan_v321", "v315": "trade_plan_v315", "v342": "trade_plan_v342", "v362": "trade_plan_v362", "v367": "trade_plan_v367"}.get(pipeline, "trade_plan")
     return cached(request, key, 20, lambda: db.kv_get(key, {}))
 
 

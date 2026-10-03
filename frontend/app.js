@@ -409,6 +409,7 @@
     { v: "v285", nm: "CB", ds: "C4 + 20% model Coinbase premium" },
     { v: "v321", nm: "R2", ds: "G2 + bậc dip 5σ, agent RL học từ mọi độ sâu (chọn walk-forward mọi năm)" },
     { v: "v315", nm: "M1", ds: "Thủ công: chỉ lệnh book (không dip), vào bằng limit hồi giá 0.75σ — cho người tự đánh" },
+    { v: "v367", nm: "M5", ds: "Thủ công: như M4 + khi tín hiệu tắt mà lệnh đang lỗ thì siết SL thay vì đóng — win lệnh book ~66%" },
     { v: "v362", nm: "M4", ds: "Thủ công: như M3 nhưng SL/TP lệnh book 5σ/10σ (chọn trên 4 năm Train; đang chờ bằng chứng paper)" },
     { v: "v342", nm: "M3", ds: "Thủ công: book M1 ×0.75 + 2 lệnh limit bắt đáy mỗi coin (3σ / 4σ) kèm TP và SL sàn 8σ — người tự đặt được" },
   ];
@@ -763,7 +764,7 @@
     const rows = (state.live.latest?.sleeve || []).filter((r) => r.symbol === sym);
     // C4 / C5: the dip stop fires on a 5m CLOSE (bot) at 4 / 5 sigma, plus a native 8-sigma touch stop on the exchange
     const closeK = { v321: 4, v301: 4, v295: 4, v285: 4, v269: 4, v266: 5 }[planPipe()];
-    const dsz = ["v295", "v301", "v321", "v342", "v362"].includes(planPipe()) ? (planOf(sym)?.dip_size || {}) : null;  // CS / G2: the agents' decision per rung
+    const dsz = ["v295", "v301", "v321", "v342", "v362", "v367"].includes(planPipe()) ? (planOf(sym)?.dip_size || {}) : null;  // CS / G2: the agents' decision per rung
     const decOf = (r) => { if (!dsz) return null; const k = Object.keys(dsz).find((x) => Number(x) === Number(r.rung)); return k ? dsz[k] : null; };
     const mulOf = (r) => { const d = decOf(r); return d == null ? 1 : Number(typeof d === "object" ? d.size : d); };
     const tpOf = (r) => { const d = decOf(r); return d && typeof d === "object" ? Number(d.tp) : 1; };
