@@ -2,7 +2,7 @@
   "schema_version": 1,
   "project": "Agentic Alpha Lab BTC swing research",
   "created_at": "2026-09-06T00:00:00Z",
-  "next_version": 334,
+  "next_version": 335,
   "control": {
     "coordinator_model": "gpt-5.6-sol",
     "coordinator_reasoning": "high",
@@ -54,7 +54,7 @@
     "expected_workers": 3,
     "version_range": [
       45,
-      333
+      334
     ],
     "parent_commit": "1ecf947baddd5ef78444670330e9db62128dad50",
     "cloud_snapshot": {
@@ -13994,7 +13994,7 @@
       "version": "v331",
       "track": "B",
       "direction_key": "v331-manual-breakeven",
-      "status": "running",
+      "status": "rejected",
       "parent_versions": [
         "v328"
       ],
@@ -14007,9 +14007,36 @@
       "write_scope": "research/parallel/rounds/parallel-20260906-r2/v331",
       "worker_agent_id": "01a07791-eecb-7053-8866-dcdbe31e84d7",
       "worker_host_id": "local",
-      "result_manifest": null,
+      "result_manifest": "research\\parallel\\rounds\\parallel-20260906-r2\\v331\\result_manifest.json",
       "registered_at": "2026-10-03T00:57:09.735780Z",
-      "assigned_at": "2026-10-03T00:57:09.735780Z"
+      "assigned_at": "2026-10-03T00:57:09.735780Z",
+      "result_manifest_sha256": "bbbd23f7f835a7850cc01284a3d3fd7bbf2203ef9d1dc8a64647606f5053d432",
+      "result_summary": {
+        "scenarios": {
+          "normal": {
+            "monthly_geometric_net_percent": 3.011,
+            "max_drawdown_percent": 17.95,
+            "fills": 995,
+            "months": 48
+          },
+          "fee_stress": {
+            "monthly_geometric_net_percent": 3.011,
+            "max_drawdown_percent": 17.95,
+            "fills": 995,
+            "months": 48
+          },
+          "execution_stress": {
+            "monthly_geometric_net_percent": 3.011,
+            "max_drawdown_percent": 17.95,
+            "fills": 995,
+            "months": 48
+          }
+        },
+        "independent_test": false,
+        "live_approved": false,
+        "audit_notes": "rows, fold choices, transfer flags and final rows replicated; one-anchor member / table refits equal the caches; feature timing, label and fit windows, no most-recent-year number in any choice (v324_v333_audit/COMPARISON.md)"
+      },
+      "audited_at": "2026-10-03T00:58:12.838210Z"
     },
     {
       "version": "v332",
@@ -14052,7 +14079,28 @@
       "result_manifest": null,
       "registered_at": "2026-10-03T00:57:10.298013Z",
       "assigned_at": "2026-10-03T00:57:10.298013Z"
+    },
+    {
+      "version": "v334",
+      "track": "B",
+      "direction_key": "v334-r2-tighter-governor",
+      "status": "running",
+      "parent_versions": [
+        "v331"
+      ],
+      "model_family": "risk-governor-grid",
+      "objective": "BOT goal 2: DD < 15% via a tighter drawdown governor on R2",
+      "data_contract": "audited caches; v306 machinery; most recent year once",
+      "policy_contract": "BOT R2 rules; engine gov hook",
+      "hypothesis": "a tighter governor lowers the BOT drawdown with a smaller return loss than a lower risk level",
+      "parent_commit": "1ecf947baddd5ef78444670330e9db62128dad50",
+      "write_scope": "research/parallel/rounds/parallel-20260906-r2/v334",
+      "worker_agent_id": "01a07791-eecb-7053-8866-dcdbe31e84d7",
+      "worker_host_id": "local",
+      "result_manifest": null,
+      "registered_at": "2026-10-03T00:58:12.834076Z",
+      "assigned_at": "2026-10-03T00:58:12.834076Z"
     }
   ],
-  "updated_at": "2026-10-03T00:57:10.298013Z"
+  "updated_at": "2026-10-03T00:58:12.838210Z"
 }
