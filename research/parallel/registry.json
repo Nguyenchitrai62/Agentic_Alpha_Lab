@@ -2,7 +2,7 @@
   "schema_version": 1,
   "project": "Agentic Alpha Lab BTC swing research",
   "created_at": "2026-09-06T00:00:00Z",
-  "next_version": 372,
+  "next_version": 373,
   "control": {
     "coordinator_model": "gpt-5.6-sol",
     "coordinator_reasoning": "high",
@@ -54,7 +54,7 @@
     "expected_workers": 3,
     "version_range": [
       45,
-      371
+      372
     ],
     "parent_commit": "1ecf947baddd5ef78444670330e9db62128dad50",
     "cloud_snapshot": {
@@ -15818,7 +15818,7 @@
       "version": "v369",
       "track": "C",
       "direction_key": "v369-bot-blend-m5",
-      "status": "running",
+      "status": "rejected",
       "parent_versions": [
         "v368"
       ],
@@ -15831,9 +15831,36 @@
       "write_scope": "research/parallel/rounds/parallel-20260906-r2/v369",
       "worker_agent_id": "01a07748-5adc-7061-8052-0ed36705a8a8",
       "worker_host_id": "local",
-      "result_manifest": null,
+      "result_manifest": "research\\parallel\\rounds\\parallel-20260906-r2\\v369\\result_manifest.json",
       "registered_at": "2026-10-03T09:51:43.048666Z",
-      "assigned_at": "2026-10-03T09:51:43.048666Z"
+      "assigned_at": "2026-10-03T09:51:43.048666Z",
+      "result_manifest_sha256": "e0a919a6a2d2c695ce6a38302464365a1a94d7cbefd88ba317e716100b2e6beb",
+      "result_summary": {
+        "scenarios": {
+          "normal": {
+            "monthly_geometric_net_percent": 7.085,
+            "max_drawdown_percent": 17.12,
+            "fills": 0,
+            "months": 48
+          },
+          "fee_stress": {
+            "monthly_geometric_net_percent": 7.085,
+            "max_drawdown_percent": 17.12,
+            "fills": 0,
+            "months": 48
+          },
+          "execution_stress": {
+            "monthly_geometric_net_percent": 7.085,
+            "max_drawdown_percent": 17.12,
+            "fills": 0,
+            "months": 48
+          }
+        },
+        "independent_test": false,
+        "live_approved": false,
+        "audit_notes": "COMPARISON.md verdict PASS"
+      },
+      "audited_at": "2026-10-03T10:39:47.334060Z"
     },
     {
       "version": "v370",
@@ -15876,7 +15903,28 @@
       "result_manifest": null,
       "registered_at": "2026-10-03T10:10:54.817511Z",
       "assigned_at": "2026-10-03T10:10:54.817511Z"
+    },
+    {
+      "version": "v372",
+      "track": "C",
+      "direction_key": "v372-cnn-dip-agent",
+      "status": "running",
+      "parent_versions": [
+        "v371"
+      ],
+      "model_family": "cnn-1d-pytorch",
+      "objective": "CNN dip size agent on bar-open 1m sequences (Kaggle GPU) for R2 and M5",
+      "data_contract": "pooled 35-coin dip fills, bar-open state + previous-bar 1m sequences of coin and BTC, fills exited before anchor - 7d",
+      "policy_contract": "R2 vs R2c (BOT fitness, folds 1-3) and M5 vs M5c (goal-1 fitness, folds 2-3); last year once",
+      "hypothesis": "Raw intrabar paths carry dip-reversal information the 7 summary features miss",
+      "parent_commit": "1ecf947baddd5ef78444670330e9db62128dad50",
+      "write_scope": "research/parallel/rounds/parallel-20260906-r2/v372",
+      "worker_agent_id": "01a07748-5adc-7061-8052-0ed36705a8a8",
+      "worker_host_id": "local",
+      "result_manifest": null,
+      "registered_at": "2026-10-03T10:39:47.329549Z",
+      "assigned_at": "2026-10-03T10:39:47.329549Z"
     }
   ],
-  "updated_at": "2026-10-03T10:10:54.822364Z"
+  "updated_at": "2026-10-03T10:39:47.334060Z"
 }
