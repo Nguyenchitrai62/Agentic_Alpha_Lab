@@ -386,7 +386,7 @@
     const head = ["Thứ tự / pipeline", "Test · 1 năm<br>Lãi ròng/tháng (%)", "DD<br>tối đa", `Win ${winLbl}<br>Test`, "Train / chọn model<br>4 năm · Lãi ròng/tháng (%)", "Train: năm thấp nhất<br>Lãi ròng/tháng (%)", "Toàn bộ 5 năm<br>Lãi ròng/tháng (%)", "Số năm<br>thua lỗ", `Win ${winLbl}<br>(Train / Test)`, "Số lệnh book<br>(Train / Test)", "DD<br>(nến 4h / từng phút)", "Paper thực tế<br>lãi · phân vị so với kỳ vọng"];
     table($("pipeEvid"), head, order.map((v, i) => row(v, i + 1)));
     renderPlanCards(order);
-    $("evidTitle").textContent = prod === "bot" ? "Chọn bot" : "Chọn gói tín hiệu";
+    $("evidTitle").textContent = prod === "bot" ? "Chọn bot" : "Chọn pipeline";
     $("pipeOrderNote").textContent = Object.values(ev)[0]?.automatic_order
       ? "Thứ tự trong từng sản phẩm: lợi nhuận/tháng Test cao hơn → DD thấp hơn → Win rate Test cao hơn."
       : "Thứ tự do admin sắp xếp. Trạng thái khóa do admin quản lý riêng cho từng pipeline.";
@@ -408,11 +408,11 @@
         : '<span class="muted">mới bắt đầu</span>';
       const email = e.admin_contact_email || state.user?.admin_contact_email || "";
       const cta = locked
-        ? `<a class="btn pc-cta unlock" href="mailto:${esc(encodeURIComponent(email))}?subject=${encodeURIComponent("Mở khóa gói " + p.nm + " " + p.title)}">🔒 Liên hệ mở khóa</a>`
+        ? `<a class="btn pc-cta unlock" href="mailto:${esc(encodeURIComponent(email))}?subject=${encodeURIComponent("Xin quyền xem pipeline " + p.nm)}">Liên hệ admin để xem tín hiệu</a>`
         : `<button type="button" class="btn pc-cta ${on ? "primary" : ""}" data-pipe="${v}" aria-pressed="${on}">${on ? "✓ Đang xem tín hiệu" : "Xem tín hiệu"}</button>`;
       return `<article class="plan-card${on ? " on" : ""}${locked ? " locked" : ""}" ${locked ? 'data-locked="true"' : `data-pipe="${v}"`}>
-        <div class="pc-top"><span class="pc-name">${esc(p.title)}</span><span class="pc-code">${esc(p.nm)}</span>
-          ${v === P.rec ? '<span class="pc-badge">Khuyên dùng</span>' : ""}${locked ? '<span class="pc-badge vip">VIP</span>' : ""}</div>
+        <div class="pc-top"><span class="pc-name">${esc(p.nm)}</span>
+          ${v === P.rec ? '<span class="pc-badge">Khuyên dùng</span>' : ""}${locked ? '<span class="pc-badge lock">🔒 Đang khóa</span>' : ""}</div>
         <div class="pc-tag">${esc(p.tag)}</div>
         <div class="pc-main"><b class="${s.monthly_5y >= 0 ? "up" : "down"}">${f(s.monthly_5y)}%</b><span>lãi / tháng · 5 năm</span></div>
         <dl class="pc-stats"><div><dt>Năm gần nhất</dt><dd>${f(s.monthly_last_year)}%/th</dd></div>
@@ -438,16 +438,16 @@
   // paper pipelines (prospective evidence); O1 = the most robust walk-forward foundation, the default view
   // paper pipelines grouped by PRODUCT (one tab each): MANUAL = the Manual tab, a human can follow it (book + bracket dip limits with
   // exchange-native TP / SL; per-pipeline locks); BOT = the Bot tab (full dip ladder, stops watched on 5m closes; the 3 best, no locks,
-  // visible to admins and to accounts with the BOT grant). title / tag = the plain-language card text; ds = the technical description.
+  // visible to admins and to accounts with the BOT grant). tag = the plain-language card text; ds = the technical description.
   const PIPES = [
-    { v: "v367", nm: "M5", title: "Pro", tag: "Tỉ lệ thắng cao nhất: lệnh đang lỗ khi tín hiệu tắt được siết SL thay vì đóng", product: "manual", ds: "Book ×0.75 (SL/TP 5σ/10σ) + 2 lệnh limit bắt đáy mỗi coin (3σ / 4σ) kèm TP và SL sàn 8σ; tín hiệu tắt mà lệnh đang lỗ thì siết SL thay vì đóng — win lệnh book ~66%" },
-    { v: "v362", nm: "M4", title: "Tăng trưởng", tag: "Lệnh xu hướng SL/TP rộng + 2 lệnh bắt đáy mỗi coin", product: "manual", ds: "Như M5 nhưng đóng lệnh khi tín hiệu tắt (không siết SL)" },
-    { v: "v342", nm: "M3", title: "Cân bằng", tag: "Lệnh xu hướng + 2 lệnh bắt đáy mỗi coin", product: "manual", ds: "Book ×0.75 (SL/TP 4σ/8σ) + 2 lệnh limit bắt đáy 3σ / 4σ kèm TP và SL sàn 8σ" },
-    { v: "v340", nm: "M2", title: "An toàn", tag: "Lệnh xu hướng + 1 lệnh bắt đáy mỗi coin; DD thấp nhất", product: "manual", ds: "Book ×0.75 (SL/TP 4σ/8σ) + 1 lệnh limit bắt đáy 3σ kèm TP và SL sàn 8σ" },
-    { v: "v315", nm: "M1", title: "Cơ bản", tag: "Chỉ lệnh theo xu hướng, ít lệnh, dễ theo nhất", product: "manual", ds: "Chỉ lệnh book (không bắt đáy), vào bằng limit hồi giá 0.75σ" },
-    { v: "v321", nm: "R2", title: "Bot Pro", tag: "Thang 5 lệnh bắt đáy mỗi coin, AI chọn khối lượng và chốt lời", product: "bot", ds: "Book CB + thang bắt đáy 2.5–5σ (SL bot theo nến 5m + SL sàn 8σ), agent RL chọn khối lượng & chốt lời" },
-    { v: "v301", nm: "G2", title: "Bot Plus", tag: "Thang 4 lệnh bắt đáy mỗi coin, AI chọn khối lượng và chốt lời", product: "bot", ds: "Như R2 nhưng thang 2.5–4σ, agent học từ 4 độ sâu" },
-    { v: "v295", nm: "CS", title: "Bot", tag: "Thang 4 lệnh bắt đáy mỗi coin, AI chọn khối lượng", product: "bot", ds: "Book CB + thang bắt đáy 2.5–4σ, agent RL chỉ chọn khối lượng (học từ 35 coin)" },
+    { v: "v367", nm: "M5", tag: "Tỉ lệ thắng cao nhất: lệnh đang lỗ khi tín hiệu tắt được siết SL thay vì đóng", product: "manual", ds: "Book ×0.75 (SL/TP 5σ/10σ) + 2 lệnh limit bắt đáy mỗi coin (3σ / 4σ) kèm TP và SL sàn 8σ; tín hiệu tắt mà lệnh đang lỗ thì siết SL thay vì đóng — win lệnh book ~66%" },
+    { v: "v362", nm: "M4", tag: "Lệnh xu hướng SL/TP rộng + 2 lệnh bắt đáy mỗi coin", product: "manual", ds: "Như M5 nhưng đóng lệnh khi tín hiệu tắt (không siết SL)" },
+    { v: "v342", nm: "M3", tag: "Lệnh xu hướng + 2 lệnh bắt đáy mỗi coin", product: "manual", ds: "Book ×0.75 (SL/TP 4σ/8σ) + 2 lệnh limit bắt đáy 3σ / 4σ kèm TP và SL sàn 8σ" },
+    { v: "v340", nm: "M2", tag: "Lệnh xu hướng + 1 lệnh bắt đáy mỗi coin; DD thấp nhất", product: "manual", ds: "Book ×0.75 (SL/TP 4σ/8σ) + 1 lệnh limit bắt đáy 3σ kèm TP và SL sàn 8σ" },
+    { v: "v315", nm: "M1", tag: "Chỉ lệnh theo xu hướng, ít lệnh, dễ theo nhất", product: "manual", ds: "Chỉ lệnh book (không bắt đáy), vào bằng limit hồi giá 0.75σ" },
+    { v: "v321", nm: "R2", tag: "Thang 5 lệnh bắt đáy mỗi coin, AI chọn khối lượng và chốt lời", product: "bot", ds: "Book CB + thang bắt đáy 2.5–5σ (SL bot theo nến 5m + SL sàn 8σ), agent RL chọn khối lượng & chốt lời" },
+    { v: "v301", nm: "G2", tag: "Thang 4 lệnh bắt đáy mỗi coin, AI chọn khối lượng và chốt lời", product: "bot", ds: "Như R2 nhưng thang 2.5–4σ, agent học từ 4 độ sâu" },
+    { v: "v295", nm: "CS", tag: "Thang 4 lệnh bắt đáy mỗi coin, AI chọn khối lượng", product: "bot", ds: "Book CB + thang bắt đáy 2.5–4σ, agent RL chỉ chọn khối lượng (học từ 35 coin)" },
   ];
   const PRODUCTS = {
     manual: { label: "Giao dịch thủ công (MANUAL)", rec: "v367", winKey: "book",

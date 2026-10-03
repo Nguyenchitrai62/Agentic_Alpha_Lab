@@ -443,7 +443,7 @@ test('Manual tab shows the MANUAL plan cards (locked ones offer unlock) and the 
   assert.ok(main.includes('data-pipe="v367"') && main.includes('data-pipe="v315"') && !main.includes('data-pipe="v321"') && main.includes('Win lệnh book'));
   const cards = ui.$('pipeCards').innerHTML;
   for (const p of ['v367', 'v342', 'v340', 'v315']) assert.ok(cards.includes(`data-pipe="${p}"`));
-  assert.ok(!cards.includes('data-pipe="v362"') && cards.includes('Liên hệ mở khóa') && cards.includes('VIP') && cards.includes('Khuyên dùng'));
+  assert.ok(!cards.includes('data-pipe="v362"') && cards.includes('Liên hệ admin để xem tín hiệu') && cards.includes('Đang khóa') && cards.includes('Khuyên dùng'));
   assert.ok(cards.includes('5.9%') && cards.includes('+0.40%'));
   assert.equal(ui.$('goalPanel').hidden, true);  // research goal progress: admins only
   assert.ok(ui.$('goalPanel').innerHTML.includes('Mục tiêu 1') && ui.$('goalPanel').innerHTML.includes('đạt trên mô phỏng'));
@@ -454,7 +454,7 @@ test('Manual tab shows the MANUAL plan cards (locked ones offer unlock) and the 
   assert.equal(ui.product(), 'bot');
   assert.equal(ui.planPipe(), 'v321');
   main = ui.$('pipeEvid').innerHTML;
-  assert.ok(ui.$('pipeCards').innerHTML.includes('Bot Pro') && !ui.$('pipeCards').innerHTML.includes('VIP'));
+  assert.ok(ui.$('pipeCards').innerHTML.includes('R2') && !ui.$('pipeCards').innerHTML.includes('Đang khóa'));
   assert.ok(main.includes('data-pipe="v321"') && main.includes('data-pipe="v295"') && !main.includes('data-pipe="v367"') && main.includes('Win mọi lệnh'));
   assert.ok(ui.$('goalPanel').innerHTML.includes('Mục tiêu BOT') && ui.$('goalPanel').innerHTML.includes('chưa đạt'));
   assert.equal(ui.$('manualChecklist').hidden, true);
