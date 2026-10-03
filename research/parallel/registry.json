@@ -2,7 +2,7 @@
   "schema_version": 1,
   "project": "Agentic Alpha Lab BTC swing research",
   "created_at": "2026-09-06T00:00:00Z",
-  "next_version": 346,
+  "next_version": 348,
   "control": {
     "coordinator_model": "gpt-5.6-sol",
     "coordinator_reasoning": "high",
@@ -54,7 +54,7 @@
     "expected_workers": 3,
     "version_range": [
       45,
-      345
+      347
     ],
     "parent_commit": "1ecf947baddd5ef78444670330e9db62128dad50",
     "cloud_snapshot": {
@@ -14570,7 +14570,7 @@
       "version": "v343",
       "track": "B",
       "direction_key": "v343-dip-depth-pair-cb",
-      "status": "running",
+      "status": "rejected",
       "parent_versions": [
         "v342"
       ],
@@ -14583,15 +14583,42 @@
       "write_scope": "research/parallel/rounds/parallel-20260906-r2/v343",
       "worker_agent_id": "01a07791-eecb-7053-8866-dcdbe31e84d7",
       "worker_host_id": "local",
-      "result_manifest": null,
+      "result_manifest": "research\\parallel\\rounds\\parallel-20260906-r2\\v343\\result_manifest.json",
       "registered_at": "2026-10-03T03:16:52.998091Z",
-      "assigned_at": "2026-10-03T03:16:52.998091Z"
+      "assigned_at": "2026-10-03T03:16:52.998091Z",
+      "result_manifest_sha256": "9bd3a3bdccf664b51709b133aa3fce5a8227d52761be6960928588d30031c0ae",
+      "result_summary": {
+        "scenarios": {
+          "normal": {
+            "monthly_geometric_net_percent": 6.233,
+            "max_drawdown_percent": 17.73,
+            "fills": 2404,
+            "months": 48
+          },
+          "fee_stress": {
+            "monthly_geometric_net_percent": 6.233,
+            "max_drawdown_percent": 17.73,
+            "fills": 2404,
+            "months": 48
+          },
+          "execution_stress": {
+            "monthly_geometric_net_percent": 6.233,
+            "max_drawdown_percent": 17.73,
+            "fills": 2404,
+            "months": 48
+          }
+        },
+        "independent_test": false,
+        "live_approved": false,
+        "audit_notes": "COMPARISON.md verdict PASS"
+      },
+      "audited_at": "2026-10-03T03:33:52.781016Z"
     },
     {
       "version": "v344",
       "track": "A",
       "direction_key": "v344-book-share-cb",
-      "status": "running",
+      "status": "rejected",
       "parent_versions": [
         "v343"
       ],
@@ -14604,9 +14631,36 @@
       "write_scope": "research/parallel/rounds/parallel-20260906-r2/v344",
       "worker_agent_id": "01a07792-4a6b-7fc3-a08a-af2923b1778a",
       "worker_host_id": "local",
-      "result_manifest": null,
+      "result_manifest": "research\\parallel\\rounds\\parallel-20260906-r2\\v344\\result_manifest.json",
       "registered_at": "2026-10-03T03:18:02.813130Z",
-      "assigned_at": "2026-10-03T03:18:02.813130Z"
+      "assigned_at": "2026-10-03T03:18:02.813130Z",
+      "result_manifest_sha256": "addfe4daf1b60a077257cd0a1223cfbda56083c83684cce0263eb1521d3ef6e9",
+      "result_summary": {
+        "scenarios": {
+          "normal": {
+            "monthly_geometric_net_percent": 6.233,
+            "max_drawdown_percent": 17.73,
+            "fills": 2404,
+            "months": 48
+          },
+          "fee_stress": {
+            "monthly_geometric_net_percent": 6.233,
+            "max_drawdown_percent": 17.73,
+            "fills": 2404,
+            "months": 48
+          },
+          "execution_stress": {
+            "monthly_geometric_net_percent": 6.233,
+            "max_drawdown_percent": 17.73,
+            "fills": 2404,
+            "months": 48
+          }
+        },
+        "independent_test": false,
+        "live_approved": false,
+        "audit_notes": "COMPARISON.md verdict PASS"
+      },
+      "audited_at": "2026-10-03T03:40:28.374112Z"
     },
     {
       "version": "v345",
@@ -14628,7 +14682,49 @@
       "result_manifest": null,
       "registered_at": "2026-10-03T03:21:20.422998Z",
       "assigned_at": "2026-10-03T03:21:20.422998Z"
+    },
+    {
+      "version": "v346",
+      "track": "B",
+      "direction_key": "v346-dip-stop-distance-cb",
+      "status": "running",
+      "parent_versions": [
+        "v344"
+      ],
+      "model_family": "hist-gradient-boosting",
+      "objective": "native stop distance of the MANUAL bracket dip limits",
+      "data_contract": "as v343",
+      "policy_contract": "L2 (8 sigma) vs ST6 vs ST10; dev folds only; last year once",
+      "hypothesis": "The 8-sigma stop was never tuned for MANUAL; 6 or 10 sigma may improve return per DD",
+      "parent_commit": "1ecf947baddd5ef78444670330e9db62128dad50",
+      "write_scope": "research/parallel/rounds/parallel-20260906-r2/v346",
+      "worker_agent_id": "01a07791-eecb-7053-8866-dcdbe31e84d7",
+      "worker_host_id": "local",
+      "result_manifest": null,
+      "registered_at": "2026-10-03T03:33:52.776262Z",
+      "assigned_at": "2026-10-03T03:33:52.776262Z"
+    },
+    {
+      "version": "v347",
+      "track": "A",
+      "direction_key": "v347-member-weight-evolution",
+      "status": "running",
+      "parent_versions": [
+        "v344"
+      ],
+      "model_family": "hist-gradient-boosting",
+      "objective": "walk-forward GA over the nine book-member weights under the fixed M3 structure",
+      "data_contract": "kpack (same audited engine and inputs); member caches incl. PT",
+      "policy_contract": "M3 structure and risk fixed; weights 0..4 for 9 members; folds k=2,3 vs CB; final dev4; last year once",
+      "hypothesis": "Evolved member weights (no leverage genes) improve the MANUAL book under M3",
+      "parent_commit": "1ecf947baddd5ef78444670330e9db62128dad50",
+      "write_scope": "research/parallel/rounds/parallel-20260906-r2/v347",
+      "worker_agent_id": "01a07792-4a6b-7fc3-a08a-af2923b1778a",
+      "worker_host_id": "local",
+      "result_manifest": null,
+      "registered_at": "2026-10-03T03:40:28.368852Z",
+      "assigned_at": "2026-10-03T03:40:28.368852Z"
     }
   ],
-  "updated_at": "2026-10-03T03:21:20.427372Z"
+  "updated_at": "2026-10-03T03:40:28.374112Z"
 }
