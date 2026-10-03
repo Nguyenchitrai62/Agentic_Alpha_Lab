@@ -401,6 +401,7 @@
     { v: "v285", nm: "CB", ds: "C4 + 20% model Coinbase premium" },
     { v: "v321", nm: "R2", ds: "G2 + bậc dip 5σ, agent RL học từ mọi độ sâu (chọn walk-forward mọi năm)" },
     { v: "v315", nm: "M1", ds: "Thủ công: chỉ lệnh book (không dip), vào bằng limit hồi giá 0.75σ — cho người tự đánh" },
+    { v: "v342", nm: "M3", ds: "Thủ công: book M1 ×0.75 + 2 lệnh limit bắt đáy mỗi coin (3σ / 4σ) kèm TP và SL sàn 8σ — người tự đặt được" },
   ];
   const PIPE_LABEL = Object.fromEntries(PIPES.map((p) => [p.v, p.nm]));
   function visiblePipes() {
@@ -511,7 +512,9 @@
     return `<details class="dip-d" open><summary>Lệnh chờ bắt đáy nến này <span class="muted small">(${status})</span></summary>
       <div class="tbl-scroll"><table class="tbl compact dip-tbl"><thead><tr><th>Bậc</th><th>Mua limit</th><th>TP</th><th>SL</th><th>Khối lượng</th></tr></thead>
       <tbody>${rows}</tbody></table></div>
-      <div class="muted small">Mỗi bậc: 1 lệnh limit mua riêng, kèm TP limit + SL sàn đặt sẵn; bot đóng lệnh nếu nến 5m đóng dưới "SL bot"; lệnh còn mở tới cuối nến thì đóng ở giá mở nến sau.</div></details>`;
+      <div class="muted small">${d.some((r) => r.stop_kind === "close5")
+        ? 'Mỗi bậc: 1 lệnh limit mua riêng, kèm TP limit + SL sàn đặt sẵn; bot đóng lệnh nếu nến 5m đóng dưới "SL bot"; lệnh còn mở tới cuối nến thì đóng ở giá mở nến sau.'
+        : "Mỗi bậc: 1 lệnh limit mua riêng (chế độ hedge / tài khoản phụ), gắn sẵn TP limit + SL chạm trên sàn; lệnh còn mở tới cuối nến thì đóng (market) ở lần kiểm tra kế tiếp."}</div></details>`;
   }
   function compactPlan(sym) {
     if (state.live.planLoading) return '<p class="muted">Đang tải kế hoạch lệnh…</p>';
@@ -751,7 +754,7 @@
     const rows = (state.live.latest?.sleeve || []).filter((r) => r.symbol === sym);
     // C4 / C5: the dip stop fires on a 5m CLOSE (bot) at 4 / 5 sigma, plus a native 8-sigma touch stop on the exchange
     const closeK = { v321: 4, v301: 4, v295: 4, v285: 4, v269: 4, v266: 5 }[planPipe()];
-    const dsz = ["v295", "v301", "v321"].includes(planPipe()) ? (planOf(sym)?.dip_size || {}) : null;  // CS / G2: the agents' decision per rung
+    const dsz = ["v295", "v301", "v321", "v342"].includes(planPipe()) ? (planOf(sym)?.dip_size || {}) : null;  // CS / G2: the agents' decision per rung
     const decOf = (r) => { if (!dsz) return null; const k = Object.keys(dsz).find((x) => Number(x) === Number(r.rung)); return k ? dsz[k] : null; };
     const mulOf = (r) => { const d = decOf(r); return d == null ? 1 : Number(typeof d === "object" ? d.size : d); };
     const tpOf = (r) => { const d = decOf(r); return d && typeof d === "object" ? Number(d.tp) : 1; };

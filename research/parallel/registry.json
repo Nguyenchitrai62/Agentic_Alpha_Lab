@@ -2,7 +2,7 @@
   "schema_version": 1,
   "project": "Agentic Alpha Lab BTC swing research",
   "created_at": "2026-09-06T00:00:00Z",
-  "next_version": 338,
+  "next_version": 343,
   "control": {
     "coordinator_model": "gpt-5.6-sol",
     "coordinator_reasoning": "high",
@@ -54,7 +54,7 @@
     "expected_workers": 3,
     "version_range": [
       45,
-      337
+      342
     ],
     "parent_commit": "1ecf947baddd5ef78444670330e9db62128dad50",
     "cloud_snapshot": {
@@ -14186,7 +14186,7 @@
       "version": "v335",
       "track": "C",
       "direction_key": "v335-manual-daily-cadence",
-      "status": "running",
+      "status": "rejected",
       "parent_versions": [
         "v332"
       ],
@@ -14199,15 +14199,42 @@
       "write_scope": "research/parallel/rounds/parallel-20260906-r2/v335",
       "worker_agent_id": "01a07748-5adc-7061-8052-0ed36705a8a8",
       "worker_host_id": "local",
-      "result_manifest": null,
+      "result_manifest": "research\\parallel\\rounds\\parallel-20260906-r2\\v335\\result_manifest.json",
       "registered_at": "2026-10-03T01:05:42.234152Z",
-      "assigned_at": "2026-10-03T01:05:42.234152Z"
+      "assigned_at": "2026-10-03T01:05:42.234152Z",
+      "result_manifest_sha256": "c6e8bde446275864048cb133a8544f9b197ed444b35906428aff181bcf2250de",
+      "result_summary": {
+        "scenarios": {
+          "normal": {
+            "monthly_geometric_net_percent": 2.139,
+            "max_drawdown_percent": 21.39,
+            "fills": 984,
+            "months": 48
+          },
+          "fee_stress": {
+            "monthly_geometric_net_percent": 2.139,
+            "max_drawdown_percent": 21.39,
+            "fills": 984,
+            "months": 48
+          },
+          "execution_stress": {
+            "monthly_geometric_net_percent": 2.139,
+            "max_drawdown_percent": 21.39,
+            "fills": 984,
+            "months": 48
+          }
+        },
+        "independent_test": false,
+        "live_approved": false,
+        "audit_notes": "rows, fold choices, transfer flags and final rows replicated; v336 alt cube / PTX anchor refit equal the caches; timing / windows / no most-recent-year in choices checked (v334_v337_audit/COMPARISON.md)"
+      },
+      "audited_at": "2026-10-03T02:46:52.299424Z"
     },
     {
       "version": "v336",
       "track": "A",
       "direction_key": "v336-manual-breadth",
-      "status": "running",
+      "status": "rejected",
       "parent_versions": [
         "v333"
       ],
@@ -14220,15 +14247,42 @@
       "write_scope": "research/parallel/rounds/parallel-20260906-r2/v336",
       "worker_agent_id": "01a07792-4a6b-7fc3-a08a-af2923b1778a",
       "worker_host_id": "local",
-      "result_manifest": null,
+      "result_manifest": "research\\parallel\\rounds\\parallel-20260906-r2\\v336\\result_manifest.json",
       "registered_at": "2026-10-03T01:09:20.058147Z",
-      "assigned_at": "2026-10-03T01:09:20.058147Z"
+      "assigned_at": "2026-10-03T01:09:20.058147Z",
+      "result_manifest_sha256": "ee5ad42653baf98ef42a34c99c917ecb865bcb0003ccd38ecc8eff93dd2c77ec",
+      "result_summary": {
+        "scenarios": {
+          "normal": {
+            "monthly_geometric_net_percent": 3.011,
+            "max_drawdown_percent": 17.95,
+            "fills": 995,
+            "months": 48
+          },
+          "fee_stress": {
+            "monthly_geometric_net_percent": 3.011,
+            "max_drawdown_percent": 17.95,
+            "fills": 995,
+            "months": 48
+          },
+          "execution_stress": {
+            "monthly_geometric_net_percent": 3.011,
+            "max_drawdown_percent": 17.95,
+            "fills": 995,
+            "months": 48
+          }
+        },
+        "independent_test": false,
+        "live_approved": false,
+        "audit_notes": "rows, fold choices, transfer flags and final rows replicated; v336 alt cube / PTX anchor refit equal the caches; timing / windows / no most-recent-year in choices checked (v334_v337_audit/COMPARISON.md)"
+      },
+      "audited_at": "2026-10-03T02:48:27.408889Z"
     },
     {
       "version": "v337",
       "track": "B",
       "direction_key": "v337-options-member-return",
-      "status": "running",
+      "status": "rejected",
       "parent_versions": [
         "v334"
       ],
@@ -14241,10 +14295,196 @@
       "write_scope": "research/parallel/rounds/parallel-20260906-r2/v337",
       "worker_agent_id": "01a07791-eecb-7053-8866-dcdbe31e84d7",
       "worker_host_id": "local",
-      "result_manifest": null,
+      "result_manifest": "research\\parallel\\rounds\\parallel-20260906-r2\\v337\\result_manifest.json",
       "registered_at": "2026-10-03T01:39:54.231095Z",
-      "assigned_at": "2026-10-03T01:39:54.231095Z"
+      "assigned_at": "2026-10-03T01:39:54.231095Z",
+      "result_manifest_sha256": "8602dab9f5115ea2f60f5b3ddb308767ee2618937b21e487a31dc8645664a213",
+      "result_summary": {
+        "scenarios": {
+          "normal": {
+            "monthly_geometric_net_percent": 3.011,
+            "max_drawdown_percent": 17.95,
+            "fills": 995,
+            "months": 48
+          },
+          "fee_stress": {
+            "monthly_geometric_net_percent": 3.011,
+            "max_drawdown_percent": 17.95,
+            "fills": 995,
+            "months": 48
+          },
+          "execution_stress": {
+            "monthly_geometric_net_percent": 3.011,
+            "max_drawdown_percent": 17.95,
+            "fills": 995,
+            "months": 48
+          }
+        },
+        "independent_test": false,
+        "live_approved": false,
+        "audit_notes": "rows, fold choices, transfer flags and final rows replicated; v336 alt cube / PTX anchor refit equal the caches; timing / windows / no most-recent-year in choices checked (v334_v337_audit/COMPARISON.md)"
+      },
+      "audited_at": "2026-10-03T02:50:58.266574Z"
+    },
+    {
+      "version": "v338",
+      "track": "C",
+      "direction_key": "v338-manual-single-dip",
+      "status": "audited",
+      "parent_versions": [
+        "v335"
+      ],
+      "model_family": "hist-gradient-boosting",
+      "objective": "MANUAL product + one human-placeable dip limit per coin with exchange-native TP/SL",
+      "data_contract": "engine_user 1m Binance USD-M majors 2021-09-24..2026-09-23; M2 members; v306 gene tables (bar-open R2 agent predictions)",
+      "policy_contract": "M2 book rules + single rung 3.0/3.5 sigma, fills from minute 16, touch stop 8 sigma, budget 0.26 at 8 sigma; choose on dev folds only",
+      "hypothesis": "A single deep limit per coin (manual-feasible) lifts MANUAL return toward 5%/month without the bot ladder",
+      "parent_commit": "1ecf947baddd5ef78444670330e9db62128dad50",
+      "write_scope": "research/parallel/rounds/parallel-20260906-r2/v338",
+      "worker_agent_id": "01a07748-5adc-7061-8052-0ed36705a8a8",
+      "worker_host_id": "local",
+      "result_manifest": "research\\parallel\\rounds\\parallel-20260906-r2\\v338\\result_manifest.json",
+      "registered_at": "2026-10-03T02:46:52.295601Z",
+      "assigned_at": "2026-10-03T02:46:52.295601Z",
+      "result_manifest_sha256": "dfe9b3cdb884486922d70390c569ff0590d168d7d90493dabed5db22f36ad08c",
+      "result_summary": {
+        "scenarios": {
+          "normal": {
+            "monthly_geometric_net_percent": 3.905,
+            "max_drawdown_percent": 16.77,
+            "fills": 2105,
+            "months": 48
+          },
+          "fee_stress": {
+            "monthly_geometric_net_percent": 3.905,
+            "max_drawdown_percent": 16.77,
+            "fills": 2105,
+            "months": 48
+          },
+          "execution_stress": {
+            "monthly_geometric_net_percent": 3.905,
+            "max_drawdown_percent": 16.77,
+            "fills": 2105,
+            "months": 48
+          }
+        },
+        "independent_test": false,
+        "live_approved": false,
+        "audit_notes": "COMPARISON.md verdict PASS"
+      },
+      "audited_at": "2026-10-03T02:56:57.971008Z"
+    },
+    {
+      "version": "v339",
+      "track": "A",
+      "direction_key": "v339-single-dip-intensity",
+      "status": "rejected",
+      "parent_versions": [
+        "v338"
+      ],
+      "model_family": "hist-gradient-boosting",
+      "objective": "intensity (depth 2.5 / size x2) of the MANUAL-feasible single dip limit",
+      "data_contract": "as v338",
+      "policy_contract": "MD30 vs MD25 vs MD30x2; dev folds only; last year once",
+      "hypothesis": "A closer or larger single dip lifts MANUAL return toward 5%/month at DD<20",
+      "parent_commit": "1ecf947baddd5ef78444670330e9db62128dad50",
+      "write_scope": "research/parallel/rounds/parallel-20260906-r2/v339",
+      "worker_agent_id": "01a07792-4a6b-7fc3-a08a-af2923b1778a",
+      "worker_host_id": "local",
+      "result_manifest": "research\\parallel\\rounds\\parallel-20260906-r2\\v339\\result_manifest.json",
+      "registered_at": "2026-10-03T02:48:27.404131Z",
+      "assigned_at": "2026-10-03T02:48:27.404131Z",
+      "result_manifest_sha256": "68f806d5f1a7a1d7ae402fe361f3b203591fc999105dffdc6cbbc835141110cf",
+      "result_summary": {
+        "scenarios": {
+          "normal": {
+            "monthly_geometric_net_percent": 4.738,
+            "max_drawdown_percent": 17.75,
+            "fills": 2106,
+            "months": 48
+          },
+          "fee_stress": {
+            "monthly_geometric_net_percent": 4.738,
+            "max_drawdown_percent": 17.75,
+            "fills": 2106,
+            "months": 48
+          },
+          "execution_stress": {
+            "monthly_geometric_net_percent": 4.738,
+            "max_drawdown_percent": 17.75,
+            "fills": 2106,
+            "months": 48
+          }
+        },
+        "independent_test": false,
+        "live_approved": false,
+        "audit_notes": "COMPARISON.md verdict PASS"
+      },
+      "audited_at": "2026-10-03T02:54:55.792868Z"
+    },
+    {
+      "version": "v340",
+      "track": "B",
+      "direction_key": "v340-book-dip-risk-allocation",
+      "status": "running",
+      "parent_versions": [
+        "v338"
+      ],
+      "model_family": "hist-gradient-boosting",
+      "objective": "move MANUAL risk from the book to the single dip limit",
+      "data_contract": "as v338",
+      "policy_contract": "MD30 vs RA1 (book 0.75, dip x2) vs RA2 (book 0.75, dip x2.5); dev folds only; last year once",
+      "hypothesis": "Book whipsaws drive DD while dips win 72%; reallocating raises return per DD",
+      "parent_commit": "1ecf947baddd5ef78444670330e9db62128dad50",
+      "write_scope": "research/parallel/rounds/parallel-20260906-r2/v340",
+      "worker_agent_id": "01a07791-eecb-7053-8866-dcdbe31e84d7",
+      "worker_host_id": "local",
+      "result_manifest": null,
+      "registered_at": "2026-10-03T02:50:58.262235Z",
+      "assigned_at": "2026-10-03T02:50:58.262235Z"
+    },
+    {
+      "version": "v341",
+      "track": "A",
+      "direction_key": "v341-ra2-risk-level",
+      "status": "running",
+      "parent_versions": [
+        "v340"
+      ],
+      "model_family": "hist-gradient-boosting",
+      "objective": "overall risk level of the reallocated MANUAL design RA2",
+      "data_contract": "as v338",
+      "policy_contract": "RA2 vs RT28 vs RT31 (target 0.28/0.31, cap 2); dev folds only; last year once",
+      "hypothesis": "RA2 has DD headroom; a higher vol target lifts return toward 5%/month at DD<20",
+      "parent_commit": "1ecf947baddd5ef78444670330e9db62128dad50",
+      "write_scope": "research/parallel/rounds/parallel-20260906-r2/v341",
+      "worker_agent_id": "01a07792-4a6b-7fc3-a08a-af2923b1778a",
+      "worker_host_id": "local",
+      "result_manifest": null,
+      "registered_at": "2026-10-03T02:54:55.788831Z",
+      "assigned_at": "2026-10-03T02:54:55.788831Z"
+    },
+    {
+      "version": "v342",
+      "track": "C",
+      "direction_key": "v342-two-rung-manual-ladder",
+      "status": "running",
+      "parent_versions": [
+        "v340"
+      ],
+      "model_family": "hist-gradient-boosting",
+      "objective": "two human-placeable bracket dip limits per coin on top of RA2",
+      "data_contract": "as v338",
+      "policy_contract": "RA2 vs L2 vs L2h; dev folds only; last year once",
+      "hypothesis": "A second native-bracket dip rung at 4 sigma adds return without bot-watched stops",
+      "parent_commit": "1ecf947baddd5ef78444670330e9db62128dad50",
+      "write_scope": "research/parallel/rounds/parallel-20260906-r2/v342",
+      "worker_agent_id": "01a07748-5adc-7061-8052-0ed36705a8a8",
+      "worker_host_id": "local",
+      "result_manifest": null,
+      "registered_at": "2026-10-03T02:56:57.966293Z",
+      "assigned_at": "2026-10-03T02:56:57.966293Z"
     }
   ],
-  "updated_at": "2026-10-03T01:39:54.236225Z"
+  "updated_at": "2026-10-03T02:56:57.971008Z"
 }

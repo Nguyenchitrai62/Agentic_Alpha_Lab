@@ -32,6 +32,7 @@ PIPELINES = {  # pipeline key -> (research-books function in scripts/forward_v20
     "v301": ("research_books_d2", 6.504),  # CB + v301 G2 size + take-profit agents at the bar open, dip budget 0.26
     "v321": ("research_books_d2", 7.079),  # CB + v321 R2: ladder 2.5..5.0 sigma, agents fitted on every rung depth, budget 0.26
     "v315": ("research_books_d2", 2.956),  # MANUAL M1: CB book only (no dip ladder), pullback entry 0.75 sigma_4h, orders valid 3 bars
+    "v342": ("research_books_d2", 6.233),   # MANUAL M3: M1 book x0.75 + two human-placeable dip limits (3.0 / 4.0 sigma, native 8-sigma stop)
 }
 KW_OVERRIDE = {"v240": {"sleeve_risk_budget": 0.18},
                "v266": {"sleeve_risk_budget": 0.18, "sleeve_stop_mode": "close5", "sleeve_backstop": 8.0},
@@ -41,7 +42,9 @@ KW_OVERRIDE = {"v240": {"sleeve_risk_budget": 0.18},
                "v301": {"sleeve_risk_budget": 0.26, "sleeve_stop_mode": "close5", "sleeve_backstop": 8.0, "m_sleeve_sl": 4.0},
                "v321": {"sleeve_risk_budget": 0.26, "sleeve_stop_mode": "close5", "sleeve_backstop": 8.0, "m_sleeve_sl": 4.0,
                         "rungs": (2.5, 3.0, 3.5, 4.0, 5.0)},
-               "v315": {"sleeve": False}}
+               "v315": {"sleeve": False},
+               "v342": {"sleeve_risk_budget": 0.26, "sleeve_stop_mode": "touch", "m_sleeve_sl": 8.0, "size_mult": 4.375, "rungs": (3.0, 4.0)}}
+M3_R2_RUNG = {0: 1, 1: 3}  # M3 rung index -> the R2 table's rung index (R2 ladder 2.5 / 3.0 / 3.5 / 4.0 / 5.0)
 SIZE_TABLE = ROOT / "artifacts/research/engine_real/v295_size_mult_m0.parquet"  # research/diagnostics/s1_exec/s1_cache.py
 G2_TABLE = ROOT / "artifacts/research/engine_real/v301_g2_table_m0.parquet"  # research/diagnostics/g2_exec/g2_cache.py
 R2_TABLE = ROOT / "artifacts/research/engine_real/v321_r2_table_m0.parquet"  # research/diagnostics/r2_exec/r2_cache.py
@@ -74,17 +77,20 @@ def simulate(pipe: str):
         look = {(pd.Timestamp(t), s, int(r)): float(m) for t, s, r, m in zip(tab["T"], tab["sym"], tab["rung"], tab["mult"])}
         idx = books.index
         kw["sleeve_fill_size"] = lambda i, a, r, f: look.get((idx[i] + pd.Timedelta(hours=4), cols[a], r), 1.0)
-    if pipe in ("v301", "v321"):  # walk-forward size + take-profit decisions of the G2 / R2 agents (one per holding bar, coin and rung)
+    if pipe in ("v301", "v321", "v342"):  # walk-forward size + take-profit decisions of the G2 / R2 agents (one per holding bar, coin and rung)
         tab = pd.read_parquet(G2_TABLE if pipe == "v301" else R2_TABLE)
         keys = [(pd.Timestamp(t), s, int(r)) for t, s, r in zip(tab["T"], tab["sym"], tab["rung"])]
         lsz, ltp = dict(zip(keys, tab["size"].astype(float))), dict(zip(keys, tab["tp"].astype(float)))
         idx = books.index
-        kw["sleeve_fill_size"] = lambda i, a, r, f: lsz.get((idx[i] + pd.Timedelta(hours=4), cols[a], r), 1.0)
-        kw["sleeve_tp"] = lambda i, a, r, f: ltp.get((idx[i] + pd.Timedelta(hours=4), cols[a], r), 1.0)
+        rmap = M3_R2_RUNG if pipe == "v342" else {}
+        kw["sleeve_fill_size"] = lambda i, a, r, f: lsz.get((idx[i] + pd.Timedelta(hours=4), cols[a], rmap.get(r, r)), 1.0)
+        kw["sleeve_tp"] = lambda i, a, r, f: ltp.get((idx[i] + pd.Timedelta(hours=4), cols[a], rmap.get(r, r)), 1.0)
     trade = dict(v216.GRID, policy=v216.grid_policy(v221.B_ABS, v221.B_REL))
-    if pipe == "v315":  # MANUAL M1: pullback entry limit 0.75 sigma_4h, orders valid 3 bars; the in-position grid policy unchanged
+    if pipe in ("v315", "v342"):  # MANUAL M1 / M3: pullback entry limit 0.75 sigma_4h, orders valid 3 bars; in-position grid unchanged
         grid_pol = trade["policy"]
         trade = dict(trade, n_valid=3, policy=lambda i, a, st: {"open": 0.75} if st["pos"] == 0 else grid_pol(i, a, st))
+        if pipe == "v342":  # M3: book positions x0.75 (signal threshold unscaled), the risk moved to the two dip limits
+            trade["book_mult"] = 0.75
     res = eu.simulate(books, opens, prep, trade=trade, win_start=5, events=events, bars=bars, **kw)
     if abs(res["monthly_dev4"] - dev4) > 0.01:
         raise RuntimeError(f"{pipe}: replay dev4 {res['monthly_dev4']} != research {dev4}")
