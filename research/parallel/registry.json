@@ -2,7 +2,7 @@
   "schema_version": 1,
   "project": "Agentic Alpha Lab BTC swing research",
   "created_at": "2026-09-06T00:00:00Z",
-  "next_version": 345,
+  "next_version": 346,
   "control": {
     "coordinator_model": "gpt-5.6-sol",
     "coordinator_reasoning": "high",
@@ -54,7 +54,7 @@
     "expected_workers": 3,
     "version_range": [
       45,
-      344
+      345
     ],
     "parent_commit": "1ecf947baddd5ef78444670330e9db62128dad50",
     "cloud_snapshot": {
@@ -14522,7 +14522,7 @@
       "version": "v342",
       "track": "C",
       "direction_key": "v342-two-rung-manual-ladder",
-      "status": "running",
+      "status": "audited",
       "parent_versions": [
         "v340"
       ],
@@ -14535,9 +14535,36 @@
       "write_scope": "research/parallel/rounds/parallel-20260906-r2/v342",
       "worker_agent_id": "01a07748-5adc-7061-8052-0ed36705a8a8",
       "worker_host_id": "local",
-      "result_manifest": null,
+      "result_manifest": "research\\parallel\\rounds\\parallel-20260906-r2\\v342\\result_manifest.json",
       "registered_at": "2026-10-03T02:56:57.966293Z",
-      "assigned_at": "2026-10-03T02:56:57.966293Z"
+      "assigned_at": "2026-10-03T02:56:57.966293Z",
+      "result_manifest_sha256": "60d459a560eb449feb5e69af4cb25e88ecf006c1131a7e76726f65436894c6c4",
+      "result_summary": {
+        "scenarios": {
+          "normal": {
+            "monthly_geometric_net_percent": 5.779,
+            "max_drawdown_percent": 19.71,
+            "fills": 2534,
+            "months": 48
+          },
+          "fee_stress": {
+            "monthly_geometric_net_percent": 5.779,
+            "max_drawdown_percent": 19.71,
+            "fills": 2534,
+            "months": 48
+          },
+          "execution_stress": {
+            "monthly_geometric_net_percent": 5.779,
+            "max_drawdown_percent": 19.71,
+            "fills": 2534,
+            "months": 48
+          }
+        },
+        "independent_test": false,
+        "live_approved": false,
+        "audit_notes": "COMPARISON.md verdict PASS"
+      },
+      "audited_at": "2026-10-03T03:21:20.427372Z"
     },
     {
       "version": "v343",
@@ -14580,7 +14607,28 @@
       "result_manifest": null,
       "registered_at": "2026-10-03T03:18:02.813130Z",
       "assigned_at": "2026-10-03T03:18:02.813130Z"
+    },
+    {
+      "version": "v345",
+      "track": "C",
+      "direction_key": "v345-bot-book-share",
+      "status": "running",
+      "parent_versions": [
+        "v342"
+      ],
+      "model_family": "hist-gradient-boosting",
+      "objective": "BOT R2 with a smaller book (risk moved to the dip ladder)",
+      "data_contract": "as v306 / v321",
+      "policy_contract": "R2 vs RB75 vs RB50 (book_mult); dev folds k=1,2,3; last year once",
+      "hypothesis": "Half of the BOT DD is book concentration; a smaller book lowers DD more than return",
+      "parent_commit": "1ecf947baddd5ef78444670330e9db62128dad50",
+      "write_scope": "research/parallel/rounds/parallel-20260906-r2/v345",
+      "worker_agent_id": "01a07748-5adc-7061-8052-0ed36705a8a8",
+      "worker_host_id": "local",
+      "result_manifest": null,
+      "registered_at": "2026-10-03T03:21:20.422998Z",
+      "assigned_at": "2026-10-03T03:21:20.422998Z"
     }
   ],
-  "updated_at": "2026-10-03T03:18:02.817882Z"
+  "updated_at": "2026-10-03T03:21:20.427372Z"
 }
