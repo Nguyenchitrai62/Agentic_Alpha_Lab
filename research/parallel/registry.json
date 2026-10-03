@@ -2,7 +2,7 @@
   "schema_version": 1,
   "project": "Agentic Alpha Lab BTC swing research",
   "created_at": "2026-09-06T00:00:00Z",
-  "next_version": 353,
+  "next_version": 354,
   "control": {
     "coordinator_model": "gpt-5.6-sol",
     "coordinator_reasoning": "high",
@@ -54,7 +54,7 @@
     "expected_workers": 3,
     "version_range": [
       45,
-      352
+      353
     ],
     "parent_commit": "1ecf947baddd5ef78444670330e9db62128dad50",
     "cloud_snapshot": {
@@ -14906,7 +14906,7 @@
       "version": "v350",
       "track": "A",
       "direction_key": "v350-m3rule-agents",
-      "status": "running",
+      "status": "rejected",
       "parent_versions": [
         "v349"
       ],
@@ -14919,9 +14919,36 @@
       "write_scope": "research/parallel/rounds/parallel-20260906-r2/v350",
       "worker_agent_id": "01a07792-4a6b-7fc3-a08a-af2923b1778a",
       "worker_host_id": "local",
-      "result_manifest": null,
+      "result_manifest": "research\\parallel\\rounds\\parallel-20260906-r2\\v350\\result_manifest.json",
       "registered_at": "2026-10-03T04:44:49.255988Z",
-      "assigned_at": "2026-10-03T04:44:49.255988Z"
+      "assigned_at": "2026-10-03T04:44:49.255988Z",
+      "result_manifest_sha256": "19686e44837299a747035bdcce15ed1a7a1befdb9c657738a4a5b469972c2153",
+      "result_summary": {
+        "scenarios": {
+          "normal": {
+            "monthly_geometric_net_percent": 6.233,
+            "max_drawdown_percent": 17.73,
+            "fills": 2404,
+            "months": 48
+          },
+          "fee_stress": {
+            "monthly_geometric_net_percent": 6.233,
+            "max_drawdown_percent": 17.73,
+            "fills": 2404,
+            "months": 48
+          },
+          "execution_stress": {
+            "monthly_geometric_net_percent": 6.233,
+            "max_drawdown_percent": 17.73,
+            "fills": 2404,
+            "months": 48
+          }
+        },
+        "independent_test": false,
+        "live_approved": false,
+        "audit_notes": "COMPARISON.md verdict PASS"
+      },
+      "audited_at": "2026-10-03T06:59:14.294988Z"
     },
     {
       "version": "v351",
@@ -14964,7 +14991,28 @@
       "result_manifest": null,
       "registered_at": "2026-10-03T06:54:51.534333Z",
       "assigned_at": "2026-10-03T06:54:51.534333Z"
+    },
+    {
+      "version": "v353",
+      "track": "A",
+      "direction_key": "v353-bot-subaccount-blend",
+      "status": "running",
+      "parent_versions": [
+        "v352"
+      ],
+      "model_family": "hist-gradient-boosting",
+      "objective": "walk-forward capital-weighted sub-account blend of six audited pipelines (BOT)",
+      "data_contract": "kpack inputs; member equity paths from engine_user",
+      "policy_contract": "15624 blends (weights 0..4), flat choice on years [:k]; transfer vs R2 in >=2 of 3 folds; last year once",
+      "hypothesis": "Diversifying across pipeline variants lowers the BOT drawdown more than its return",
+      "parent_commit": "1ecf947baddd5ef78444670330e9db62128dad50",
+      "write_scope": "research/parallel/rounds/parallel-20260906-r2/v353",
+      "worker_agent_id": "01a07792-4a6b-7fc3-a08a-af2923b1778a",
+      "worker_host_id": "local",
+      "result_manifest": null,
+      "registered_at": "2026-10-03T06:59:14.291443Z",
+      "assigned_at": "2026-10-03T06:59:14.291443Z"
     }
   ],
-  "updated_at": "2026-10-03T06:54:51.538420Z"
+  "updated_at": "2026-10-03T06:59:14.295996Z"
 }
