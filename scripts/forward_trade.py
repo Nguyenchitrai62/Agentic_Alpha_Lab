@@ -82,6 +82,7 @@ G2_START = pd.Timestamp("2026-09-30T00:00:00Z")  # v301 G2 paper window (first b
 R2_START = pd.Timestamp("2026-10-03T00:00:00Z")  # v321 R2 paper window (first bar after its deployment)
 M1_START = pd.Timestamp("2026-10-03T04:00:00Z")  # v315 M1 MANUAL paper window (first bar after its deployment)
 M3_START = pd.Timestamp("2026-10-03T08:00:00Z")  # v342 M3 MANUAL paper window (first bar after its deployment)
+M4_START = pd.Timestamp("2026-10-04T00:00:00Z")  # v362 M4 MANUAL paper window (first bar after its deployment)
 
 
 def live_state(start, now, cls=None):
@@ -195,7 +196,7 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--policy", default=None, help="JSON with the policy parameters (default: v216 grid G2)")
     ap.add_argument("--from", dest="start", default=None, help="first traded holding bar (default FREEZE)")
-    ap.add_argument("--candidate", default="v151_deploy_v4", choices=["v151_deploy_v4", "v233_T3", "v236_W2", "v240_O1", "v266_B1", "v269_M1", "v285_D2", "v295_CS", "v301_G2", "v321_R2", "v315_M1", "v342_M3"],
+    ap.add_argument("--candidate", default="v151_deploy_v4", choices=["v151_deploy_v4", "v233_T3", "v236_W2", "v240_O1", "v266_B1", "v269_M1", "v285_D2", "v295_CS", "v301_G2", "v321_R2", "v315_M1", "v342_M3", "v362_M4"],
                     help="books: v205 (v151_deploy_v4 live rows, default), the v233 T3 or the v236 W2 foundation (their live rows)")
     args = ap.parse_args()
     cand = {"v151_deploy_v4": ("research_books", OUT, "v205 books + trade mode"),
@@ -217,7 +218,9 @@ def main():
             "v315_M1": ("research_books_d2", OUT.with_name("trade_plan_v315.json"),
                         "v315 M1 MANUAL: CB book orders only (no dip ladder), pullback entry limit 0.75 sigma_4h valid 3 bars - for a human"),
             "v342_M3": ("research_books_d2", OUT.with_name("trade_plan_v342.json"),
-                        "v342 M3 MANUAL: M1 book x0.75 + two human-placeable dip limits per coin (3.0 / 4.0 sigma, TP + native 8-sigma stop)")}
+                        "v342 M3 MANUAL: M1 book x0.75 + two human-placeable dip limits per coin (3.0 / 4.0 sigma, TP + native 8-sigma stop)"),
+            "v362_M4": ("research_books_d2", OUT.with_name("trade_plan_v362.json"),
+                        "v362 M4 MANUAL: M3 with book SL 5 / TP 10 sigma_d (dev4-selected; fold transfer not confirmed - paper evidence decides)")}
     rb_name, out_path, pipe_name = cand[args.candidate]
     p = dict(DEFAULT, **(json.loads(Path(args.policy).read_text()) if args.policy else {}))
     # per-pipeline policy overrides from audited research: O1 runs the v247 sleeve stop-risk budget 0.18 (since 2026-09-29)
@@ -239,11 +242,14 @@ def main():
                                "name": "v315 M1 MANUAL: CB book only, pullback entry 0.75 sigma_4h valid 3 bars, target 0.25, cap 2"},
                    "v342_M3": {"k_entry": 0.75, "n_valid": 3, "book_mult": 0.75, "size_mult": 4.375, "sleeve_risk_budget": 0.26,
                                "sleeve_stop_mode": "touch", "m_sleeve_sl": 8.0,
-                               "name": "v342 M3 MANUAL: M1 book x0.75 + dip limits 3.0 / 4.0 sigma (R2 agents' size / TP), native 8-sigma touch stop"}}.get(args.candidate, {}))
+                               "name": "v342 M3 MANUAL: M1 book x0.75 + dip limits 3.0 / 4.0 sigma (R2 agents' size / TP), native 8-sigma touch stop"},
+                   "v362_M4": {"k_entry": 0.75, "n_valid": 3, "book_mult": 0.75, "size_mult": 4.375, "sleeve_risk_budget": 0.26,
+                               "sleeve_stop_mode": "touch", "m_sleeve_sl": 8.0, "m_sl": 5.0, "m_tp": 10.0,
+                               "name": "v362 M4 MANUAL: M3 with book SL 5 / TP 10 sigma_d"}}.get(args.candidate, {}))
     # D2's live Coinbase member is logged from 2026-09-29 21 UTC; its paper window starts at the next 4h bar
     start = pd.Timestamp(args.start, tz="UTC") if args.start else {"v285_D2": pd.Timestamp("2026-09-30T00:00:00Z"),
                                                                      "v295_CS": CS_START, "v301_G2": G2_START,
-                                                                     "v321_R2": R2_START, "v315_M1": M1_START, "v342_M3": M3_START}.get(args.candidate, FREEZE)
+                                                                     "v321_R2": R2_START, "v315_M1": M1_START, "v342_M3": M3_START, "v362_M4": M4_START}.get(args.candidate, FREEZE)
     now = pd.Timestamp(datetime.now(timezone.utc))
     if now < start:  # before the first traded bar: publish an empty plan that says when trading starts
         out_path.write_text(json.dumps({"pipeline": pipe_name, "policy": p, "freeze": str(start), "generated_at": now.isoformat(),
@@ -256,7 +262,7 @@ def main():
     eu = _load("engine_user_tm", RD / "engine_user/engine_user.py")
     v212 = _load("v212_tm", RD / "v212/v212_trade_scaling.py")
     books = getattr(fw, rb_name)(eu)
-    if args.candidate in ("v285_D2", "v295_CS", "v301_G2", "v321_R2", "v315_M1", "v342_M3"):  # 0.8 x the O1 advisor rows + 0.2 x the live Coinbase member (rows present in both)
+    if args.candidate in ("v285_D2", "v295_CS", "v301_G2", "v321_R2", "v315_M1", "v342_M3", "v362_M4"):  # 0.8 x the O1 advisor rows + 0.2 x the live Coinbase member (rows present in both)
         lo1, lcb = fw.live_books("v240_O1"), fw.live_books("v285_CB")
         common = lo1.index.intersection(lcb.index)
         lb = 0.8 * lo1.loc[common] + 0.2 * lcb.loc[common]
@@ -287,7 +293,7 @@ def main():
         return {}
     eu.summarize = grab
     kw = dict(fw.KW, sleeve_risk_budget=p["sleeve_risk_budget"], size_mult=p["size_mult"],
-              **{k: p[k] for k in ("sleeve_stop_mode", "sleeve_backstop", "m_sleeve_sl", "sleeve") if k in p})
+              **{k: p[k] for k in ("sleeve_stop_mode", "sleeve_backstop", "m_sleeve_sl", "sleeve", "m_sl", "m_tp") if k in p})
     dip_size = None
     if args.candidate == "v295_CS":  # frozen v295 size agent, each rung sized once at the bar open (state at the close of minute 0)
         size_hook, dip_size = cs_size_hook(grid, cur_bar, start, now)
@@ -299,7 +305,7 @@ def main():
         size_hook, tp_hook, dip_size = g2_hooks(grid, cur_bar, start, now, "v321_r2_dip_agents")
         kw["sleeve_fill_size"], kw["sleeve_tp"] = size_hook, tp_hook
         kw["rungs"] = _load("v321_rungs_tm", ROOT / "scripts/v321_r2_dip_agents.py").RUNGS
-    if args.candidate == "v342_M3":  # MANUAL M3: the frozen R2 agents decide size / TP of the two bracket dip limits at the bar open
+    if args.candidate in ("v342_M3", "v362_M4"):  # MANUAL M3 / M4: the frozen R2 agents decide size / TP of the two bracket dip limits at the bar open
         size_hook, tp_hook, dip_size = g2_hooks(grid, cur_bar, start, now, "manual_dip_agents")
         kw["sleeve_fill_size"], kw["sleeve_tp"] = size_hook, tp_hook
         kw["rungs"] = _load("manual_rungs_tm", ROOT / "scripts/manual_dip_agents.py").RUNGS
@@ -329,8 +335,8 @@ def main():
             c["order"] = {"kind": "open", "side": "BUY" if state["side"][j] > 0 else "SELL", "price": float(state["px"][j]),
                           "weight": float(state["w"][j]), "issued": str(grid[int(state["issued"][j])] + pd.Timedelta(hours=4)),
                           "valid_until": str(grid[min(int(state["exp"][j]) - 1, len(grid) - 1)] + pd.Timedelta(hours=8)),
-                          "sl_if_filled": float(state["px"][j] * (1 - np.sign(state["side"][j]) * 4 * state["psd"][j])),
-                          "tp_if_filled": float(state["px"][j] * (1 + np.sign(state["side"][j]) * 8 * state["psd"][j]))}
+                          "sl_if_filled": float(state["px"][j] * (1 - np.sign(state["side"][j]) * float(kw.get("m_sl", 4.0)) * state["psd"][j])),
+                          "tp_if_filled": float(state["px"][j] * (1 + np.sign(state["side"][j]) * float(kw.get("m_tp") or 2 * kw.get("m_sl", 4.0)) * state["psd"][j]))}
         else:
             c["state"] = "flat"
         coins[s] = c

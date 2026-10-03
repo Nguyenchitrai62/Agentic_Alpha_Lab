@@ -2,7 +2,7 @@
   "schema_version": 1,
   "project": "Agentic Alpha Lab BTC swing research",
   "created_at": "2026-09-06T00:00:00Z",
-  "next_version": 362,
+  "next_version": 363,
   "control": {
     "coordinator_model": "gpt-5.6-sol",
     "coordinator_reasoning": "high",
@@ -54,7 +54,7 @@
     "expected_workers": 3,
     "version_range": [
       45,
-      361
+      362
     ],
     "parent_commit": "1ecf947baddd5ef78444670330e9db62128dad50",
     "cloud_snapshot": {
@@ -15338,7 +15338,7 @@
       "version": "v359",
       "track": "A",
       "direction_key": "v359-m3-cap",
-      "status": "running",
+      "status": "rejected",
       "parent_versions": [
         "v358"
       ],
@@ -15351,9 +15351,36 @@
       "write_scope": "research/parallel/rounds/parallel-20260906-r2/v359",
       "worker_agent_id": "01a07792-4a6b-7fc3-a08a-af2923b1778a",
       "worker_host_id": "local",
-      "result_manifest": null,
+      "result_manifest": "research\\parallel\\rounds\\parallel-20260906-r2\\v359\\result_manifest.json",
       "registered_at": "2026-10-03T08:56:17.494532Z",
-      "assigned_at": "2026-10-03T08:56:17.494532Z"
+      "assigned_at": "2026-10-03T08:56:17.494532Z",
+      "result_manifest_sha256": "f0be12c25456cd00f286b582518467ed26554a6e267d7488b6b31164d2c16876",
+      "result_summary": {
+        "scenarios": {
+          "normal": {
+            "monthly_geometric_net_percent": 6.233,
+            "max_drawdown_percent": 17.73,
+            "fills": 2404,
+            "months": 48
+          },
+          "fee_stress": {
+            "monthly_geometric_net_percent": 6.233,
+            "max_drawdown_percent": 17.73,
+            "fills": 2404,
+            "months": 48
+          },
+          "execution_stress": {
+            "monthly_geometric_net_percent": 6.233,
+            "max_drawdown_percent": 17.73,
+            "fills": 2404,
+            "months": 48
+          }
+        },
+        "independent_test": false,
+        "live_approved": false,
+        "audit_notes": "COMPARISON.md verdict PASS"
+      },
+      "audited_at": "2026-10-03T09:07:08.338934Z"
     },
     {
       "version": "v360",
@@ -15396,7 +15423,28 @@
       "result_manifest": null,
       "registered_at": "2026-10-03T09:01:04.074186Z",
       "assigned_at": "2026-10-03T09:01:04.074186Z"
+    },
+    {
+      "version": "v362",
+      "track": "A",
+      "direction_key": "v362-m3-book-sltp",
+      "status": "running",
+      "parent_versions": [
+        "v361"
+      ],
+      "model_family": "hist-gradient-boosting",
+      "objective": "book stop / take-profit multiples in M3",
+      "data_contract": "kpack inputs",
+      "policy_contract": "M3 SL4/TP8 vs S3T6 vs S5T10; folds k=2,3; last year once",
+      "hypothesis": "The book SL/TP set before the dip limits existed may not suit M3",
+      "parent_commit": "1ecf947baddd5ef78444670330e9db62128dad50",
+      "write_scope": "research/parallel/rounds/parallel-20260906-r2/v362",
+      "worker_agent_id": "01a07792-4a6b-7fc3-a08a-af2923b1778a",
+      "worker_host_id": "local",
+      "result_manifest": null,
+      "registered_at": "2026-10-03T09:07:08.334879Z",
+      "assigned_at": "2026-10-03T09:07:08.334879Z"
     }
   ],
-  "updated_at": "2026-10-03T09:01:04.078702Z"
+  "updated_at": "2026-10-03T09:07:08.338934Z"
 }
