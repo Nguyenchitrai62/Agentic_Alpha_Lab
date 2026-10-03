@@ -444,7 +444,7 @@ test('Manual tab shows the MANUAL plan cards (locked ones offer unlock) and the 
   const cards = ui.$('pipeCards').innerHTML;
   for (const p of ['v367', 'v342', 'v340', 'v315']) assert.ok(cards.includes(`data-pipe="${p}"`));
   assert.ok(!cards.includes('data-pipe="v362"') && cards.includes('Liên hệ admin để xem tín hiệu') && cards.includes('Đang khóa') && cards.includes('Khuyên dùng'));
-  assert.ok(cards.includes('5.9%') && cards.includes('+0.40%'));
+  assert.ok(cards.includes('Năm ẩn') && cards.includes('5.2%') && cards.includes('18.6%') && cards.includes('69%') && cards.includes('+0.40%'));
   assert.equal(ui.$('goalPanel').hidden, true);  // research goal progress: admins only
   assert.ok(ui.$('goalPanel').innerHTML.includes('Mục tiêu 1') && ui.$('goalPanel').innerHTML.includes('đạt trên mô phỏng'));
   assert.equal(ui.$('manualChecklist').hidden, false);

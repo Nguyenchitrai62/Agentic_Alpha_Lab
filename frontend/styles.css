@@ -468,9 +468,12 @@ details.archive > summary { cursor: pointer; color: var(--muted); font-size: 12p
 .pc-badge.lock { background: var(--panel-2); color: var(--muted); }
 .pc-badge + .pc-badge { margin-left: 0; }
 .pc-tag { color: var(--muted); font-size: 12px; line-height: 1.35; min-height: 32px; }
-.pc-main { display: flex; align-items: baseline; gap: 6px; }
-.pc-main b { font-size: 26px; font-weight: 700; font-variant-numeric: tabular-nums; }
-.pc-main span { color: var(--muted); font-size: 11.5px; }
+.pc-key { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin: 2px 0 0; }
+.pc-key div { background: var(--panel-2); border-radius: 6px; padding: 6px 4px; text-align: center; min-width: 0; }
+.pc-key dt { color: var(--muted); font-size: 10.5px; font-weight: 600; }
+.pc-key dd { margin: 1px 0 0; font-size: 19px; font-weight: 700; color: var(--text-hi); font-variant-numeric: tabular-nums; }
+.pc-key dd.up { color: var(--up); } .pc-key dd.down { color: var(--down); }
+.pc-key span { color: var(--muted); font-size: 10px; }
 .pc-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 10px; margin: 0; }
 .pc-stats div { min-width: 0; }
 .pc-stats dt { color: var(--muted); font-size: 10.5px; }
@@ -483,5 +486,5 @@ details.more > summary { cursor: pointer; padding: 10px 12px; font-weight: 600; 
 details.more[open] > summary { border-bottom: 1px solid var(--line); }
 details.more > .cards { padding: 10px; }
 details.more .goal-panel { padding: 8px 12px; border-bottom: 1px solid var(--line); }
-@media (max-width: 700px) { .plan-grid { grid-template-columns: 1fr 1fr; } .pc-main b { font-size: 22px; } }
+@media (max-width: 700px) { .plan-grid { grid-template-columns: 1fr 1fr; } .pc-key dd { font-size: 17px; } }
 @media (max-width: 440px) { .plan-grid { grid-template-columns: 1fr; } }

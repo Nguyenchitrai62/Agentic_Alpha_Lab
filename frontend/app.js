@@ -414,10 +414,10 @@
         <div class="pc-top"><span class="pc-name">${esc(p.nm)}</span>
           ${v === P.rec ? '<span class="pc-badge">Khuyên dùng</span>' : ""}${locked ? '<span class="pc-badge lock">🔒 Đang khóa</span>' : ""}</div>
         <div class="pc-tag">${esc(p.tag)}</div>
-        <div class="pc-main"><b class="${s.monthly_5y >= 0 ? "up" : "down"}">${f(s.monthly_5y)}%</b><span>lãi / tháng · 5 năm</span></div>
-        <dl class="pc-stats"><div><dt>Năm gần nhất</dt><dd>${f(s.monthly_last_year)}%/th</dd></div>
-          <div><dt>Sụt vốn tối đa</dt><dd>${f(s.gate_dd)}%</dd></div>
-          <div><dt>Tỉ lệ thắng</dt><dd>${win != null ? Math.round(100 * win) + "%" : "—"}</dd></div>
+        <dl class="pc-key"><div><dt>Năm ẩn</dt><dd class="${s.monthly_last_year >= 0 ? "up" : "down"}">${f(s.monthly_last_year)}%</dd><span>lãi / tháng</span></div>
+          <div><dt>DD tối đa</dt><dd>${f(s.gate_dd)}%</dd><span>sụt vốn</span></div>
+          <div><dt>Win</dt><dd>${win != null ? Math.round(100 * win) + "%" : "—"}</dd><span>năm ẩn</span></div></dl>
+        <dl class="pc-stats"><div><dt>TB 5 năm</dt><dd>${f(s.monthly_5y)}%/th</dd></div>
           <div><dt>Paper thực tế</dt><dd>${paper}</dd></div></dl>
         ${cta}</article>`;
     }).join("") || '<p class="muted">Chưa có dữ liệu.</p>';
