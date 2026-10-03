@@ -348,6 +348,13 @@
     return `<p class="muted">Các pipeline đang được khóa. Bạn vẫn xem được bảng đánh giá ở tab <a href="#todo">Pipeline</a>.
       <a href="mailto:${esc(encodeURIComponent(state.user?.admin_contact_email || ""))}">Liên hệ admin để mở quyền xem tín hiệu</a>.</p>`;
   }
+  // live paper result since the freeze vs the research bootstrap for the same horizon (scripts/prospective_scorecard.py)
+  function paperCell(pr) {
+    if (!pr || pr.live_pct == null) return "—";
+    const days = pr.days != null ? ` <span class="muted small">(${Number(pr.days).toFixed(1)} ngày)</span>` : "";
+    const pc = pr.percentile != null ? ` · p${Math.round(pr.percentile)}` : "";
+    return `<span class="${pr.live_pct >= 0 ? "up" : "down"}">${Number(pr.live_pct).toFixed(2)}%</span>${pc}${days}`;
+  }
   function renderEvidence() {
     const ev = state.evid; if (!ev) return;
     const cur = planPipe();
@@ -369,9 +376,10 @@
         <div class="pn-name">${locked ? `<b>#${ev[v].rank} ${p.nm}</b>` : `<button type="button" class="pipeline-choice" data-pipe="${p.v}" aria-pressed="${cur === p.v}">#${ev[v].rank} ${p.nm}<span>${cur === p.v ? "Đang xem" : "Xem tín hiệu"}</span></button>`}</div><div class="pn-desc">${p.ds}</div>${contact}</div></div></td>
         <td class="${last >= 5 ? "up" : ""}"><b>${f(last)}</b></td><td class="${s.gate_dd > 20 ? "down" : ""}">${f(s.gate_dd, 1)}%</td>
         <td>${pct(s.win_hidden)}</td><td>${f(s.monthly_dev4)}</td><td>${f(worst)}</td><td>${f(s.monthly_5y)}</td><td>${esc(s.losing_years ?? "—")}</td><td>${win}</td>
-        <td>${esc(s.trades_dev ?? "—")} / ${esc(s.trades_hidden ?? "—")}</td><td>${f(s.dd_4h, 1)}% / ${f(s.dd_1m, 1)}%</td></tr>`;
+        <td>${esc(s.trades_dev ?? "—")} / ${esc(s.trades_hidden ?? "—")}</td><td>${f(s.dd_4h, 1)}% / ${f(s.dd_1m, 1)}%</td>
+        <td>${paperCell(ev[v].prospective)}</td></tr>`;
     });
-    table($("pipeEvid"), ["Thứ tự / pipeline", "Test · 1 năm<br>Lãi ròng/tháng (%)", "DD<br>tối đa", "Win rate<br>Test", "Train / chọn model<br>4 năm · Lãi ròng/tháng (%)", "Train: năm thấp nhất<br>Lãi ròng/tháng (%)", "Toàn bộ 5 năm<br>Lãi ròng/tháng (%)", "Số năm<br>thua lỗ", "Win rate<br>(Train / Test)", "Số lệnh<br>(Train / Test)", "DD<br>(nến 4h / từng phút)"], rows);
+    table($("pipeEvid"), ["Thứ tự / pipeline", "Test · 1 năm<br>Lãi ròng/tháng (%)", "DD<br>tối đa", "Win rate<br>Test", "Train / chọn model<br>4 năm · Lãi ròng/tháng (%)", "Train: năm thấp nhất<br>Lãi ròng/tháng (%)", "Toàn bộ 5 năm<br>Lãi ròng/tháng (%)", "Số năm<br>thua lỗ", "Win rate<br>(Train / Test)", "Số lệnh<br>(Train / Test)", "DD<br>(nến 4h / từng phút)", "Paper thực tế<br>lãi · phân vị so với kỳ vọng"], rows);
     $("pipeOrderNote").textContent = Object.values(ev)[0]?.automatic_order
       ? "Thứ tự tự động: lợi nhuận/tháng Test cao hơn → DD thấp hơn → Win rate Test cao hơn."
       : "Thứ tự do admin sắp xếp. Trạng thái khóa do admin quản lý riêng cho từng pipeline.";

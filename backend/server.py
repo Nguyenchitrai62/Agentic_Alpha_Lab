@@ -20,7 +20,7 @@ from fastapi.responses import JSONResponse, ORJSONResponse, Response
 import orjson
 
 from . import auth, catalog, db, pipeline
-from .config import SETTINGS, log
+from .config import ROOT, SETTINGS, log
 from .security import BodyLimitMiddleware
 
 APP_VERSION = "1.0.0"
@@ -243,6 +243,10 @@ def pipelines_summary(request: Request, user: dict = Depends(auth.require_viewer
 
     def load():
         out = {}
+        try:  # scripts/prospective_scorecard.py output (live paper result vs the walk-forward bootstrap expectation)
+            score = {r["pipeline"]: r for r in orjson.loads((ROOT / "artifacts/research/advisor_shadow/prospective_scorecard.json").read_bytes())["rows"]}
+        except Exception:  # noqa: BLE001
+            score = {}
         for i, p in enumerate(order, 1):
             raw = db.kv_get(f"summary_tm_{p}", {}) or {}
             # Historical evaluation remains public to approved viewers; never serialize plans/signals here.
@@ -252,6 +256,7 @@ def pipelines_summary(request: Request, user: dict = Depends(auth.require_viewer
             out[p] = {"rank": i, "locked": locked, "locked_for_viewers": settings["locked"][p],
                       "automatic_order": settings["automatic"], "walkforward": summary,
                       "paper_net_pct": plan.get("net_return_pct"), "freeze": plan.get("freeze"),
+                      "prospective": None if locked else {k: score.get(p, {}).get(k) for k in ("days", "live_pct", "expected_p50", "percentile")},
                       "admin_contact_email": SETTINGS.admin_contact_email if locked else None}
         return out
     return cached(request, "pipelines_summary:" + str(settings["revision"]) + ":" + ",".join(order)

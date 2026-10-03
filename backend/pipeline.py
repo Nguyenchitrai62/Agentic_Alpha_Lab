@@ -542,4 +542,10 @@ def job_cycle() -> str:
     if failures:
         raise RuntimeError(" | ".join(out))
     db.kv_set("pipeline_input_check", {"status": "complete", "checked_at": db.now_ms()})
+    try:  # prospective scorecard (live paper vs walk-forward expectation); informational, never blocks the cycle
+        sc = subprocess.run([SETTINGS.python_exe, str(ROOT / "scripts/prospective_scorecard.py")], cwd=str(ROOT), capture_output=True, text=True,
+                            timeout=600)
+        out.append("scorecard ok" if sc.returncode == 0 else f"scorecard failed ({sc.returncode})")
+    except Exception as exc:  # noqa: BLE001
+        out.append(f"scorecard failed: {type(exc).__name__}")
     return " | ".join(out)
