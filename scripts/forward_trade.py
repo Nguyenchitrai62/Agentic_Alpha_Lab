@@ -82,7 +82,7 @@ G2_START = pd.Timestamp("2026-09-30T00:00:00Z")  # v301 G2 paper window (first b
 R2_START = pd.Timestamp("2026-10-03T00:00:00Z")  # v321 R2 paper window (first bar after its deployment)
 M1_START = pd.Timestamp("2026-10-03T04:00:00Z")  # v315 M1 MANUAL paper window (first bar after its deployment)
 M3_START = pd.Timestamp("2026-10-03T08:00:00Z")  # v342 M3 MANUAL paper window (first bar after its deployment)
-M4_START = pd.Timestamp("2026-10-04T00:00:00Z")  # v362 M4 MANUAL paper window (first bar after its deployment)
+M4_START = pd.Timestamp("2026-10-03T16:00:00Z")  # M4 / M5 / M2 MANUAL paper window: first 4h bar after all three configs were frozen (M2 at 13:58 UTC)
 
 
 def live_state(start, now, cls=None):
