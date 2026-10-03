@@ -2,7 +2,7 @@
   "schema_version": 1,
   "project": "Agentic Alpha Lab BTC swing research",
   "created_at": "2026-09-06T00:00:00Z",
-  "next_version": 337,
+  "next_version": 338,
   "control": {
     "coordinator_model": "gpt-5.6-sol",
     "coordinator_reasoning": "high",
@@ -54,7 +54,7 @@
     "expected_workers": 3,
     "version_range": [
       45,
-      336
+      337
     ],
     "parent_commit": "1ecf947baddd5ef78444670330e9db62128dad50",
     "cloud_snapshot": {
@@ -14138,7 +14138,7 @@
       "version": "v334",
       "track": "B",
       "direction_key": "v334-r2-tighter-governor",
-      "status": "running",
+      "status": "rejected",
       "parent_versions": [
         "v331"
       ],
@@ -14151,9 +14151,36 @@
       "write_scope": "research/parallel/rounds/parallel-20260906-r2/v334",
       "worker_agent_id": "01a07791-eecb-7053-8866-dcdbe31e84d7",
       "worker_host_id": "local",
-      "result_manifest": null,
+      "result_manifest": "research\\parallel\\rounds\\parallel-20260906-r2\\v334\\result_manifest.json",
       "registered_at": "2026-10-03T00:58:12.834076Z",
-      "assigned_at": "2026-10-03T00:58:12.834076Z"
+      "assigned_at": "2026-10-03T00:58:12.834076Z",
+      "result_manifest_sha256": "4e42f6040678f51002b51840a976deefc2fdd4cad622630cc013e8918d0af8a9",
+      "result_summary": {
+        "scenarios": {
+          "normal": {
+            "monthly_geometric_net_percent": 7.079,
+            "max_drawdown_percent": 18.39,
+            "fills": 5341,
+            "months": 48
+          },
+          "fee_stress": {
+            "monthly_geometric_net_percent": 7.079,
+            "max_drawdown_percent": 18.39,
+            "fills": 5341,
+            "months": 48
+          },
+          "execution_stress": {
+            "monthly_geometric_net_percent": 7.079,
+            "max_drawdown_percent": 18.39,
+            "fills": 5341,
+            "months": 48
+          }
+        },
+        "independent_test": false,
+        "live_approved": false,
+        "audit_notes": "rows, fold choices, transfer flags and final rows replicated; v336 alt cube / PTX anchor refit equal the caches; timing / windows / no most-recent-year in choices checked (v334_v337_audit/COMPARISON.md)"
+      },
+      "audited_at": "2026-10-03T01:39:54.236225Z"
     },
     {
       "version": "v335",
@@ -14196,7 +14223,28 @@
       "result_manifest": null,
       "registered_at": "2026-10-03T01:09:20.058147Z",
       "assigned_at": "2026-10-03T01:09:20.058147Z"
+    },
+    {
+      "version": "v337",
+      "track": "B",
+      "direction_key": "v337-options-member-return",
+      "status": "running",
+      "parent_versions": [
+        "v334"
+      ],
+      "model_family": "member-mix-grid",
+      "objective": "MANUAL + BOT: bring the Deribit options-informed member back into the modern mixes",
+      "data_contract": "cached walk-forward members incl. the options member; most recent year once per product",
+      "policy_contract": "MANUAL M2 rules cap 2; BOT R2 machinery",
+      "hypothesis": "the options member adds diverse information (ran before registration; prereg_sha256.txt)",
+      "parent_commit": "1ecf947baddd5ef78444670330e9db62128dad50",
+      "write_scope": "research/parallel/rounds/parallel-20260906-r2/v337",
+      "worker_agent_id": "01a07791-eecb-7053-8866-dcdbe31e84d7",
+      "worker_host_id": "local",
+      "result_manifest": null,
+      "registered_at": "2026-10-03T01:39:54.231095Z",
+      "assigned_at": "2026-10-03T01:39:54.231095Z"
     }
   ],
-  "updated_at": "2026-10-03T01:09:20.063779Z"
+  "updated_at": "2026-10-03T01:39:54.236225Z"
 }
