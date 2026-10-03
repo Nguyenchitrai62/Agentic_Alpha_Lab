@@ -31,6 +31,7 @@ PIPELINES = {  # pipeline key -> (research-books function in scripts/forward_v20
     "v295": ("research_books_d2", 6.168),  # CB + v295 size agent (walk-forward multipliers, sized at the bar open)
     "v301": ("research_books_d2", 6.504),  # CB + v301 G2 size + take-profit agents at the bar open, dip budget 0.26
     "v321": ("research_books_d2", 7.079),  # CB + v321 R2: ladder 2.5..5.0 sigma, agents fitted on every rung depth, budget 0.26
+    "v315": ("research_books_d2", 2.956),  # MANUAL M1: CB book only (no dip ladder), pullback entry 0.75 sigma_4h, orders valid 3 bars
 }
 KW_OVERRIDE = {"v240": {"sleeve_risk_budget": 0.18},
                "v266": {"sleeve_risk_budget": 0.18, "sleeve_stop_mode": "close5", "sleeve_backstop": 8.0},
@@ -39,7 +40,8 @@ KW_OVERRIDE = {"v240": {"sleeve_risk_budget": 0.18},
                "v295": {"sleeve_risk_budget": 0.18, "sleeve_stop_mode": "close5", "sleeve_backstop": 8.0, "m_sleeve_sl": 4.0},
                "v301": {"sleeve_risk_budget": 0.26, "sleeve_stop_mode": "close5", "sleeve_backstop": 8.0, "m_sleeve_sl": 4.0},
                "v321": {"sleeve_risk_budget": 0.26, "sleeve_stop_mode": "close5", "sleeve_backstop": 8.0, "m_sleeve_sl": 4.0,
-                        "rungs": (2.5, 3.0, 3.5, 4.0, 5.0)}}
+                        "rungs": (2.5, 3.0, 3.5, 4.0, 5.0)},
+               "v315": {"sleeve": False}}
 SIZE_TABLE = ROOT / "artifacts/research/engine_real/v295_size_mult_m0.parquet"  # research/diagnostics/s1_exec/s1_cache.py
 G2_TABLE = ROOT / "artifacts/research/engine_real/v301_g2_table_m0.parquet"  # research/diagnostics/g2_exec/g2_cache.py
 R2_TABLE = ROOT / "artifacts/research/engine_real/v321_r2_table_m0.parquet"  # research/diagnostics/r2_exec/r2_cache.py
@@ -79,8 +81,11 @@ def simulate(pipe: str):
         idx = books.index
         kw["sleeve_fill_size"] = lambda i, a, r, f: lsz.get((idx[i] + pd.Timedelta(hours=4), cols[a], r), 1.0)
         kw["sleeve_tp"] = lambda i, a, r, f: ltp.get((idx[i] + pd.Timedelta(hours=4), cols[a], r), 1.0)
-    res = eu.simulate(books, opens, prep, trade=dict(v216.GRID, policy=v216.grid_policy(v221.B_ABS, v221.B_REL)), win_start=5,
-                      events=events, bars=bars, **kw)
+    trade = dict(v216.GRID, policy=v216.grid_policy(v221.B_ABS, v221.B_REL))
+    if pipe == "v315":  # MANUAL M1: pullback entry limit 0.75 sigma_4h, orders valid 3 bars; the in-position grid policy unchanged
+        grid_pol = trade["policy"]
+        trade = dict(trade, n_valid=3, policy=lambda i, a, st: {"open": 0.75} if st["pos"] == 0 else grid_pol(i, a, st))
+    res = eu.simulate(books, opens, prep, trade=trade, win_start=5, events=events, bars=bars, **kw)
     if abs(res["monthly_dev4"] - dev4) > 0.01:
         raise RuntimeError(f"{pipe}: replay dev4 {res['monthly_dev4']} != research {dev4}")
     res["trade_stats"] = v221.v216.v213.trade_stats(events)  # book trades after fees: dev years / most recent year

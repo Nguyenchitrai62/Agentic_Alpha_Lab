@@ -400,6 +400,7 @@
     { v: "v269", nm: "C4", ds: "O1 + SL dip 4σ theo nến 5m + SL sàn 8σ" },
     { v: "v285", nm: "CB", ds: "C4 + 20% model Coinbase premium" },
     { v: "v321", nm: "R2", ds: "G2 + bậc dip 5σ, agent RL học từ mọi độ sâu (chọn walk-forward mọi năm)" },
+    { v: "v315", nm: "M1", ds: "Thủ công: chỉ lệnh book (không dip), vào bằng limit hồi giá 0.75σ — cho người tự đánh" },
   ];
   const PIPE_LABEL = Object.fromEntries(PIPES.map((p) => [p.v, p.nm]));
   function visiblePipes() {
