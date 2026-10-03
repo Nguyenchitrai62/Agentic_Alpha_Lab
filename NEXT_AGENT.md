@@ -1,6 +1,6 @@
 # Handoff for the next coding agent
 
-ROUND parallel-20260906-r2 (2026-10-03): BOT paper pipelines G2 (v301) and R2 (v321, best walk-forward BOT); MANUAL best general M2 (v317 pullback, cap 2) ~3.2-3.8 %/month - floor 5% open; next registry version see `parallel_registry.py inventory` (v309-v313 ran outside the registry, prereg hashes kept).
+ROUND parallel-20260906-r2 (2026-10-03, after v370): MANUAL = bracket dip limits (one plain limit buy per coin and depth with TP limit + exchange-native touch stop) next to the book. Paper pipelines M3 (v342: CB books x0.75 + limits at 3.0 / 4.0 sigma), M4 (v362: + book SL 5 / TP 10) and M5 (v367: M4 + tighten a losing stop when the signal goes flat; 5y 5.86, last year 5.22, DD 18.6, book win 0.66 - every goal-1 metric on the replay, chosen with a post-hoc goal-1 fitness, disclosed; prospective log decides). BOT = R2 (v321); goal 2 (8 %/month, DD < 15) open. Use the kpack inputs (KPACK=artifacts/kaggle/kpack/pack347, ~4 s per simulation; patch simulate.__globals__ for fees). MANUAL fitness = v310 (book win). scripts/prospective_scorecard.py compares live paper with the research bootstrap. Next registry version: parallel_registry.py inventory.
 
 ROUND parallel-20260906-r2 (2026-10-02, newest): two products scored separately (AGENTS.md: MANUAL book-only floor 5%/DD<20/win55, BOT book+dip). Walk-forward evolution v306 (BOT), v307-v309 (MANUAL); Kaggle CPU runs via research/parallel/rounds/parallel-20260906-r2/kpack (see each version's cloud_submission.json); state in .claude/skills/alpha-lab-leader/research-map.md.
 
