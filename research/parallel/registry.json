@@ -2,7 +2,7 @@
   "schema_version": 1,
   "project": "Agentic Alpha Lab BTC swing research",
   "created_at": "2026-09-06T00:00:00Z",
-  "next_version": 356,
+  "next_version": 357,
   "control": {
     "coordinator_model": "gpt-5.6-sol",
     "coordinator_reasoning": "high",
@@ -54,7 +54,7 @@
     "expected_workers": 3,
     "version_range": [
       45,
-      355
+      356
     ],
     "parent_commit": "1ecf947baddd5ef78444670330e9db62128dad50",
     "cloud_snapshot": {
@@ -15050,7 +15050,7 @@
       "version": "v353",
       "track": "A",
       "direction_key": "v353-bot-subaccount-blend",
-      "status": "running",
+      "status": "rejected",
       "parent_versions": [
         "v352"
       ],
@@ -15063,9 +15063,36 @@
       "write_scope": "research/parallel/rounds/parallel-20260906-r2/v353",
       "worker_agent_id": "01a07792-4a6b-7fc3-a08a-af2923b1778a",
       "worker_host_id": "local",
-      "result_manifest": null,
+      "result_manifest": "research\\parallel\\rounds\\parallel-20260906-r2\\v353\\result_manifest.json",
       "registered_at": "2026-10-03T06:59:14.291443Z",
-      "assigned_at": "2026-10-03T06:59:14.291443Z"
+      "assigned_at": "2026-10-03T06:59:14.291443Z",
+      "result_manifest_sha256": "9c0fdbf794f064a02b3fff5eca1251b8e3d749539494acbc8826645903128a88",
+      "result_summary": {
+        "scenarios": {
+          "normal": {
+            "monthly_geometric_net_percent": 7.085,
+            "max_drawdown_percent": 17.12,
+            "fills": 0,
+            "months": 48
+          },
+          "fee_stress": {
+            "monthly_geometric_net_percent": 7.085,
+            "max_drawdown_percent": 17.12,
+            "fills": 0,
+            "months": 48
+          },
+          "execution_stress": {
+            "monthly_geometric_net_percent": 7.085,
+            "max_drawdown_percent": 17.12,
+            "fills": 0,
+            "months": 48
+          }
+        },
+        "independent_test": false,
+        "live_approved": false,
+        "audit_notes": "COMPARISON.md verdict PASS"
+      },
+      "audited_at": "2026-10-03T07:58:09.752582Z"
     },
     {
       "version": "v354",
@@ -15108,7 +15135,28 @@
       "result_manifest": null,
       "registered_at": "2026-10-03T07:16:09.816149Z",
       "assigned_at": "2026-10-03T07:16:09.816149Z"
+    },
+    {
+      "version": "v356",
+      "track": "A",
+      "direction_key": "v356-three-rung-manual",
+      "status": "running",
+      "parent_versions": [
+        "v355"
+      ],
+      "model_family": "hist-gradient-boosting",
+      "objective": "third bracket dip limit at 5 sigma on M3",
+      "data_contract": "kpack inputs",
+      "policy_contract": "M3 (3,4) vs L3 (3,4,5) vs L3h (3,4,5 risk-equal); folds k=2,3; last year once",
+      "hypothesis": "The 5-sigma rung that helped R2 also helps the manual product",
+      "parent_commit": "1ecf947baddd5ef78444670330e9db62128dad50",
+      "write_scope": "research/parallel/rounds/parallel-20260906-r2/v356",
+      "worker_agent_id": "01a07792-4a6b-7fc3-a08a-af2923b1778a",
+      "worker_host_id": "local",
+      "result_manifest": null,
+      "registered_at": "2026-10-03T07:58:09.747301Z",
+      "assigned_at": "2026-10-03T07:58:09.747301Z"
     }
   ],
-  "updated_at": "2026-10-03T07:16:09.820811Z"
+  "updated_at": "2026-10-03T07:58:09.752582Z"
 }
