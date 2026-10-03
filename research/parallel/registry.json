@@ -2,7 +2,7 @@
   "schema_version": 1,
   "project": "Agentic Alpha Lab BTC swing research",
   "created_at": "2026-09-06T00:00:00Z",
-  "next_version": 373,
+  "next_version": 377,
   "control": {
     "coordinator_model": "gpt-5.6-sol",
     "coordinator_reasoning": "high",
@@ -54,7 +54,7 @@
     "expected_workers": 3,
     "version_range": [
       45,
-      372
+      376
     ],
     "parent_commit": "1ecf947baddd5ef78444670330e9db62128dad50",
     "cloud_snapshot": {
@@ -15866,7 +15866,7 @@
       "version": "v370",
       "track": "B",
       "direction_key": "v370-m5-neighbourhood",
-      "status": "running",
+      "status": "audited",
       "parent_versions": [
         "v369"
       ],
@@ -15879,15 +15879,42 @@
       "write_scope": "research/parallel/rounds/parallel-20260906-r2/v370",
       "worker_agent_id": "01a07791-eecb-7053-8866-dcdbe31e84d7",
       "worker_host_id": "local",
-      "result_manifest": null,
+      "result_manifest": "research\\parallel\\rounds\\parallel-20260906-r2\\v370\\result_manifest.json",
       "registered_at": "2026-10-03T09:53:04.544703Z",
-      "assigned_at": "2026-10-03T09:53:04.544703Z"
+      "assigned_at": "2026-10-03T09:53:04.544703Z",
+      "result_manifest_sha256": "ebdc932ad7216ed77bd257ebd9c5f07e24db8887f7169204a5e6912004b973ea",
+      "result_summary": {
+        "scenarios": {
+          "normal": {
+            "monthly_geometric_net_percent": 6.25,
+            "max_drawdown_percent": 17.03,
+            "fills": 2303,
+            "months": 48
+          },
+          "fee_stress": {
+            "monthly_geometric_net_percent": 6.25,
+            "max_drawdown_percent": 17.03,
+            "fills": 2303,
+            "months": 48
+          },
+          "execution_stress": {
+            "monthly_geometric_net_percent": 6.25,
+            "max_drawdown_percent": 17.03,
+            "fills": 2303,
+            "months": 48
+          }
+        },
+        "independent_test": false,
+        "live_approved": false,
+        "audit_notes": "COMPARISON.md verdict PASS"
+      },
+      "audited_at": "2026-10-03T18:43:57.556871Z"
     },
     {
       "version": "v371",
       "track": "A",
       "direction_key": "v371-bot-trader-grid",
-      "status": "running",
+      "status": "rejected",
       "parent_versions": [
         "v370"
       ],
@@ -15900,15 +15927,42 @@
       "write_scope": "research/parallel/rounds/parallel-20260906-r2/v371",
       "worker_agent_id": "01a07792-4a6b-7fc3-a08a-af2923b1778a",
       "worker_host_id": "local",
-      "result_manifest": null,
+      "result_manifest": "research\\parallel\\rounds\\parallel-20260906-r2\\v371\\result_manifest.json",
       "registered_at": "2026-10-03T10:10:54.817511Z",
-      "assigned_at": "2026-10-03T10:10:54.817511Z"
+      "assigned_at": "2026-10-03T10:10:54.817511Z",
+      "result_manifest_sha256": "549ea7f7b02e7b7cd123102c33d3f40f1d80cc0d05c4b8b05a5568ca6f8b9978",
+      "result_summary": {
+        "scenarios": {
+          "normal": {
+            "monthly_geometric_net_percent": 7.216,
+            "max_drawdown_percent": 16.7,
+            "fills": 5333,
+            "months": 48
+          },
+          "fee_stress": {
+            "monthly_geometric_net_percent": 7.216,
+            "max_drawdown_percent": 16.7,
+            "fills": 5333,
+            "months": 48
+          },
+          "execution_stress": {
+            "monthly_geometric_net_percent": 7.216,
+            "max_drawdown_percent": 16.7,
+            "fills": 5333,
+            "months": 48
+          }
+        },
+        "independent_test": false,
+        "live_approved": false,
+        "audit_notes": "COMPARISON.md verdict PASS"
+      },
+      "audited_at": "2026-10-03T18:38:49.899481Z"
     },
     {
       "version": "v372",
       "track": "C",
       "direction_key": "v372-cnn-dip-agent",
-      "status": "running",
+      "status": "rejected",
       "parent_versions": [
         "v371"
       ],
@@ -15921,10 +15975,148 @@
       "write_scope": "research/parallel/rounds/parallel-20260906-r2/v372",
       "worker_agent_id": "01a07748-5adc-7061-8052-0ed36705a8a8",
       "worker_host_id": "local",
-      "result_manifest": null,
+      "result_manifest": "research\\parallel\\rounds\\parallel-20260906-r2\\v372\\result_manifest.json",
       "registered_at": "2026-10-03T10:39:47.329549Z",
-      "assigned_at": "2026-10-03T10:39:47.329549Z"
+      "assigned_at": "2026-10-03T10:39:47.329549Z",
+      "result_manifest_sha256": "e205d44e02463aa3855ceeb50c5348e0c15807b3ac920fab3893a7fe53bb9b72",
+      "result_summary": {
+        "scenarios": {
+          "normal": {
+            "monthly_geometric_net_percent": 6.936,
+            "max_drawdown_percent": 17.94,
+            "fills": 5349,
+            "months": 48
+          },
+          "fee_stress": {
+            "monthly_geometric_net_percent": 6.936,
+            "max_drawdown_percent": 17.94,
+            "fills": 5349,
+            "months": 48
+          },
+          "execution_stress": {
+            "monthly_geometric_net_percent": 6.936,
+            "max_drawdown_percent": 17.94,
+            "fills": 5349,
+            "months": 48
+          }
+        },
+        "independent_test": false,
+        "live_approved": false,
+        "audit_notes": "COMPARISON.md verdict PASS"
+      },
+      "audited_at": "2026-10-03T18:14:26.277422Z"
+    },
+    {
+      "version": "v373",
+      "track": "C",
+      "direction_key": "v373-m2-management",
+      "status": "rejected",
+      "parent_versions": [
+        "v340"
+      ],
+      "model_family": "rule-variants",
+      "objective": "MANUAL M2 low-DD structure with M4/M5 book management toward goal 2",
+      "data_contract": "kpack347 CB books, R2 dip agent tables, engine_user trade mode; nothing fitted",
+      "policy_contract": "rows M2 / M2S (SL5 TP10) / M2ST (+loss_act tighten); folds k=2,3 v310 book-win fitness; most recent year once for the final",
+      "hypothesis": "M4/M5 management lifts M2's return and book win while keeping DD < 15",
+      "parent_commit": "1ecf947baddd5ef78444670330e9db62128dad50",
+      "write_scope": "research/parallel/rounds/parallel-20260906-r2/v373",
+      "worker_agent_id": "01a07748-5adc-7061-8052-0ed36705a8a8",
+      "worker_host_id": "local",
+      "result_manifest": "research\\parallel\\rounds\\parallel-20260906-r2\\v373\\result_manifest.json",
+      "registered_at": "2026-10-03T18:14:26.272221Z",
+      "assigned_at": "2026-10-03T18:14:26.272221Z",
+      "result_manifest_sha256": "a5f41a167537e147958723fee1a69281dfd6bcc4f8c140059dceb3d3afeec8bd",
+      "result_summary": {
+        "scenarios": {
+          "normal": {
+            "monthly_geometric_net_percent": 5.032,
+            "max_drawdown_percent": 17.09,
+            "fills": 1880,
+            "months": 48
+          },
+          "fee_stress": {
+            "monthly_geometric_net_percent": 5.032,
+            "max_drawdown_percent": 17.09,
+            "fills": 1880,
+            "months": 48
+          },
+          "execution_stress": {
+            "monthly_geometric_net_percent": 5.032,
+            "max_drawdown_percent": 17.09,
+            "fills": 1880,
+            "months": 48
+          }
+        },
+        "independent_test": false,
+        "live_approved": false,
+        "audit_notes": "v373_audit/COMPARISON.md: PASS (blind replication of the three rows, both folds, transfer flag and final)"
+      },
+      "audited_at": "2026-10-03T18:55:55.789713Z"
+    },
+    {
+      "version": "v374",
+      "track": "A",
+      "direction_key": "v374-phase-robust-dip-rules",
+      "status": "running",
+      "parent_versions": [
+        "v342"
+      ],
+      "model_family": "rule-grid",
+      "objective": "dip-limit rule chosen on the mean over four 4h-grid phases, validated on the untouched pre-research period",
+      "data_contract": "Binance 1m 2020-10..2025-09 dip-only sleeve, phase-shifted grids; most recent year not simulated",
+      "policy_contract": "18 rows rungs x TP x stop; folds k=2,3 phase-mean F; pre-period validation report only",
+      "hypothesis": "a phase-robust dip rule beats the standard-grid-tuned reference on unseen dev years and on 2020-21",
+      "parent_commit": "1ecf947baddd5ef78444670330e9db62128dad50",
+      "write_scope": "research/parallel/rounds/parallel-20260906-r2/v374",
+      "worker_agent_id": "01a07792-4a6b-7fc3-a08a-af2923b1778a",
+      "worker_host_id": "local",
+      "result_manifest": null,
+      "registered_at": "2026-10-03T18:38:49.894447Z",
+      "assigned_at": "2026-10-03T18:38:49.894447Z"
+    },
+    {
+      "version": "v375",
+      "track": "B",
+      "direction_key": "v375-phase-mean-reranking",
+      "status": "running",
+      "parent_versions": [
+        "v367"
+      ],
+      "model_family": "rule-variants",
+      "objective": "honest re-ranking of the deployed MANUAL / BOT pipelines on the 4-phase mean",
+      "data_contract": "dev years only, whole pipelines on 4 phase-shifted grids, agents off, books forward-filled",
+      "policy_contract": "rows M2 M3 M4 M5 / R2 G2 CS; folds k=2,3 per product; reference M5 / R2",
+      "hypothesis": "the phase-robust ranking differs from the standard-grid ranking",
+      "parent_commit": "1ecf947baddd5ef78444670330e9db62128dad50",
+      "write_scope": "research/parallel/rounds/parallel-20260906-r2/v375",
+      "worker_agent_id": "01a07791-eecb-7053-8866-dcdbe31e84d7",
+      "worker_host_id": "local",
+      "result_manifest": null,
+      "registered_at": "2026-10-03T18:43:57.550516Z",
+      "assigned_at": "2026-10-03T18:43:57.550516Z"
+    },
+    {
+      "version": "v376",
+      "track": "C",
+      "direction_key": "v376-multiphase-bot",
+      "status": "running",
+      "parent_versions": [
+        "v321"
+      ],
+      "model_family": "rule-variants",
+      "objective": "BOT run as four clock-shifted sub-books (1/4 capital each) to diversify the 4h-phase path risk",
+      "data_contract": "dev years only, phase-shifted grids, agents on with per-phase rebuilt tables, books forward-filled",
+      "policy_contract": "rows R2_1P (ref, phase mean) / R2_4P / M5_4P / M5_4P_k12; BOT fitness; folds k=2,3",
+      "hypothesis": "four-clock sub-books keep the phase-mean return with a much lower drawdown",
+      "parent_commit": "1ecf947baddd5ef78444670330e9db62128dad50",
+      "write_scope": "research/parallel/rounds/parallel-20260906-r2/v376",
+      "worker_agent_id": "01a07748-5adc-7061-8052-0ed36705a8a8",
+      "worker_host_id": "local",
+      "result_manifest": null,
+      "registered_at": "2026-10-03T18:55:55.783566Z",
+      "assigned_at": "2026-10-03T18:55:55.783566Z"
     }
   ],
-  "updated_at": "2026-10-03T10:39:47.334060Z"
+  "updated_at": "2026-10-03T18:55:55.789713Z"
 }
