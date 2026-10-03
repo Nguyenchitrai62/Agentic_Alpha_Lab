@@ -2,7 +2,7 @@
   "schema_version": 1,
   "project": "Agentic Alpha Lab BTC swing research",
   "created_at": "2026-09-06T00:00:00Z",
-  "next_version": 369,
+  "next_version": 370,
   "control": {
     "coordinator_model": "gpt-5.6-sol",
     "coordinator_reasoning": "high",
@@ -54,7 +54,7 @@
     "expected_workers": 3,
     "version_range": [
       45,
-      368
+      369
     ],
     "parent_commit": "1ecf947baddd5ef78444670330e9db62128dad50",
     "cloud_snapshot": {
@@ -15674,7 +15674,7 @@
       "version": "v366",
       "track": "C",
       "direction_key": "v366-m4-management",
-      "status": "running",
+      "status": "rejected",
       "parent_versions": [
         "v365"
       ],
@@ -15687,9 +15687,36 @@
       "write_scope": "research/parallel/rounds/parallel-20260906-r2/v366",
       "worker_agent_id": "01a07748-5adc-7061-8052-0ed36705a8a8",
       "worker_host_id": "local",
-      "result_manifest": null,
+      "result_manifest": "research\\parallel\\rounds\\parallel-20260906-r2\\v366\\result_manifest.json",
       "registered_at": "2026-10-03T09:30:58.325808Z",
-      "assigned_at": "2026-10-03T09:30:58.325808Z"
+      "assigned_at": "2026-10-03T09:30:58.325808Z",
+      "result_manifest_sha256": "048e2433af1d5c040c49ac69ca30e149fff22701dc79b656dffdb9c522b8c6d3",
+      "result_summary": {
+        "scenarios": {
+          "normal": {
+            "monthly_geometric_net_percent": 6.392,
+            "max_drawdown_percent": 16.63,
+            "fills": 2372,
+            "months": 48
+          },
+          "fee_stress": {
+            "monthly_geometric_net_percent": 6.392,
+            "max_drawdown_percent": 16.63,
+            "fills": 2372,
+            "months": 48
+          },
+          "execution_stress": {
+            "monthly_geometric_net_percent": 6.392,
+            "max_drawdown_percent": 16.63,
+            "fills": 2372,
+            "months": 48
+          }
+        },
+        "independent_test": false,
+        "live_approved": false,
+        "audit_notes": "COMPARISON.md verdict PASS; M5 backend replay 6.015 and forward rule checked"
+      },
+      "audited_at": "2026-10-03T09:51:43.054131Z"
     },
     {
       "version": "v367",
@@ -15732,7 +15759,28 @@
       "result_manifest": null,
       "registered_at": "2026-10-03T09:49:59.906470Z",
       "assigned_at": "2026-10-03T09:49:59.906470Z"
+    },
+    {
+      "version": "v369",
+      "track": "C",
+      "direction_key": "v369-bot-blend-m5",
+      "status": "running",
+      "parent_versions": [
+        "v368"
+      ],
+      "model_family": "hist-gradient-boosting",
+      "objective": "BOT sub-account blend of R2 with M5 / M4",
+      "data_contract": "kpack inputs; member equity paths",
+      "policy_contract": "124 blends (weights 0..4 of R2, M5, M4); flat choice; folds k=1,2,3 vs R2; last year once",
+      "hypothesis": "M5's different book management diversifies R2 and lowers the BOT DD",
+      "parent_commit": "1ecf947baddd5ef78444670330e9db62128dad50",
+      "write_scope": "research/parallel/rounds/parallel-20260906-r2/v369",
+      "worker_agent_id": "01a07748-5adc-7061-8052-0ed36705a8a8",
+      "worker_host_id": "local",
+      "result_manifest": null,
+      "registered_at": "2026-10-03T09:51:43.048666Z",
+      "assigned_at": "2026-10-03T09:51:43.048666Z"
     }
   ],
-  "updated_at": "2026-10-03T09:49:59.911522Z"
+  "updated_at": "2026-10-03T09:51:43.054131Z"
 }
