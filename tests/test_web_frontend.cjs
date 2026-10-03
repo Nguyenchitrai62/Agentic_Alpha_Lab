@@ -443,12 +443,13 @@ test('Manual tab shows the MANUAL plan cards (locked ones offer unlock) and the 
   assert.ok(main.includes('data-pipe="v367"') && main.includes('data-pipe="v315"') && !main.includes('data-pipe="v321"') && main.includes('Win lệnh book'));
   const cards = ui.$('pipeCards').innerHTML;
   for (const p of ['v367', 'v342', 'v340', 'v315']) assert.ok(cards.includes(`data-pipe="${p}"`));
-  assert.ok(!cards.includes('data-pipe="v362"') && cards.includes('Liên hệ admin để xem tín hiệu') && cards.includes('Đang khóa') && cards.includes('Khuyên dùng'));
+  assert.ok(!cards.includes('data-pipe="v362"') && cards.includes('Liên hệ admin để xem') && cards.includes('Đang khóa') && cards.includes('Khuyên dùng'));
   assert.ok(cards.includes('Năm ẩn') && cards.includes('5.2%') && cards.includes('18.6%') && cards.includes('69%') && cards.includes('+0.40%'));
   assert.equal(ui.$('goalPanel').hidden, true);  // research goal progress: admins only
   assert.ok(ui.$('goalPanel').innerHTML.includes('Mục tiêu 1') && ui.$('goalPanel').innerHTML.includes('đạt trên mô phỏng'));
-  assert.equal(ui.$('manualChecklist').hidden, false);
-  assert.ok(ui.$('manualChecklist').innerHTML.includes('Bắt đáy') && ui.$('manualChecklist').innerHTML.includes('Vào lệnh xu hướng'));
+  const coinCards = ui.$('todoCards').innerHTML;  // MANUAL orders: one card per coin
+  assert.ok(coinCards.includes('id="card-SOLUSDT"') && coinCards.includes('Bắt đáy') && coinCards.includes('Vào lệnh xu hướng') && coinCards.includes('copy-btn'));
+  assert.ok(coinCards.includes('CHỜ MUA') && coinCards.includes('ĐỨNG NGOÀI'));
   ui.state.view = 'bot';
   await ui.loadTodo();
   assert.equal(ui.product(), 'bot');
@@ -457,6 +458,5 @@ test('Manual tab shows the MANUAL plan cards (locked ones offer unlock) and the 
   assert.ok(ui.$('pipeCards').innerHTML.includes('R2') && !ui.$('pipeCards').innerHTML.includes('Đang khóa'));
   assert.ok(main.includes('data-pipe="v321"') && main.includes('data-pipe="v295"') && !main.includes('data-pipe="v367"') && main.includes('Win mọi lệnh'));
   assert.ok(ui.$('goalPanel').innerHTML.includes('Mục tiêu BOT') && ui.$('goalPanel').innerHTML.includes('chưa đạt'));
-  assert.equal(ui.$('manualChecklist').hidden, true);
   assert.equal(ui.$('botNote').hidden, false);
 });

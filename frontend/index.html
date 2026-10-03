@@ -9,11 +9,11 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="styles.css?v=20261003-plan-cards" />
+  <link rel="stylesheet" href="styles.css?v=20261003-layout2" />
   <script src="config.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/lightweight-charts@4.2.0/dist/lightweight-charts.standalone.production.js" defer></script>
   <script src="https://accounts.google.com/gsi/client" async defer></script>
-  <script src="app.js?v=20261003-plan-cards" defer></script>
+  <script src="app.js?v=20261003-layout2" defer></script>
 </head>
 <body>
   <header class="topbar">
@@ -65,29 +65,31 @@
 
     <!-- ===================== live market ===================== -->
     <section id="view-todo" class="view page todo" hidden>
-      <div class="todo-top">
+      <div class="page-bar">
         <div class="pipe-status" id="pipeStatus"></div>
-        <label class="eq-in">Vốn của bạn <input type="number" id="eqInput" min="10" step="100" /> USDT</label>
+        <label class="eq-in">Vốn của bạn <input type="number" id="eqInput" min="10" step="100" inputmode="decimal" /> USDT</label>
       </div>
-      <div class="plans-head"><h2 id="evidTitle">Chọn pipeline</h2><span class="muted small" id="productNote"></span></div>
-      <div class="plan-grid" id="pipeCards"></div>
-      <p class="muted small plan-basis">Năm ẩn: năm gần nhất (09/2025 – 09/2026), không dùng để phát triển hay chọn mô hình. Lãi/tháng là lãi kép bình quân,
-        đã trừ phí và funding, mô phỏng với lệnh limit, SL/TP và phí sàn thật; DD là mức sụt vốn lớn nhất trên cả 5 năm; Win là tỉ lệ lệnh có lãi sau phí trong năm ẩn. Paper là kết quả theo dõi trên dữ liệu mới, sau khi mô hình đã đóng băng. Kết quả quá khứ không bảo đảm lợi nhuận tương lai.</p>
-      <p class="sr-only" id="pipeSelectedNote" role="status" aria-live="polite"></p>
-      <div class="panel checklist-panel" id="manualChecklist" hidden></div>
-      <div class="panel bot-panel" id="botNote" hidden></div>
-      <div class="panel board-panel">
-        <div class="panel-h"><span>Trạng thái từng coin</span><span class="muted small" id="boardMeta"></span>
-          <span class="muted small" id="wsState2">● realtime</span></div>
-        <div class="table-wrap"><table class="board" id="board"></table></div>
-      </div>
-      <details class="more"><summary>Hướng dẫn từng bước cho từng coin</summary><div class="cards" id="todoCards"></div></details>
+      <section class="sec" aria-labelledby="evidTitle">
+        <div class="sec-head"><h2 id="evidTitle">Chọn pipeline</h2><p class="muted" id="productNote"></p></div>
+        <div class="plan-grid" id="pipeCards"></div>
+        <p class="plan-basis">Năm ẩn: năm gần nhất (09/2025 – 09/2026), không dùng để phát triển hay chọn mô hình. Lãi/tháng là lãi kép bình quân, đã trừ phí
+          và funding, mô phỏng với lệnh limit, SL/TP và phí sàn thật. DD là mức sụt vốn lớn nhất trên cả 5 năm. Win là tỉ lệ lệnh có lãi sau phí trong năm ẩn.
+          Paper là kết quả theo dõi trên dữ liệu mới, sau khi mô hình đã đóng băng.</p>
+        <p class="sr-only" id="pipeSelectedNote" role="status" aria-live="polite"></p>
+      </section>
+      <div class="note-bar" id="botNote" hidden></div>
+      <section class="sec" aria-labelledby="coinsTitle">
+        <div class="sec-head"><h2 id="coinsTitle">Lệnh theo từng coin</h2><p class="muted" id="boardMeta"></p>
+          <span class="live-dot" id="wsState2">● realtime</span></div>
+        <div class="coin-grid" id="todoCards"></div>
+        <table class="board" id="board" hidden></table>
+      </section>
       <details class="more evid-panel"><summary>Bảng số liệu đầy đủ và cách tính</summary>
         <div class="goal-panel" id="goalPanel" hidden></div>
         <div class="table-wrap" tabindex="0" aria-label="Bảng số liệu đầy đủ, cuộn ngang để xem hết"><table class="tbl compact evid" id="pipeEvid"></table></div>
-        <div class="muted small evid-note">Train: 4 năm 09/2021 – 09/2025 dùng để phát triển và chọn mô hình. Test: năm 09/2025 – 09/2026 đánh giá mô hình đã chọn.
-          Mô phỏng walk-forward: tại mỗi mốc, mô hình chỉ học từ dữ liệu trước mốc đó. DD là mức sụt vốn lớn nhất (lấy mức lớn hơn giữa nến 4h và từng phút).
-          Win rate là tỷ lệ lệnh có lãi sau phí. Phí: maker 0.02% (vào lệnh, TP), taker 0.055% (SL); long trả funding 0.01%/8h.</div>
+        <div class="muted small evid-note">Train: 4 năm 09/2021 – 09/2025 dùng để phát triển và chọn mô hình. Test (năm ẩn): 09/2025 – 09/2026 đánh giá mô hình đã chọn.
+          Mô phỏng walk-forward: tại mỗi mốc, mô hình chỉ học từ dữ liệu trước mốc đó. DD lấy mức lớn hơn giữa nến 4h và từng phút.
+          Phí: maker 0.02% (vào lệnh, TP), taker 0.055% (SL); long trả funding 0.01%/8h.</div>
         <div class="muted small evid-note" id="pipeOrderNote"></div>
       </details>
       <p class="fine">Mọi lệnh vào / nhồi / chốt là limit; Stop-loss là Stop Market, Take-profit là Limit. Khối lượng tính theo "Vốn của bạn".

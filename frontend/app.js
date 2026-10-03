@@ -366,7 +366,7 @@
       const p = pipeOf(v);
       const locked = ev[v].locked;
       const email = ev[v].admin_contact_email || state.user?.admin_contact_email || "";
-      const contact = locked ? `<div class="pipe-access">🔒 Tín hiệu đang khóa · <a href="mailto:${esc(encodeURIComponent(email))}?subject=${encodeURIComponent("Xin quyền xem pipeline " + p.nm)}">Liên hệ admin qua email</a></div>`
+      const contact = locked ? `<div class="pipe-access">${ICON_LOCK} Tín hiệu đang khóa · <a href="mailto:${esc(encodeURIComponent(email))}?subject=${encodeURIComponent("Xin quyền xem pipeline " + p.nm)}">Liên hệ admin qua email</a></div>`
         : "";
       const s = ev[v]?.walkforward || {}, y = s.yearly || [];
       const dev = y.slice(0, 4).map((r) => mo(r[1]));
@@ -399,6 +399,7 @@
   function renderPlanCards(order) {
     const el = $("pipeCards"); if (!el) return;
     const ev = state.evid, cur = planPipe(), P = PRODUCTS[product()];
+    el.style?.setProperty?.("--n", Math.max(1, order.length));
     const f = (x, d = 1) => x == null || !isFinite(x) ? "—" : Number(x).toFixed(d);
     el.innerHTML = order.map((v) => {
       const p = pipeOf(v), e = ev[v], s = e.walkforward || {}, locked = e.locked, on = cur === v;
@@ -408,12 +409,12 @@
         : '<span class="muted">mới bắt đầu</span>';
       const email = e.admin_contact_email || state.user?.admin_contact_email || "";
       const cta = locked
-        ? `<a class="btn pc-cta unlock" href="mailto:${esc(encodeURIComponent(email))}?subject=${encodeURIComponent("Xin quyền xem pipeline " + p.nm)}">Liên hệ admin để xem tín hiệu</a>`
-        : `<button type="button" class="btn pc-cta ${on ? "primary" : ""}" data-pipe="${v}" aria-pressed="${on}">${on ? "✓ Đang xem tín hiệu" : "Xem tín hiệu"}</button>`;
+        ? `<a class="btn pc-cta unlock" href="mailto:${esc(encodeURIComponent(email))}?subject=${encodeURIComponent("Xin quyền xem pipeline " + p.nm)}">${ICON_LOCK} Liên hệ admin để xem</a>`
+        : `<button type="button" class="btn pc-cta ${on ? "primary" : ""}" data-pipe="${v}" aria-pressed="${on}">${on ? "Đang xem tín hiệu" : "Xem tín hiệu"}</button>`;
       return `<article class="plan-card${on ? " on" : ""}${locked ? " locked" : ""}" ${locked ? 'data-locked="true"' : `data-pipe="${v}"`}>
-        <div class="pc-top"><span class="pc-name">${esc(p.nm)}</span>
-          ${v === P.rec ? '<span class="pc-badge">Khuyên dùng</span>' : ""}${locked ? '<span class="pc-badge lock">🔒 Đang khóa</span>' : ""}</div>
-        <div class="pc-tag">${esc(p.tag)}</div>
+        <div class="pc-top"><span class="pc-name">${esc(p.nm)}</span><span class="pc-badges">
+          ${v === P.rec ? `<span class="pc-badge rec">${ICON_STAR} Khuyên dùng</span>` : ""}${locked ? `<span class="pc-badge lock">${ICON_LOCK} Đang khóa</span>` : ""}</span></div>
+        <p class="pc-tag" title="${esc(p.tag)}">${esc(p.tag)}</p>
         <dl class="pc-key"><div><dt>Năm ẩn</dt><dd class="${s.monthly_last_year >= 0 ? "up" : "down"}">${f(s.monthly_last_year)}%</dd><span>lãi / tháng</span></div>
           <div><dt>DD tối đa</dt><dd>${f(s.gate_dd)}%</dd><span>sụt vốn</span></div>
           <div><dt>Win</dt><dd>${win != null ? Math.round(100 * win) + "%" : "—"}</dd><span>năm ẩn</span></div></dl>
@@ -465,6 +466,8 @@
       ] },
   };
   const pipeOf = (v) => PIPES.find((p) => p.v === v);
+  const ICON_LOCK = '<svg class="ic" viewBox="0 0 24 24" width="13" height="13" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2" fill="none" stroke="currentColor" stroke-width="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3" fill="none" stroke="currentColor" stroke-width="2"/></svg>';
+  const ICON_STAR = '<svg class="ic" viewBox="0 0 24 24" width="12" height="12" aria-hidden="true"><path d="M12 3l2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1-4.4-4.3 6.1-.9z" fill="currentColor"/></svg>';
   const product = () => state.view === "bot" ? "bot" : "manual";  // the Pipeline tab = MANUAL, the Bot tab = BOT
   const canSeeBot = () => state.user?.role === "admin" || !!state.user?.bot_access;
   // keep the selected pipeline inside the product of the open tab (the recommended one first)
@@ -508,52 +511,13 @@
       <div class="goal-paper">${paper}</div>
       <div class="muted small">Đạt trên mô phỏng chưa phải xác nhận cuối: năm Test đã được xem nhiều lần trong nghiên cứu; bằng chứng sạch là kết quả paper trên dữ liệu mới.</div>`;
   }
-  // MANUAL: every order to place at this 4h close in one list; BOT: what the bot must keep doing
+  // BOT: what the bot must keep doing (MANUAL orders live in the coin cards)
   function renderProductPanels() {
-    const cl = $("manualChecklist"), bn = $("botNote"); if (!cl || !bn) return;
-    const prod = product(), cur = pipeOf(planPipe());
-    cl.hidden = !(prod === "manual" && cur?.product === "manual");
-    bn.hidden = !(prod === "bot" && cur?.product === "bot");
-    if (!bn.hidden) bn.innerHTML = `<div class="panel-h"><span>Vận hành bot · ${esc(cur.nm)}</span></div>
-      <ul class="bot-list"><li>Mỗi nến 4h: đặt lại toàn bộ thang lệnh limit bắt đáy theo bảng "Lệnh chờ bắt đáy" của từng coin (từ phút 16 đến hết nến).</li>
-      <li>Stop-loss lệnh bắt đáy do bot kích hoạt khi nến 5m đóng dưới mức SL; luôn đặt sẵn SL sàn 8σ phòng khi bot mất kết nối.</li>
-      <li>Lệnh bắt đáy còn mở cuối nến: bot đóng ở giá mở nến kế tiếp.</li>
-      <li>Rủi ro vận hành: nếu bot ngừng chạy, mô phỏng cho DD ~22% (chỉ còn SL sàn).</li></ul>`;
-    if (cl.hidden) return;
-    const plan = state.live.plan;
-    if (!plan?.coins) { cl.innerHTML = `<div class="panel-h"><span>Danh sách lệnh cần đặt</span></div><p class="muted">Chưa có kế hoạch lệnh (chờ chu kỳ 4h kế tiếp).</p>`; return; }
-    const rows = [];
-    for (const s of SYMS) {
-      const c = planOf(s); if (!c) continue;
-      const add = (kind, side, price, sl, tp, w, until, extra = "") => {
-        const l = w != null ? lot(s, w, price) : null;
-        const q = l ? `${l.txt} ${coin(s)}${l.ok ? "" : ' <span class="note warn">dưới mức tối thiểu</span>'}` : "—";
-        const txt = `${side} ${s} LIMIT ${fmtPx(price)}${l ? " qty " + l.txt : ""}${sl ? " SL " + fmtPx(sl) : ""}${tp ? " TP " + fmtPx(tp) : ""}`;
-        rows.push(`<tr><td class="sym">${coin(s)}</td><td>${kind}${extra}</td><td><span class="badge ${side === "BUY" ? "long" : "short"}">${side === "BUY" ? "MUA" : "BÁN"}</span></td>
-          <td class="m">${fmtPx(price)}</td><td class="m down">${sl ? fmtPx(sl) : "—"}</td><td class="m up">${tp ? fmtPx(tp) : "—"}</td><td>${q}</td>
-          <td class="small">${until ? dt(Date.parse(until)) : "—"}</td><td><button type="button" class="btn small copy-btn" data-copy="${esc(txt)}">Copy</button></td></tr>`);
-      };
-      if (c.state === "pending") add("Vào lệnh xu hướng", c.order.side, c.order.price, c.order.sl_if_filled, c.order.tp_if_filled, c.order.weight, c.order.valid_until);
-      if (c.state === "position" && c.order) add({ add: "Nhồi thêm", reduce: "Chốt bớt", close: "Đóng hết" }[c.order.kind] || c.order.kind,
-        c.order.side, c.order.price, null, null, c.order.kind === "add" ? c.order.amount : null, c.order.valid_until);
-      if (c.state === "position" && !c.order) {
-        const slm = lastEvent(s, ["sl_move"]);
-        if (recent(slm)) rows.push(`<tr><td class="sym">${coin(s)}</td><td>Sửa stop-loss</td><td>—</td><td class="m">—</td><td class="m down">${fmtPx(c.position.sl)}</td><td>—</td><td>—</td><td>—</td><td></td></tr>`);
-      }
-      for (const d of c.dips || []) if (!d.filled) add("Bắt đáy", "BUY", d.buy_limit, d.stop, d.tp, d.size_frac, d.active_until, ` ${d.rung}σ`);
-    }
-    const nextDec = plan.next_decision ? Date.parse(plan.next_decision) : null;
-    const barStart = plan.decision_bar ? Date.parse(plan.decision_bar) + 4 * 3600e3 : null;
-    const hr = barStart ? new Date(barStart).getHours() : null;
-    const night = hr != null && hr >= 1 && hr < 6;
-    cl.innerHTML = `<div class="panel-h"><span>Danh sách lệnh cần đặt · ${esc(cur.nm)}</span>
-        <span class="muted small">${nextDec ? "quyết định kế tiếp " + dt(nextDec) : ""}</span></div>
-      <div class="muted small">Đặt trong 15–30 phút sau khi nến 4h đóng; mỗi lệnh limit gắn sẵn SL (Stop Market) và TP (Limit).${night ? " <b>Nến ban đêm:</b> nếu không thức được, có thể bỏ qua nến này (mô phỏng: 5 năm vẫn ~5,2%/tháng)." : ""}</div>
-      <div class="table-wrap"><table class="tbl compact">${rows.length ? `<thead><tr><th>Coin</th><th>Lệnh</th><th>Chiều</th><th>Giá limit</th><th>Stop-loss</th><th>Take-profit</th><th>Khối lượng</th><th>Hiệu lực đến</th><th></th></tr></thead><tbody>${rows.join("")}</tbody>` : '<tbody><tr><td class="muted">Không có lệnh mới cần đặt ở nến này — giữ nguyên lệnh và SL/TP đang có trên sàn.</td></tr></tbody>'}</table></div>`;
-    cl.onclick = (e) => {
-      const b = e.target.closest(".copy-btn"); if (!b) return;
-      navigator.clipboard?.writeText(b.dataset.copy).then(() => toast("Đã copy: " + b.dataset.copy), () => toast(b.dataset.copy));
-    };
+    const bn = $("botNote"); if (!bn) return;
+    const cur = pipeOf(planPipe());
+    bn.hidden = !(product() === "bot" && cur?.product === "bot");
+    if (!bn.hidden) bn.innerHTML = `<b>Vận hành bot · ${esc(cur.nm)}</b><span>Mỗi nến 4h đặt lại toàn bộ lệnh bắt đáy (từ phút 16 đến hết nến).</span>
+      <span>SL bắt đáy kích hoạt khi nến 5m đóng dưới mức SL; luôn có SL sàn 8σ phòng mất kết nối.</span><span>Lệnh bắt đáy còn mở cuối nến: đóng ở giá mở nến sau.</span>`;
   }
   const PIPE_LABEL = Object.fromEntries(PIPES.map((p) => [p.v, p.nm]));
   function visiblePipes() {
@@ -708,18 +672,67 @@
       <span class="muted small">${plan?.next_decision ? "cập nhật kế tiếp " + dt(Date.parse(plan.next_decision)) : ""}</span></div>${compactPlan(sym)}
       <p class="fine">Hướng dẫn từng bước cho từng coin ở tab <a href="#todo">Pipeline</a>.</p>`;
   }
+  // orders to place now for one coin, from the selected pipeline's plan: entry / add / reduce / close / stop move / dip limits
+  function ordersFor(s) {
+    const c = planOf(s), out = []; if (!c) return out;
+    const add = (kind, side, price, sl, tp, w, until) => out.push({ kind, side, price, sl, tp, w, until });
+    if (c.state === "pending") add("Vào lệnh xu hướng", c.order.side, c.order.price, c.order.sl_if_filled, c.order.tp_if_filled, c.order.weight, c.order.valid_until);
+    if (c.state === "position" && c.order) add({ add: "Nhồi thêm", reduce: "Chốt bớt", close: "Đóng hết" }[c.order.kind] || c.order.kind,
+      c.order.side, c.order.price, null, null, c.order.kind === "add" ? c.order.amount : null, c.order.valid_until);
+    if (c.state === "position" && !c.order && recent(lastEvent(s, ["sl_move"]))) add("Sửa stop-loss", null, null, c.position.sl, null, null, null);
+    for (const d of c.dips || []) if (!d.filled) add(`Bắt đáy ${d.rung}σ`, "BUY", d.buy_limit, d.stop, d.tp, d.size_frac, d.active_until);
+    return out;
+  }
+  const kv = (k, v, cls = "") => `<div><dt>${k}</dt><dd class="${cls}">${v}</dd></div>`;
+  function orderRow(s, o) {
+    const l = o.w != null && o.price ? lot(s, o.w, o.price) : null;
+    const txt = o.side ? `${o.side} ${s} LIMIT ${fmtPx(o.price)}${l ? " qty " + l.txt : ""}${o.sl ? " SL " + fmtPx(o.sl) : ""}${o.tp ? " TP " + fmtPx(o.tp) : ""}`
+      : `${s} SL ${fmtPx(o.sl)}`;
+    const side = o.side ? `<span class="badge ${o.side === "BUY" ? "long" : "short"}">${o.side === "BUY" ? "MUA" : "BÁN"}</span>` : "";
+    return `<div class="ord"><div class="ord-top"><span class="ord-kind">${esc(o.kind)}</span>${side}
+        <button type="button" class="btn sm copy-btn" data-copy="${esc(txt)}" aria-label="Copy lệnh ${esc(o.kind)} ${coin(s)}">Copy</button></div>
+      <dl class="kv">${kv("Giá limit", o.price ? fmtPx(o.price) : "—")}${kv("Khối lượng", l ? `${l.txt} ${coin(s)}` : "—")}
+        ${kv("Stop-loss", o.sl ? fmtPx(o.sl) : "—", "down")}${kv("Take-profit", o.tp ? fmtPx(o.tp) : "—", "up")}</dl>
+      ${o.until ? `<div class="ord-foot">Huỷ nếu chưa khớp lúc ${dt(Date.parse(o.until))}</div>` : ""}${l && !l.ok ? `<div class="ord-foot warn">Dưới mức tối thiểu của sàn (${l.min} ${coin(s)})</div>` : ""}</div>`;
+  }
+  function coinBadge(s) {
+    const c = planOf(s);
+    if (c?.state === "position") return `<span class="badge ${c.position.side === "LONG" ? "long" : "short"}">GIỮ ${c.position.side}</span>`;
+    if (c?.state === "pending") return `<span class="badge ${c.order.side === "BUY" ? "long" : "short"}">CHỜ ${c.order.side === "BUY" ? "MUA" : "BÁN"}</span>`;
+    if ((c?.dips || []).some((d) => !d.filled)) return '<span class="badge dip">CHỜ BẮT ĐÁY</span>';
+    return '<span class="badge flat">ĐỨNG NGOÀI</span>';
+  }
+  function coinBody(s) {
+    if (state.live.planLoading) return '<p class="muted">Đang tải kế hoạch lệnh…</p>';
+    if (!state.live.plan) return `<p class="muted">Chưa có dữ liệu kế hoạch lệnh cho ${esc(PIPE_LABEL[planPipe()] || "pipeline này")}.</p>`;
+    const c = planOf(s), px = state.live.prices[s]?.c, parts = [];
+    if (c?.state === "position") {
+      const p = c.position, L = p.side === "LONG", u = px ? (L ? 1 : -1) * (px / p.avg_entry - 1) * 100 : p.upnl_pct;
+      parts.push(`<div class="pos ${L ? "long" : "short"}"><div class="pos-h"><span>Vị thế đang giữ</span><span id="cpl-${s}">${sgn(u)}</span></div>
+        <dl class="kv">${kv("Giá vào TB", fmtPx(p.avg_entry))}${kv("Khối lượng", `${qty(s, p.weight, p.avg_entry)} ${coin(s)}`)}
+          ${kv("Stop-loss", fmtPx(p.sl) + (p.break_even ? " · hoà vốn" : ""), "down")}${kv("Take-profit", fmtPx(p.tp), "up")}</dl></div>`);
+    }
+    const ords = ordersFor(s);
+    if (ords.length) parts.push(`<div class="ord-h">Lệnh cần đặt</div>` + ords.map((o) => orderRow(s, o)).join(""));
+    else parts.push(`<p class="coin-idle">${c?.state === "position" ? "Không cần đặt thêm lệnh — giữ nguyên SL/TP." : "Không có lệnh mới cho coin này."}</p>`);
+    return parts.join("");
+  }
   function renderCards() {
     const el = $("todoCards"); if (!el) return;
     if (!planPipe()) { el.innerHTML = accessMessage(); return; }
-    const plan = state.live.plan, nm = PIPE_LABEL[planPipe()] || "";
     el.innerHTML = SYMS.map((s) => {
       const p = state.live.prices[s];
-      return `<div class="panel plan card" id="card-${s}">
-        <div class="panel-h"><span>${coin(s)} · ${nm}</span>
-          <span class="card-price"><span class="px card-px" id="cpx-${s}">${p ? fmtPx(p.c) : ""}</span> <span class="small" id="cch-${s}">${p ? sgn((p.c / p.o - 1) * 100) : ""}</span></span></div>
-        <div id="cbox-${s}">${compactPlan(s)}</div>
-        <details class="steps-d"><summary>Hướng dẫn từng bước</summary>${planHtml(s)}</details></div>`;
+      return `<article class="coin-card" id="card-${s}">
+        <header class="coin-h"><span class="coin-name">${coin(s)}</span>
+          <span class="coin-px"><span class="px" id="cpx-${s}">${p ? fmtPx(p.c) : ""}</span> <span class="small" id="cch-${s}">${p ? sgn((p.c / p.o - 1) * 100) : ""}</span></span>
+          <span class="coin-badge">${coinBadge(s)}</span></header>
+        <div class="coin-body" id="cbox-${s}">${coinBody(s)}</div>
+        <details class="steps-d"><summary>Hướng dẫn từng bước</summary>${planHtml(s)}</details></article>`;
     }).join("");
+    el.onclick = (e) => {
+      const b = e.target.closest(".copy-btn"); if (!b) return;
+      navigator.clipboard?.writeText(b.dataset.copy).then(() => toast("Đã copy: " + b.dataset.copy), () => toast(b.dataset.copy));
+    };
   }
 
 
@@ -835,7 +848,7 @@
     if ($("cpx-" + sym)) {
       $("cpx-" + sym).textContent = fmtPx(p.c); $("cch-" + sym).innerHTML = sgn((p.c / p.o - 1) * 100);
       const box = $("cbox-" + sym); if (box && !(state.live.boxT?.[sym] > Date.now() - 2000)) {  // at most every 2 s
-        box.innerHTML = compactPlan(sym); (state.live.boxT ||= {})[sym] = Date.now();
+        box.innerHTML = coinBody(sym); (state.live.boxT ||= {})[sym] = Date.now();
       }
     }
     if ($("b-pl-" + sym)) { const b = boardCells(sym); $("b-pl-" + sym).innerHTML = b.pl; $("b-en-" + sym).innerHTML = b.px; }
