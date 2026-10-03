@@ -108,6 +108,7 @@ def test_failed_prerequisite_blocks_plans_and_records_failure(backend, monkeypat
     _, db, _ = backend
     pipe = importlib.import_module("backend.pipeline")
     calls = []
+    monkeypatch.setattr(pipe, "ensure_data", lambda **kw: calls.append("check") or {"message": "data check: nothing missing"})
     names = ["candles", "aggflow", "backfill", "shadow", "trade_plan"]
     for name, attr in zip(names, ["job_candles", "job_aggflow", "job_backfill", "job_shadow_fast", "job_trade_plan"]):
         def run(name=name):
@@ -118,7 +119,7 @@ def test_failed_prerequisite_blocks_plans_and_records_failure(backend, monkeypat
         monkeypatch.setattr(pipe, attr, run)
     with pytest.raises(RuntimeError, match=failed):
         pipe.job_cycle()
-    assert calls == names[:names.index(failed) + 1]
+    assert calls == ["check"] + names[:names.index(failed) + 1]
     assert db.kv_get("pipeline_input_check")["failed_step"] == failed
 
 
@@ -126,10 +127,11 @@ def test_periodic_refresh_checks_full_cycle_and_releases_lock(backend, monkeypat
     _, db, _ = backend
     pipe = importlib.import_module("backend.pipeline")
     calls = []
+    monkeypatch.setattr(pipe, "ensure_data", lambda **kw: calls.append("ensure_data") or {"message": "ok"})
     for attr in ["job_candles", "job_aggflow", "job_backfill", "job_shadow_fast", "job_trade_plan"]:
         monkeypatch.setattr(pipe, attr, lambda attr=attr: calls.append(attr) or "ok")
     assert pipe.refresh_candles_quietly()
-    assert calls == ["job_candles", "job_aggflow", "job_backfill", "job_shadow_fast", "job_trade_plan"]
+    assert calls == ["ensure_data", "job_candles", "job_aggflow", "job_backfill", "job_shadow_fast", "job_trade_plan"]
     assert db.kv_get("pipeline_input_check")["status"] == "complete"
     monkeypatch.setattr(pipe, "job_candles", lambda: (_ for _ in ()).throw(RuntimeError("gap")))
     assert not pipe.refresh_candles_quietly()
@@ -202,6 +204,7 @@ def test_startup_always_checks_and_resume_crossing_closes_runs_immediately(backe
         events.append(trigger)
         if len(events) > 1:
             raise StopScheduler()
+    monkeypatch.setattr(server, "_startup_check", lambda: run("startup"))
     def sleep(seconds):
         assert events == ["startup"]  # inspection happened before the first wait
         clock.current += timedelta(hours=8)
@@ -223,6 +226,7 @@ def test_startup_error_retries_instead_of_killing_scheduler(backend, monkeypatch
         raise StopScheduler()
     sleeps = []
     monkeypatch.setattr(server, "_run_cycle_until_done", run)
+    monkeypatch.setattr(server, "_startup_check", lambda: run("startup"))
     monkeypatch.setattr(server.time, "sleep", sleeps.append)
     with pytest.raises(StopScheduler):
         server._scheduler()
@@ -515,3 +519,213 @@ def test_old_coinbase_spot_research_holes_are_preserved(tmp_path, monkeypatch, k
     run = mod.update_coinbase if kind == "coinbase" else mod.update_spot
     assert run("BTC-USD" if kind == "coinbase" else "BTCUSDT", SimpleNamespace()) == 0
     assert len(pd.read_parquet(path)) == len(times)
+
+
+# ---------------------------------------------------------------- data completeness check (startup + every cycle)
+NOW = "2026-10-02T12:02:00Z"
+
+
+def complete_inputs(pipe, db, tmp_path, monkeypatch, now=NOW):
+    """A DB + plan folder where nothing is missing at `now` (BTCUSDT 4h only)."""
+    now_ms = pipe._ms(now)
+    step = pipe.H4_MS
+    last = now_ms // step * step - step
+    first = last - 10 * step
+    monkeypatch.setattr(pipe, "SYMS", ["BTCUSDT"])
+    monkeypatch.setattr(pipe, "INTERVALS", {"4h": step})
+    monkeypatch.setattr(pipe, "ROOT", tmp_path)
+    monkeypatch.setattr(pipe, "static_inputs_missing", lambda: [])
+    folder = tmp_path / pipe.PLAN_DIR
+    folder.mkdir(parents=True, exist_ok=True)
+    slot = pipe.due_slot(now_ms)
+    with db.write() as c:
+        c.executemany("INSERT INTO candles VALUES(?,?,?,?,?,?,?,?)",
+                      [("BTCUSDT", "4h", t, 1, 2, .5, 1.5, 10) for t in range(first, last + step, step)])
+        c.executemany("INSERT INTO equity(source, t, equity) VALUES(?, 1, 100)", [(f"tm_{p}",) for p in pipe.catalog.PIPELINES])
+    db.kv_set("candle_start_BTCUSDT_4h", first)
+    for p in pipe.catalog.PIPELINES:
+        bar = str(pd.Timestamp(slot, unit="ms", tz="UTC"))
+        db.kv_set(f"trade_plan_{p}", {"decision_bar": bar, "coins": {}})
+        db.kv_set(f"plan_status_{p}", {"completed_slot": slot})
+        db.kv_set(f"summary_tm_{p}", {"monthly_last_year": 1})
+        (folder / f"trade_plan_{p}.json").write_text(json.dumps({"decision_bar": bar}))
+    return now_ms
+
+
+def forbid(monkeypatch, pipe):
+    history = importlib.import_module("backend.history_tm")
+
+    def boom(*a, **kw):
+        raise AssertionError("no repair expected")
+    monkeypatch.setattr(pipe, "job_candles", boom)
+    monkeypatch.setattr(history, "build", boom)
+    return history
+
+
+def test_check_with_nothing_missing_does_no_work(backend, tmp_path, monkeypatch):
+    _, db, _ = backend
+    pipe = importlib.import_module("backend.pipeline")
+    now_ms = complete_inputs(pipe, db, tmp_path, monkeypatch)
+    forbid(monkeypatch, pipe)
+    for _ in range(2):  # idempotent
+        report = pipe.ensure_data(build_summaries=True, now_ms=now_ms)
+        assert report["candles"] == [] and report["plans_stale"] == {} and report["summaries_missing"] == []
+        assert report["fixed"] == [] and report["errors"] == [] and not report["candles_repaired"]
+        assert "nothing missing" in report["message"]
+    assert db.kv_get("data_check")["checked_at"] == now_ms
+
+
+def test_check_finds_candle_gaps_stale_plans_and_missing_replays(backend, tmp_path, monkeypatch):
+    _, db, _ = backend
+    pipe = importlib.import_module("backend.pipeline")
+    now_ms = complete_inputs(pipe, db, tmp_path, monkeypatch)
+    history = forbid(monkeypatch, pipe)
+    step = pipe.H4_MS
+    last = now_ms // step * step - step
+    with db.write() as c:  # an interior hole and a stale end
+        c.execute("DELETE FROM candles WHERE t IN (?, ?)", (last - 5 * step, last))
+        c.execute("DELETE FROM equity WHERE source = 'tm_v301'")  # summary present but its replay rows are gone
+    db.kv_set("summary_tm_v342", None)
+    db.kv_set("trade_plan_v367", {})
+    (tmp_path / pipe.PLAN_DIR / "trade_plan_v315.json").unlink()
+    repaired, built = [], []
+    monkeypatch.setattr(pipe, "job_candles", lambda: repaired.append(1) or "candles upserted: 2")
+    monkeypatch.setattr(history, "build", lambda p, db: built.append(p) or f"tm_{p}: rebuilt")
+    report = pipe.ensure_data(build_summaries=True, now_ms=now_ms)
+    assert any("missing at the end" in x for x in report["candles"]) and any("interior gap" in x for x in report["candles"])
+    assert repaired == [1] and report["candles_repaired"]
+    assert report["plans_stale"] == {"v367": "no stored plan", "v315": "plan file missing"}
+    ranked = pipe.catalog.ranked()
+    assert built == sorted(["v301", "v342"], key=ranked.index)  # best first, only the missing ones
+    # A failing candle repair is reported as an input error, never raised.
+    monkeypatch.setattr(pipe, "job_candles", lambda: (_ for _ in ()).throw(RuntimeError("binance down")))
+    report = pipe.ensure_data(now_ms=now_ms)
+    assert report["errors"] and "binance down" in report["errors"][0] and not report["candles_repaired"]
+    with pytest.raises(RuntimeError, match="binance down"):
+        pipe.job_check()
+
+
+def test_old_plan_decision_bar_is_stale(backend, tmp_path, monkeypatch):
+    _, db, _ = backend
+    pipe = importlib.import_module("backend.pipeline")
+    now_ms = complete_inputs(pipe, db, tmp_path, monkeypatch)
+    old = str(pd.Timestamp(pipe.due_slot(now_ms) - pipe.H4_MS, unit="ms", tz="UTC"))
+    db.kv_set("trade_plan_v340", {"decision_bar": old})
+    assert pipe.stale_plans(now_ms) == {"v340": "plan older than the last closed 4h bar"}
+    # the next bar makes every plan stale
+    assert set(pipe.stale_plans(now_ms + pipe.H4_MS)) == set(pipe.catalog.PIPELINES)
+
+
+def test_failed_replay_build_is_not_retried_every_refresh(backend, monkeypatch):
+    _, db, _ = backend
+    pipe = importlib.import_module("backend.pipeline")
+    history = importlib.import_module("backend.history_tm")
+    monkeypatch.setattr(pipe, "missing_summaries", lambda: ["v342"])
+    calls = []
+
+    def build(p, db):
+        calls.append(p)
+        raise RuntimeError("research cache missing")
+    monkeypatch.setattr(history, "build", build)
+    with pytest.raises(RuntimeError, match="research cache missing"):
+        pipe.build_missing_summaries()
+    assert "skipped" in pipe.build_missing_summaries() and calls == ["v342"]
+    with pytest.raises(RuntimeError):
+        pipe.build_missing_summaries(force=True)
+    assert calls == ["v342", "v342"]
+    monkeypatch.setattr(history, "build", lambda p, db: f"tm_{p}: ok")
+    assert pipe.build_missing_summaries(force=True) == "summaries: tm_v342: ok"
+    assert db.kv_get(pipe.SUMMARY_FAILURES_KEY) == {}
+
+
+def test_cycle_checks_first_then_plans_best_first_then_missing_replays(backend, tmp_path, monkeypatch):
+    _, db, _ = backend
+    pipe = importlib.import_module("backend.pipeline")
+    history = importlib.import_module("backend.history_tm")
+    now_ms = complete_inputs(pipe, db, tmp_path, monkeypatch, now=pd.Timestamp(db.now_ms(), unit="ms", tz="UTC"))
+    step = pipe.H4_MS
+    with db.write() as c:  # the newest closed candle is not stored yet
+        c.execute("DELETE FROM candles WHERE t = ?", (now_ms // step * step - step,))
+    db.kv_set("summary_tm_v342", None)  # missing replay
+    db.kv_set("summary_tm_v362", {"monthly_last_year": 99, "gate_dd": 10, "win_hidden": .7})  # now the best pipeline
+    calls = []
+    for attr in ["job_candles", "job_aggflow", "job_backfill", "job_shadow_fast"]:
+        monkeypatch.setattr(pipe, attr, lambda attr=attr: calls.append(attr) or "ok")
+    slot = db.now_ms() // step * step
+    for p in pipe.catalog.PIPELINES:
+        (tmp_path / pipe.PLAN_DIR / f"trade_plan_{p}.json").write_text(json.dumps({
+            "decision_bar": str(pd.Timestamp(slot, unit="ms", tz="UTC")), "coins": {}, "net_return_pct": 0, "bars": []}))
+        db.kv_set(f"plan_status_{p}", None)
+
+    def run(cmd, **kw):
+        calls.append(cmd[cmd.index("--candidate") + 1] if "--candidate" in cmd else "scorecard")
+        return SimpleNamespace(returncode=0, stderr="", stdout="")
+    monkeypatch.setattr(pipe.subprocess, "run", run)
+    monkeypatch.setattr(history, "store_paper", lambda *a: None)
+    monkeypatch.setattr(history, "build", lambda p, db: calls.append("build " + p) or f"tm_{p}: ok")
+    msg = pipe.job_cycle()
+    candidates = [pipe.catalog.PIPELINES[p]["candidate"] for p in pipe.catalog.ranked()]
+    assert candidates[0] == "v362_M4"
+    # the check repaired the candle (so the candle step does not fetch again), then the inputs, the plans best first,
+    # the missing replay, and the scorecard
+    assert calls == ["job_candles", "job_aggflow", "job_backfill", "job_shadow_fast", *candidates, "build v342", "scorecard"]
+    assert "data check:" in msg and "repaired by the data check" in msg
+    assert db.kv_get("data_check")["summaries_missing"] == ["v342"]
+
+
+@pytest.mark.parametrize("case", ["stale", "summaries", "clean", "failed"])
+def test_startup_check_then_cycle_only_when_needed(backend, monkeypatch, case):
+    _, db, _ = backend
+    server = importlib.import_module("backend.server")
+    events = []
+    report = {"plans_stale": {"v321": "no stored plan"} if case == "stale" else {},
+              "summaries_missing": ["v342"] if case == "summaries" else []}
+
+    def check():
+        events.append("check")
+        db.kv_set(server.pipeline.DATA_CHECK_KEY, report)
+        if case == "failed":
+            raise RuntimeError("candles: binance down")
+        return "data check"
+    monkeypatch.setattr(server.pipeline, "job_check", check)
+    monkeypatch.setattr(server.pipeline, "job_summaries", lambda: events.append("summaries") or "ok")
+    monkeypatch.setattr(server, "_run_cycle_until_done", lambda trigger: events.append("cycle " + trigger))
+    monkeypatch.setattr(server, "_cycle_incomplete", lambda t: False)
+    server._startup_check()
+    expected = {"stale": ["check", "cycle startup"], "summaries": ["check", "summaries"], "clean": ["check"],
+                "failed": ["check", "cycle startup"]}[case]
+    assert events == expected
+    job = db.one("SELECT kind, status, triggered_by FROM jobs WHERE kind = 'check'")
+    assert job == {"kind": "check", "status": "failed" if case == "failed" else "done", "triggered_by": "startup"}
+
+
+def test_startup_check_is_skipped_while_another_job_runs(backend, monkeypatch):
+    server = importlib.import_module("backend.server")
+    events = []
+    monkeypatch.setattr(server.pipeline, "job_check", lambda: events.append("check") or "ok")
+    monkeypatch.setattr(server, "_run_cycle_until_done", lambda trigger: events.append("cycle " + trigger))
+    assert server.pipeline._job_lock.acquire(blocking=False)
+    try:
+        server._startup_check()
+    finally:
+        server.pipeline._job_lock.release()
+    assert events == ["cycle startup"]  # no concurrent check; the cycle retries until the lock is free
+
+
+@pytest.mark.parametrize("enabled", [True, False])
+def test_server_startup_launches_background_scheduler_only_when_enabled(backend, monkeypatch, enabled):
+    from dataclasses import replace
+    config, _, _ = backend
+    server = importlib.import_module("backend.server")
+    monkeypatch.setattr(server, "SETTINGS", replace(config.SETTINGS, scheduler_enabled=enabled))
+    started = []
+
+    class Thread:
+        def __init__(self, target, name, daemon):
+            started.append((target, daemon))
+
+        def start(self):
+            started.append("start")
+    monkeypatch.setattr(server.threading, "Thread", Thread)
+    server._startup()
+    assert started == ([(server._scheduler, True), "start"] if enabled else [])

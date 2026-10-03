@@ -1,6 +1,8 @@
 """Pipeline jobs that fill the web database. The API never runs the pipeline; these jobs do (scheduled or by admin).
 
-- candles:     Binance USD-M 4h / 1h / 1d klines for the five majors (incremental).
+- check:       ensure_data(): one data-completeness pass (candle gaps repaired, stale trade plans and missing walk-forward
+               replays found / rebuilt); runs at backend startup and as the first step of every cycle.
+- candles:    Binance USD-M 4h / 1h / 1d klines for the five majors (incremental).
 - signal:      the frozen v205 pipeline for the latest closed 4h bar (scripts/v197_advisor.py), stored as a 'live' run.
 - forward:     prospective paper trading of v205 since its freeze (scripts/forward_v205.py) -> equity('forward').
 - walkforward: one-off backfill of the out-of-sample 2021-2026 replay (engine_user): per-bar target weights with
@@ -309,6 +311,189 @@ def job_trade_plan() -> str:
     return " | ".join(msgs)
 
 
+# ---------------------------------------------------------------- data completeness check (startup + every cycle)
+DATA_CHECK_KEY = "data_check"
+SUMMARY_FAILURES_KEY = "summary_build_failures"
+PLAN_DIR = "artifacts/research/advisor_shadow"
+
+
+def due_slot(now_ms: int | None = None) -> int:
+    """Start of the 4h bar whose trade plans must exist now (the previous bar until the schedule offset has passed)."""
+    now_ms = db.now_ms() if now_ms is None else now_ms
+    slot = now_ms // H4_MS * H4_MS
+    return slot - H4_MS if now_ms < slot + SETTINGS.schedule_offset_minutes * 60_000 else slot
+
+
+def candle_gaps(now_ms: int | None = None) -> list[str]:
+    """Cheap SQL-only inspection of the stored klines: missing series, stale last closed candle, interior holes, and an
+    unverified or truncated history start. The repair itself is job_candles (exact gap ranges + refetch)."""
+    now_ms = db.now_ms() if now_ms is None else now_ms
+    issues = []
+    for sym in SYMS:
+        for iv, step in INTERVALS.items():
+            name = f"{sym} {iv}"
+            last = now_ms // step * step - step  # newest closed candle (never the forming one)
+            r = db.one("SELECT COUNT(*) AS n, MIN(t) AS a, MAX(t) AS b FROM candles WHERE symbol = ? AND interval = ?", (sym, iv))
+            if not r or not r["n"]:
+                issues.append(f"{name}: no candles")
+                continue
+            if r["b"] < last:
+                issues.append(f"{name}: {(last - r['b']) // step} closed candle(s) missing at the end")
+            holes = (r["b"] - r["a"]) // step + 1 - r["n"]
+            if holes > 0:
+                issues.append(f"{name}: {holes} interior gap candle(s)")
+            known = db.kv_get(f"candle_start_{sym}_{iv}")
+            if known is None:
+                issues.append(f"{name}: history start not verified yet")
+            elif r["a"] > known:
+                issues.append(f"{name}: {(r['a'] - known) // step} candle(s) missing at the start")
+    return issues
+
+
+def stale_plans(now_ms: int | None = None) -> dict[str, str]:
+    """Catalog pipelines (best first) whose trade plan is missing in the DB, missing on disk, or older than the due 4h bar."""
+    slot = due_slot(now_ms)
+    out = {}
+    for pipe in catalog.ranked():
+        plan = db.kv_get(f"trade_plan_{pipe}")
+        done = (db.kv_get(f"plan_status_{pipe}", {}) or {}).get("completed_slot")
+        reason = None
+        if not plan:
+            reason = "no stored plan"
+        elif not isinstance(done, int) or done < slot:
+            reason = "not completed for the due 4h bar"
+        elif not (ROOT / PLAN_DIR / f"trade_plan_{pipe}.json").exists():
+            reason = "plan file missing"
+        else:
+            try:
+                if _ms(plan["decision_bar"]) < slot:
+                    reason = "plan older than the last closed 4h bar"
+            except Exception:  # noqa: BLE001 - an unparseable bar is judged by the completion marker alone
+                pass
+        if reason:
+            out[pipe] = reason
+    return out
+
+
+def missing_summaries() -> list[str]:
+    """Catalog pipelines (best first) without a walk-forward replay: summary_tm_<p> missing or no tm_<p> equity rows."""
+    return [p for p in catalog.ranked()
+            if not db.kv_get(f"summary_tm_{p}")
+            or not db.one("SELECT 1 AS x FROM equity WHERE source = ? LIMIT 1", (f"tm_{p}",))]
+
+
+def static_inputs_missing() -> list[str]:
+    """Frozen research inputs the replays and plans read; they cannot be rebuilt here, only reported."""
+    from . import history_tm
+    paths = [history_tm.SIZE_TABLE, history_tm.G2_TABLE, history_tm.R2_TABLE, RD / "engine_user/engine_user.py",
+             ROOT / "scripts/forward_trade.py"]
+    return [str(p.relative_to(ROOT)) if p.is_relative_to(ROOT) else str(p) for p in paths if not p.exists()]
+
+
+def build_missing_summaries(force: bool = False) -> str:
+    """history_tm.build (~1-3 min each) only for catalog pipelines whose replay is missing, best first. A pipeline whose
+    build failed is retried at most once per 4h unless forced, so the 15-minute refresh does not loop on it."""
+    missing = missing_summaries()
+    if not missing:
+        return "summaries: complete"
+    from . import history_tm
+    failures = db.kv_get(SUMMARY_FAILURES_KEY, {}) or {}
+    now = db.now_ms()
+    msgs, failed = [], []
+    for pipe in missing:
+        prev = failures.get(pipe) or {}
+        if not force and now - int(prev.get("at", 0)) < H4_MS:
+            msgs.append(f"tm_{pipe} skipped (build failed {(now - prev['at']) // 60_000} min ago)")
+            continue
+        log.info("data check: building the missing walk-forward replay tm_%s", pipe)
+        try:
+            msgs.append(history_tm.build(pipe, db))
+            failures.pop(pipe, None)
+        except Exception as exc:  # noqa: BLE001 - one broken replay must not stop the others
+            err = f"{type(exc).__name__}: {exc}"[:500]
+            failures[pipe] = {"at": now, "error": err}
+            msgs.append(f"tm_{pipe} FAILED: {err}")
+            failed.append(pipe)
+            log.error("data check: tm_%s build failed: %s", pipe, err)
+    db.kv_set(SUMMARY_FAILURES_KEY, failures)
+    msg = "summaries: " + " | ".join(msgs)
+    if failed:
+        raise RuntimeError(msg)
+    return msg
+
+
+def ensure_data(build_summaries: bool = False, now_ms: int | None = None) -> dict:
+    """One data-completeness pass: inspect everything the pipelines need and repair what can be repaired.
+
+    candles   (5 majors x 4h/1h/1d) gaps or a stale last closed candle -> job_candles (gap ranges refetched)
+    plans     trade_plan_<p> missing in the DB / on disk / older than the due 4h bar -> reported (plans_stale); the caller
+              runs the pipeline cycle, which regenerates them best first
+    summaries summary_tm_<p> or its tm_<p> rows missing -> history_tm.build, only when build_summaries (slow)
+    static    frozen research tables / engine files missing -> reported only
+
+    Idempotent and cheap (a few indexed SQL reads) when nothing is missing. Never raises: problems land in the report
+    ('errors' = input repairs that failed, 'warnings' = non-blocking), which is also stored in kv 'data_check'."""
+    now_ms = db.now_ms() if now_ms is None else now_ms
+    report = {"checked_at": now_ms, "due_slot": due_slot(now_ms), "candles": [], "candles_repaired": False,
+              "plans_stale": {}, "summaries_missing": [], "static_missing": [], "fixed": [], "errors": [], "warnings": []}
+
+    def guard(section, fn):
+        try:
+            return fn()
+        except Exception as exc:  # noqa: BLE001 - the check must never take the server down
+            report["errors" if section == "candles" else "warnings"].append(f"{section}: {type(exc).__name__}: {exc}"[:600])
+            return None
+
+    report["candles"] = guard("candles", lambda: candle_gaps(now_ms)) or []
+    if report["candles"]:
+        msg = guard("candles", job_candles)
+        if msg is not None:
+            report["candles_repaired"] = True
+            report["fixed"].append(msg)
+    report["summaries_missing"] = guard("summaries", missing_summaries) or []
+    if build_summaries and report["summaries_missing"]:
+        msg = guard("summaries", build_missing_summaries)
+        if msg is not None:
+            report["fixed"].append(msg)
+        report["summaries_missing"] = guard("summaries", missing_summaries) or []
+    report["plans_stale"] = guard("plans", lambda: stale_plans(now_ms)) or {}
+    report["static_missing"] = guard("static", static_inputs_missing) or []
+    if report["static_missing"]:
+        report["warnings"].append("static inputs missing (not repairable here): " + ", ".join(report["static_missing"]))
+
+    found = []
+    if report["candles"]:
+        found.append(f"candles {len(report['candles'])} issue(s) ({'; '.join(report['candles'][:3])})")
+    if report["plans_stale"]:
+        found.append("stale plans " + ", ".join(f"{p} ({r})" for p, r in report["plans_stale"].items()))
+    if report["summaries_missing"]:
+        found.append("missing replays " + ", ".join(report["summaries_missing"]))
+    parts = ["data check: " + ("; ".join(found) if found else "nothing missing")]
+    if report["fixed"]:
+        parts.append("fixed: " + " | ".join(report["fixed"]))
+    if report["errors"] or report["warnings"]:
+        parts.append("problems: " + " | ".join(report["errors"] + report["warnings"]))
+    report["message"] = " - ".join(parts)[:4000]
+    try:
+        db.kv_set(DATA_CHECK_KEY, report)
+    except Exception as exc:  # noqa: BLE001
+        log.warning("data check: report not stored: %r", exc)
+    (log.warning if report["errors"] else log.info)("%s", report["message"][:1500])
+    return report
+
+
+def job_check() -> str:
+    """Jobs-table wrapper of the fast check (no replay builds): fails when an input repair failed."""
+    report = ensure_data(build_summaries=False)
+    if report["errors"]:
+        raise RuntimeError(report["message"])
+    return report["message"]
+
+
+def job_summaries() -> str:
+    return build_missing_summaries()
+
+
 # ---------------------------------------------------------------- walk-forward history (one-off, heavy)
 def _load(name, path):
     spec = importlib.util.spec_from_file_location(name, path)
@@ -524,12 +709,24 @@ def job_walkforward_tm() -> str:
 
 
 def job_cycle() -> str:
-    """Scheduled cycle after each 4h close: candles + whale flow -> gap check + as-of backfill of missed bars -> the member advisors
-    (O1 flow set + Coinbase member) -> the five pipelines' trade plans. The retired research logs (full shadow log, v205 live signal,
-    v205 forward, dip log) no longer run."""
+    """Scheduled cycle after each 4h close: data check (ensure_data: candle gaps repaired, stale plans / missing replays
+    found) -> candles + whale flow -> gap check + as-of backfill of missed bars -> the member advisors (O1 flow set + Coinbase
+    member) -> every catalog pipeline's trade plan, best pipeline first (plan_order) -> missing walk-forward replays (slow, so
+    after the plans) -> scorecard. The retired research logs (full shadow log, v205 live signal, v205 forward, dip log) no
+    longer run."""
     out, failures, t0 = [], [], datetime.now(timezone.utc)
     db.kv_set("pipeline_input_check", {"status": "checking", "started_at": db.now_ms()})
-    for name, fn in (("candles", job_candles), ("aggflow", job_aggflow), ("backfill", job_backfill), ("shadow", job_shadow_fast), ("trade_plan", job_trade_plan)):
+    check: dict = {}
+
+    def data_check():
+        check.update(ensure_data(build_summaries=False))
+        return check["message"]
+
+    def candles():  # the check already ran the full candle repair successfully: do not fetch twice in one cycle
+        return "candles: repaired by the data check" if check.get("candles_repaired") else job_candles()
+
+    for name, fn in (("check", data_check), ("candles", candles), ("aggflow", job_aggflow), ("backfill", job_backfill),
+                     ("shadow", job_shadow_fast), ("trade_plan", job_trade_plan)):
         try:
             out.append(fn())
         except Exception as exc:
@@ -542,6 +739,11 @@ def job_cycle() -> str:
     if failures:
         raise RuntimeError(" | ".join(out))
     db.kv_set("pipeline_input_check", {"status": "complete", "checked_at": db.now_ms()})
+    if check.get("summaries_missing"):  # display/ranking data only: never blocks or delays the plans
+        try:
+            out.append(build_missing_summaries())
+        except Exception as exc:  # noqa: BLE001
+            out.append(f"summaries incomplete: {exc}"[:1000])
     try:  # prospective scorecard (live paper vs walk-forward expectation); informational, never blocks the cycle
         sc = subprocess.run([SETTINGS.python_exe, str(ROOT / "scripts/prospective_scorecard.py")], cwd=str(ROOT), capture_output=True, text=True,
                             timeout=600)

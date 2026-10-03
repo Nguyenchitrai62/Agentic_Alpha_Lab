@@ -440,7 +440,7 @@ def admin_run(payload: dict = Body(...), user: dict = Depends(auth.require_admin
     kind = payload.get("kind", "cycle")
     fns = {"cycle": pipeline.job_cycle, "signal": pipeline.job_signal, "candles": pipeline.job_candles, "trade_plan": pipeline.job_trade_plan, "shadow": pipeline.job_shadow,
            "forward": pipeline.job_forward, "walkforward": pipeline.job_walkforward,
-           "walkforward_tm": pipeline.job_walkforward_tm}
+           "walkforward_tm": pipeline.job_walkforward_tm, "check": pipeline.job_check, "summaries": pipeline.job_summaries}
     if not isinstance(kind, str) or kind not in fns:
         raise HTTPException(400, f"kind must be one of {list(fns)}")
 
@@ -525,14 +525,28 @@ def _run_cycle_until_done(trigger: str):
 
 
 def _due_slot(now_ms: int) -> int:
-    slot = now_ms // pipeline.H4_MS * pipeline.H4_MS
-    return slot - pipeline.H4_MS if now_ms < slot + SETTINGS.schedule_offset_minutes * 60_000 else slot
+    return pipeline.due_slot(now_ms)
 
 
 def _cycle_incomplete(now_ms: int) -> bool:
     slot = _due_slot(now_ms)
     return any((db.kv_get(f"plan_status_{p}", {}) or {}).get("completed_slot", 0) < slot
                or not db.kv_get(f"trade_plan_{p}") for p in catalog.PIPELINES)
+
+
+def _startup_check():
+    """Backend start: the data check runs at once (candle gaps repaired, stale plans / missing replays found), then the
+    pipeline cycle (best pipeline first) if any plan is stale or the check could not finish; otherwise only the missing
+    walk-forward replays are rebuilt. Both go through pipeline.run_job, so they never overlap another job."""
+    _heartbeat["t"] = datetime.now(timezone.utc).isoformat()
+    result = pipeline.run_job("check", pipeline.job_check, "startup")
+    clear_cache()
+    report = db.kv_get(pipeline.DATA_CHECK_KEY) or {}
+    if result["status"] != "done" or report.get("plans_stale") or _cycle_incomplete(db.now_ms()):
+        _run_cycle_until_done("startup")  # the cycle also builds missing replays, after the plans
+    elif report.get("summaries_missing"):
+        pipeline.run_job("summaries", pipeline.job_summaries, "startup")
+        clear_cache()
 
 
 def _scheduler():
@@ -542,9 +556,11 @@ def _scheduler():
     while True:
         try:
             # Always inspect/repair inputs immediately at startup, even if completion markers look current.
-            if startup or _cycle_incomplete(db.now_ms()):
-                _run_cycle_until_done("startup" if startup else "catch-up")
+            if startup:
+                _startup_check()
                 startup = False
+            elif _cycle_incomplete(db.now_ms()):
+                _run_cycle_until_done("catch-up")
             now = datetime.now(timezone.utc)
             nxt = now.replace(minute=0, second=0, microsecond=0) + timedelta(hours=4 - now.hour % 4, minutes=SETTINGS.schedule_offset_minutes)
             if nxt - now > timedelta(hours=4):
