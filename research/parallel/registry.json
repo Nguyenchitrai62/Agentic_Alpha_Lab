@@ -2,7 +2,7 @@
   "schema_version": 1,
   "project": "Agentic Alpha Lab BTC swing research",
   "created_at": "2026-09-06T00:00:00Z",
-  "next_version": 361,
+  "next_version": 362,
   "control": {
     "coordinator_model": "gpt-5.6-sol",
     "coordinator_reasoning": "high",
@@ -54,7 +54,7 @@
     "expected_workers": 3,
     "version_range": [
       45,
-      360
+      361
     ],
     "parent_commit": "1ecf947baddd5ef78444670330e9db62128dad50",
     "cloud_snapshot": {
@@ -15290,7 +15290,7 @@
       "version": "v358",
       "track": "B",
       "direction_key": "v358-m3-risk-level",
-      "status": "running",
+      "status": "rejected",
       "parent_versions": [
         "v357"
       ],
@@ -15303,9 +15303,36 @@
       "write_scope": "research/parallel/rounds/parallel-20260906-r2/v358",
       "worker_agent_id": "01a07791-eecb-7053-8866-dcdbe31e84d7",
       "worker_host_id": "local",
-      "result_manifest": null,
+      "result_manifest": "research\\parallel\\rounds\\parallel-20260906-r2\\v358\\result_manifest.json",
       "registered_at": "2026-10-03T08:19:54.392698Z",
-      "assigned_at": "2026-10-03T08:19:54.392698Z"
+      "assigned_at": "2026-10-03T08:19:54.392698Z",
+      "result_manifest_sha256": "1a559a592b0923e85f881f1509953fd59e2b3a6b11d026c2b7cdf3b03911ca17",
+      "result_summary": {
+        "scenarios": {
+          "normal": {
+            "monthly_geometric_net_percent": 6.233,
+            "max_drawdown_percent": 17.73,
+            "fills": 2404,
+            "months": 48
+          },
+          "fee_stress": {
+            "monthly_geometric_net_percent": 6.233,
+            "max_drawdown_percent": 17.73,
+            "fills": 2404,
+            "months": 48
+          },
+          "execution_stress": {
+            "monthly_geometric_net_percent": 6.233,
+            "max_drawdown_percent": 17.73,
+            "fills": 2404,
+            "months": 48
+          }
+        },
+        "independent_test": false,
+        "live_approved": false,
+        "audit_notes": "COMPARISON.md verdict PASS"
+      },
+      "audited_at": "2026-10-03T09:01:04.078702Z"
     },
     {
       "version": "v359",
@@ -15348,7 +15375,28 @@
       "result_manifest": null,
       "registered_at": "2026-10-03T08:59:57.993288Z",
       "assigned_at": "2026-10-03T08:59:57.993288Z"
+    },
+    {
+      "version": "v361",
+      "track": "B",
+      "direction_key": "v361-m3-entry-depth",
+      "status": "running",
+      "parent_versions": [
+        "v360"
+      ],
+      "model_family": "hist-gradient-boosting",
+      "objective": "pullback entry depth of the MANUAL book in M3",
+      "data_contract": "kpack inputs",
+      "policy_contract": "M3 k_entry 0.75 vs 0.50 vs 1.00; folds k=2,3; last year once",
+      "hypothesis": "With dip limits in the account the best book entry depth may differ",
+      "parent_commit": "1ecf947baddd5ef78444670330e9db62128dad50",
+      "write_scope": "research/parallel/rounds/parallel-20260906-r2/v361",
+      "worker_agent_id": "01a07791-eecb-7053-8866-dcdbe31e84d7",
+      "worker_host_id": "local",
+      "result_manifest": null,
+      "registered_at": "2026-10-03T09:01:04.074186Z",
+      "assigned_at": "2026-10-03T09:01:04.074186Z"
     }
   ],
-  "updated_at": "2026-10-03T08:59:57.998795Z"
+  "updated_at": "2026-10-03T09:01:04.078702Z"
 }
