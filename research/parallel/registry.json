@@ -2,7 +2,7 @@
   "schema_version": 1,
   "project": "Agentic Alpha Lab BTC swing research",
   "created_at": "2026-09-06T00:00:00Z",
-  "next_version": 335,
+  "next_version": 336,
   "control": {
     "coordinator_model": "gpt-5.6-sol",
     "coordinator_reasoning": "high",
@@ -54,7 +54,7 @@
     "expected_workers": 3,
     "version_range": [
       45,
-      334
+      335
     ],
     "parent_commit": "1ecf947baddd5ef78444670330e9db62128dad50",
     "cloud_snapshot": {
@@ -14042,7 +14042,7 @@
       "version": "v332",
       "track": "C",
       "direction_key": "v332-pooled-short-and-big",
-      "status": "running",
+      "status": "rejected",
       "parent_versions": [
         "v329"
       ],
@@ -14055,9 +14055,36 @@
       "write_scope": "research/parallel/rounds/parallel-20260906-r2/v332",
       "worker_agent_id": "01a07748-5adc-7061-8052-0ed36705a8a8",
       "worker_host_id": "local",
-      "result_manifest": null,
+      "result_manifest": "research\\parallel\\rounds\\parallel-20260906-r2\\v332\\result_manifest.json",
       "registered_at": "2026-10-03T00:57:10.020854Z",
-      "assigned_at": "2026-10-03T00:57:10.020854Z"
+      "assigned_at": "2026-10-03T00:57:10.020854Z",
+      "result_manifest_sha256": "0fe35cc4f72fc4755475a3e75e3e03aaedc62099f1c971a386fa65dcab834b07",
+      "result_summary": {
+        "scenarios": {
+          "normal": {
+            "monthly_geometric_net_percent": 3.011,
+            "max_drawdown_percent": 17.95,
+            "fills": 995,
+            "months": 48
+          },
+          "fee_stress": {
+            "monthly_geometric_net_percent": 3.011,
+            "max_drawdown_percent": 17.95,
+            "fills": 995,
+            "months": 48
+          },
+          "execution_stress": {
+            "monthly_geometric_net_percent": 3.011,
+            "max_drawdown_percent": 17.95,
+            "fills": 995,
+            "months": 48
+          }
+        },
+        "independent_test": false,
+        "live_approved": false,
+        "audit_notes": "rows, fold choices, transfer flags and final rows replicated; one-anchor member / table refits equal the caches; feature timing, label and fit windows, no most-recent-year number in any choice (v324_v333_audit/COMPARISON.md)"
+      },
+      "audited_at": "2026-10-03T01:05:42.241087Z"
     },
     {
       "version": "v333",
@@ -14100,7 +14127,28 @@
       "result_manifest": null,
       "registered_at": "2026-10-03T00:58:12.834076Z",
       "assigned_at": "2026-10-03T00:58:12.834076Z"
+    },
+    {
+      "version": "v335",
+      "track": "C",
+      "direction_key": "v335-manual-daily-cadence",
+      "status": "running",
+      "parent_versions": [
+        "v332"
+      ],
+      "model_family": "trade-cadence-grid",
+      "objective": "MANUAL: a once-a-day decision cadence a human can follow, judged at 60-minute latency",
+      "data_contract": "audited caches; M2 books; most recent year once",
+      "policy_contract": "M2 rules; decisions only at one daily close; native SL/TP always active",
+      "hypothesis": "a daily cadence keeps most of M2's edge and is robust to human latency",
+      "parent_commit": "1ecf947baddd5ef78444670330e9db62128dad50",
+      "write_scope": "research/parallel/rounds/parallel-20260906-r2/v335",
+      "worker_agent_id": "01a07748-5adc-7061-8052-0ed36705a8a8",
+      "worker_host_id": "local",
+      "result_manifest": null,
+      "registered_at": "2026-10-03T01:05:42.234152Z",
+      "assigned_at": "2026-10-03T01:05:42.234152Z"
     }
   ],
-  "updated_at": "2026-10-03T00:58:12.838210Z"
+  "updated_at": "2026-10-03T01:05:42.241087Z"
 }
