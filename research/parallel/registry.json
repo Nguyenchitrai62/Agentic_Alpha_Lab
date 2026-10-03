@@ -2,7 +2,7 @@
   "schema_version": 1,
   "project": "Agentic Alpha Lab BTC swing research",
   "created_at": "2026-09-06T00:00:00Z",
-  "next_version": 354,
+  "next_version": 355,
   "control": {
     "coordinator_model": "gpt-5.6-sol",
     "coordinator_reasoning": "high",
@@ -54,7 +54,7 @@
     "expected_workers": 3,
     "version_range": [
       45,
-      353
+      354
     ],
     "parent_commit": "1ecf947baddd5ef78444670330e9db62128dad50",
     "cloud_snapshot": {
@@ -14954,7 +14954,7 @@
       "version": "v351",
       "track": "C",
       "direction_key": "v351-quarterly-basis-member",
-      "status": "running",
+      "status": "rejected",
       "parent_versions": [
         "v350"
       ],
@@ -14967,9 +14967,36 @@
       "write_scope": "research/parallel/rounds/parallel-20260906-r2/v351",
       "worker_agent_id": "01a07748-5adc-7061-8052-0ed36705a8a8",
       "worker_host_id": "local",
-      "result_manifest": null,
+      "result_manifest": "research\\parallel\\rounds\\parallel-20260906-r2\\v351\\result_manifest.json",
       "registered_at": "2026-10-03T05:29:05.426969Z",
-      "assigned_at": "2026-10-03T05:29:05.426969Z"
+      "assigned_at": "2026-10-03T05:29:05.426969Z",
+      "result_manifest_sha256": "c0e1635a9e197e3578bac14c09dcd68ef38d6a3490c5dfbb8fd8de9f7080c9f1",
+      "result_summary": {
+        "scenarios": {
+          "normal": {
+            "monthly_geometric_net_percent": 6.233,
+            "max_drawdown_percent": 17.73,
+            "fills": 2404,
+            "months": 48
+          },
+          "fee_stress": {
+            "monthly_geometric_net_percent": 6.233,
+            "max_drawdown_percent": 17.73,
+            "fills": 2404,
+            "months": 48
+          },
+          "execution_stress": {
+            "monthly_geometric_net_percent": 6.233,
+            "max_drawdown_percent": 17.73,
+            "fills": 2404,
+            "months": 48
+          }
+        },
+        "independent_test": false,
+        "live_approved": false,
+        "audit_notes": "COMPARISON.md verdict PASS"
+      },
+      "audited_at": "2026-10-03T07:13:15.970729Z"
     },
     {
       "version": "v352",
@@ -15012,7 +15039,28 @@
       "result_manifest": null,
       "registered_at": "2026-10-03T06:59:14.291443Z",
       "assigned_at": "2026-10-03T06:59:14.291443Z"
+    },
+    {
+      "version": "v354",
+      "track": "C",
+      "direction_key": "v354-m3-governor",
+      "status": "running",
+      "parent_versions": [
+        "v353"
+      ],
+      "model_family": "hist-gradient-boosting",
+      "objective": "drawdown governor of the MANUAL pipeline M3",
+      "data_contract": "kpack inputs",
+      "policy_contract": "M3 gov (0.20,0.10) vs GL25 (0.25,0.15) vs GT16 (0.16,0.08); folds k=2,3; last year once",
+      "hypothesis": "The BOT governor is not tuned for the MANUAL structure",
+      "parent_commit": "1ecf947baddd5ef78444670330e9db62128dad50",
+      "write_scope": "research/parallel/rounds/parallel-20260906-r2/v354",
+      "worker_agent_id": "01a07748-5adc-7061-8052-0ed36705a8a8",
+      "worker_host_id": "local",
+      "result_manifest": null,
+      "registered_at": "2026-10-03T07:13:15.966190Z",
+      "assigned_at": "2026-10-03T07:13:15.966190Z"
     }
   ],
-  "updated_at": "2026-10-03T06:59:14.295996Z"
+  "updated_at": "2026-10-03T07:13:15.970729Z"
 }
