@@ -131,7 +131,7 @@ def test_google_login_opens_free_pipelines_without_approval(web_client, monkeypa
     assert response.status_code == 200
     pair = response.json()
     assert pair["user"]["role"] == "viewer"
-    assert pair["user"]["allowed_pipelines"] == ["v342", "v315"] and pair["user"]["bot_access"] is False
+    assert pair["user"]["allowed_pipelines"] == ["v342", "v340", "v315"] and pair["user"]["bot_access"] is False
     assert "refresh_token" not in pair
     assert "HttpOnly" in response.headers["set-cookie"]
     headers = {"Authorization": "Bearer " + pair["access_token"]}
@@ -156,7 +156,7 @@ def test_existing_pending_session_gets_free_access_when_automatic_mode_enabled(w
     assert client.get("/api/trade_plan?pipeline=v342", headers=headers).status_code == 200
     assert client.get("/api/auth/me", headers=headers).json()["role"] == "viewer"
     renewed = client.post("/api/auth/refresh", headers={"Authorization": "Bearer " + pair["refresh_token"]}).json()
-    assert renewed["user"]["allowed_pipelines"] == ["v342", "v315"]
+    assert renewed["user"]["allowed_pipelines"] == ["v342", "v340", "v315"]
 
 
 @pytest.mark.parametrize("email", ["new@example.com", "viewer@example.com"])
@@ -204,7 +204,7 @@ def test_admin_order_and_locks_apply_to_existing_session_and_scheduler(web_clien
     # Warm both caches before changing policy; the same viewer access token must acquire/lose rights immediately.
     client.get("/api/pipelines_summary", headers=viewer)
     client.get("/api/trade_plan?pipeline=v342", headers=viewer)
-    order = ["v315", "v367", "v342", "v301", "v362", "v321", "v295"]
+    order = ["v315", "v367", "v342", "v301", "v362", "v321", "v295", "v340"]
     locks = {**original["locked"], "v367": False, "v342": True}
     payload = {"order": order, "locked": locks, "revision": 0}
     response = client.post("/api/admin/pipelines", headers=admin, json=payload)
@@ -212,9 +212,9 @@ def test_admin_order_and_locks_apply_to_existing_session_and_scheduler(web_clien
     assert response.json() == {"order": order, "locked": locks, "automatic": False, "revision": 1}
     assert client.get("/api/trade_plan?pipeline=v367", headers=viewer).status_code == 200
     assert client.get("/api/trade_plan?pipeline=v342", headers=viewer).status_code == 403
-    assert client.get("/api/auth/me", headers=viewer).json()["allowed_pipelines"] == ["v315", "v367"]
+    assert client.get("/api/auth/me", headers=viewer).json()["allowed_pipelines"] == ["v315", "v367", "v340"]
     summary = client.get("/api/pipelines_summary", headers=viewer).json()
-    assert list(summary) == ["v315", "v367", "v342", "v362"] and summary["v342"]["locked"] and not summary["v367"]["locked"]
+    assert list(summary) == ["v315", "v367", "v342", "v362", "v340"] and summary["v342"]["locked"] and not summary["v367"]["locked"]
     assert client.get("/api/pipelines_summary", headers=admin).json()["v342"]["locked_for_viewers"]
     assert all(not p["locked"] for p in client.get("/api/pipelines_summary", headers=admin).json().values())
     catalog = importlib.reload(importlib.import_module("backend.catalog"))
@@ -262,7 +262,7 @@ def test_all_locked_and_all_unlocked_are_supported(web_client):
     for revision, locked in enumerate((True, False)):
         payload = {"order": policy["order"], "locked": {p: locked for p in policy["order"]}, "revision": revision}
         assert client.post("/api/admin/pipelines", headers=admin, json=payload).status_code == 200
-        n = 4  # MANUAL pipelines; the Bot tab needs the account's BOT grant
+        n = 5  # MANUAL pipelines; the Bot tab needs the account's BOT grant
         assert len(client.get("/api/auth/me", headers=viewer).json()["allowed_pipelines"]) == (0 if locked else n)
         assert len(client.get("/api/pipelines_summary", headers=viewer).json()) == n
         for path in ("/api/trade_plan", "/api/overview"):
@@ -305,15 +305,15 @@ def test_viewer_cannot_read_restricted_pipeline(web_client, path):
 def test_pipeline_permissions_and_cache_are_role_safe(web_client):
     client, _, (_, db, auth) = web_client
     admin, viewer = _bearer(auth, "admin@example.com"), _bearer(auth, "viewer@example.com")
-    for pipe in ("v321", "v301", "v295", "v315", "v342", "v362", "v367"):
+    for pipe in ("v321", "v301", "v295", "v315", "v340", "v342", "v362", "v367"):
         db.kv_set(f"trade_plan_{pipe}", {"pipeline": pipe, "coins": {"secret": pipe}})
-    assert len(client.get("/api/pipelines_summary", headers=admin).json()) == 7
+    assert len(client.get("/api/pipelines_summary", headers=admin).json()) == 8
     summary = client.get("/api/pipelines_summary", headers=viewer).json()
-    assert len(summary) == 4  # MANUAL only; the two best MANUAL pipelines are locked by default
+    assert len(summary) == 5  # MANUAL only; the two best MANUAL pipelines are locked by default
     assert [p for p in summary if summary[p]["locked"]] == ["v367", "v362"]
     assert summary["v367"]["paper_net_pct"] is None
     assert summary["v367"]["freeze"] is None
-    assert client.get("/api/auth/me", headers=viewer).json()["allowed_pipelines"] == ["v342", "v315"]
+    assert client.get("/api/auth/me", headers=viewer).json()["allowed_pipelines"] == ["v342", "v340", "v315"]
     for pipe in ("v342", "v315"):
         assert client.get(f"/api/trade_plan?pipeline={pipe}", headers=viewer).json()["pipeline"] == pipe
     assert client.get("/api/trade_plan", headers=viewer).json()["pipeline"] == "v342"
@@ -366,7 +366,7 @@ def test_individual_vip_grant_and_revocation_apply_to_existing_header_and_cache(
     grant = {"email": "viewer@example.com", "pipelines": ["v367"]}
     assert client.post("/api/admin/users", headers=admin, json=grant).status_code == 200
     db.init()  # schema initialization preserves grants
-    assert client.get("/api/auth/me", headers=first).json()["allowed_pipelines"] == ["v367", "v342", "v315"]
+    assert client.get("/api/auth/me", headers=first).json()["allowed_pipelines"] == ["v367", "v342", "v340", "v315"]
     assert not client.get("/api/pipelines_summary", headers=first).json()["v367"]["locked"]
     assert client.get("/api/pipelines_summary", headers=second).json()["v367"]["locked"]
     assert client.get(path, headers=second).status_code == 403
@@ -498,7 +498,7 @@ def test_plan_priority_uses_product_rank_and_unfinished_cycle(backend):
     _, db, _ = backend
     pipe = importlib.import_module("backend.pipeline")
     slot = 100
-    assert pipe.plan_order(slot) == ["v321", "v301", "v295", "v367", "v362", "v342", "v315"]
+    assert pipe.plan_order(slot) == ["v321", "v301", "v295", "v367", "v362", "v342", "v340", "v315"]
     db.kv_set("plan_status_v301", {"completed_slot": slot})
     assert pipe.plan_order(slot)[0] == "v321" and pipe.plan_order(slot)[-1] == "v301"
     db.kv_set("summary_tm_v342", {"monthly_last_year": 9, "gate_dd": 15, "win_hidden": .6})
@@ -535,7 +535,7 @@ def test_plan_failure_still_attempts_all_five_and_retries_unfinished(backend, tm
     monkeypatch.setattr(pipe.subprocess, "run", execute)
     with pytest.raises(RuntimeError, match="v301"):
         pipe.job_trade_plan()
-    assert calls == ["v321_R2", "v301_G2", "v295_CS", "v367_M5", "v362_M4", "v342_M3", "v315_M1"]
+    assert calls == ["v321_R2", "v301_G2", "v295_CS", "v367_M5", "v362_M4", "v342_M3", "v340_M2", "v315_M1"]
     assert pipe.plan_order(db.now_ms() // pipe.H4_MS * pipe.H4_MS)[0] == "v301"
     assert not db.kv_get("plan_status_v301")
     assert db.kv_get("plan_status_v315")["completed_at"]
@@ -611,9 +611,9 @@ def test_saved_policy_from_older_catalogue_appends_new_pipeline_locked(backend):
     old = ["v266", "v301", "v269", "v295", "v285", "v342"]  # an older catalogue (v266 / v269 / v285 retired since)
     db.kv_set("pipeline_access_policy", {"order": old, "locked": {p: p == "v301" for p in old}, "revision": 3})
     pol = catalog.policy()
-    assert pol["order"] == ["v301", "v295", "v342", "v321", "v367", "v362", "v315"]
+    assert pol["order"] == ["v301", "v295", "v342", "v321", "v367", "v362", "v340", "v315"]
     # MANUAL pipelines missing from the saved locks start locked; bots never carry a lock
-    assert pol["locked"] == {"v301": False, "v295": False, "v342": False, "v321": False, "v367": True, "v362": True, "v315": True}
+    assert pol["locked"] == {"v301": False, "v295": False, "v342": False, "v321": False, "v367": True, "v362": True, "v340": True, "v315": True}
     assert catalog.allowed({"role": "viewer", "email": "nobody@example.com"}) == ["v342"]
 
 
@@ -628,7 +628,7 @@ def test_bot_tab_is_an_account_grant_without_pipeline_locks(web_client):
     assert client.post("/api/admin/users", headers=admin, json={"email": "viewer@example.com", "pipelines": ["v321"]}).status_code == 400
     assert client.post("/api/admin/users", headers=admin, json={"email": "viewer@example.com", "pipelines": ["bot"]}).status_code == 200
     me = client.get("/api/auth/me", headers=viewer).json()
-    assert me["bot_access"] is True and me["allowed_pipelines"] == ["v321", "v301", "v295", "v342", "v315"]
+    assert me["bot_access"] is True and me["allowed_pipelines"] == ["v321", "v301", "v295", "v342", "v340", "v315"]
     summary = client.get("/api/pipelines_summary", headers=viewer).json()
     assert all(not summary[p]["locked"] for p in ("v321", "v301", "v295")) and summary["v367"]["locked"]
     for pipe in ("v321", "v301", "v295"):

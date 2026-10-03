@@ -131,7 +131,7 @@ test('all locked pipelines keep their historical metrics visible and issue no pl
   assert.equal(ui.state.live.plan, null);
   assert.equal(ui.visiblePipes().length, 0);
   assert.deepEqual(paths, ['/api/pipelines_summary']);
-  const html = ui.$('pipeEvid').innerHTML + ui.$('pipeArchive').innerHTML;  // product split: older BOT pipelines sit in the archive table
+  const html = ui.$('pipeEvid').innerHTML;
   assert.ok(html.includes('6.71') && html.includes('200 / 55'));
   assert.ok(html.includes('Test · 1 năm<br>Lãi ròng/tháng (%)') && html.includes('Train / chọn model<br>4 năm · Lãi ròng/tháng (%)'));
   assert.ok(html.includes('mailto:admin%40example.com'));
@@ -316,7 +316,7 @@ test('ordinary Google login immediately renders three free choices and fetches o
   await new Promise(setImmediate);
   assert.equal(ui.$('tabs').hidden, false);
   assert.equal(ui.$('adminTab').hidden, true);
-  const tables = () => ui.$('pipeEvid').innerHTML + ui.$('pipeArchive').innerHTML;  // BOT product: active + archived tables
+  const tables = () => ui.$('pipeEvid').innerHTML;
   for (const p of ['v342','v362','v315']) assert.ok(tables().includes(`data-pipe="${p}"`));
   assert.ok(!tables().includes('data-pipe="v367"'));
   assert.ok(tables().includes('Liên hệ admin qua email'));
@@ -424,11 +424,11 @@ test('revoking a VIP grant clears already displayed private data and falls back 
   assert.equal(ui.state.user.role, 'viewer');
 });
 
-test('Pipeline tab shows MANUAL pipelines with goals and the order checklist; the Bot tab shows the BOT pipelines', async () => {
+test('Manual tab shows the MANUAL plan cards (locked ones offer unlock) and the order checklist; the Bot tab shows the BOT pipelines', async () => {
   const wf = { monthly_5y: 5.86, monthly_last_year: 5.22, gate_dd: 18.6, win_hidden: .686, win_dev: .65, win_all_hidden: .67,
     win_all_dev: .69, losing_years: 0, monthly_dev4: 6.0, yearly: [], trades_dev: 900, trades_hidden: 300 };
-  const ev = Object.fromEntries(['v321', 'v301', 'v295', 'v367', 'v342', 'v315'].map((p, i) => [p, {
-    rank: i + 1, locked: false, automatic_order: true, walkforward: wf, prospective: { days: 2, live_pct: 0.4, percentile: 55 } }]));
+  const ev = Object.fromEntries(['v321', 'v301', 'v295', 'v367', 'v362', 'v342', 'v340', 'v315'].map((p, i) => [p, {
+    rank: i + 1, locked: p === 'v362', automatic_order: true, walkforward: wf, prospective: { days: 2, live_pct: 0.4, percentile: 55 } }]));
   const plan = { decision_bar: '2026-10-04T00:00:00+00:00', next_decision: '2026-10-04T04:05:00+00:00', coins: {
     SOLUSDT: { state: 'pending', order: { side: 'BUY', price: 110, weight: 0.3, sl_if_filled: 100, tp_if_filled: 130, valid_until: '2026-10-04T12:00:00+00:00' },
       dips: [{ rung: 3, buy_limit: 105, tp: 107, stop: 95, size_frac: 0.3, active_until: '2026-10-04T03:59:00+00:00', filled: false }] } } };
@@ -439,17 +439,22 @@ test('Pipeline tab shows MANUAL pipelines with goals and the order checklist; th
   await ui.loadTodo();
   assert.equal(ui.product(), 'manual');
   assert.equal(ui.planPipe(), 'v367');
-  let main = ui.$('pipeEvid').innerHTML, arch = ui.$('pipeArchive').innerHTML;
-  assert.ok(main.includes('data-pipe="v367"') && main.includes('data-pipe="v342"') && !main.includes('data-pipe="v321"'));
-  assert.ok(arch.includes('data-pipe="v315"') && main.includes('Win lệnh book'));
+  let main = ui.$('pipeEvid').innerHTML;
+  assert.ok(main.includes('data-pipe="v367"') && main.includes('data-pipe="v315"') && !main.includes('data-pipe="v321"') && main.includes('Win lệnh book'));
+  const cards = ui.$('pipeCards').innerHTML;
+  for (const p of ['v367', 'v342', 'v340', 'v315']) assert.ok(cards.includes(`data-pipe="${p}"`));
+  assert.ok(!cards.includes('data-pipe="v362"') && cards.includes('Liên hệ mở khóa') && cards.includes('VIP') && cards.includes('Khuyên dùng'));
+  assert.ok(cards.includes('5.9%') && cards.includes('+0.40%'));
+  assert.equal(ui.$('goalPanel').hidden, true);  // research goal progress: admins only
   assert.ok(ui.$('goalPanel').innerHTML.includes('Mục tiêu 1') && ui.$('goalPanel').innerHTML.includes('đạt trên mô phỏng'));
   assert.equal(ui.$('manualChecklist').hidden, false);
-  assert.ok(ui.$('manualChecklist').innerHTML.includes('Bắt đáy') && ui.$('manualChecklist').innerHTML.includes('Vào lệnh book'));
+  assert.ok(ui.$('manualChecklist').innerHTML.includes('Bắt đáy') && ui.$('manualChecklist').innerHTML.includes('Vào lệnh xu hướng'));
   ui.state.view = 'bot';
   await ui.loadTodo();
   assert.equal(ui.product(), 'bot');
   assert.equal(ui.planPipe(), 'v321');
   main = ui.$('pipeEvid').innerHTML;
+  assert.ok(ui.$('pipeCards').innerHTML.includes('Bot Pro') && !ui.$('pipeCards').innerHTML.includes('VIP'));
   assert.ok(main.includes('data-pipe="v321"') && main.includes('data-pipe="v295"') && !main.includes('data-pipe="v367"') && main.includes('Win mọi lệnh'));
   assert.ok(ui.$('goalPanel').innerHTML.includes('Mục tiêu BOT') && ui.$('goalPanel').innerHTML.includes('chưa đạt'));
   assert.equal(ui.$('manualChecklist').hidden, true);

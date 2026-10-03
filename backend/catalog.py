@@ -17,6 +17,7 @@ PIPELINES = {  # product: "manual" = a human can follow it (per-pipeline locks /
     "v367": {"candidate": "v367_M5", "product": "manual", "monthly_last_year": 5.22, "gate_dd": 18.62, "win_hidden": 0.686},
     "v362": {"candidate": "v362_M4", "product": "manual", "monthly_last_year": 5.04, "gate_dd": 16.96, "win_hidden": 0.556},
     "v342": {"candidate": "v342_M3", "product": "manual", "monthly_last_year": 4.704, "gate_dd": 17.73, "win_hidden": 0.556},
+    "v340": {"candidate": "v340_M2", "product": "manual", "monthly_last_year": 3.733, "gate_dd": 13.95, "win_hidden": 0.556},
     "v315": {"candidate": "v315_M1", "product": "manual", "monthly_last_year": 3.289, "gate_dd": 18.47, "win_hidden": 0.550},
 }
 MANUAL = {p for p, v in PIPELINES.items() if v["product"] == "manual"}

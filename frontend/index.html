@@ -9,11 +9,11 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="styles.css?v=20261002-monthly-profit" />
+  <link rel="stylesheet" href="styles.css?v=20261003-plan-cards" />
   <script src="config.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/lightweight-charts@4.2.0/dist/lightweight-charts.standalone.production.js" defer></script>
   <script src="https://accounts.google.com/gsi/client" async defer></script>
-  <script src="app.js?v=20261002-monthly-profit" defer></script>
+  <script src="app.js?v=20261003-plan-cards" defer></script>
 </head>
 <body>
   <header class="topbar">
@@ -22,7 +22,7 @@
       <span>Alpha Lab</span><span class="tag">paper</span>
     </div>
     <nav class="tabs" id="tabs" hidden>
-      <button data-view="todo" class="active">Pipeline</button>
+      <button data-view="todo" class="active">Manual</button>
       <button data-view="bot" id="botTab" hidden>Bot</button>
       <button data-view="live">Market</button>
       <button data-view="history">History</button>
@@ -41,8 +41,8 @@
         <p class="muted">BTC · ETH · SOL · BNB · XRP — Binance USD-M perpetual, quyết định mỗi nến 4h.</p>
         <div class="login-benefits">
           <div><b>Xem tín hiệu miễn phí</b><span id="loginAccessNote">Đăng nhập Google để xem ngay các pipeline đang mở.</span></div>
-          <div><b>So sánh cả 5 pipeline</b><span>Đầy đủ lợi nhuận, DD và Win rate trên Train / Test.</span></div>
-          <div><b>Pipeline nâng cao</b><span>Liên hệ admin nếu muốn xem tín hiệu đang khóa.</span></div>
+          <div><b>5 gói tín hiệu tự đặt lệnh</b><span>Lợi nhuận, DD, tỉ lệ thắng và kết quả paper của từng gói.</span></div>
+          <div><b>Gói VIP</b><span>Liên hệ admin để mở khóa gói đang khóa.</span></div>
         </div>
         <div id="gsiButton"></div>
         <p id="loginMsg" class="msg" role="status" aria-live="polite"></p>
@@ -69,33 +69,29 @@
         <div class="pipe-status" id="pipeStatus"></div>
         <label class="eq-in">Vốn của bạn <input type="number" id="eqInput" min="10" step="100" /> USDT</label>
       </div>
-      <p class="muted small product-note" id="productNote"></p>
-      <div class="panel goal-panel" id="goalPanel"></div>
-      <div class="panel evid-panel">
-        <div class="panel-h"><span id="evidTitle">Chọn pipeline · bảng đánh giá hiệu quả</span>
-          <span class="muted small">Lãi ròng/tháng (%) · 2021-09 → 2026-09 · mô phỏng lệnh thật (limit, SL/TP, phí, funding)</span></div>
-        <div class="table-wrap" tabindex="0" aria-label="Bảng đánh giá pipeline của sản phẩm đang chọn, cuộn ngang để xem đầy đủ chỉ số"><table class="tbl compact evid" id="pipeEvid"></table></div>
-        <details class="archive" id="archiveWrap"><summary>Lưu trữ · pipeline cũ của sản phẩm này (vẫn chạy paper, không còn khuyên dùng)</summary>
-          <div class="table-wrap" tabindex="0"><table class="tbl compact evid" id="pipeArchive"></table></div></details>
-        <div class="muted small evid-note">Train / chọn model: kết quả 4 năm (09/2021–09/2025) dùng để phát triển và chọn model.
-          Test: kết quả 1 năm (09/2025–09/2026) đánh giá model đã chọn.
-          Đây là kết quả mô phỏng walk-forward; tại mỗi mốc, model chỉ học từ dữ liệu trước mốc đó.
-          DD là drawdown tối đa; Win rate là tỷ lệ lệnh có lãi sau phí.
-          Lãi ròng/tháng (%) là lợi nhuận bình quân mỗi tháng theo lãi kép, đã trừ phí và funding; ví dụ 5% nghĩa là lãi bình quân 5%/tháng.
-          Pipeline bị khóa vẫn hiện đầy đủ chỉ số đánh giá; liên hệ email trong bảng để hỏi quyền xem tín hiệu.</div>
-        <div class="muted small evid-note" id="pipeOrderNote"></div>
-        <div class="muted small evid-note" id="pipeSelectedNote" role="status" aria-live="polite"></div>
-      </div>
+      <div class="plans-head"><h2 id="evidTitle">Chọn gói tín hiệu</h2><span class="muted small" id="productNote"></span></div>
+      <div class="plan-grid" id="pipeCards"></div>
+      <p class="muted small plan-basis">Lãi/tháng là lãi kép bình quân, đã trừ phí và funding, trên mô phỏng 5 năm (09/2021 – 09/2026) với lệnh limit,
+        SL/TP và phí sàn thật. Paper là kết quả theo dõi trên dữ liệu mới, sau khi mô hình đã đóng băng. Kết quả quá khứ không bảo đảm lợi nhuận tương lai.</p>
+      <p class="sr-only" id="pipeSelectedNote" role="status" aria-live="polite"></p>
       <div class="panel checklist-panel" id="manualChecklist" hidden></div>
       <div class="panel bot-panel" id="botNote" hidden></div>
       <div class="panel board-panel">
-        <div class="panel-h"><span>Việc cần làm ngay bây giờ</span><span class="muted small" id="boardMeta"></span>
+        <div class="panel-h"><span>Trạng thái từng coin</span><span class="muted small" id="boardMeta"></span>
           <span class="muted small" id="wsState2">● realtime</span></div>
         <div class="table-wrap"><table class="board" id="board"></table></div>
       </div>
-      <div class="cards" id="todoCards"></div>
-      <p class="fine">Mọi lệnh vào / nhồi / chốt là limit (không khớp trong 5 phút đầu sau khi nến 4h đóng, hiệu lực 8h); Stop-loss là lệnh
-        Stop Market, Take-profit là lệnh Limit. Khối lượng tính theo "Vốn của bạn". Kết quả nghiên cứu, không phải lời khuyên đầu tư.</p>
+      <details class="more"><summary>Hướng dẫn từng bước cho từng coin</summary><div class="cards" id="todoCards"></div></details>
+      <details class="more evid-panel"><summary>Bảng số liệu đầy đủ và cách tính</summary>
+        <div class="goal-panel" id="goalPanel" hidden></div>
+        <div class="table-wrap" tabindex="0" aria-label="Bảng số liệu đầy đủ, cuộn ngang để xem hết"><table class="tbl compact evid" id="pipeEvid"></table></div>
+        <div class="muted small evid-note">Train: 4 năm 09/2021 – 09/2025 dùng để phát triển và chọn mô hình. Test: năm 09/2025 – 09/2026 đánh giá mô hình đã chọn.
+          Mô phỏng walk-forward: tại mỗi mốc, mô hình chỉ học từ dữ liệu trước mốc đó. DD là mức sụt vốn lớn nhất (lấy mức lớn hơn giữa nến 4h và từng phút).
+          Win rate là tỷ lệ lệnh có lãi sau phí. Phí: maker 0.02% (vào lệnh, TP), taker 0.055% (SL); long trả funding 0.01%/8h.</div>
+        <div class="muted small evid-note" id="pipeOrderNote"></div>
+      </details>
+      <p class="fine">Mọi lệnh vào / nhồi / chốt là limit; Stop-loss là Stop Market, Take-profit là Limit. Khối lượng tính theo "Vốn của bạn".
+        Tín hiệu tham khảo, không phải lời khuyên đầu tư; hệ thống không đặt lệnh thay bạn.</p>
     </section>
 
     <section id="view-live" class="view live" hidden>

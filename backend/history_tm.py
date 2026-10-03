@@ -32,6 +32,7 @@ PIPELINES = {  # pipeline key -> (research-books function in scripts/forward_v20
     "v301": ("research_books_d2", 6.504),  # CB + v301 G2 size + take-profit agents at the bar open, dip budget 0.26
     "v321": ("research_books_d2", 7.079),  # CB + v321 R2: ladder 2.5..5.0 sigma, agents fitted on every rung depth, budget 0.26
     "v315": ("research_books_d2", 2.956),  # MANUAL M1: CB book only (no dip ladder), pullback entry 0.75 sigma_4h, orders valid 3 bars
+    "v340": ("research_books_d2", 5.23),  # MANUAL M2: M1 book x0.75 + ONE human-placeable dip limit per coin (3.0 sigma, native 8-sigma stop; v340 RA2)
     "v342": ("research_books_d2", 6.233),
     "v362": ("research_books_d2", 6.392),
     "v367": ("research_books_d2", 6.015),  # MANUAL M5: M4 + loss_act tighten (book win ~0.66; v367 post-hoc goal-1 fitness)   # MANUAL M4: M3 with book SL 5 / TP 10 sigma_d (v362 dev4-selected)   # MANUAL M3: M1 book x0.75 + two human-placeable dip limits (3.0 / 4.0 sigma, native 8-sigma stop)
@@ -45,6 +46,7 @@ KW_OVERRIDE = {"v240": {"sleeve_risk_budget": 0.18},
                "v321": {"sleeve_risk_budget": 0.26, "sleeve_stop_mode": "close5", "sleeve_backstop": 8.0, "m_sleeve_sl": 4.0,
                         "rungs": (2.5, 3.0, 3.5, 4.0, 5.0)},
                "v315": {"sleeve": False},
+               "v340": {"sleeve_risk_budget": 0.26, "sleeve_stop_mode": "touch", "m_sleeve_sl": 8.0, "size_mult": 4.375, "rungs": (3.0,)},
                "v342": {"sleeve_risk_budget": 0.26, "sleeve_stop_mode": "touch", "m_sleeve_sl": 8.0, "size_mult": 4.375, "rungs": (3.0, 4.0)},
                "v362": {"sleeve_risk_budget": 0.26, "sleeve_stop_mode": "touch", "m_sleeve_sl": 8.0, "size_mult": 4.375, "rungs": (3.0, 4.0),
                         "m_sl": 5.0, "m_tp": 10.0},
@@ -83,22 +85,22 @@ def simulate(pipe: str):
         look = {(pd.Timestamp(t), s, int(r)): float(m) for t, s, r, m in zip(tab["T"], tab["sym"], tab["rung"], tab["mult"])}
         idx = books.index
         kw["sleeve_fill_size"] = lambda i, a, r, f: look.get((idx[i] + pd.Timedelta(hours=4), cols[a], r), 1.0)
-    if pipe in ("v301", "v321", "v342", "v362", "v367"):  # walk-forward size + take-profit decisions of the G2 / R2 agents (one per holding bar, coin and rung)
+    if pipe in ("v301", "v321", "v340", "v342", "v362", "v367"):  # walk-forward size + take-profit decisions of the G2 / R2 agents (one per holding bar, coin and rung)
         tab = pd.read_parquet(G2_TABLE if pipe == "v301" else R2_TABLE)
         keys = [(pd.Timestamp(t), s, int(r)) for t, s, r in zip(tab["T"], tab["sym"], tab["rung"])]
         lsz, ltp = dict(zip(keys, tab["size"].astype(float))), dict(zip(keys, tab["tp"].astype(float)))
         idx = books.index
-        rmap = M3_R2_RUNG if pipe in ("v342", "v362", "v367") else {}
+        rmap = M3_R2_RUNG if pipe in ("v340", "v342", "v362", "v367") else {}
         kw["sleeve_fill_size"] = lambda i, a, r, f: lsz.get((idx[i] + pd.Timedelta(hours=4), cols[a], rmap.get(r, r)), 1.0)
         kw["sleeve_tp"] = lambda i, a, r, f: ltp.get((idx[i] + pd.Timedelta(hours=4), cols[a], rmap.get(r, r)), 1.0)
     trade = dict(v216.GRID, policy=v216.grid_policy(v221.B_ABS, v221.B_REL))
-    if pipe in ("v315", "v342", "v362", "v367"):  # MANUAL M1 / M3: pullback entry limit 0.75 sigma_4h, orders valid 3 bars; in-position grid unchanged
+    if pipe in ("v315", "v340", "v342", "v362", "v367"):  # MANUAL M1 / M3: pullback entry limit 0.75 sigma_4h, orders valid 3 bars; in-position grid unchanged
         grid_pol = trade["policy"]
         trade = dict(trade, n_valid=3, policy=lambda i, a, st: {"open": 0.75} if st["pos"] == 0 else grid_pol(i, a, st))
         if pipe == "v367":  # M5: a losing position whose signal goes flat gets its stop tightened instead of a close
             pol5 = trade["policy"]
             trade["policy"] = lambda i, a, st: "tighten" if st["pos"] != 0 and st["sgn"] == 0 and st["upnl"] < 0 else pol5(i, a, st)
-        if pipe in ("v342", "v362", "v367"):  # M3: book positions x0.75 (signal threshold unscaled), the risk moved to the two dip limits
+        if pipe in ("v340", "v342", "v362", "v367"):  # M2 / M3: book positions x0.75 (signal threshold unscaled), the risk moved to the two dip limits
             trade["book_mult"] = 0.75
     res = eu.simulate(books, opens, prep, trade=trade, win_start=5, events=events, bars=bars, **kw)
     if abs(res["monthly_dev4"] - dev4) > 0.01:

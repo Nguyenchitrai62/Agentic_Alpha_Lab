@@ -319,8 +319,8 @@
     const el = $("pipeStatus"); if (!el) return;
     try {
       const h = await api("/api/status"), c = h.last_cycle, ok = c && c.status === "done";
-      el.innerHTML = `<span><i class="dot ${ok ? "" : "bad"}"></i>Pipeline tự chạy mỗi 4h (1 phút sau khi nến 4h đóng) · lệnh cập nhật lại mỗi 15 phút</span>
-        <span>Lần chạy gần nhất: <b>${c ? dt(c.started_at) : "—"}</b> (${c ? (ok ? "xong" : c.status) : "—"})</span>
+      el.innerHTML = `<span><i class="dot ${ok ? "" : "bad"}"></i>Tín hiệu mới mỗi nến 4h</span>
+        <span>Cập nhật: <b>${c ? dt(c.started_at) : "—"}</b>${c && !ok ? ` (${esc(c.status)})` : ""}</span>
         <span>Lần tới: <b>${h.next_cycle_utc ? dt(Date.parse(h.next_cycle_utc)) : "—"}</b></span>`;
     } catch (e) { el.textContent = ""; }
   }
@@ -384,18 +384,43 @@
     };
     const winLbl = P.winKey === "all" ? "mọi lệnh" : "lệnh book";
     const head = ["Thứ tự / pipeline", "Test · 1 năm<br>Lãi ròng/tháng (%)", "DD<br>tối đa", `Win ${winLbl}<br>Test`, "Train / chọn model<br>4 năm · Lãi ròng/tháng (%)", "Train: năm thấp nhất<br>Lãi ròng/tháng (%)", "Toàn bộ 5 năm<br>Lãi ròng/tháng (%)", "Số năm<br>thua lỗ", `Win ${winLbl}<br>(Train / Test)`, "Số lệnh book<br>(Train / Test)", "DD<br>(nến 4h / từng phút)", "Paper thực tế<br>lãi · phân vị so với kỳ vọng"];
-    const active = order.filter((v) => !pipeOf(v).archived), archived = order.filter((v) => pipeOf(v).archived);
-    table($("pipeEvid"), head, active.map((v, i) => row(v, i + 1)));
-    $("archiveWrap").hidden = !archived.length;
-    if (archived.length) table($("pipeArchive"), head, archived.map((v, i) => row(v, active.length + i + 1)));
-    $("evidTitle").textContent = `${P.label} · chọn pipeline · bảng đánh giá hiệu quả`;
+    table($("pipeEvid"), head, order.map((v, i) => row(v, i + 1)));
+    renderPlanCards(order);
+    $("evidTitle").textContent = prod === "bot" ? "Chọn bot" : "Chọn gói tín hiệu";
     $("pipeOrderNote").textContent = Object.values(ev)[0]?.automatic_order
       ? "Thứ tự trong từng sản phẩm: lợi nhuận/tháng Test cao hơn → DD thấp hơn → Win rate Test cao hơn."
       : "Thứ tự do admin sắp xếp. Trạng thái khóa do admin quản lý riêng cho từng pipeline.";
     $("pipeSelectedNote").textContent = cur
-      ? `Đang xem: ${PIPE_LABEL[cur]}. Lựa chọn áp dụng cho Pipeline, Market, History và Performance; bảng trên chỉ so sánh pipeline của sản phẩm đang chọn.`
+      ? `Đang xem: ${PIPE_LABEL[cur]}. Lựa chọn áp dụng cho Manual / Bot, Market, History và Performance.`
       : "Chưa có pipeline được mở quyền xem tín hiệu.";
-    for (const id of ["pipeEvid", "pipeArchive"]) $(id).onclick = (e) => { const r = e.target.closest("[data-pipe]"); if (r) setPlanPipe(r.dataset.pipe); };
+    for (const id of ["pipeEvid", "pipeCards"]) $(id).onclick = (e) => { const r = e.target.closest("[data-pipe]"); if (r) setPlanPipe(r.dataset.pipe); };
+  }
+  // one card per pipeline of the open tab: the headline numbers, the live paper result and either "view signals" or "unlock"
+  function renderPlanCards(order) {
+    const el = $("pipeCards"); if (!el) return;
+    const ev = state.evid, cur = planPipe(), P = PRODUCTS[product()];
+    const f = (x, d = 1) => x == null || !isFinite(x) ? "—" : Number(x).toFixed(d);
+    el.innerHTML = order.map((v) => {
+      const p = pipeOf(v), e = ev[v], s = e.walkforward || {}, locked = e.locked, on = cur === v;
+      const win = P.winKey === "all" ? (s.win_all_hidden ?? s.win_hidden) : s.win_hidden;
+      const pr = e.prospective;
+      const paper = pr && pr.live_pct != null && pr.days >= 1 ? `${sgn(pr.live_pct)} <span class="muted">· ${Math.floor(pr.days)} ngày</span>`
+        : '<span class="muted">mới bắt đầu</span>';
+      const email = e.admin_contact_email || state.user?.admin_contact_email || "";
+      const cta = locked
+        ? `<a class="btn pc-cta unlock" href="mailto:${esc(encodeURIComponent(email))}?subject=${encodeURIComponent("Mở khóa gói " + p.nm + " " + p.title)}">🔒 Liên hệ mở khóa</a>`
+        : `<button type="button" class="btn pc-cta ${on ? "primary" : ""}" data-pipe="${v}" aria-pressed="${on}">${on ? "✓ Đang xem tín hiệu" : "Xem tín hiệu"}</button>`;
+      return `<article class="plan-card${on ? " on" : ""}${locked ? " locked" : ""}" ${locked ? 'data-locked="true"' : `data-pipe="${v}"`}>
+        <div class="pc-top"><span class="pc-name">${esc(p.title)}</span><span class="pc-code">${esc(p.nm)}</span>
+          ${v === P.rec ? '<span class="pc-badge">Khuyên dùng</span>' : ""}${locked ? '<span class="pc-badge vip">VIP</span>' : ""}</div>
+        <div class="pc-tag">${esc(p.tag)}</div>
+        <div class="pc-main"><b class="${s.monthly_5y >= 0 ? "up" : "down"}">${f(s.monthly_5y)}%</b><span>lãi / tháng · 5 năm</span></div>
+        <dl class="pc-stats"><div><dt>Năm gần nhất</dt><dd>${f(s.monthly_last_year)}%/th</dd></div>
+          <div><dt>Sụt vốn tối đa</dt><dd>${f(s.gate_dd)}%</dd></div>
+          <div><dt>Tỉ lệ thắng</dt><dd>${win != null ? Math.round(100 * win) + "%" : "—"}</dd></div>
+          <div><dt>Paper thực tế</dt><dd>${paper}</dd></div></dl>
+        ${cta}</article>`;
+    }).join("") || '<p class="muted">Chưa có dữ liệu.</p>';
   }
 
   async function loadTodo() {
@@ -411,28 +436,29 @@
   // ---- executable trade plan (trade mode): what should be on the exchange now
   const planOf = (sym) => state.live.plan?.coins?.[sym];
   // paper pipelines (prospective evidence); O1 = the most robust walk-forward foundation, the default view
-  // paper pipelines grouped by PRODUCT (one tab each): MANUAL = the Pipeline tab, a human can follow it (book + bracket dip limits with
+  // paper pipelines grouped by PRODUCT (one tab each): MANUAL = the Manual tab, a human can follow it (book + bracket dip limits with
   // exchange-native TP / SL; per-pipeline locks); BOT = the Bot tab (full dip ladder, stops watched on 5m closes; the 3 best, no locks,
-  // visible to admins and to accounts with the BOT grant). archived = still paper-logged, no longer recommended.
+  // visible to admins and to accounts with the BOT grant). title / tag = the plain-language card text; ds = the technical description.
   const PIPES = [
-    { v: "v367", nm: "M5", product: "manual", ds: "Book ×0.75 (SL/TP 5σ/10σ) + 2 lệnh limit bắt đáy mỗi coin (3σ / 4σ) kèm TP và SL sàn 8σ; tín hiệu tắt mà lệnh đang lỗ thì siết SL thay vì đóng — win lệnh book ~66%" },
-    { v: "v362", nm: "M4", product: "manual", ds: "Như M5 nhưng đóng lệnh khi tín hiệu tắt (không siết SL)" },
-    { v: "v342", nm: "M3", product: "manual", ds: "Book ×0.75 (SL/TP 4σ/8σ) + 2 lệnh limit bắt đáy 3σ / 4σ kèm TP và SL sàn 8σ" },
-    { v: "v315", nm: "M1", product: "manual", archived: true, ds: "Chỉ lệnh book (không bắt đáy), vào bằng limit hồi giá 0.75σ" },
-    { v: "v321", nm: "R2", product: "bot", ds: "Book CB + thang bắt đáy 2.5–5σ (SL bot theo nến 5m + SL sàn 8σ), agent RL chọn khối lượng & chốt lời" },
-    { v: "v301", nm: "G2", product: "bot", ds: "Như R2 nhưng thang 2.5–4σ, agent học từ 4 độ sâu" },
-    { v: "v295", nm: "CS", product: "bot", ds: "Book CB + thang bắt đáy 2.5–4σ, agent RL chỉ chọn khối lượng (học từ 35 coin)" },
+    { v: "v367", nm: "M5", title: "Pro", tag: "Tỉ lệ thắng cao nhất: lệnh đang lỗ khi tín hiệu tắt được siết SL thay vì đóng", product: "manual", ds: "Book ×0.75 (SL/TP 5σ/10σ) + 2 lệnh limit bắt đáy mỗi coin (3σ / 4σ) kèm TP và SL sàn 8σ; tín hiệu tắt mà lệnh đang lỗ thì siết SL thay vì đóng — win lệnh book ~66%" },
+    { v: "v362", nm: "M4", title: "Tăng trưởng", tag: "Lệnh xu hướng SL/TP rộng + 2 lệnh bắt đáy mỗi coin", product: "manual", ds: "Như M5 nhưng đóng lệnh khi tín hiệu tắt (không siết SL)" },
+    { v: "v342", nm: "M3", title: "Cân bằng", tag: "Lệnh xu hướng + 2 lệnh bắt đáy mỗi coin", product: "manual", ds: "Book ×0.75 (SL/TP 4σ/8σ) + 2 lệnh limit bắt đáy 3σ / 4σ kèm TP và SL sàn 8σ" },
+    { v: "v340", nm: "M2", title: "An toàn", tag: "Lệnh xu hướng + 1 lệnh bắt đáy mỗi coin; DD thấp nhất", product: "manual", ds: "Book ×0.75 (SL/TP 4σ/8σ) + 1 lệnh limit bắt đáy 3σ kèm TP và SL sàn 8σ" },
+    { v: "v315", nm: "M1", title: "Cơ bản", tag: "Chỉ lệnh theo xu hướng, ít lệnh, dễ theo nhất", product: "manual", ds: "Chỉ lệnh book (không bắt đáy), vào bằng limit hồi giá 0.75σ" },
+    { v: "v321", nm: "R2", title: "Bot Pro", tag: "Thang 5 lệnh bắt đáy mỗi coin, AI chọn khối lượng và chốt lời", product: "bot", ds: "Book CB + thang bắt đáy 2.5–5σ (SL bot theo nến 5m + SL sàn 8σ), agent RL chọn khối lượng & chốt lời" },
+    { v: "v301", nm: "G2", title: "Bot Plus", tag: "Thang 4 lệnh bắt đáy mỗi coin, AI chọn khối lượng và chốt lời", product: "bot", ds: "Như R2 nhưng thang 2.5–4σ, agent học từ 4 độ sâu" },
+    { v: "v295", nm: "CS", title: "Bot", tag: "Thang 4 lệnh bắt đáy mỗi coin, AI chọn khối lượng", product: "bot", ds: "Book CB + thang bắt đáy 2.5–4σ, agent RL chỉ chọn khối lượng (học từ 35 coin)" },
   ];
   const PRODUCTS = {
     manual: { label: "Giao dịch thủ công (MANUAL)", rec: "v367", winKey: "book",
-      note: "Người tự đặt lệnh: mỗi 4h đặt lệnh limit kèm TP / SL sẵn trên sàn. Cần bật Hedge mode (hoặc tài khoản phụ cho lệnh bắt đáy).",
+      note: "Bạn tự đặt lệnh: mỗi 4h vài lệnh limit có sẵn SL/TP trên sàn. Bật Hedge mode để lệnh bắt đáy không bù trừ lệnh SHORT.",
       goals: [
         { name: "Mục tiêu 1 (bắt buộc)", items: [["monthly_5y", "5 năm", ">=", 5, "%/th"], ["monthly_last_year", "Năm Test", ">=", 5, "%/th"],
           ["gate_dd", "DD", "<", 20, "%"], ["win_hidden", "Win lệnh book (Test)", ">=", 0.55, "win"], ["losing_years", "Năm thua lỗ", "==", 0, ""]] },
         { name: "Mục tiêu 2", items: [["monthly_5y", "5 năm", ">=", 8, "%/th"], ["gate_dd", "DD", "<", 15, "%"], ["win_hidden", "Win lệnh book (Test)", ">=", 0.60, "win"]] },
       ] },
     bot: { label: "Bot tự động (BOT)", rec: "v321", winKey: "all",
-      note: "Cần bot chạy liên tục: đặt lại thang lệnh bắt đáy mỗi 4h và theo dõi SL trên nến 5m. Nếu bot ngừng, chỉ còn SL sàn 8σ (DD mô phỏng ~22%).",
+      note: "Cần bot chạy 24/7: đặt lại thang lệnh bắt đáy mỗi 4h và theo dõi SL trên nến 5m.",
       goals: [
         { name: "Mục tiêu BOT", items: [["monthly_5y", "5 năm", ">=", 8, "%/th"], ["monthly_last_year", "Năm Test", ">=", 8, "%/th"], ["gate_dd", "DD", "<", 15, "%"],
           ["win_all_hidden", "Win mọi lệnh (Test)", ">", 0.65, "win"], ["losing_years", "Năm thua lỗ", "==", 0, ""]] },
@@ -447,7 +473,7 @@
     if (cur?.product === p) return;
     const allowed = visiblePipes().filter((x) => x.product === p);
     if (!allowed.length) return;
-    const rec = allowed.find((x) => x.v === PRODUCTS[p].rec) || allowed.find((x) => !x.archived) || allowed[0];
+    const rec = allowed.find((x) => x.v === PRODUCTS[p].rec) || allowed[0];
     await setPlanPipe(rec.v);
   }
   function renderProduct() {
@@ -456,6 +482,7 @@
   // goal progress of the product's selected (or recommended) pipeline: replay metrics vs the targets + the live paper result
   function renderGoals() {
     const el = $("goalPanel"); if (!el || !state.evid) return;
+    el.hidden = state.user?.role !== "admin";  // research goal progress: admins only
     const prod = product(), P = PRODUCTS[prod], cur = pipeOf(planPipe());
     const v = cur?.product === prod ? cur.v : P.rec, ev = state.evid[v];
     if (!ev) { el.innerHTML = ""; return; }
@@ -506,7 +533,7 @@
           <td class="m">${fmtPx(price)}</td><td class="m down">${sl ? fmtPx(sl) : "—"}</td><td class="m up">${tp ? fmtPx(tp) : "—"}</td><td>${q}</td>
           <td class="small">${until ? dt(Date.parse(until)) : "—"}</td><td><button type="button" class="btn small copy-btn" data-copy="${esc(txt)}">Copy</button></td></tr>`);
       };
-      if (c.state === "pending") add("Vào lệnh book", c.order.side, c.order.price, c.order.sl_if_filled, c.order.tp_if_filled, c.order.weight, c.order.valid_until);
+      if (c.state === "pending") add("Vào lệnh xu hướng", c.order.side, c.order.price, c.order.sl_if_filled, c.order.tp_if_filled, c.order.weight, c.order.valid_until);
       if (c.state === "position" && c.order) add({ add: "Nhồi thêm", reduce: "Chốt bớt", close: "Đóng hết" }[c.order.kind] || c.order.kind,
         c.order.side, c.order.price, null, null, c.order.kind === "add" ? c.order.amount : null, c.order.valid_until);
       if (c.state === "position" && !c.order) {
@@ -521,8 +548,7 @@
     const night = hr != null && hr >= 1 && hr < 6;
     cl.innerHTML = `<div class="panel-h"><span>Danh sách lệnh cần đặt · ${esc(cur.nm)}</span>
         <span class="muted small">${nextDec ? "quyết định kế tiếp " + dt(nextDec) : ""}</span></div>
-      <div class="muted small">Đặt trong khoảng 15 phút sau khi nến 4h đóng (trễ 30 phút vẫn ổn, trễ 60 phút làm hỏng kết quả). Mỗi lệnh là limit kèm SL (Stop Market) và TP (Limit) đặt sẵn trên sàn.
-        Cần Hedge mode để lệnh mua bắt đáy không bù trừ với vị thế SHORT của book.${night ? " <b>Nến ban đêm:</b> nếu không thức được, có thể bỏ qua nến này (mô phỏng: 5 năm vẫn ~5,2%/tháng)." : ""}</div>
+      <div class="muted small">Đặt trong 15–30 phút sau khi nến 4h đóng; mỗi lệnh limit gắn sẵn SL (Stop Market) và TP (Limit).${night ? " <b>Nến ban đêm:</b> nếu không thức được, có thể bỏ qua nến này (mô phỏng: 5 năm vẫn ~5,2%/tháng)." : ""}</div>
       <div class="table-wrap"><table class="tbl compact">${rows.length ? `<thead><tr><th>Coin</th><th>Lệnh</th><th>Chiều</th><th>Giá limit</th><th>Stop-loss</th><th>Take-profit</th><th>Khối lượng</th><th>Hiệu lực đến</th><th></th></tr></thead><tbody>${rows.join("")}</tbody>` : '<tbody><tr><td class="muted">Không có lệnh mới cần đặt ở nến này — giữ nguyên lệnh và SL/TP đang có trên sàn.</td></tr></tbody>'}</table></div>`;
     cl.onclick = (e) => {
       const b = e.target.closest(".copy-btn"); if (!b) return;
@@ -881,7 +907,7 @@
     const rows = (state.live.latest?.sleeve || []).filter((r) => r.symbol === sym);
     // C4 / C5: the dip stop fires on a 5m CLOSE (bot) at 4 / 5 sigma, plus a native 8-sigma touch stop on the exchange
     const closeK = { v321: 4, v301: 4, v295: 4, v285: 4, v269: 4, v266: 5 }[planPipe()];
-    const dsz = ["v295", "v301", "v321", "v342", "v362", "v367"].includes(planPipe()) ? (planOf(sym)?.dip_size || {}) : null;  // CS / G2: the agents' decision per rung
+    const dsz = ["v295", "v301", "v321", "v340", "v342", "v362", "v367"].includes(planPipe()) ? (planOf(sym)?.dip_size || {}) : null;  // CS / G2: the agents' decision per rung
     const decOf = (r) => { if (!dsz) return null; const k = Object.keys(dsz).find((x) => Number(x) === Number(r.rung)); return k ? dsz[k] : null; };
     const mulOf = (r) => { const d = decOf(r); return d == null ? 1 : Number(typeof d === "object" ? d.size : d); };
     const tpOf = (r) => { const d = decOf(r); return d && typeof d === "object" ? Number(d.tp) : 1; };
