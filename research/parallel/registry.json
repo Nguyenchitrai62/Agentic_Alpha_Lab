@@ -2,7 +2,7 @@
   "schema_version": 1,
   "project": "Agentic Alpha Lab BTC swing research",
   "created_at": "2026-09-06T00:00:00Z",
-  "next_version": 371,
+  "next_version": 372,
   "control": {
     "coordinator_model": "gpt-5.6-sol",
     "coordinator_reasoning": "high",
@@ -54,7 +54,7 @@
     "expected_workers": 3,
     "version_range": [
       45,
-      370
+      371
     ],
     "parent_commit": "1ecf947baddd5ef78444670330e9db62128dad50",
     "cloud_snapshot": {
@@ -15770,7 +15770,7 @@
       "version": "v368",
       "track": "A",
       "direction_key": "v368-bot-tighten",
-      "status": "running",
+      "status": "rejected",
       "parent_versions": [
         "v367"
       ],
@@ -15783,9 +15783,36 @@
       "write_scope": "research/parallel/rounds/parallel-20260906-r2/v368",
       "worker_agent_id": "01a07792-4a6b-7fc3-a08a-af2923b1778a",
       "worker_host_id": "local",
-      "result_manifest": null,
+      "result_manifest": "research\\parallel\\rounds\\parallel-20260906-r2\\v368\\result_manifest.json",
       "registered_at": "2026-10-03T09:49:59.906470Z",
-      "assigned_at": "2026-10-03T09:49:59.906470Z"
+      "assigned_at": "2026-10-03T09:49:59.906470Z",
+      "result_manifest_sha256": "d9788dc173f36c6a8712cf745043a0aed722c8fe93010b6c1157c59fcd1cd5ef",
+      "result_summary": {
+        "scenarios": {
+          "normal": {
+            "monthly_geometric_net_percent": 7.079,
+            "max_drawdown_percent": 18.39,
+            "fills": 5341,
+            "months": 48
+          },
+          "fee_stress": {
+            "monthly_geometric_net_percent": 7.079,
+            "max_drawdown_percent": 18.39,
+            "fills": 5341,
+            "months": 48
+          },
+          "execution_stress": {
+            "monthly_geometric_net_percent": 7.079,
+            "max_drawdown_percent": 18.39,
+            "fills": 5341,
+            "months": 48
+          }
+        },
+        "independent_test": false,
+        "live_approved": false,
+        "audit_notes": "COMPARISON.md verdict PASS"
+      },
+      "audited_at": "2026-10-03T10:10:54.822364Z"
     },
     {
       "version": "v369",
@@ -15828,7 +15855,28 @@
       "result_manifest": null,
       "registered_at": "2026-10-03T09:53:04.544703Z",
       "assigned_at": "2026-10-03T09:53:04.544703Z"
+    },
+    {
+      "version": "v371",
+      "track": "A",
+      "direction_key": "v371-bot-trader-grid",
+      "status": "running",
+      "parent_versions": [
+        "v370"
+      ],
+      "model_family": "hist-gradient-boosting",
+      "objective": "exhaustive walk-forward search over book-management and dip-risk genes on the BOT R2",
+      "data_contract": "kpack inputs",
+      "policy_contract": "648 rows; flat choice on years [:k]; folds k=1,2,3 vs R2 (>=2 of 3); last year once",
+      "hypothesis": "The joint trader genes lift the BOT return per DD that single genes could not",
+      "parent_commit": "1ecf947baddd5ef78444670330e9db62128dad50",
+      "write_scope": "research/parallel/rounds/parallel-20260906-r2/v371",
+      "worker_agent_id": "01a07792-4a6b-7fc3-a08a-af2923b1778a",
+      "worker_host_id": "local",
+      "result_manifest": null,
+      "registered_at": "2026-10-03T10:10:54.817511Z",
+      "assigned_at": "2026-10-03T10:10:54.817511Z"
     }
   ],
-  "updated_at": "2026-10-03T09:53:04.549867Z"
+  "updated_at": "2026-10-03T10:10:54.822364Z"
 }
