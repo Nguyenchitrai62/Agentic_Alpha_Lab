@@ -350,9 +350,20 @@ def candle_gaps(now_ms: int | None = None) -> list[str]:
     return issues
 
 
+# code that defines a trade plan: a plan generated before any of these files changed is rebuilt (e.g. a new paper start or rule)
+PLAN_CODE = ("scripts/forward_trade.py", "scripts/forward_v205.py", "scripts/manual_dip_agents.py", "scripts/v321_r2_dip_agents.py",
+             "research/parallel/rounds/parallel-20260906-r2/engine_user/engine_user.py")
+
+
+def plan_code_mtime_ms() -> int:
+    return max((int((ROOT / f).stat().st_mtime * 1000) for f in PLAN_CODE if (ROOT / f).exists()), default=0)
+
+
 def stale_plans(now_ms: int | None = None) -> dict[str, str]:
-    """Catalog pipelines (best first) whose trade plan is missing in the DB, missing on disk, or older than the due 4h bar."""
+    """Catalog pipelines (best first) whose trade plan is missing in the DB, missing on disk, older than the due 4h bar, or
+    generated before the plan code last changed."""
     slot = due_slot(now_ms)
+    code_ms = plan_code_mtime_ms()
     out = {}
     for pipe in catalog.ranked():
         plan = db.kv_get(f"trade_plan_{pipe}")
@@ -369,6 +380,11 @@ def stale_plans(now_ms: int | None = None) -> dict[str, str]:
                 if _ms(plan["decision_bar"]) < slot:
                     reason = "plan older than the last closed 4h bar"
             except Exception:  # noqa: BLE001 - an unparseable bar is judged by the completion marker alone
+                pass
+            try:
+                if not reason and plan.get("generated_at") and _ms(plan["generated_at"]) < code_ms:
+                    reason = "plan code changed after the plan was generated"
+            except Exception:  # noqa: BLE001
                 pass
         if reason:
             out[pipe] = reason

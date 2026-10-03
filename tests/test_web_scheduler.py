@@ -729,3 +729,19 @@ def test_server_startup_launches_background_scheduler_only_when_enabled(backend,
     monkeypatch.setattr(server.threading, "Thread", Thread)
     server._startup()
     assert started == ([(server._scheduler, True), "start"] if enabled else [])
+
+
+def test_plan_generated_before_a_plan_code_change_is_stale(backend, tmp_path, monkeypatch):
+    _, db, _ = backend
+    pipe = importlib.import_module("backend.pipeline")
+    now_ms = complete_inputs(pipe, db, tmp_path, monkeypatch)
+    script = tmp_path / "scripts/forward_trade.py"
+    script.parent.mkdir(parents=True, exist_ok=True)
+    script.write_text("# plan code")
+    os.utime(script, (now_ms / 1000, now_ms / 1000))
+    before, after = (str(pd.Timestamp(now_ms + d, unit="ms", tz="UTC")) for d in (-60_000, 60_000))
+    for p in pipe.catalog.PIPELINES:
+        plan = db.kv_get(f"trade_plan_{p}")
+        db.kv_set(f"trade_plan_{p}", {**plan, "generated_at": after})
+    db.kv_set("trade_plan_v367", {**db.kv_get("trade_plan_v367"), "generated_at": before})
+    assert pipe.stale_plans(now_ms) == {"v367": "plan code changed after the plan was generated"}
