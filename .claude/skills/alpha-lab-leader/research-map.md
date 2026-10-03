@@ -1,6 +1,6 @@
 # Research map (update after every rotation)
 
-Last update: 2026-10-03 (after v370; MANUAL M3/M4/M5 paper pipelines, BOT R2).
+Last update: 2026-10-04 (system audit clean; v373 rejected; PHASE LUCK: dip results depend strongly on the 4h grid phase - select dip rules on the 4-phase mean from now on).
 
 ## Honest status
 
