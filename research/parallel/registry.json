@@ -2,7 +2,7 @@
   "schema_version": 1,
   "project": "Agentic Alpha Lab BTC swing research",
   "created_at": "2026-09-06T00:00:00Z",
-  "next_version": 355,
+  "next_version": 356,
   "control": {
     "coordinator_model": "gpt-5.6-sol",
     "coordinator_reasoning": "high",
@@ -54,7 +54,7 @@
     "expected_workers": 3,
     "version_range": [
       45,
-      354
+      355
     ],
     "parent_commit": "1ecf947baddd5ef78444670330e9db62128dad50",
     "cloud_snapshot": {
@@ -15002,7 +15002,7 @@
       "version": "v352",
       "track": "B",
       "direction_key": "v352-info-book-risk-control",
-      "status": "running",
+      "status": "rejected",
       "parent_versions": [
         "v351"
       ],
@@ -15015,9 +15015,36 @@
       "write_scope": "research/parallel/rounds/parallel-20260906-r2/v352",
       "worker_agent_id": "01a07791-eecb-7053-8866-dcdbe31e84d7",
       "worker_host_id": "local",
-      "result_manifest": null,
+      "result_manifest": "research\\parallel\\rounds\\parallel-20260906-r2\\v352\\result_manifest.json",
       "registered_at": "2026-10-03T06:54:51.534333Z",
-      "assigned_at": "2026-10-03T06:54:51.534333Z"
+      "assigned_at": "2026-10-03T06:54:51.534333Z",
+      "result_manifest_sha256": "0f433c08fec5acb5af6c425632a8861f9a02915145d5ce6f4abd971a10c50d7a",
+      "result_summary": {
+        "scenarios": {
+          "normal": {
+            "monthly_geometric_net_percent": 6.233,
+            "max_drawdown_percent": 17.73,
+            "fills": 2404,
+            "months": 48
+          },
+          "fee_stress": {
+            "monthly_geometric_net_percent": 6.233,
+            "max_drawdown_percent": 17.73,
+            "fills": 2404,
+            "months": 48
+          },
+          "execution_stress": {
+            "monthly_geometric_net_percent": 6.233,
+            "max_drawdown_percent": 17.73,
+            "fills": 2404,
+            "months": 48
+          }
+        },
+        "independent_test": false,
+        "live_approved": false,
+        "audit_notes": "COMPARISON.md verdict PASS"
+      },
+      "audited_at": "2026-10-03T07:16:09.820811Z"
     },
     {
       "version": "v353",
@@ -15060,7 +15087,28 @@
       "result_manifest": null,
       "registered_at": "2026-10-03T07:13:15.966190Z",
       "assigned_at": "2026-10-03T07:13:15.966190Z"
+    },
+    {
+      "version": "v355",
+      "track": "B",
+      "direction_key": "v355-hedged-dip-bot",
+      "status": "running",
+      "parent_versions": [
+        "v353"
+      ],
+      "model_family": "hist-gradient-boosting",
+      "objective": "BOT R2 with BTC-hedged dip rungs",
+      "data_contract": "kpack inputs; engine_user sleeve_hedge hook",
+      "policy_contract": "R2 vs HD50 vs HD100; folds k=1,2,3 BOT fitness; last year once",
+      "hypothesis": "Half of the dip edge is idiosyncratic; a BTC hedge cuts flush drawdowns more than return",
+      "parent_commit": "1ecf947baddd5ef78444670330e9db62128dad50",
+      "write_scope": "research/parallel/rounds/parallel-20260906-r2/v355",
+      "worker_agent_id": "01a07791-eecb-7053-8866-dcdbe31e84d7",
+      "worker_host_id": "local",
+      "result_manifest": null,
+      "registered_at": "2026-10-03T07:16:09.816149Z",
+      "assigned_at": "2026-10-03T07:16:09.816149Z"
     }
   ],
-  "updated_at": "2026-10-03T07:13:15.970729Z"
+  "updated_at": "2026-10-03T07:16:09.820811Z"
 }

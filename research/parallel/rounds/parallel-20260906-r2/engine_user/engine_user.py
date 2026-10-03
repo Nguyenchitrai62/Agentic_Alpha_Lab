@@ -73,7 +73,10 @@ def prepare(books, opens):
                 settle=settle_at_end, sig1h=sig1h)
 
 
-def simulate(books, opens, prep, m_sl=3.0, m_sleeve_sl=2.0, sleeve=True, target=0.25, cap=2.0, d_limit=D_LIMIT, win_end=60, sleeve_risk_budget=None, gap=0.02, m_sleeve_tp=1.0, rung_scale_fixed=None, size_mult=1.0, rungs=RUNGS, m_tp=None, hourly=False, align=None, events=None, bars=None, exec_policy=None, fixed_levels=False, attrib=None, trade=None, win_start=2, state_out=None, sleeve_filter=None, sleeve_tp=None, strat_vt=None, sleeve_start=16, risk_mult=None, sleeve_breaker=None, sleeve_stop_mode="touch", sleeve_backstop=None, sleeve_budget_sl=None, book_stop_mode="touch", book_backstop=None, sleeve_exit_agent=None, sleeve_lock_cut=False, sleeve_fill_size=None, path_out=None, book_size=None, gov=None):
+def simulate(books, opens, prep, m_sl=3.0, m_sleeve_sl=2.0, sleeve=True, target=0.25, cap=2.0, d_limit=D_LIMIT, win_end=60, sleeve_risk_budget=None, gap=0.02, m_sleeve_tp=1.0, rung_scale_fixed=None, size_mult=1.0, rungs=RUNGS, m_tp=None, hourly=False, align=None, events=None, bars=None, exec_policy=None, fixed_levels=False, attrib=None, trade=None, win_start=2, state_out=None, sleeve_filter=None, sleeve_tp=None, strat_vt=None, sleeve_start=16, risk_mult=None, sleeve_breaker=None, sleeve_stop_mode="touch", sleeve_backstop=None, sleeve_budget_sl=None, book_stop_mode="touch", book_backstop=None, sleeve_exit_agent=None, sleeve_lock_cut=False, sleeve_fill_size=None, path_out=None, book_size=None, gov=None, sleeve_hedge=None):
+    # sleeve_hedge: optional (fraction h, hedge asset index b): every dip rung of another asset is paired with a short of h x its notional in
+    #   asset b, opened at the fill minute's close and closed at the rung's exit minute close (next bar open for a time exit), taker both legs,
+    #   no funding on the short; the rung's return becomes the paired return. Bot-only (needs a market order at the fill). None = unchanged.
     # gov: optional (dd_zero, width) of the drawdown governor g = clip((dd_zero - dd) / width, 0, 1) on the trailing 90-day peak
     #   (default None = (0.20, 0.10), the audited governor: full size below DD 10%, zero at 20%).
     # book_size: trade mode only; optional callable (i, a, sgn) -> size multiplier of a NEW book entry order (0 = skip), decided when the
@@ -704,6 +707,14 @@ def simulate(books, opens, prep, m_sl=3.0, m_sleeve_sl=2.0, sleeve=True, target=
                         ret = o2[i][a] / lv - 1 - MAKER - TAKER - (FUND_LONG if settle[i] else 0.0)
                     else:
                         ret = Oa[end_m] / lv - 1 - MAKER - TAKER
+                hseg = None
+                if sleeve_hedge is not None and a != sleeve_hedge[1]:
+                    hh, hb = sleeve_hedge
+                    hin = float(C[i, f, hb])
+                    hout = float(C[i, x, hb]) if x < 240 else float(o2[i][hb])
+                    if np.isfinite(hin) and np.isfinite(hout) and hin > 0:
+                        ret = ret + hh * (1 - hout / hin - 2 * TAKER)
+                        hseg = hh * (1 - C[i, :, hb].astype(float) / hin)
                 taken.append((f, r, a, lv, x, ret, sg, rn))
                 sleeve_pnl += rn * ret
                 if events is not None:
@@ -715,6 +726,8 @@ def simulate(books, opens, prep, m_sl=3.0, m_sleeve_sl=2.0, sleeve=True, target=
                 seg = np.zeros(240)
                 end = min(x, 240)
                 seg[f:end] = Ca[f:end] / lv - 1
+                if hseg is not None:
+                    seg[f:end] += np.nan_to_num(hseg[f:end])
                 if x < 240:
                     seg[x:] = ret
                 path += rn * seg
