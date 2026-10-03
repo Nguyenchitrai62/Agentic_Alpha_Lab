@@ -2,7 +2,7 @@
   "schema_version": 1,
   "project": "Agentic Alpha Lab BTC swing research",
   "created_at": "2026-09-06T00:00:00Z",
-  "next_version": 368,
+  "next_version": 369,
   "control": {
     "coordinator_model": "gpt-5.6-sol",
     "coordinator_reasoning": "high",
@@ -54,7 +54,7 @@
     "expected_workers": 3,
     "version_range": [
       45,
-      367
+      368
     ],
     "parent_commit": "1ecf947baddd5ef78444670330e9db62128dad50",
     "cloud_snapshot": {
@@ -15626,7 +15626,7 @@
       "version": "v365",
       "track": "A",
       "direction_key": "v365-m4-partial-tp",
-      "status": "running",
+      "status": "rejected",
       "parent_versions": [
         "v364"
       ],
@@ -15639,9 +15639,36 @@
       "write_scope": "research/parallel/rounds/parallel-20260906-r2/v365",
       "worker_agent_id": "01a07792-4a6b-7fc3-a08a-af2923b1778a",
       "worker_host_id": "local",
-      "result_manifest": null,
+      "result_manifest": "research\\parallel\\rounds\\parallel-20260906-r2\\v365\\result_manifest.json",
       "registered_at": "2026-10-03T09:29:36.162332Z",
-      "assigned_at": "2026-10-03T09:29:36.162332Z"
+      "assigned_at": "2026-10-03T09:29:36.162332Z",
+      "result_manifest_sha256": "fe7cb3ba792df90b68f3014480f4474f2e08165807bb92f74eed6aeaea595218",
+      "result_summary": {
+        "scenarios": {
+          "normal": {
+            "monthly_geometric_net_percent": 6.392,
+            "max_drawdown_percent": 16.63,
+            "fills": 2372,
+            "months": 48
+          },
+          "fee_stress": {
+            "monthly_geometric_net_percent": 6.392,
+            "max_drawdown_percent": 16.63,
+            "fills": 2372,
+            "months": 48
+          },
+          "execution_stress": {
+            "monthly_geometric_net_percent": 6.392,
+            "max_drawdown_percent": 16.63,
+            "fills": 2372,
+            "months": 48
+          }
+        },
+        "independent_test": false,
+        "live_approved": false,
+        "audit_notes": "COMPARISON.md verdict PASS; M5 backend replay 6.015 and forward rule checked"
+      },
+      "audited_at": "2026-10-03T09:49:59.911522Z"
     },
     {
       "version": "v366",
@@ -15684,7 +15711,28 @@
       "result_manifest": null,
       "registered_at": "2026-10-03T09:31:52.418617Z",
       "assigned_at": "2026-10-03T09:31:52.418617Z"
+    },
+    {
+      "version": "v368",
+      "track": "A",
+      "direction_key": "v368-bot-tighten",
+      "status": "running",
+      "parent_versions": [
+        "v367"
+      ],
+      "model_family": "hist-gradient-boosting",
+      "objective": "the M5 tighten rule on the BOT R2",
+      "data_contract": "kpack inputs",
+      "policy_contract": "R2 vs RT (tighten) vs RT5 (tighten + SL5/TP10); folds k=1,2,3 BOT fitness; last year once",
+      "hypothesis": "Tightening losing book stops lifts the BOT book win and lowers DD",
+      "parent_commit": "1ecf947baddd5ef78444670330e9db62128dad50",
+      "write_scope": "research/parallel/rounds/parallel-20260906-r2/v368",
+      "worker_agent_id": "01a07792-4a6b-7fc3-a08a-af2923b1778a",
+      "worker_host_id": "local",
+      "result_manifest": null,
+      "registered_at": "2026-10-03T09:49:59.906470Z",
+      "assigned_at": "2026-10-03T09:49:59.906470Z"
     }
   ],
-  "updated_at": "2026-10-03T09:31:52.423763Z"
+  "updated_at": "2026-10-03T09:49:59.911522Z"
 }
