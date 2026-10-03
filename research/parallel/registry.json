@@ -2,7 +2,7 @@
   "schema_version": 1,
   "project": "Agentic Alpha Lab BTC swing research",
   "created_at": "2026-09-06T00:00:00Z",
-  "next_version": 351,
+  "next_version": 352,
   "control": {
     "coordinator_model": "gpt-5.6-sol",
     "coordinator_reasoning": "high",
@@ -54,7 +54,7 @@
     "expected_workers": 3,
     "version_range": [
       45,
-      350
+      351
     ],
     "parent_commit": "1ecf947baddd5ef78444670330e9db62128dad50",
     "cloud_snapshot": {
@@ -14810,7 +14810,7 @@
       "version": "v348",
       "track": "C",
       "direction_key": "v348-dip-rule-grid",
-      "status": "running",
+      "status": "rejected",
       "parent_versions": [
         "v347"
       ],
@@ -14823,9 +14823,36 @@
       "write_scope": "research/parallel/rounds/parallel-20260906-r2/v348",
       "worker_agent_id": "01a07748-5adc-7061-8052-0ed36705a8a8",
       "worker_host_id": "local",
-      "result_manifest": null,
+      "result_manifest": "research\\parallel\\rounds\\parallel-20260906-r2\\v348\\result_manifest.json",
       "registered_at": "2026-10-03T04:03:02.237111Z",
-      "assigned_at": "2026-10-03T04:03:02.237111Z"
+      "assigned_at": "2026-10-03T04:03:02.237111Z",
+      "result_manifest_sha256": "b2ca3800a94bdd6389948224dfcd72cc858d97fa6e10824ea09e76af78b68c3d",
+      "result_summary": {
+        "scenarios": {
+          "normal": {
+            "monthly_geometric_net_percent": 6.141,
+            "max_drawdown_percent": 17.7,
+            "fills": 2425,
+            "months": 48
+          },
+          "fee_stress": {
+            "monthly_geometric_net_percent": 6.141,
+            "max_drawdown_percent": 17.7,
+            "fills": 2425,
+            "months": 48
+          },
+          "execution_stress": {
+            "monthly_geometric_net_percent": 6.141,
+            "max_drawdown_percent": 17.7,
+            "fills": 2425,
+            "months": 48
+          }
+        },
+        "independent_test": false,
+        "live_approved": false,
+        "audit_notes": "COMPARISON.md verdict PASS"
+      },
+      "audited_at": "2026-10-03T05:29:05.432216Z"
     },
     {
       "version": "v349",
@@ -14868,7 +14895,28 @@
       "result_manifest": null,
       "registered_at": "2026-10-03T04:44:49.255988Z",
       "assigned_at": "2026-10-03T04:44:49.255988Z"
+    },
+    {
+      "version": "v351",
+      "track": "C",
+      "direction_key": "v351-quarterly-basis-member",
+      "status": "running",
+      "parent_versions": [
+        "v350"
+      ],
+      "model_family": "hist-gradient-boosting",
+      "objective": "quarterly delivery-futures basis features in book member A, scored on M3",
+      "data_contract": "data/raw/qbasis_20261003 (public archive), BTC/ETH market-wide features at the 4h close",
+      "policy_contract": "M3 vs QB1 (A with basis); folds k=2,3; last year once",
+      "hypothesis": "Futures term structure is new leverage-demand information the book lacks",
+      "parent_commit": "1ecf947baddd5ef78444670330e9db62128dad50",
+      "write_scope": "research/parallel/rounds/parallel-20260906-r2/v351",
+      "worker_agent_id": "01a07748-5adc-7061-8052-0ed36705a8a8",
+      "worker_host_id": "local",
+      "result_manifest": null,
+      "registered_at": "2026-10-03T05:29:05.426969Z",
+      "assigned_at": "2026-10-03T05:29:05.426969Z"
     }
   ],
-  "updated_at": "2026-10-03T04:44:49.260565Z"
+  "updated_at": "2026-10-03T05:29:05.432216Z"
 }
