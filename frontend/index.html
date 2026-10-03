@@ -23,6 +23,7 @@
     </div>
     <nav class="tabs" id="tabs" hidden>
       <button data-view="todo" class="active">Pipeline</button>
+      <button data-view="bot" id="botTab" hidden>Bot</button>
       <button data-view="live">Market</button>
       <button data-view="history">History</button>
       <button data-view="perf">Performance</button>
@@ -68,10 +69,14 @@
         <div class="pipe-status" id="pipeStatus"></div>
         <label class="eq-in">Vốn của bạn <input type="number" id="eqInput" min="10" step="100" /> USDT</label>
       </div>
+      <p class="muted small product-note" id="productNote"></p>
+      <div class="panel goal-panel" id="goalPanel"></div>
       <div class="panel evid-panel">
-        <div class="panel-h"><span>Chọn pipeline · bảng đánh giá hiệu quả</span>
+        <div class="panel-h"><span id="evidTitle">Chọn pipeline · bảng đánh giá hiệu quả</span>
           <span class="muted small">Lãi ròng/tháng (%) · 2021-09 → 2026-09 · mô phỏng lệnh thật (limit, SL/TP, phí, funding)</span></div>
-        <div class="table-wrap" tabindex="0" aria-label="Bảng đánh giá 5 pipeline, cuộn ngang để xem đầy đủ chỉ số"><table class="tbl compact evid" id="pipeEvid"></table></div>
+        <div class="table-wrap" tabindex="0" aria-label="Bảng đánh giá pipeline của sản phẩm đang chọn, cuộn ngang để xem đầy đủ chỉ số"><table class="tbl compact evid" id="pipeEvid"></table></div>
+        <details class="archive" id="archiveWrap"><summary>Lưu trữ · pipeline cũ của sản phẩm này (vẫn chạy paper, không còn khuyên dùng)</summary>
+          <div class="table-wrap" tabindex="0"><table class="tbl compact evid" id="pipeArchive"></table></div></details>
         <div class="muted small evid-note">Train / chọn model: kết quả 4 năm (09/2021–09/2025) dùng để phát triển và chọn model.
           Test: kết quả 1 năm (09/2025–09/2026) đánh giá model đã chọn.
           Đây là kết quả mô phỏng walk-forward; tại mỗi mốc, model chỉ học từ dữ liệu trước mốc đó.
@@ -81,6 +86,8 @@
         <div class="muted small evid-note" id="pipeOrderNote"></div>
         <div class="muted small evid-note" id="pipeSelectedNote" role="status" aria-live="polite"></div>
       </div>
+      <div class="panel checklist-panel" id="manualChecklist" hidden></div>
+      <div class="panel bot-panel" id="botNote" hidden></div>
       <div class="panel board-panel">
         <div class="panel-h"><span>Việc cần làm ngay bây giờ</span><span class="muted small" id="boardMeta"></span>
           <span class="muted small" id="wsState2">● realtime</span></div>

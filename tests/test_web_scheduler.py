@@ -240,7 +240,7 @@ def test_due_cycle_requires_all_five_stored_plans(backend):
         db.kv_set(f"plan_status_{name}", {"completed_slot": slot})
         db.kv_set(f"trade_plan_{name}", {"decision_bar": "present"})
     assert not server._cycle_incomplete(now)
-    db.kv_set("trade_plan_v266", {})
+    db.kv_set("trade_plan_v315", {})
     assert server._cycle_incomplete(now)
 
 

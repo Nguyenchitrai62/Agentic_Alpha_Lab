@@ -432,3 +432,22 @@ html { scroll-padding-top: calc(var(--top-h) + 16px); }
   .evid-panel .evid th:first-child { min-width: 170px; }
   .pipeline-choice { flex-direction: column; align-items: flex-start; gap: 2px; }
 }
+
+/* ---- product split (MANUAL / BOT), goal progress, manual checklist (2026-10-03) */
+.product-bar { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin: 4px 0 10px; }
+.product-seg button { padding: 6px 14px; font-size: 13px; font-weight: 600; }
+.goal-row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 4px 0; }
+.goal-name { min-width: 200px; font-size: 12.5px; }
+.goal-chip { display: inline-flex; gap: 5px; align-items: baseline; font-size: 12px; padding: 3px 8px; border-radius: 999px;
+  border: 1px solid var(--line-2); background: var(--panel-2); white-space: nowrap; }
+.goal-chip.ok { border-color: color-mix(in srgb, var(--up) 60%, transparent); }
+.goal-chip.ok b { color: var(--up); }
+.goal-chip.no { border-color: color-mix(in srgb, var(--down) 60%, transparent); }
+.goal-chip.no b { color: var(--down); }
+.goal-paper { margin: 8px 0 4px; font-size: 12.5px; }
+details.archive { margin-top: 8px; }
+details.archive > summary { cursor: pointer; color: var(--muted); font-size: 12px; padding: 4px 0; }
+.bot-list { margin: 0; padding-left: 18px; font-size: 12.5px; line-height: 1.6; }
+.btn.small { padding: 2px 8px; font-size: 11.5px; }
+.checklist-panel .note.warn, .note.warn { color: var(--down); }
+@media (max-width: 640px) { .goal-name { min-width: 100%; } .product-seg { width: 100%; } .product-seg button { flex: 1; } }

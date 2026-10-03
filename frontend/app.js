@@ -228,7 +228,7 @@
       $("pendingContact").href = `mailto:${encodeURIComponent(u.admin_contact_email || "")}`;
       showOnly("pending"); $("tabs").hidden = true; return;
     }
-    $("tabs").hidden = false; $("adminTab").hidden = u.role !== "admin";
+    $("tabs").hidden = false; $("adminTab").hidden = u.role !== "admin"; $("botTab").hidden = !canSeeBot();
     state.h.pipe = null; state.perfPipe = null;
     startTicker();
     route();
@@ -237,11 +237,12 @@
   // ------------------------------------------------------------------ routing
   function route() {
     let v = (location.hash || "#todo").slice(1);
-    if (!["todo", "live", "history", "perf", "admin"].includes(v) || (v === "admin" && state.user.role !== "admin")) v = "todo";
+    if (!["todo", "bot", "live", "history", "perf", "admin"].includes(v) || (v === "admin" && state.user.role !== "admin")
+        || (v === "bot" && !canSeeBot())) v = "todo";
     state.view = v;
     document.querySelectorAll("#tabs button").forEach((b) => b.classList.toggle("active", b.dataset.view === v));
-    showOnly(v);
-    ({ todo: loadTodo, live: loadLive, history: initHistory, perf: loadPerf, admin: loadAdmin })[v]();
+    showOnly(v === "bot" ? "todo" : v);
+    ({ todo: loadTodo, bot: loadTodo, live: loadLive, history: initHistory, perf: loadPerf, admin: loadAdmin })[v]();
     updateTitle();
   }
   $("tabs").onclick = (e) => { const b = e.target.closest("button"); if (b) location.hash = b.dataset.view; };
@@ -357,62 +358,177 @@
   }
   function renderEvidence() {
     const ev = state.evid; if (!ev) return;
-    const cur = planPipe();
+    const cur = planPipe(), prod = product(), P = PRODUCTS[prod];
     const mo = (net) => (Math.pow(1 + net / 100, 1 / 12) - 1) * 100;
     const f = (x, d = 2) => x == null || !isFinite(x) ? "—" : Number(x).toFixed(d);
-    const rows = Object.keys(ev).sort((a, b) => ev[a].rank - ev[b].rank).map((v) => {
-      const p = PIPES.find((p) => p.v === v);
-      if (!p) return "";
+    const order = Object.keys(ev).sort((a, b) => ev[a].rank - ev[b].rank).filter((v) => pipeOf(v)?.product === prod);
+    const row = (v, rank) => {
+      const p = pipeOf(v);
       const locked = ev[v].locked;
       const email = ev[v].admin_contact_email || state.user?.admin_contact_email || "";
       const contact = locked ? `<div class="pipe-access">🔒 Tín hiệu đang khóa · <a href="mailto:${esc(encodeURIComponent(email))}?subject=${encodeURIComponent("Xin quyền xem pipeline " + p.nm)}">Liên hệ admin qua email</a></div>`
         : "";
-      const s = ev[p.v]?.walkforward || {}, y = s.yearly || [];
+      const s = ev[v]?.walkforward || {}, y = s.yearly || [];
       const dev = y.slice(0, 4).map((r) => mo(r[1]));
       const worst = dev.length ? Math.min(...dev) : null;
       const last = s.monthly_last_year;
-      const win = s.win_dev != null ? `${(100 * s.win_dev).toFixed(0)}% / ${(100 * (s.win_hidden ?? 0)).toFixed(0)}%` : "—";
-      return `<tr class="${locked ? "locked" : cur === p.v ? "on" : ""}" ${locked ? 'data-locked="true"' : `data-pipe="${p.v}"`}><td><div class="pcell"><span class="radio"></span><div>
-        <div class="pn-name">${locked ? `<b>#${ev[v].rank} ${p.nm}</b>` : `<button type="button" class="pipeline-choice" data-pipe="${p.v}" aria-pressed="${cur === p.v}">#${ev[v].rank} ${p.nm}<span>${cur === p.v ? "Đang xem" : "Xem tín hiệu"}</span></button>`}</div><div class="pn-desc">${p.ds}</div>${contact}</div></div></td>
+      const [wd, wh] = P.winKey === "all" ? [s.win_all_dev ?? s.win_dev, s.win_all_hidden ?? s.win_hidden] : [s.win_dev, s.win_hidden];
+      const win = wd != null ? `${(100 * wd).toFixed(0)}% / ${(100 * (wh ?? 0)).toFixed(0)}%` : "—";
+      const star = v === P.rec ? '<span class="tag">khuyên dùng</span>' : "";
+      return `<tr class="${locked ? "locked" : cur === v ? "on" : ""}" ${locked ? 'data-locked="true"' : `data-pipe="${v}"`}><td><div class="pcell"><span class="radio"></span><div>
+        <div class="pn-name">${locked ? `<b>#${rank} ${p.nm}</b> ${star}` : `<button type="button" class="pipeline-choice" data-pipe="${v}" aria-pressed="${cur === v}">#${rank} ${p.nm}<span>${cur === v ? "Đang xem" : "Xem tín hiệu"}</span></button> ${star}`}</div><div class="pn-desc">${p.ds}</div>${contact}</div></div></td>
         <td class="${last >= 5 ? "up" : ""}"><b>${f(last)}</b></td><td class="${s.gate_dd > 20 ? "down" : ""}">${f(s.gate_dd, 1)}%</td>
-        <td>${pct(s.win_hidden)}</td><td>${f(s.monthly_dev4)}</td><td>${f(worst)}</td><td>${f(s.monthly_5y)}</td><td>${esc(s.losing_years ?? "—")}</td><td>${win}</td>
+        <td>${pct(wh)}</td><td>${f(s.monthly_dev4)}</td><td>${f(worst)}</td><td>${f(s.monthly_5y)}</td><td>${esc(s.losing_years ?? "—")}</td><td>${win}</td>
         <td>${esc(s.trades_dev ?? "—")} / ${esc(s.trades_hidden ?? "—")}</td><td>${f(s.dd_4h, 1)}% / ${f(s.dd_1m, 1)}%</td>
         <td>${paperCell(ev[v].prospective)}</td></tr>`;
-    });
-    table($("pipeEvid"), ["Thứ tự / pipeline", "Test · 1 năm<br>Lãi ròng/tháng (%)", "DD<br>tối đa", "Win rate<br>Test", "Train / chọn model<br>4 năm · Lãi ròng/tháng (%)", "Train: năm thấp nhất<br>Lãi ròng/tháng (%)", "Toàn bộ 5 năm<br>Lãi ròng/tháng (%)", "Số năm<br>thua lỗ", "Win rate<br>(Train / Test)", "Số lệnh<br>(Train / Test)", "DD<br>(nến 4h / từng phút)", "Paper thực tế<br>lãi · phân vị so với kỳ vọng"], rows);
+    };
+    const winLbl = P.winKey === "all" ? "mọi lệnh" : "lệnh book";
+    const head = ["Thứ tự / pipeline", "Test · 1 năm<br>Lãi ròng/tháng (%)", "DD<br>tối đa", `Win ${winLbl}<br>Test`, "Train / chọn model<br>4 năm · Lãi ròng/tháng (%)", "Train: năm thấp nhất<br>Lãi ròng/tháng (%)", "Toàn bộ 5 năm<br>Lãi ròng/tháng (%)", "Số năm<br>thua lỗ", `Win ${winLbl}<br>(Train / Test)`, "Số lệnh book<br>(Train / Test)", "DD<br>(nến 4h / từng phút)", "Paper thực tế<br>lãi · phân vị so với kỳ vọng"];
+    const active = order.filter((v) => !pipeOf(v).archived), archived = order.filter((v) => pipeOf(v).archived);
+    table($("pipeEvid"), head, active.map((v, i) => row(v, i + 1)));
+    $("archiveWrap").hidden = !archived.length;
+    if (archived.length) table($("pipeArchive"), head, archived.map((v, i) => row(v, active.length + i + 1)));
+    $("evidTitle").textContent = `${P.label} · chọn pipeline · bảng đánh giá hiệu quả`;
     $("pipeOrderNote").textContent = Object.values(ev)[0]?.automatic_order
-      ? "Thứ tự tự động: lợi nhuận/tháng Test cao hơn → DD thấp hơn → Win rate Test cao hơn."
+      ? "Thứ tự trong từng sản phẩm: lợi nhuận/tháng Test cao hơn → DD thấp hơn → Win rate Test cao hơn."
       : "Thứ tự do admin sắp xếp. Trạng thái khóa do admin quản lý riêng cho từng pipeline.";
     $("pipeSelectedNote").textContent = cur
-      ? `Đang xem: ${PIPE_LABEL[cur]}. Lựa chọn áp dụng cho Pipeline, Market, History và Performance; bảng trên luôn so sánh cả 5 pipeline.`
+      ? `Đang xem: ${PIPE_LABEL[cur]}. Lựa chọn áp dụng cho Pipeline, Market, History và Performance; bảng trên chỉ so sánh pipeline của sản phẩm đang chọn.`
       : "Chưa có pipeline được mở quyền xem tín hiệu.";
-    $("pipeEvid").onclick = (e) => { const r = e.target.closest("[data-pipe]"); if (r) setPlanPipe(r.dataset.pipe); };
+    for (const id of ["pipeEvid", "pipeArchive"]) $(id).onclick = (e) => { const r = e.target.closest("[data-pipe]"); if (r) setPlanPipe(r.dataset.pipe); };
   }
 
   async function loadTodo() {
     try {
       renderPipeStatus();
       await loadEvidence();
+      if (pipeOf(planPipe())?.product !== product()) await ensureProductPipe();
       await loadPlans();
-      renderPipeBar(); renderBoard(); renderCards(); updateTitle();
+      renderProduct(); renderGoals(); renderPipeBar(); renderBoard(); renderCards(); renderProductPanels(); updateTitle();
     } catch (e) { toast(e.message); }
   }
 
   // ---- executable trade plan (trade mode): what should be on the exchange now
   const planOf = (sym) => state.live.plan?.coins?.[sym];
   // paper pipelines (prospective evidence); O1 = the most robust walk-forward foundation, the default view
-  const PIPES = [  // the five best pipelines (walk-forward, bar-open forms); older paper pipelines are retired (2026-09-30)
-    { v: "v301", nm: "G2", ds: "CB + agent RL chọn khối lượng & chốt lời bắt đáy, ngân sách dip 0.26", star: "khuyên dùng" },
-    { v: "v295", nm: "CS", ds: "CB + agent RL chọn khối lượng bắt đáy (học từ 35 coin)" },
-    { v: "v266", nm: "C5", ds: "O1 + SL dip 5σ theo nến 5m + SL sàn 8σ" },
-    { v: "v269", nm: "C4", ds: "O1 + SL dip 4σ theo nến 5m + SL sàn 8σ" },
-    { v: "v285", nm: "CB", ds: "C4 + 20% model Coinbase premium" },
-    { v: "v321", nm: "R2", ds: "G2 + bậc dip 5σ, agent RL học từ mọi độ sâu (chọn walk-forward mọi năm)" },
-    { v: "v315", nm: "M1", ds: "Thủ công: chỉ lệnh book (không dip), vào bằng limit hồi giá 0.75σ — cho người tự đánh" },
-    { v: "v367", nm: "M5", ds: "Thủ công: như M4 + khi tín hiệu tắt mà lệnh đang lỗ thì siết SL thay vì đóng — win lệnh book ~66%" },
-    { v: "v362", nm: "M4", ds: "Thủ công: như M3 nhưng SL/TP lệnh book 5σ/10σ (chọn trên 4 năm Train; đang chờ bằng chứng paper)" },
-    { v: "v342", nm: "M3", ds: "Thủ công: book M1 ×0.75 + 2 lệnh limit bắt đáy mỗi coin (3σ / 4σ) kèm TP và SL sàn 8σ — người tự đặt được" },
+  // paper pipelines grouped by PRODUCT (one tab each): MANUAL = the Pipeline tab, a human can follow it (book + bracket dip limits with
+  // exchange-native TP / SL; per-pipeline locks); BOT = the Bot tab (full dip ladder, stops watched on 5m closes; the 3 best, no locks,
+  // visible to admins and to accounts with the BOT grant). archived = still paper-logged, no longer recommended.
+  const PIPES = [
+    { v: "v367", nm: "M5", product: "manual", ds: "Book ×0.75 (SL/TP 5σ/10σ) + 2 lệnh limit bắt đáy mỗi coin (3σ / 4σ) kèm TP và SL sàn 8σ; tín hiệu tắt mà lệnh đang lỗ thì siết SL thay vì đóng — win lệnh book ~66%" },
+    { v: "v362", nm: "M4", product: "manual", ds: "Như M5 nhưng đóng lệnh khi tín hiệu tắt (không siết SL)" },
+    { v: "v342", nm: "M3", product: "manual", ds: "Book ×0.75 (SL/TP 4σ/8σ) + 2 lệnh limit bắt đáy 3σ / 4σ kèm TP và SL sàn 8σ" },
+    { v: "v315", nm: "M1", product: "manual", archived: true, ds: "Chỉ lệnh book (không bắt đáy), vào bằng limit hồi giá 0.75σ" },
+    { v: "v321", nm: "R2", product: "bot", ds: "Book CB + thang bắt đáy 2.5–5σ (SL bot theo nến 5m + SL sàn 8σ), agent RL chọn khối lượng & chốt lời" },
+    { v: "v301", nm: "G2", product: "bot", ds: "Như R2 nhưng thang 2.5–4σ, agent học từ 4 độ sâu" },
+    { v: "v295", nm: "CS", product: "bot", ds: "Book CB + thang bắt đáy 2.5–4σ, agent RL chỉ chọn khối lượng (học từ 35 coin)" },
   ];
+  const PRODUCTS = {
+    manual: { label: "Giao dịch thủ công (MANUAL)", rec: "v367", winKey: "book",
+      note: "Người tự đặt lệnh: mỗi 4h đặt lệnh limit kèm TP / SL sẵn trên sàn. Cần bật Hedge mode (hoặc tài khoản phụ cho lệnh bắt đáy).",
+      goals: [
+        { name: "Mục tiêu 1 (bắt buộc)", items: [["monthly_5y", "5 năm", ">=", 5, "%/th"], ["monthly_last_year", "Năm Test", ">=", 5, "%/th"],
+          ["gate_dd", "DD", "<", 20, "%"], ["win_hidden", "Win lệnh book (Test)", ">=", 0.55, "win"], ["losing_years", "Năm thua lỗ", "==", 0, ""]] },
+        { name: "Mục tiêu 2", items: [["monthly_5y", "5 năm", ">=", 8, "%/th"], ["gate_dd", "DD", "<", 15, "%"], ["win_hidden", "Win lệnh book (Test)", ">=", 0.60, "win"]] },
+      ] },
+    bot: { label: "Bot tự động (BOT)", rec: "v321", winKey: "all",
+      note: "Cần bot chạy liên tục: đặt lại thang lệnh bắt đáy mỗi 4h và theo dõi SL trên nến 5m. Nếu bot ngừng, chỉ còn SL sàn 8σ (DD mô phỏng ~22%).",
+      goals: [
+        { name: "Mục tiêu BOT", items: [["monthly_5y", "5 năm", ">=", 8, "%/th"], ["monthly_last_year", "Năm Test", ">=", 8, "%/th"], ["gate_dd", "DD", "<", 15, "%"],
+          ["win_all_hidden", "Win mọi lệnh (Test)", ">", 0.65, "win"], ["losing_years", "Năm thua lỗ", "==", 0, ""]] },
+      ] },
+  };
+  const pipeOf = (v) => PIPES.find((p) => p.v === v);
+  const product = () => state.view === "bot" ? "bot" : "manual";  // the Pipeline tab = MANUAL, the Bot tab = BOT
+  const canSeeBot = () => state.user?.role === "admin" || !!state.user?.bot_access;
+  // keep the selected pipeline inside the product of the open tab (the recommended one first)
+  async function ensureProductPipe() {
+    const p = product(), cur = pipeOf(planPipe());
+    if (cur?.product === p) return;
+    const allowed = visiblePipes().filter((x) => x.product === p);
+    if (!allowed.length) return;
+    const rec = allowed.find((x) => x.v === PRODUCTS[p].rec) || allowed.find((x) => !x.archived) || allowed[0];
+    await setPlanPipe(rec.v);
+  }
+  function renderProduct() {
+    const el = $("productNote"); if (el) el.textContent = PRODUCTS[product()].note;
+  }
+  // goal progress of the product's selected (or recommended) pipeline: replay metrics vs the targets + the live paper result
+  function renderGoals() {
+    const el = $("goalPanel"); if (!el || !state.evid) return;
+    const prod = product(), P = PRODUCTS[prod], cur = pipeOf(planPipe());
+    const v = cur?.product === prod ? cur.v : P.rec, ev = state.evid[v];
+    if (!ev) { el.innerHTML = ""; return; }
+    const s = ev.walkforward || {};
+    const val = (k) => k === "win_all_hidden" ? (s.win_all_hidden ?? s.win_hidden) : s[k];
+    const show = (x, unit) => x == null || !isFinite(x) ? "—" : unit === "win" ? `${(100 * x).toFixed(0)}%` : unit === "" ? String(x) : `${Number(x).toFixed(2)}${unit === "%" ? "%" : ""}`;
+    const tgt = (op, t, unit) => `${{ ">=": "≥", "<": "<", ">": ">", "==": "=" }[op]} ${unit === "win" ? (100 * t).toFixed(0) + "%" : t + (unit === "%" ? "%" : "")}`;
+    const pass = (x, op, t) => x != null && isFinite(x) && ({ ">=": x >= t, "<": x < t, ">": x > t, "==": x === t }[op]);
+    const goals = P.goals.map((g) => {
+      const chips = g.items.map(([k, name, op, t, unit]) => {
+        const x = val(k), ok = pass(x, op, t);
+        return `<span class="goal-chip ${ok ? "ok" : "no"}" title="${esc(name)} ${tgt(op, t, unit)}"><b>${esc(name)}</b> ${show(x, unit)} <span class="muted">${tgt(op, t, unit)}</span> ${ok ? "✓" : "✗"}</span>`;
+      }).join("");
+      const all = g.items.every(([k, , op, t]) => pass(val(k), op, t));
+      return `<div class="goal-row"><span class="goal-name">${esc(g.name)}: <b class="${all ? "up" : "down"}">${all ? "đạt trên mô phỏng" : "chưa đạt"}</b></span>${chips}</div>`;
+    }).join("");
+    const pr = ev.prospective;
+    const paper = pr && pr.live_pct != null
+      ? `Paper (dữ liệu mới, chưa ai thấy): <b>${sgn(pr.live_pct)}</b> sau ${Number(pr.days || 0).toFixed(1)} ngày${pr.percentile != null ? ` · phân vị <b>p${Math.round(pr.percentile)}</b> so với kỳ vọng (50 = đúng như nghiên cứu)` : " · chưa đủ dữ liệu để so kỳ vọng"}`
+      : "Paper: chưa có dữ liệu (pipeline mới hoặc chưa tới giờ bắt đầu).";
+    el.innerHTML = `<div class="panel-h"><span>Tiến độ mục tiêu · ${esc(PIPE_LABEL[v] || v)}${v === P.rec ? ' <span class="tag">khuyên dùng</span>' : ""}</span>
+      <span class="muted small">mô phỏng walk-forward 2021-09 → 2026-09</span></div>${goals}
+      <div class="goal-paper">${paper}</div>
+      <div class="muted small">Đạt trên mô phỏng chưa phải xác nhận cuối: năm Test đã được xem nhiều lần trong nghiên cứu; bằng chứng sạch là kết quả paper trên dữ liệu mới.</div>`;
+  }
+  // MANUAL: every order to place at this 4h close in one list; BOT: what the bot must keep doing
+  function renderProductPanels() {
+    const cl = $("manualChecklist"), bn = $("botNote"); if (!cl || !bn) return;
+    const prod = product(), cur = pipeOf(planPipe());
+    cl.hidden = !(prod === "manual" && cur?.product === "manual");
+    bn.hidden = !(prod === "bot" && cur?.product === "bot");
+    if (!bn.hidden) bn.innerHTML = `<div class="panel-h"><span>Vận hành bot · ${esc(cur.nm)}</span></div>
+      <ul class="bot-list"><li>Mỗi nến 4h: đặt lại toàn bộ thang lệnh limit bắt đáy theo bảng "Lệnh chờ bắt đáy" của từng coin (từ phút 16 đến hết nến).</li>
+      <li>Stop-loss lệnh bắt đáy do bot kích hoạt khi nến 5m đóng dưới mức SL; luôn đặt sẵn SL sàn 8σ phòng khi bot mất kết nối.</li>
+      <li>Lệnh bắt đáy còn mở cuối nến: bot đóng ở giá mở nến kế tiếp.</li>
+      <li>Rủi ro vận hành: nếu bot ngừng chạy, mô phỏng cho DD ~22% (chỉ còn SL sàn).</li></ul>`;
+    if (cl.hidden) return;
+    const plan = state.live.plan;
+    if (!plan?.coins) { cl.innerHTML = `<div class="panel-h"><span>Danh sách lệnh cần đặt</span></div><p class="muted">Chưa có kế hoạch lệnh (chờ chu kỳ 4h kế tiếp).</p>`; return; }
+    const rows = [];
+    for (const s of SYMS) {
+      const c = planOf(s); if (!c) continue;
+      const add = (kind, side, price, sl, tp, w, until, extra = "") => {
+        const l = w != null ? lot(s, w, price) : null;
+        const q = l ? `${l.txt} ${coin(s)}${l.ok ? "" : ' <span class="note warn">dưới mức tối thiểu</span>'}` : "—";
+        const txt = `${side} ${s} LIMIT ${fmtPx(price)}${l ? " qty " + l.txt : ""}${sl ? " SL " + fmtPx(sl) : ""}${tp ? " TP " + fmtPx(tp) : ""}`;
+        rows.push(`<tr><td class="sym">${coin(s)}</td><td>${kind}${extra}</td><td><span class="badge ${side === "BUY" ? "long" : "short"}">${side === "BUY" ? "MUA" : "BÁN"}</span></td>
+          <td class="m">${fmtPx(price)}</td><td class="m down">${sl ? fmtPx(sl) : "—"}</td><td class="m up">${tp ? fmtPx(tp) : "—"}</td><td>${q}</td>
+          <td class="small">${until ? dt(Date.parse(until)) : "—"}</td><td><button type="button" class="btn small copy-btn" data-copy="${esc(txt)}">Copy</button></td></tr>`);
+      };
+      if (c.state === "pending") add("Vào lệnh book", c.order.side, c.order.price, c.order.sl_if_filled, c.order.tp_if_filled, c.order.weight, c.order.valid_until);
+      if (c.state === "position" && c.order) add({ add: "Nhồi thêm", reduce: "Chốt bớt", close: "Đóng hết" }[c.order.kind] || c.order.kind,
+        c.order.side, c.order.price, null, null, c.order.kind === "add" ? c.order.amount : null, c.order.valid_until);
+      if (c.state === "position" && !c.order) {
+        const slm = lastEvent(s, ["sl_move"]);
+        if (recent(slm)) rows.push(`<tr><td class="sym">${coin(s)}</td><td>Sửa stop-loss</td><td>—</td><td class="m">—</td><td class="m down">${fmtPx(c.position.sl)}</td><td>—</td><td>—</td><td>—</td><td></td></tr>`);
+      }
+      for (const d of c.dips || []) if (!d.filled) add("Bắt đáy", "BUY", d.buy_limit, d.stop, d.tp, d.size_frac, d.active_until, ` ${d.rung}σ`);
+    }
+    const nextDec = plan.next_decision ? Date.parse(plan.next_decision) : null;
+    const barStart = plan.decision_bar ? Date.parse(plan.decision_bar) + 4 * 3600e3 : null;
+    const hr = barStart ? new Date(barStart).getHours() : null;
+    const night = hr != null && hr >= 1 && hr < 6;
+    cl.innerHTML = `<div class="panel-h"><span>Danh sách lệnh cần đặt · ${esc(cur.nm)}</span>
+        <span class="muted small">${nextDec ? "quyết định kế tiếp " + dt(nextDec) : ""}</span></div>
+      <div class="muted small">Đặt trong khoảng 15 phút sau khi nến 4h đóng (trễ 30 phút vẫn ổn, trễ 60 phút làm hỏng kết quả). Mỗi lệnh là limit kèm SL (Stop Market) và TP (Limit) đặt sẵn trên sàn.
+        Cần Hedge mode để lệnh mua bắt đáy không bù trừ với vị thế SHORT của book.${night ? " <b>Nến ban đêm:</b> nếu không thức được, có thể bỏ qua nến này (mô phỏng: 5 năm vẫn ~5,2%/tháng)." : ""}</div>
+      <div class="table-wrap"><table class="tbl compact">${rows.length ? `<thead><tr><th>Coin</th><th>Lệnh</th><th>Chiều</th><th>Giá limit</th><th>Stop-loss</th><th>Take-profit</th><th>Khối lượng</th><th>Hiệu lực đến</th><th></th></tr></thead><tbody>${rows.join("")}</tbody>` : '<tbody><tr><td class="muted">Không có lệnh mới cần đặt ở nến này — giữ nguyên lệnh và SL/TP đang có trên sàn.</td></tr></tbody>'}</table></div>`;
+    cl.onclick = (e) => {
+      const b = e.target.closest(".copy-btn"); if (!b) return;
+      navigator.clipboard?.writeText(b.dataset.copy).then(() => toast("Đã copy: " + b.dataset.copy), () => toast(b.dataset.copy));
+    };
+  }
   const PIPE_LABEL = Object.fromEntries(PIPES.map((p) => [p.v, p.nm]));
   function visiblePipes() {
     const ids = state.user?.allowed_pipelines || [];
@@ -428,6 +544,7 @@
     if (!visiblePipes().some((p) => p.v === v)) return;
     state.selectedPipeline = v;
     try { localStorage.setItem("planPipe6", v); } catch { /* per-viewer convenience only */ }
+
     clearPipelineData();
     const gen = ++planGeneration;
     state.live.planLoading = true;
@@ -440,7 +557,7 @@
     });
     if (gen !== planGeneration || v !== planPipe() || !state.user) return;
     state.live.plan = plan; state.live.planLoading = false;
-    renderPipeBar(); renderBoard(); renderCards(); renderWatchlist(); renderPlan(); renderEvidence();
+    renderPipeBar(); renderBoard(); renderCards(); renderWatchlist(); renderPlan(); renderEvidence(); renderGoals(); renderProductPanels();
   }
   function renderPipeBar() {
     if (!$("pipeBar")) return;  // the Pipeline tab now selects pipelines in the training-results table
@@ -563,7 +680,7 @@
     const sym = state.live.symbol, plan = state.live.plan;
     $("planPanel").innerHTML = `<div class="panel-h"><span>${coin(sym)} · ${PIPE_LABEL[planPipe()] || ""}</span>
       <span class="muted small">${plan?.next_decision ? "cập nhật kế tiếp " + dt(Date.parse(plan.next_decision)) : ""}</span></div>${compactPlan(sym)}
-      <p class="fine">Hướng dẫn từng bước cho cả 5 coin ở tab <a href="#todo">Pipeline</a>.</p>`;
+      <p class="fine">Hướng dẫn từng bước cho từng coin ở tab <a href="#todo">Pipeline</a>.</p>`;
   }
   function renderCards() {
     const el = $("todoCards"); if (!el) return;
@@ -1219,7 +1336,8 @@
       <td>${i + 1}</td><td><b>${esc(PIPE_LABEL[p])}</b><span class="note">${esc(PIPES.find((x) => x.v === p).ds)}</span></td>
       <td><button class="btn sm" data-move="${i}" data-delta="-1" aria-label="Đưa ${esc(PIPE_LABEL[p])} lên" ${i === 0 ? "disabled" : ""}>↑</button>
         <button class="btn sm" data-move="${i}" data-delta="1" aria-label="Đưa ${esc(PIPE_LABEL[p])} xuống" ${i === draft.order.length - 1 ? "disabled" : ""}>↓</button></td>
-      <td><button class="btn sm" data-lock="${p}" aria-pressed="${draft.locked[p]}">${draft.locked[p] ? "🔒 Đang khóa · Mở khóa" : "Đang mở · Khóa tín hiệu"}</button></td></tr>`));
+      <td>${pipeOf(p)?.product === "bot" ? '<span class="muted small">Tab Bot: không khóa, chỉ tài khoản được cấp quyền Bot</span>'
+        : `<button class="btn sm" data-lock="${p}" aria-pressed="${draft.locked[p]}">${draft.locked[p] ? "🔒 Đang khóa · Mở khóa" : "Đang mở · Khóa tín hiệu"}</button>`}</td></tr>`));
     $("pipelineSettingsTbl").onclick = (e) => {
       const lock = e.target.closest("[data-lock]"), move = e.target.closest("[data-move]");
       if (lock) draft.locked[lock.dataset.lock] = !draft.locked[lock.dataset.lock];
@@ -1269,9 +1387,11 @@
   async function loadUsers() {
     try {
       const users = await api("/api/admin/users");
-      table($("usersTbl"), ["Email", "Tên", "Quyền", "Cấp riêng pipeline", "Lần cuối", ""], users.map((u) => {
+      table($("usersTbl"), ["Email", "Tên", "Quyền", "Cấp riêng (pipeline MANUAL / tab Bot)", "Lần cuối", ""], users.map((u) => {
         const admin = u.role === "admin";
-        const grants = admin ? "Tất cả pipeline" : PIPES.map(p => `<label class="grant-choice"><input type="checkbox" data-grant="${esc(p.v)}" ${u.granted_pipelines?.includes(p.v) ? "checked" : ""}>${esc(p.nm)}</label>`).join("") + `<button class="btn sm" data-save-grants="${esc(u.email)}">Lưu quyền pipeline</button>`;
+        const grants = admin ? "Tất cả pipeline + tab Bot" : PIPES.filter((p) => p.product === "manual").map(p => `<label class="grant-choice"><input type="checkbox" data-grant="${esc(p.v)}" ${u.granted_pipelines?.includes(p.v) ? "checked" : ""}>${esc(p.nm)}</label>`).join("")
+          + `<label class="grant-choice bot-grant"><input type="checkbox" data-grant="bot" ${u.granted_pipelines?.includes("bot") ? "checked" : ""}>Tab Bot</label>`
+          + `<button class="btn sm" data-save-grants="${esc(u.email)}">Lưu quyền</button>`;
         return `<tr><td>${esc(u.email)}</td><td>${esc(u.name || "")}</td><td>${admin ? "Admin" : u.approved ? "Người xem" : u.access_revoked ? "Đã thu hồi" : "Chờ duyệt"}</td><td>${grants}</td>
           <td>${dt(u.last_seen)}</td><td>${admin ? "" : `<button class="btn sm" data-email="${esc(u.email)}" data-ap="${u.approved ? 0 : 1}">${u.approved ? "Thu hồi" : u.access_revoked ? "Khôi phục" : "Duyệt"}</button>`}</td></tr>`;
       }));

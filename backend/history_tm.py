@@ -175,6 +175,15 @@ def build(pipe: str, db) -> str:
     ts = res.get("trade_stats", {})
     summary["win_dev"], summary["win_hidden"] = ts.get("dev", {}).get("win_rate"), ts.get("_hidden", {}).get("win_rate")
     summary["trades_dev"], summary["trades_hidden"] = ts.get("dev", {}).get("trades"), ts.get("_hidden", {}).get("trades")
+    # all trades (book + dip rungs): the BOT goal's win rate; rungs counted by exit time, engine net return (fees included)
+    dev0, hid0 = pd.Timestamp("2021-09-24", tz="UTC"), pd.Timestamp("2025-09-24", tz="UTC")
+    rungs = [(pd.Timestamp(e["t"]), float(e["ret"])) for e in events if e["kind"] in ("rung_tp", "rung_sl", "rung_timeout") and "ret" in e]
+    for key, lo, hi, part in (("dev", dev0, hid0, "dev"), ("hidden", hid0, pd.Timestamp("2100-01-01", tz="UTC"), "_hidden")):
+        rr = [r for t, r in rungs if lo <= t < hi]
+        nb, wb = ts.get(part, {}).get("trades") or 0, ts.get(part, {}).get("win_rate") or 0.0
+        n = nb + len(rr)
+        summary[f"win_all_{key}"] = round((wb * nb + sum(r > 0 for r in rr)) / n, 4) if n else None
+        summary[f"rungs_{key}"] = len(rr)
     with db.write() as c:
         c.execute("DELETE FROM run_books WHERE run_id IN (SELECT id FROM runs WHERE source = ?)", (src,))
         for tb in ("runs", "trades", "equity", "orders"):

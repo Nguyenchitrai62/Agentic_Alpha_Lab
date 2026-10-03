@@ -9,18 +9,20 @@ from . import db
 from .config import SETTINGS
 
 # Recorded dashboard metrics: product ranking only, explicitly requested by the user.
-PIPELINES = {
-    "v301": {"candidate": "v301_G2", "monthly_last_year": 5.349, "gate_dd": 17.09, "win_hidden": 0.558},
-    "v295": {"candidate": "v295_CS", "monthly_last_year": 5.266, "gate_dd": 17.2, "win_hidden": 0.558},
-    "v266": {"candidate": "v266_B1", "monthly_last_year": 4.464, "gate_dd": 19.7, "win_hidden": 0.541},
-    "v269": {"candidate": "v269_M1", "monthly_last_year": 4.645, "gate_dd": 18.27, "win_hidden": 0.546},
-    "v285": {"candidate": "v285_D2", "monthly_last_year": 5.167, "gate_dd": 18.39, "win_hidden": 0.558},
-    "v321": {"candidate": "v321_R2", "monthly_last_year": 5.655, "gate_dd": 18.39, "win_hidden": 0.560},
-    "v315": {"candidate": "v315_M1", "monthly_last_year": 3.289, "gate_dd": 18.47, "win_hidden": 0.550},
-    "v342": {"candidate": "v342_M3", "monthly_last_year": 4.704, "gate_dd": 17.73, "win_hidden": 0.556},
-    "v362": {"candidate": "v362_M4", "monthly_last_year": 5.04, "gate_dd": 16.96, "win_hidden": 0.556},
-    "v367": {"candidate": "v367_M5", "monthly_last_year": 5.22, "gate_dd": 18.62, "win_hidden": 0.686},
+PIPELINES = {  # product: "manual" = a human can follow it (per-pipeline locks / grants); "bot" = needs a bot (Bot tab: no locks, the 3 best,
+               # visible only to admins and to accounts holding the BOT grant)
+    "v321": {"candidate": "v321_R2", "product": "bot", "monthly_last_year": 5.655, "gate_dd": 18.39, "win_hidden": 0.560},
+    "v301": {"candidate": "v301_G2", "product": "bot", "monthly_last_year": 5.349, "gate_dd": 17.09, "win_hidden": 0.558},
+    "v295": {"candidate": "v295_CS", "product": "bot", "monthly_last_year": 5.266, "gate_dd": 17.2, "win_hidden": 0.558},
+    "v367": {"candidate": "v367_M5", "product": "manual", "monthly_last_year": 5.22, "gate_dd": 18.62, "win_hidden": 0.686},
+    "v362": {"candidate": "v362_M4", "product": "manual", "monthly_last_year": 5.04, "gate_dd": 16.96, "win_hidden": 0.556},
+    "v342": {"candidate": "v342_M3", "product": "manual", "monthly_last_year": 4.704, "gate_dd": 17.73, "win_hidden": 0.556},
+    "v315": {"candidate": "v315_M1", "product": "manual", "monthly_last_year": 3.289, "gate_dd": 18.47, "win_hidden": 0.550},
 }
+MANUAL = {p for p, v in PIPELINES.items() if v["product"] == "manual"}
+BOT = {p for p, v in PIPELINES.items() if v["product"] == "bot"}
+BOT_GRANT = "bot"  # account-level grant that opens the whole Bot tab
+GRANTABLE = MANUAL | {BOT_GRANT}
 
 
 def metric_order() -> list[str]:
@@ -39,10 +41,10 @@ def metric_order() -> list[str]:
     return sorted(PIPELINES, key=score)
 
 
-NEW_LOCKED = {"v321", "v315", "v342", "v362", "v367"}  # paper pipelines added 2026-10-03: admin-only until the admin unlocks them
 POLICY_KEY = "pipeline_access_policy"
 SUMMARY_FIELDS = ("monthly_5y", "monthly_dev4", "monthly_last_year", "dd_4h", "dd_1m", "gate_dd",
-                  "losing_years", "yearly", "win_dev", "win_hidden", "trades_dev", "trades_hidden")
+                  "losing_years", "yearly", "win_dev", "win_hidden", "trades_dev", "trades_hidden", "win_all_dev", "win_all_hidden",
+                  "rungs_dev", "rungs_hidden")
 
 
 def policy() -> dict:
@@ -53,12 +55,12 @@ def policy() -> dict:
         order = ranking
     else:  # a saved order from an older catalogue: drop retired pipelines, append new ones in metric order
         order = [p for p in saved["order"] if p in PIPELINES] + [p for p in ranking if p not in saved["order"]]
-    # pipelines added after the access rules were set start LOCKED (admin-only); the top-two-locked default applies to the others
-    older = [p for p in order if p not in NEW_LOCKED]
-    default_locks = {p: p in NEW_LOCKED or older.index(p) < 2 for p in order}
+    # MANUAL: the two best are locked by default (premium), the rest free; BOT pipelines have no locks (access is the account's BOT grant)
+    manual = [p for p in order if p in MANUAL]
+    default_locks = {p: p in MANUAL and manual.index(p) < 2 for p in order}
     saved_locks = saved.get("locked")
     # a pipeline added after the locks were saved starts LOCKED (admin-only) until the admin decides
-    locks = default_locks if saved_locks is None else {p: bool(saved_locks.get(p, True)) for p in order}
+    locks = default_locks if saved_locks is None else {p: p in MANUAL and bool(saved_locks.get(p, True)) for p in order}
     return {"order": order, "locked": locks, "automatic": automatic, "revision": saved.get("revision", 0)}
 
 
@@ -95,12 +97,20 @@ def allowed(user: dict) -> list[str]:
     if user["role"] == "admin":
         return order
     grants = set(granted(user["email"])) if user["role"] == "viewer" else set()
-    return [p for p in order if not settings["locked"][p] or p in grants] if user["role"] == "viewer" else []
+    if user["role"] != "viewer":
+        return []
+    # MANUAL: unlocked or individually granted; BOT: every bot pipeline, only with the account's BOT grant
+    return [p for p in order if (p in MANUAL and (not settings["locked"][p] or p in grants)) or (p in BOT and BOT_GRANT in grants)]
 
 
 def granted(email: str) -> list[str]:
+    """MANUAL pipeline grants and the account-level BOT grant ("bot")."""
     return [r["pipeline"] for r in db.rows("SELECT pipeline FROM user_pipeline_access WHERE email=? ORDER BY pipeline", (email,))
-            if r["pipeline"] in PIPELINES]
+            if r["pipeline"] in GRANTABLE]
+
+
+def bot_access(user: dict) -> bool:
+    return user["role"] == "admin" or user["role"] == "viewer" and BOT_GRANT in granted(user["email"])
 
 
 def default_pipeline(user: dict) -> str:
@@ -126,4 +136,4 @@ def require_source(user: dict, source: str) -> None:
 
 
 def with_permissions(user: dict) -> dict:
-    return {**user, "allowed_pipelines": allowed(user), "admin_contact_email": SETTINGS.admin_contact_email}
+    return {**user, "allowed_pipelines": allowed(user), "bot_access": bot_access(user), "admin_contact_email": SETTINGS.admin_contact_email}

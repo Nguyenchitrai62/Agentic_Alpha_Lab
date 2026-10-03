@@ -248,6 +248,8 @@ def pipelines_summary(request: Request, user: dict = Depends(auth.require_viewer
         except Exception:  # noqa: BLE001
             score = {}
         for i, p in enumerate(order, 1):
+            if p in catalog.BOT and not catalog.bot_access(user):
+                continue  # the Bot tab (its evaluation included) is visible only with the account's BOT grant
             raw = db.kv_get(f"summary_tm_{p}", {}) or {}
             # Historical evaluation remains public to approved viewers; never serialize plans/signals here.
             summary = {k: raw.get(k, catalog.PIPELINES[p].get(k)) for k in catalog.SUMMARY_FIELDS}
@@ -259,7 +261,7 @@ def pipelines_summary(request: Request, user: dict = Depends(auth.require_viewer
                       "prospective": None if locked else {k: score.get(p, {}).get(k) for k in ("days", "live_pct", "expected_p50", "percentile")},
                       "admin_contact_email": SETTINGS.admin_contact_email if locked else None}
         return out
-    return cached(request, "pipelines_summary:" + str(settings["revision"]) + ":" + ",".join(order)
+    return cached(request, "pipelines_summary:" + user["role"] + ":" + str(settings["revision"]) + ":" + ",".join(order)
                   + ":" + ",".join(sorted(permitted)), 60, load)
 
 
@@ -471,8 +473,8 @@ def admin_set_user(payload: dict = Body(...), user: dict = Depends(auth.require_
         raise HTTPException(400, "A valid email is required")
     grants = payload.get("pipelines")
     if "pipelines" in payload and (not isinstance(grants, list) or any(
-            not isinstance(p, str) or p not in catalog.PIPELINES for p in grants) or len(set(grants)) != len(grants)):
-        raise HTTPException(400, "pipelines must contain unique known pipeline IDs")
+            not isinstance(p, str) or p not in catalog.GRANTABLE for p in grants) or len(set(grants)) != len(grants)):
+        raise HTTPException(400, "pipelines must contain unique MANUAL pipeline IDs or 'bot'")
     approved = 1 if payload.get("approved", True) else 0
     if not isinstance(payload.get("approved", True), bool):
         raise HTTPException(400, "approved must be a boolean")
