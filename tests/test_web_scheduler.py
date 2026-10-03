@@ -745,3 +745,23 @@ def test_plan_generated_before_a_plan_code_change_is_stale(backend, tmp_path, mo
         db.kv_set(f"trade_plan_{p}", {**plan, "generated_at": after})
     db.kv_set("trade_plan_v367", {**db.kv_get("trade_plan_v367"), "generated_at": before})
     assert pipe.stale_plans(now_ms) == {"v367": "plan code changed after the plan was generated"}
+
+
+def test_flow_store_size_check_flags_a_doubled_day(backend, tmp_path, monkeypatch):
+    _, db, _ = backend
+    pipe = importlib.import_module("backend.pipeline")
+    now_ms = complete_inputs(pipe, db, tmp_path, monkeypatch)
+    monkeypatch.setattr(pipe.db, "now_ms", lambda: now_ms)
+    monkeypatch.setattr(pipe, "SYMS", ["BTCUSDT"])
+    step = pipe.H4_MS
+    last = now_ms // step * step - step
+    times = pd.to_datetime([last - k * step for k in range(10, -1, -1)], unit="ms", utc=True)
+    flow = pd.DataFrame({"buy_lt10k": 6.25, "sell_lt10k": 6.25, "n_lt10k": 3}, index=times)  # candles: v 10 x mid 1.25 = 12.5
+    store = tmp_path / pipe.FLOW_STORES[0]
+    store.mkdir(parents=True, exist_ok=True)
+    flow.to_parquet(store / "BTCUSDT_flow_4h.parquet")
+    assert pipe.flow_volume_issues() == []
+    flow.loc[flow.index[-6:], ["buy_lt10k", "sell_lt10k"]] *= 2  # the last day counted twice
+    flow.to_parquet(store / "BTCUSDT_flow_4h.parquet")
+    issues = pipe.flow_volume_issues()
+    assert len(issues) == 1 and "aggflow_20260928_orders/BTCUSDT" in issues[0] and "outside [0.7, 1.3]" in issues[0]

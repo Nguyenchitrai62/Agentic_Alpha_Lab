@@ -438,6 +438,37 @@ def build_missing_summaries(force: bool = False) -> str:
     return msg
 
 
+# whale-flow stores read by the live A member: each 4h row's taker notional must be ~1x the kline quote volume (a re-fetch that
+# appended a source on top of existing rows doubled 2026-09 once; system audit 2026-10-03)
+FLOW_STORES = ("data/raw/aggflow_20260928_orders", "data/raw/aggflow_20260928")
+
+
+def flow_volume_issues(days: int = 45, lo: float = 0.7, hi: float = 1.3) -> list[str]:
+    """Days in the last `days` whose median 4h ratio taker flow / kline quote volume (DB 4h candles, v x mid price) is outside
+    [lo, hi], per flow store and symbol."""
+    out = []
+    since = db.now_ms() - days * 86_400_000
+    for store in FLOW_STORES:
+        for sym in SYMS:
+            path = ROOT / store / f"{sym}_flow_4h.parquet"
+            if not path.exists():
+                continue
+            f = pd.read_parquet(path)
+            f = f[f.index >= pd.Timestamp(since, unit="ms", tz="UTC")]
+            tot = f[[c for c in f.columns if c.startswith(("buy_", "sell_"))]].sum(axis=1)
+            rows = db.rows("SELECT t, o, c, v FROM candles WHERE symbol = ? AND interval = '4h' AND t >= ?", (sym, since))
+            if tot.empty or not rows:
+                continue
+            qv = pd.Series({pd.Timestamp(r["t"], unit="ms", tz="UTC"): r["v"] * (r["o"] + r["c"]) / 2 for r in rows})
+            r = (tot / qv.reindex(tot.index)).replace([float("inf")], float("nan")).dropna()
+            day = r.groupby(r.index.floor("1D")).median()
+            bad = day[(day < lo) | (day > hi)]
+            if len(bad):
+                out.append(f"{store.rsplit('/', 1)[-1]}/{sym}: {len(bad)} day(s) with flow/volume outside [{lo}, {hi}] "
+                           f"(e.g. {bad.index[0].date()} x{bad.iloc[0]:.2f})")
+    return out
+
+
 def ensure_data(build_summaries: bool = False, now_ms: int | None = None) -> dict:
     """One data-completeness pass: inspect everything the pipelines need and repair what can be repaired.
 
@@ -473,6 +504,9 @@ def ensure_data(build_summaries: bool = False, now_ms: int | None = None) -> dic
             report["fixed"].append(msg)
         report["summaries_missing"] = guard("summaries", missing_summaries) or []
     report["plans_stale"] = guard("plans", lambda: stale_plans(now_ms)) or {}
+    report["flow"] = guard("flow", flow_volume_issues) or []
+    if report["flow"]:
+        report["warnings"].append("flow store size check: " + "; ".join(report["flow"]))
     report["static_missing"] = guard("static", static_inputs_missing) or []
     if report["static_missing"]:
         report["warnings"].append("static inputs missing (not repairable here): " + ", ".join(report["static_missing"]))
