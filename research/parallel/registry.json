@@ -2,7 +2,7 @@
   "schema_version": 1,
   "project": "Agentic Alpha Lab BTC swing research",
   "created_at": "2026-09-06T00:00:00Z",
-  "next_version": 352,
+  "next_version": 353,
   "control": {
     "coordinator_model": "gpt-5.6-sol",
     "coordinator_reasoning": "high",
@@ -54,7 +54,7 @@
     "expected_workers": 3,
     "version_range": [
       45,
-      351
+      352
     ],
     "parent_commit": "1ecf947baddd5ef78444670330e9db62128dad50",
     "cloud_snapshot": {
@@ -14858,7 +14858,7 @@
       "version": "v349",
       "track": "B",
       "direction_key": "v349-dip-hour-multiplier",
-      "status": "running",
+      "status": "rejected",
       "parent_versions": [
         "v348"
       ],
@@ -14871,9 +14871,36 @@
       "write_scope": "research/parallel/rounds/parallel-20260906-r2/v349",
       "worker_agent_id": "01a07791-eecb-7053-8866-dcdbe31e84d7",
       "worker_host_id": "local",
-      "result_manifest": null,
+      "result_manifest": "research\\parallel\\rounds\\parallel-20260906-r2\\v349\\result_manifest.json",
       "registered_at": "2026-10-03T04:37:07.594442Z",
-      "assigned_at": "2026-10-03T04:37:07.594442Z"
+      "assigned_at": "2026-10-03T04:37:07.594442Z",
+      "result_manifest_sha256": "e4ae4ef1686838b6fe68d4bde85764f02ee395797930a661f2c7f1d7de0b8baf",
+      "result_summary": {
+        "scenarios": {
+          "normal": {
+            "monthly_geometric_net_percent": 6.233,
+            "max_drawdown_percent": 17.73,
+            "fills": 2404,
+            "months": 48
+          },
+          "fee_stress": {
+            "monthly_geometric_net_percent": 6.233,
+            "max_drawdown_percent": 17.73,
+            "fills": 2404,
+            "months": 48
+          },
+          "execution_stress": {
+            "monthly_geometric_net_percent": 6.233,
+            "max_drawdown_percent": 17.73,
+            "fills": 2404,
+            "months": 48
+          }
+        },
+        "independent_test": false,
+        "live_approved": false,
+        "audit_notes": "COMPARISON.md verdict PASS"
+      },
+      "audited_at": "2026-10-03T06:54:51.538420Z"
     },
     {
       "version": "v350",
@@ -14916,7 +14943,28 @@
       "result_manifest": null,
       "registered_at": "2026-10-03T05:29:05.426969Z",
       "assigned_at": "2026-10-03T05:29:05.426969Z"
+    },
+    {
+      "version": "v352",
+      "track": "B",
+      "direction_key": "v352-info-book-risk-control",
+      "status": "running",
+      "parent_versions": [
+        "v351"
+      ],
+      "model_family": "hist-gradient-boosting",
+      "objective": "basis-informed book with one-way exposure control on M3",
+      "data_contract": "as v351",
+      "policy_contract": "M3 vs QBm60 (book 0.6) vs QBn50 (half-demeaned members); folds k=2,3; last year once",
+      "hypothesis": "Controlling one-way concentration keeps the information gain without the DD breach",
+      "parent_commit": "1ecf947baddd5ef78444670330e9db62128dad50",
+      "write_scope": "research/parallel/rounds/parallel-20260906-r2/v352",
+      "worker_agent_id": "01a07791-eecb-7053-8866-dcdbe31e84d7",
+      "worker_host_id": "local",
+      "result_manifest": null,
+      "registered_at": "2026-10-03T06:54:51.534333Z",
+      "assigned_at": "2026-10-03T06:54:51.534333Z"
     }
   ],
-  "updated_at": "2026-10-03T05:29:05.432216Z"
+  "updated_at": "2026-10-03T06:54:51.538420Z"
 }
