@@ -174,7 +174,11 @@ def check() -> None:
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--check", action="store_true")
+    ap.add_argument("--end", default=None, help="last date to fetch (YYYY-MM-DD); default 2025-09-30")
     a = ap.parse_args()
+    global END
+    if a.end:
+        END = date.fromisoformat(a.end)
     if a.check:
         check()
         return
