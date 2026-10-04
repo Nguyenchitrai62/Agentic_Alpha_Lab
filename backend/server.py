@@ -128,7 +128,16 @@ def system_status(user: dict = Depends(auth.require_viewer)):
     cyc = db.one("SELECT status, started_at, finished_at, triggered_by FROM jobs WHERE kind = 'cycle' ORDER BY id DESC LIMIT 1")
     return {"status": "ok", "version": APP_VERSION, "pipeline": pipeline.PIPELINE, "last_job": last, "last_cycle": cyc,
             "scheduler": SETTINGS.scheduler_enabled, "next_cycle_utc": _next_cycle["t"], "scheduler_heartbeat_utc": _heartbeat["t"],
-            "last_cycle_done_ms": _last_cycle_ms(), "input_check": db.kv_get("pipeline_input_check")}
+            "last_cycle_done_ms": _last_cycle_ms(), "input_check": db.kv_get("pipeline_input_check"),
+            "liquidations": _liquidations_status()}
+
+
+def _liquidations_status() -> dict:
+    try:
+        from . import liquidations
+        return liquidations.status()
+    except Exception as exc:  # status must never break /api/status
+        return {"running": False, "error": type(exc).__name__}
 
 
 @app.get("/api/public/config")
@@ -622,3 +631,17 @@ def _startup():
              "ON" if SETTINGS.scheduler_enabled else "OFF")
     if SETTINGS.scheduler_enabled:
         threading.Thread(target=_scheduler, name="pipeline-scheduler", daemon=True).start()
+    try:  # optional data recorder: any failure is logged and never affects the API
+        from . import liquidations
+        liquidations.start_background(SETTINGS.liquidations_enabled, book=SETTINGS.topbook_enabled)
+    except Exception:
+        log.exception("liquidations: collector not started")
+
+
+@app.on_event("shutdown")
+def _shutdown():
+    try:
+        from . import liquidations
+        liquidations.stop_background()
+    except Exception:
+        log.exception("liquidations: collector stop failed")

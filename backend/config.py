@@ -41,6 +41,9 @@ class Settings:
     cors_origin_regex: str = os.getenv("CORS_ALLOW_ORIGIN_REGEX", "")
     db_path: Path = Path(os.getenv("WEB_DB_PATH", str(ROOT / "artifacts/web/app.db")))
     scheduler_enabled: bool = _bool("WEB_SCHEDULER_ENABLED", True)
+    # public liquidation (+ sampled top-of-book) recorder, backend/liquidations.py; follows the scheduler switch by default
+    liquidations_enabled: bool = _bool("WEB_LIQUIDATIONS_ENABLED", _bool("WEB_SCHEDULER_ENABLED", True))
+    topbook_enabled: bool = _bool("WEB_TOPBOOK_ENABLED", True)
     schedule_offset_minutes: int = int(os.getenv("WEB_SCHEDULE_OFFSET_MINUTES", "1"))
     default_equity_usdt: float = float(os.getenv("WEB_DEFAULT_EQUITY_USDT", "10000"))
     python_exe: str = os.getenv("WEB_PYTHON_EXE", str(ROOT / ".venv/Scripts/python.exe"))
