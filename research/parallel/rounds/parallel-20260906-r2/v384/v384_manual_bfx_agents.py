@@ -112,7 +112,7 @@ def main():
     if cache.exists():
         allres = pickle.loads(cache.read_bytes())
     else:
-        with Pool(4) as pool:
+        with Pool(2) as pool:
             allres = dict(pool.map(run_phase, [(s, list(ROWS), False) for s in range(4)]))
         cache.write_bytes(pickle.dumps(allres))
     out = {"version": "v384", "rows": {}, "folds": {}}
@@ -131,7 +131,7 @@ def main():
     ch = max(ROWS, key=lambda r: fitness(allres, r, [0, 1, 2, 3]))
     out["final"] = dict(choice=ch, dev4=out["rows"][ch]["dev4"], reference=out["rows"][REF]["dev4"])
     if out["transfer"]:
-        with Pool(4) as pool:
+        with Pool(2) as pool:
             last = dict(pool.map(run_phase, [(s, [ch, REF], True) for s in range(4)]))
         out["final"]["most_recent_year_once"] = {r: metrics(last, r, [4]) for r in (ch, REF)}
     print("TRANSFER", out["transfer"], "FINAL", json.dumps(out["final"]), flush=True)

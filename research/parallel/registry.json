@@ -2,7 +2,7 @@
   "schema_version": 1,
   "project": "Agentic Alpha Lab BTC swing research",
   "created_at": "2026-09-06T00:00:00Z",
-  "next_version": 383,
+  "next_version": 385,
   "control": {
     "coordinator_model": "gpt-5.6-sol",
     "coordinator_reasoning": "high",
@@ -54,7 +54,7 @@
     "expected_workers": 3,
     "version_range": [
       45,
-      382
+      384
     ],
     "parent_commit": "1ecf947baddd5ef78444670330e9db62128dad50",
     "cloud_snapshot": {
@@ -16367,7 +16367,7 @@
       "version": "v381",
       "track": "A",
       "direction_key": "v381-bot-aug-agents",
-      "status": "running",
+      "status": "rejected",
       "parent_versions": [
         "v376"
       ],
@@ -16380,15 +16380,42 @@
       "write_scope": "research/parallel/rounds/parallel-20260906-r2/v381",
       "worker_agent_id": "01a07792-4a6b-7fc3-a08a-af2923b1778a",
       "worker_host_id": "local",
-      "result_manifest": null,
+      "result_manifest": "research\\parallel\\rounds\\parallel-20260906-r2\\v381\\result_manifest.json",
       "registered_at": "2026-10-04T01:45:51.284393Z",
-      "assigned_at": "2026-10-04T01:45:51.284393Z"
+      "assigned_at": "2026-10-04T01:45:51.284393Z",
+      "result_manifest_sha256": "311c5f1b4b38ea82221fd95395103e446ecf9da00cbf7535ee1e43c6cb9cf66f",
+      "result_summary": {
+        "scenarios": {
+          "normal": {
+            "monthly_geometric_net_percent": 5.24,
+            "max_drawdown_percent": 23.08,
+            "fills": 0,
+            "months": 48
+          },
+          "fee_stress": {
+            "monthly_geometric_net_percent": 5.24,
+            "max_drawdown_percent": 23.08,
+            "fills": 0,
+            "months": 48
+          },
+          "execution_stress": {
+            "monthly_geometric_net_percent": 5.24,
+            "max_drawdown_percent": 23.08,
+            "fills": 0,
+            "months": 48
+          }
+        },
+        "independent_test": false,
+        "live_approved": false,
+        "audit_notes": "v381_v382_audit/COMPARISON.md: PASS (blind replication; augmented tables and book families verified)"
+      },
+      "audited_at": "2026-10-04T03:14:11.129479Z"
     },
     {
       "version": "v382",
       "track": "B",
       "direction_key": "v382-bot-book-family",
-      "status": "running",
+      "status": "rejected",
       "parent_versions": [
         "v376"
       ],
@@ -16401,10 +16428,79 @@
       "write_scope": "research/parallel/rounds/parallel-20260906-r2/v382",
       "worker_agent_id": "01a07791-eecb-7053-8866-dcdbe31e84d7",
       "worker_host_id": "local",
-      "result_manifest": null,
+      "result_manifest": "research\\parallel\\rounds\\parallel-20260906-r2\\v382\\result_manifest.json",
       "registered_at": "2026-10-04T01:48:10.434137Z",
-      "assigned_at": "2026-10-04T01:48:10.434137Z"
+      "assigned_at": "2026-10-04T01:48:10.434137Z",
+      "result_manifest_sha256": "ee8c4f428e52797490a87b76aceee351ed52c194672b83436e199f8d2c9a9728",
+      "result_summary": {
+        "scenarios": {
+          "normal": {
+            "monthly_geometric_net_percent": 5.286,
+            "max_drawdown_percent": 23.55,
+            "fills": 0,
+            "months": 48
+          },
+          "fee_stress": {
+            "monthly_geometric_net_percent": 5.286,
+            "max_drawdown_percent": 23.55,
+            "fills": 0,
+            "months": 48
+          },
+          "execution_stress": {
+            "monthly_geometric_net_percent": 5.286,
+            "max_drawdown_percent": 23.55,
+            "fills": 0,
+            "months": 48
+          }
+        },
+        "independent_test": false,
+        "live_approved": false,
+        "audit_notes": "v381_v382_audit/COMPARISON.md: PASS (blind replication; augmented tables and book families verified)"
+      },
+      "audited_at": "2026-10-04T03:14:11.441019Z"
+    },
+    {
+      "version": "v383",
+      "track": "A",
+      "direction_key": "v383-bot-bfx-agents",
+      "status": "running",
+      "parent_versions": [
+        "v376"
+      ],
+      "model_family": "hist-gradient-boosting",
+      "objective": "R2 dip agents with Bitfinex margin-positioning features for the multi-phase BOT",
+      "data_contract": "new data: Bitfinex hourly margin long/short (stamp+1h), standard-grid pooled fills, per-anchor fits t_exit < anchor-7d; 4 phase grids",
+      "policy_contract": "rows R2_4P / R2bfx_4P; BOT fitness on the mix; folds k=2,3; most recent year once if transfer",
+      "hypothesis": "contrarian margin positioning improves dip sizing / TP",
+      "parent_commit": "1ecf947baddd5ef78444670330e9db62128dad50",
+      "write_scope": "research/parallel/rounds/parallel-20260906-r2/v383",
+      "worker_agent_id": "01a07792-4a6b-7fc3-a08a-af2923b1778a",
+      "worker_host_id": "local",
+      "result_manifest": null,
+      "registered_at": "2026-10-04T03:14:11.125113Z",
+      "assigned_at": "2026-10-04T03:14:11.125113Z"
+    },
+    {
+      "version": "v384",
+      "track": "B",
+      "direction_key": "v384-manual-bfx-agents",
+      "status": "running",
+      "parent_versions": [
+        "v367"
+      ],
+      "model_family": "hist-gradient-boosting",
+      "objective": "the Bitfinex-feature dip agents for the MANUAL M5 on the honest single-clock evaluation",
+      "data_contract": "as v383; M5 single-clock runs on 4 phase grids",
+      "policy_contract": "rows M5 / M5bfx; v310 goal-1 fitness on phase means; folds k=2,3; most recent year once if transfer",
+      "hypothesis": "Bitfinex-feature agents improve the MANUAL dip limits",
+      "parent_commit": "1ecf947baddd5ef78444670330e9db62128dad50",
+      "write_scope": "research/parallel/rounds/parallel-20260906-r2/v384",
+      "worker_agent_id": "01a07791-eecb-7053-8866-dcdbe31e84d7",
+      "worker_host_id": "local",
+      "result_manifest": null,
+      "registered_at": "2026-10-04T03:14:11.435818Z",
+      "assigned_at": "2026-10-04T03:14:11.435818Z"
     }
   ],
-  "updated_at": "2026-10-04T01:48:10.439389Z"
+  "updated_at": "2026-10-04T03:14:11.441019Z"
 }
