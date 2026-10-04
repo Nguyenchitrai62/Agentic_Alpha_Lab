@@ -2,7 +2,7 @@
   "schema_version": 1,
   "project": "Agentic Alpha Lab BTC swing research",
   "created_at": "2026-09-06T00:00:00Z",
-  "next_version": 382,
+  "next_version": 383,
   "control": {
     "coordinator_model": "gpt-5.6-sol",
     "coordinator_reasoning": "high",
@@ -54,7 +54,7 @@
     "expected_workers": 3,
     "version_range": [
       45,
-      381
+      382
     ],
     "parent_commit": "1ecf947baddd5ef78444670330e9db62128dad50",
     "cloud_snapshot": {
@@ -16319,7 +16319,7 @@
       "version": "v380",
       "track": "B",
       "direction_key": "v380-bot-governor",
-      "status": "running",
+      "status": "rejected",
       "parent_versions": [
         "v376"
       ],
@@ -16332,9 +16332,36 @@
       "write_scope": "research/parallel/rounds/parallel-20260906-r2/v380",
       "worker_agent_id": "01a07791-eecb-7053-8866-dcdbe31e84d7",
       "worker_host_id": "local",
-      "result_manifest": null,
+      "result_manifest": "research\\parallel\\rounds\\parallel-20260906-r2\\v380\\result_manifest.json",
       "registered_at": "2026-10-04T01:35:19.390013Z",
-      "assigned_at": "2026-10-04T01:35:19.391038Z"
+      "assigned_at": "2026-10-04T01:35:19.391038Z",
+      "result_manifest_sha256": "a53fa20ffd5c7bfee79254fa1c343a5b3657fdb80f70c1d7cd173569b87aa56e",
+      "result_summary": {
+        "scenarios": {
+          "normal": {
+            "monthly_geometric_net_percent": 5.301,
+            "max_drawdown_percent": 23.05,
+            "fills": 0,
+            "months": 48
+          },
+          "fee_stress": {
+            "monthly_geometric_net_percent": 5.301,
+            "max_drawdown_percent": 23.05,
+            "fills": 0,
+            "months": 48
+          },
+          "execution_stress": {
+            "monthly_geometric_net_percent": 5.301,
+            "max_drawdown_percent": 23.05,
+            "fills": 0,
+            "months": 48
+          }
+        },
+        "independent_test": false,
+        "live_approved": false,
+        "audit_notes": "v379_v380_audit/COMPARISON.md: PASS (blind replication; R2_4P reference reproduces v376)"
+      },
+      "audited_at": "2026-10-04T01:48:10.439389Z"
     },
     {
       "version": "v381",
@@ -16356,7 +16383,28 @@
       "result_manifest": null,
       "registered_at": "2026-10-04T01:45:51.284393Z",
       "assigned_at": "2026-10-04T01:45:51.284393Z"
+    },
+    {
+      "version": "v382",
+      "track": "B",
+      "direction_key": "v382-bot-book-family",
+      "status": "running",
+      "parent_versions": [
+        "v376"
+      ],
+      "model_family": "rule-variants",
+      "objective": "re-rank the book signal family (CB / O1 / T3) of R2-4P on the honest multi-phase evaluation",
+      "data_contract": "cached walk-forward member books, forward-filled to 4 clocks; dev years",
+      "policy_contract": "rows R2_4P (CB) / R2O1_4P / R2T3_4P; BOT fitness on the mix; folds k=2,3; most recent year once if transfer",
+      "hypothesis": "the standard-grid choice of CB books does not hold on the honest evaluation",
+      "parent_commit": "1ecf947baddd5ef78444670330e9db62128dad50",
+      "write_scope": "research/parallel/rounds/parallel-20260906-r2/v382",
+      "worker_agent_id": "01a07791-eecb-7053-8866-dcdbe31e84d7",
+      "worker_host_id": "local",
+      "result_manifest": null,
+      "registered_at": "2026-10-04T01:48:10.434137Z",
+      "assigned_at": "2026-10-04T01:48:10.434137Z"
     }
   ],
-  "updated_at": "2026-10-04T01:45:51.289782Z"
+  "updated_at": "2026-10-04T01:48:10.439389Z"
 }
