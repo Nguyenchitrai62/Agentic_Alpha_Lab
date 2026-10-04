@@ -2,7 +2,7 @@
   "schema_version": 1,
   "project": "Agentic Alpha Lab BTC swing research",
   "created_at": "2026-09-06T00:00:00Z",
-  "next_version": 379,
+  "next_version": 380,
   "control": {
     "coordinator_model": "gpt-5.6-sol",
     "coordinator_reasoning": "high",
@@ -54,7 +54,7 @@
     "expected_workers": 3,
     "version_range": [
       45,
-      378
+      379
     ],
     "parent_commit": "1ecf947baddd5ef78444670330e9db62128dad50",
     "cloud_snapshot": {
@@ -16175,7 +16175,7 @@
       "version": "v377",
       "track": "A",
       "direction_key": "v377-manual-dd-phase-mean",
-      "status": "running",
+      "status": "rejected",
       "parent_versions": [
         "v367"
       ],
@@ -16188,9 +16188,36 @@
       "write_scope": "research/parallel/rounds/parallel-20260906-r2/v377",
       "worker_agent_id": "01a07792-4a6b-7fc3-a08a-af2923b1778a",
       "worker_host_id": "local",
-      "result_manifest": null,
+      "result_manifest": "research\\parallel\\rounds\\parallel-20260906-r2\\v377\\result_manifest.json",
       "registered_at": "2026-10-04T00:21:24.848340Z",
-      "assigned_at": "2026-10-04T00:21:24.848340Z"
+      "assigned_at": "2026-10-04T00:21:24.848340Z",
+      "result_manifest_sha256": "c2bdacd6b98bc63bf1ab72775613d67f913eeede2f60dd9a687d01b0b17169a9",
+      "result_summary": {
+        "scenarios": {
+          "normal": {
+            "monthly_geometric_net_percent": 4.094,
+            "max_drawdown_percent": 24.4,
+            "fills": 0,
+            "months": 48
+          },
+          "fee_stress": {
+            "monthly_geometric_net_percent": 4.094,
+            "max_drawdown_percent": 24.4,
+            "fills": 0,
+            "months": 48
+          },
+          "execution_stress": {
+            "monthly_geometric_net_percent": 4.094,
+            "max_drawdown_percent": 24.4,
+            "fills": 0,
+            "months": 48
+          }
+        },
+        "independent_test": false,
+        "live_approved": false,
+        "audit_notes": "v376_v377_audit/COMPARISON.md: PASS (blind replication; per-phase agent tables verified: s=0 equals the deployed table, shifted state features from raw 1m, anchor rule; bear flag timing checked; v376 first-run bug and fix verified)"
+      },
+      "audited_at": "2026-10-04T01:33:12.972936Z"
     },
     {
       "version": "v378",
@@ -16212,7 +16239,28 @@
       "result_manifest": null,
       "registered_at": "2026-10-04T00:23:50.322804Z",
       "assigned_at": "2026-10-04T00:23:50.322804Z"
+    },
+    {
+      "version": "v379",
+      "track": "A",
+      "direction_key": "v379-bot-bear-filter",
+      "status": "running",
+      "parent_versions": [
+        "v376"
+      ],
+      "model_family": "rule-variants",
+      "objective": "the v378 bear-regime dip filter on the multi-phase BOT R2-4P",
+      "data_contract": "dev years on 4 phase-shifted grids, agents on per-phase tables, BTC 200d mean per phase from the full 1m history",
+      "policy_contract": "rows R2_4P (ref) / R2BH_4P; BOT fitness on the 4-sub-account mix; folds k=2,3; most recent year once if transfer",
+      "hypothesis": "halving the dip ladder in a BTC bear regime lowers the BOT mix DD and raises its worst year",
+      "parent_commit": "1ecf947baddd5ef78444670330e9db62128dad50",
+      "write_scope": "research/parallel/rounds/parallel-20260906-r2/v379",
+      "worker_agent_id": "01a07792-4a6b-7fc3-a08a-af2923b1778a",
+      "worker_host_id": "local",
+      "result_manifest": null,
+      "registered_at": "2026-10-04T01:33:12.967392Z",
+      "assigned_at": "2026-10-04T01:33:12.967392Z"
     }
   ],
-  "updated_at": "2026-10-04T00:23:50.329593Z"
+  "updated_at": "2026-10-04T01:33:12.972936Z"
 }
