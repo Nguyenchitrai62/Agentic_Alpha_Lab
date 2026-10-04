@@ -2,7 +2,7 @@
   "schema_version": 1,
   "project": "Agentic Alpha Lab BTC swing research",
   "created_at": "2026-09-06T00:00:00Z",
-  "next_version": 380,
+  "next_version": 381,
   "control": {
     "coordinator_model": "gpt-5.6-sol",
     "coordinator_reasoning": "high",
@@ -54,7 +54,7 @@
     "expected_workers": 3,
     "version_range": [
       45,
-      379
+      380
     ],
     "parent_commit": "1ecf947baddd5ef78444670330e9db62128dad50",
     "cloud_snapshot": {
@@ -16223,7 +16223,7 @@
       "version": "v378",
       "track": "B",
       "direction_key": "v378-manual-bear-filter",
-      "status": "running",
+      "status": "rejected",
       "parent_versions": [
         "v367"
       ],
@@ -16236,9 +16236,36 @@
       "write_scope": "research/parallel/rounds/parallel-20260906-r2/v378",
       "worker_agent_id": "01a07791-eecb-7053-8866-dcdbe31e84d7",
       "worker_host_id": "local",
-      "result_manifest": null,
+      "result_manifest": "research\\parallel\\rounds\\parallel-20260906-r2\\v378\\result_manifest.json",
       "registered_at": "2026-10-04T00:23:50.322804Z",
-      "assigned_at": "2026-10-04T00:23:50.322804Z"
+      "assigned_at": "2026-10-04T00:23:50.322804Z",
+      "result_manifest_sha256": "561ad75b5dfcedf48a18700a6849e4ad2deeae9357d41d6d01d4cad02b961f1d",
+      "result_summary": {
+        "scenarios": {
+          "normal": {
+            "monthly_geometric_net_percent": 4.346,
+            "max_drawdown_percent": 21.28,
+            "fills": 0,
+            "months": 48
+          },
+          "fee_stress": {
+            "monthly_geometric_net_percent": 4.346,
+            "max_drawdown_percent": 21.28,
+            "fills": 0,
+            "months": 48
+          },
+          "execution_stress": {
+            "monthly_geometric_net_percent": 4.346,
+            "max_drawdown_percent": 21.28,
+            "fills": 0,
+            "months": 48
+          }
+        },
+        "independent_test": false,
+        "live_approved": false,
+        "audit_notes": "v376_v377_audit/COMPARISON.md: PASS (blind replication; per-phase agent tables verified: s=0 equals the deployed table, shifted state features from raw 1m, anchor rule; bear flag timing checked; v376 first-run bug and fix verified)"
+      },
+      "audited_at": "2026-10-04T01:35:19.395077Z"
     },
     {
       "version": "v379",
@@ -16260,7 +16287,28 @@
       "result_manifest": null,
       "registered_at": "2026-10-04T01:33:12.967392Z",
       "assigned_at": "2026-10-04T01:33:12.967392Z"
+    },
+    {
+      "version": "v380",
+      "track": "B",
+      "direction_key": "v380-bot-governor",
+      "status": "running",
+      "parent_versions": [
+        "v376"
+      ],
+      "model_family": "rule-variants",
+      "objective": "re-tune the per-sub-book drawdown governor of the multi-phase BOT R2-4P on the honest evaluation",
+      "data_contract": "dev years on 4 phase-shifted grids, agents on per-phase tables",
+      "policy_contract": "rows R2_4P (gov 0.20/0.10) / R2G16_4P (0.16/0.08) / R2G25_4P (0.25/0.15); BOT fitness on the mix; folds k=2,3; most recent year once if transfer",
+      "hypothesis": "an earlier de-risking governor lowers the mix DD below 20 at a small return cost",
+      "parent_commit": "1ecf947baddd5ef78444670330e9db62128dad50",
+      "write_scope": "research/parallel/rounds/parallel-20260906-r2/v380",
+      "worker_agent_id": "01a07791-eecb-7053-8866-dcdbe31e84d7",
+      "worker_host_id": "local",
+      "result_manifest": null,
+      "registered_at": "2026-10-04T01:35:19.390013Z",
+      "assigned_at": "2026-10-04T01:35:19.391038Z"
     }
   ],
-  "updated_at": "2026-10-04T01:33:12.972936Z"
+  "updated_at": "2026-10-04T01:35:19.395077Z"
 }
