@@ -180,6 +180,8 @@ def test_stale_or_unstored_plan_does_not_complete_but_other_four_run(backend, tm
             raise RuntimeError("history transaction failed")
     monkeypatch.setattr(pipe.subprocess, "run", run)
     monkeypatch.setattr(history, "store_paper", store)
+    monkeypatch.setattr(pipe.multiphase, "refresh", lambda db_, slot=None: calls.append("v376_R2_4P")
+                        or db_.kv_set("plan_status_v376", {"completed_slot": slot, "completed_at": db_.now_ms()}) or "ok")
     with pytest.raises(RuntimeError, match="v301"):
         pipe.job_trade_plan()
     assert len(calls) == len(pipe.catalog.PIPELINES)
@@ -549,6 +551,11 @@ def complete_inputs(pipe, db, tmp_path, monkeypatch, now=NOW):
         db.kv_set(f"plan_status_{p}", {"completed_slot": slot})
         db.kv_set(f"summary_tm_{p}", {"monthly_last_year": 1})
         (folder / f"trade_plan_{p}.json").write_text(json.dumps({"decision_bar": bar}))
+    mp = pipe.multiphase  # v376: its four clock-shifted sub-plans are complete too
+    for s in mp.PHASES:
+        db.kv_set(mp.sub_key(s), {"decision_bar": str(pd.Timestamp(mp.phase_due_slot(now_ms, s), unit="ms", tz="UTC")), "coins": {}})
+        db.kv_set(f"plan_status_{mp.PIPE}_s{s}", {"completed_slot": mp.phase_due_slot(now_ms, s)})
+        (folder / f"{mp.sub_key(s)}.json").write_text("{}")
     return now_ms
 
 
@@ -662,6 +669,8 @@ def test_cycle_checks_first_then_plans_best_first_then_missing_replays(backend, 
         return SimpleNamespace(returncode=0, stderr="", stdout="")
     monkeypatch.setattr(pipe.subprocess, "run", run)
     monkeypatch.setattr(history, "store_paper", lambda *a: None)
+    monkeypatch.setattr(pipe.multiphase, "refresh", lambda db_, slot=None: calls.append("v376_R2_4P")
+                        or db_.kv_set("plan_status_v376", {"completed_slot": slot, "completed_at": db_.now_ms()}) or "ok")
     monkeypatch.setattr(history, "build", lambda p, db: calls.append("build " + p) or f"tm_{p}: ok")
     msg = pipe.job_cycle()
     candidates = [pipe.catalog.PIPELINES[p]["candidate"] for p in pipe.catalog.ranked()]
@@ -765,3 +774,164 @@ def test_flow_store_size_check_flags_a_doubled_day(backend, tmp_path, monkeypatc
     flow.to_parquet(store / "BTCUSDT_flow_4h.parquet")
     issues = pipe.flow_volume_issues()
     assert len(issues) == 1 and "aggflow_20260928_orders/BTCUSDT" in issues[0] and "outside [0.7, 1.3]" in issues[0]
+
+
+# ---------------------------------------------------------------- v376 R2-4P: multi-phase sub-plans (backend/multiphase.py)
+def pipe_ms(x):
+    return int(pd.Timestamp(x).timestamp() * 1000)
+
+
+def _sub_plan(s, now, net=0.0, state="flat"):
+    start = pd.Timestamp("2026-10-04T04:00Z") + pd.Timedelta(hours=s)
+    bar = (pd.Timestamp(now) - pd.Timedelta(hours=s)).floor("4h") + pd.Timedelta(hours=s)
+    coin = {"symbol": "SOLUSDT", "price": 100.0 + s, "target_weight": 0.2, "state": state,
+            "dips": [{"rung": 2.5, "buy_limit": 90.0, "size_frac": 0.04, "agent_size": 1.0, "agent_tp": 1.0}]}
+    if state == "position":
+        coin["position"] = {"side": "LONG", "weight": 0.4, "avg_entry": 95.0, "sl": 90.0, "tp": 110.0}
+    if state == "pending":
+        coin["order"] = {"kind": "open", "side": "BUY", "price": 97.0, "weight": 0.2}
+    return {"freeze": str(start), "decision_bar": str(bar), "next_decision": str(bar + pd.Timedelta(hours=4, minutes=5)),
+            "generated_at": str(pd.Timestamp(now)), "net_return_pct": net, "policy": {"name": "x"},
+            "coins": {"SOLUSDT": coin}, "events": [{"t": str(start + pd.Timedelta(minutes=30)), "symbol": "SOLUSDT", "kind": "book_fill",
+                                                    "side": "buy", "price": 95.0, "weight": 0.4}],
+            "equity_curve": [[str(start + pd.Timedelta(hours=4)), 1 + net / 100]], "bars": []}
+
+
+def test_phase_due_slot_and_next_hourly_run(backend):
+    mp = importlib.import_module("backend.multiphase")
+    server = importlib.import_module("backend.server")
+    assert mp.phase_due_slot(pipe_ms("2026-10-04T05:01:00Z"), 1, 1) == pipe_ms("2026-10-04T05:00:00Z")
+    assert mp.phase_due_slot(pipe_ms("2026-10-04T05:00:30Z"), 1, 1) == pipe_ms("2026-10-04T01:00:00Z")  # before minute 1: previous bar
+    assert mp.phase_due_slot(pipe_ms("2026-10-04T05:01:00Z"), 0, 1) == pipe_ms("2026-10-04T04:00:00Z")
+    assert mp.phase_due_slot(pipe_ms("2026-10-04T05:01:00Z"), 3, 1) == pipe_ms("2026-10-04T03:00:00Z")
+    at = lambda x: pd.Timestamp(x).to_pydatetime()  # noqa: E731
+    off = server.SETTINGS.schedule_offset_minutes
+    assert server._next_phase_run(at("2026-10-04T03:30Z")) == at("2026-10-04T05:00Z") + timedelta(minutes=off)  # hour 4 = the 4h cycle
+    assert server._next_phase_run(at("2026-10-04T05:00:00Z")) == at("2026-10-04T05:00Z") + timedelta(minutes=off)
+    assert server._next_phase_run(at("2026-10-04T05:00Z") + timedelta(minutes=off)) == at("2026-10-04T06:00Z") + timedelta(minutes=off)
+
+
+def test_merge_tags_phases_and_scales_to_total_account():
+    mp = importlib.import_module("backend.multiphase")
+    now = pd.Timestamp("2026-10-05T06:30Z")
+    subs = {0: _sub_plan(0, now, 4.0, "position"), 1: _sub_plan(1, now, 0.0, "pending"), 2: _sub_plan(2, now, -2.0), 3: _sub_plan(3, now, 2.0)}
+    m = mp.merge(subs, now)
+    assert m["multi_phase"] and m["net_return_pct"] == 1.0  # mean of the four sub-books (= the summed sub-accounts)
+    caps = {p["phase"]: p["capital"] for p in m["phases"]}
+    assert abs(sum(caps.values()) - 1) < 1e-5 and abs(caps[0] - 0.25 * 1.04 / 1.01) < 1e-6
+    c = m["coins"]["SOLUSDT"]
+    assert c["state"] == "position" and [r["label"] for r in c["subs"]] == ["khung +0h", "khung +1h", "khung +2h", "khung +3h"]
+    assert abs(c["subs"][0]["position"]["weight"] - 0.4 * caps[0]) < 1e-6 and c["subs"][0]["position"]["weight_sub"] == 0.4
+    assert abs(c["subs"][1]["order"]["weight"] - 0.2 * caps[1]) < 1e-6 and c["order"]["phase"] == 1 and c["position"]["phase"] == 0
+    assert [d["phase"] for d in c["dips"]] == [0, 1, 2, 3] and abs(c["dips"][2]["size_frac"] - 0.04 * caps[2]) < 1e-6
+    assert [e["phase"] for e in m["events"]] == [0, 1, 2, 3] and all(p["started"] for p in m["phases"])
+    assert m["freeze"] == "2026-10-04 04:00:00+00:00" and m["decision_bar"] == "2026-10-05 06:00:00+00:00"
+    assert m["next_decision"] == "2026-10-05 07:05:00+00:00"  # the earliest next shifted close (phase 3)
+    curve = dict(m["equity_curve"])
+    assert curve[str(pd.Timestamp("2026-10-04T11:00Z"))] == 1.01  # every sub-book has a bar by then: the mean
+    assert curve[str(pd.Timestamp("2026-10-04T08:00Z"))] == round((1.04 + 3) / 4, 6)  # only phase 0 has a bar; the others still 1
+
+
+def test_refresh_runs_due_phases_merges_and_marks_complete(backend, tmp_path, monkeypatch):
+    _, db, _ = backend
+    pipe = importlib.import_module("backend.pipeline")
+    mp = pipe.multiphase
+    monkeypatch.setattr(pipe, "ROOT", tmp_path)
+    folder = tmp_path / mp.PLAN_DIR
+    folder.mkdir(parents=True)
+    clock = {"now": pipe_ms("2026-10-05T06:02Z")}
+    monkeypatch.setattr(db, "now_ms", lambda: clock["now"])
+    calls = []
+
+    def run(cmd, **kw):
+        s = int(cmd[cmd.index("--phase") + 1])
+        assert cmd[cmd.index("--candidate") + 1] == "v321_R2" and cmd[1].endswith("forward_trade_phase.py")
+        calls.append(s)
+        (folder / f"trade_plan_v376_s{s}.json").write_text(json.dumps(_sub_plan(s, pd.Timestamp(clock["now"], unit="ms", tz="UTC"), s)))
+        return SimpleNamespace(returncode=0, stderr="", stdout="")
+    monkeypatch.setattr(pipe.subprocess, "run", run)
+    msg = mp.refresh(db)
+    assert calls == [0, 1, 2, 3] and "merged paper" in msg
+    merged = db.kv_get("trade_plan_v376")
+    assert merged["multi_phase"] and json.loads((folder / "trade_plan_v376.json").read_text())["net_return_pct"] == merged["net_return_pct"]
+    assert db.kv_get("plan_status_v376")["completed_slot"] == clock["now"] // pipe.H4_MS * pipe.H4_MS
+    assert db.one("SELECT COUNT(*) AS n FROM trades WHERE source = 'paper_v376'")["n"] == 4
+    assert mp.stale_reason(db, clock["now"]) is None
+    # one hour later the phase-3 bar (07:00) has closed: only phase 3 is due
+    calls.clear()
+    clock["now"] = pipe_ms("2026-10-05T07:02Z")
+    assert mp.due_phases(db) == [3]
+    assert mp.stale_reason(db, clock["now"]) == "khung +3h: not completed for its due shifted bar"
+    mp.refresh(db)
+    assert calls == [3] and mp.due_phases(db) == []
+    # a failing phase raises; the merged plan of the stored sub-plans stays, the phase stays due
+    calls.clear()
+    clock["now"] = pipe_ms("2026-10-05T08:02Z")
+
+    def fail(cmd, **kw):
+        calls.append(int(cmd[cmd.index("--phase") + 1]))
+        return SimpleNamespace(returncode=1, stderr="binance down", stdout="")
+    monkeypatch.setattr(pipe.subprocess, "run", fail)
+    with pytest.raises(RuntimeError, match=r"khung \+0h FAILED"):
+        mp.refresh(db)
+    assert calls == [0] and mp.due_phases(db) == [0] and db.kv_get("trade_plan_v376")["multi_phase"]
+
+
+def test_job_phase_plans_and_hourly_retry_while_busy(backend, monkeypatch):
+    pipe = importlib.import_module("backend.pipeline")
+    monkeypatch.setattr(pipe.multiphase, "refresh", lambda db_: "trade_plan_v376: ok")
+    assert pipe.job_phase_plans() == "trade_plan_v376: ok"
+    server = importlib.import_module("backend.server")
+    seen = []
+    monkeypatch.setattr(server.pipeline, "run_job",
+                        lambda kind, fn, trig: seen.append((kind, trig)) or {"status": "busy" if len(seen) < 3 else "done"})
+    monkeypatch.setattr(server.time, "sleep", lambda s: None)
+    assert server._run_phase_plans("hourly")["status"] == "done" and seen == [("phase_plans", "hourly")] * 3
+
+
+def test_scheduler_runs_hourly_phase_job_between_4h_cycles(backend, monkeypatch):
+    _, db, _ = backend
+    server = importlib.import_module("backend.server")
+    clock = freeze(monkeypatch, server, "2026-10-02T00:30:00Z")
+    monkeypatch.setattr(db, "now_ms", lambda: int(clock.current.timestamp() * 1000))
+    monkeypatch.setattr(server, "_keep_awake", lambda: None)
+    monkeypatch.setattr(server, "_cycle_incomplete", lambda t: False)
+    monkeypatch.setattr(server, "_startup_check", lambda: None)
+    monkeypatch.setattr(server.pipeline, "refresh_candles_quietly", lambda: True)
+    events = []
+    monkeypatch.setattr(server, "_run_phase_plans", lambda trig: events.append(("phase", clock.current.strftime("%H:%M"))))
+
+    def cycle(trigger):
+        events.append(("cycle", clock.current.strftime("%H:%M")))
+        raise StopScheduler()
+    monkeypatch.setattr(server, "_run_cycle_until_done", cycle)
+
+    def sleep(seconds):
+        clock.current += timedelta(seconds=seconds)
+    monkeypatch.setattr(server.time, "sleep", sleep)
+    with pytest.raises(StopScheduler):
+        server._scheduler()
+    off = server.SETTINGS.schedule_offset_minutes
+    assert events == [("phase", f"01:{off:02d}"), ("phase", f"02:{off:02d}"), ("phase", f"03:{off:02d}"), ("cycle", f"04:{off:02d}")]
+
+
+def test_v376_summary_from_research_series(backend, tmp_path, monkeypatch):
+    _, db, _ = backend
+    pipe = importlib.import_module("backend.pipeline")
+    monkeypatch.setattr(pipe, "ROOT", tmp_path)
+    with pytest.raises(RuntimeError, match="v376_mix_series"):
+        pipe.multiphase.build_summary(db)
+    series = tmp_path / pipe.multiphase.SERIES
+    series.parent.mkdir(parents=True)
+    order = ["SOLUSDT", "dip", "LONG", 1, 2, 90.0, None, None, 0.08, 0, 3, 91.0, "TP", 0.5, 90.0, 1, "limit"]
+    series.write_text(json.dumps({"summary": {"monthly_5y": 4.971, "monthly_dev4": 5.24, "monthly_last_year": 3.902, "gate_dd": 18.76,
+                                              "losing_years": 0, "yearly": [["2021-09-24", 26.17, 14.04]], "win_all_hidden": 0.6362},
+                                  "equity": [["2021-09-24 04:00:00+00:00", 1.0], ["2021-09-24 08:00:00+00:00", 1.01]],
+                                  "orders": {"0": [order], "2": [order]}, "note": "n"}))
+    monkeypatch.setattr(pipe, "missing_summaries", lambda: ["v376"])
+    assert "tm_v376: 2 bars, 2 orders" in pipe.build_missing_summaries(force=True)
+    s = db.kv_get("summary_tm_v376")
+    assert s["monthly_last_year"] == 3.902 and s["gate_dd"] == 18.76 and s["losing_years"] == 0
+    rows = db.rows("SELECT size, entry_type FROM orders WHERE source = 'tm_v376' ORDER BY entry_type")
+    assert [r["entry_type"] for r in rows] == ["limit khung +0h", "limit khung +2h"] and abs(rows[0]["size"] - 0.02) < 1e-12
+    assert db.one("SELECT COUNT(*) AS n FROM equity WHERE source = 'tm_v376'")["n"] == 2

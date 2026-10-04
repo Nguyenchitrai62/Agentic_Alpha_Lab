@@ -21,7 +21,7 @@ from datetime import datetime, timezone
 import numpy as np
 import pandas as pd
 
-from . import catalog, db
+from . import catalog, db, multiphase
 from .config import ROOT, SETTINGS, log
 
 SYMS = ["BTCUSDT", "ETHUSDT", "SOLUSDT", "BNBUSDT", "XRPUSDT"]
@@ -283,6 +283,9 @@ def job_trade_plan() -> str:
     for pipe in plan_order(slot):
         key = f"trade_plan_{pipe}"
         try:
+            if pipe in multiphase.PIPES:  # v376 R2-4P: due phase sub-plans (forward_trade_phase.py) + the merged plan
+                msgs.append(multiphase.refresh(db, slot=slot))
+                continue
             cmd = [SETTINGS.python_exe, str(ROOT / "scripts/forward_trade.py"),
                    "--candidate", catalog.PIPELINES[pipe]["candidate"]]
             cfg = ROOT / "configs/trade_policy.json"
@@ -309,6 +312,12 @@ def job_trade_plan() -> str:
     if failures:
         raise RuntimeError(" | ".join(msgs + failures))
     return " | ".join(msgs)
+
+
+def job_phase_plans() -> str:
+    """Hourly (minute offset of every hour): the multi-phase pipelines' sub-plan of the phase whose shifted 4h bar just closed
+    (any due phase) + the merged plan; the 4h cycle of the other pipelines is not touched."""
+    return " | ".join(multiphase.refresh(db) for _ in multiphase.PIPES)
 
 
 # ---------------------------------------------------------------- data completeness check (startup + every cycle)
@@ -386,6 +395,8 @@ def stale_plans(now_ms: int | None = None) -> dict[str, str]:
                     reason = "plan code changed after the plan was generated"
             except Exception:  # noqa: BLE001
                 pass
+        if not reason and pipe in multiphase.PIPES:  # its four clock-shifted sub-plans, each due hourly on its own grid
+            reason = multiphase.stale_reason(db, now_ms if now_ms is not None else db.now_ms())
         if reason:
             out[pipe] = reason
     return out
@@ -423,7 +434,7 @@ def build_missing_summaries(force: bool = False) -> str:
             continue
         log.info("data check: building the missing walk-forward replay tm_%s", pipe)
         try:
-            msgs.append(history_tm.build(pipe, db))
+            msgs.append(multiphase.build_summary(db) if pipe in multiphase.PIPES else history_tm.build(pipe, db))
             failures.pop(pipe, None)
         except Exception as exc:  # noqa: BLE001 - one broken replay must not stop the others
             err = f"{type(exc).__name__}: {exc}"[:500]

@@ -12,8 +12,9 @@ TRANSFER; final; then v376_final_hidden.py: the most recent year ONCE for R2_4P 
 v321 most recent year 5.655). Process note to verify: the first v376 run had a base-normalisation bug (run_first_bug.log, every equity ending at
 1.0); confirm the fix (base = eq[first-1] if first > 0 else 1.0) and that nothing else changed (v376_runs.pkl is the cached second run).
 v377 = MANUAL rows M5 / M5_B20 (dip budget 0.20) / M5_B20_BM10 (+ book_mult 1.0), phase-mean metrics, v310 goal-1 fitness, folds k = 2, 3.
-Part A (blind, before opening v376_result.json / v376_final_hidden.json / v377_result.json / run logs / the pkl caches): recompute every row,
+v378 = same harness as v377, rows M5 / M5_BH / M5_BZ: dip limits x0.5 / x0 when the BTC open of the holding bar is below the mean of the last 1200 4h opens on that phase grid (built from the full 1m history, min 600); verify the bear flag timing (only opens up to the holding-bar open) and its share per year.
+Part A (blind, before opening v376_result.json / v376_final_hidden.json / v377_result.json / v378_result.json / run logs / the pkl caches): recompute every row,
 fold choice, transfer flag and final (and v376's most-recent-year step) with your own metric code; save replication.json FIRST. Part B: compare
 (monthly > 0.01 pp, DD > 0.05 pp, F > 0.001, win > 0.001 = mismatch, report all); COMPARISON.md with "## Verdict" PASS/FAIL per version.
-Long runs: <= 4 processes (16 GB RAM). Write only under `research/parallel/rounds/parallel-20260906-r2/v376_v377_audit/` and
+Long runs: at most 2 processes at a time (the machine has ~5 GB free RAM; other jobs run). Write only under `research/parallel/rounds/parallel-20260906-r2/v376_v377_audit/` and
 `tests/test_v376_v377_audit.py`; relative paths without quoting. Do not edit leader files.

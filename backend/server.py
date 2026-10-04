@@ -275,7 +275,7 @@ def trade_plan(request: Request, pipeline: str | None = None, user: dict = Depen
     catalog.require_pipeline(user, pipeline)
     if pipeline not in catalog.PIPELINES and pipeline not in ("v205", "v233", "v236", "v240"):
         raise HTTPException(400, "Unknown pipeline.")
-    key = {"v233": "trade_plan_v233", "v236": "trade_plan_v236", "v240": "trade_plan_v240", "v266": "trade_plan_v266", "v269": "trade_plan_v269", "v285": "trade_plan_v285", "v295": "trade_plan_v295", "v301": "trade_plan_v301", "v321": "trade_plan_v321", "v315": "trade_plan_v315", "v340": "trade_plan_v340", "v342": "trade_plan_v342", "v362": "trade_plan_v362", "v367": "trade_plan_v367"}.get(pipeline, "trade_plan")
+    key = {"v233": "trade_plan_v233", "v236": "trade_plan_v236", "v240": "trade_plan_v240", "v266": "trade_plan_v266", "v269": "trade_plan_v269", "v285": "trade_plan_v285", "v295": "trade_plan_v295", "v301": "trade_plan_v301", "v321": "trade_plan_v321", "v315": "trade_plan_v315", "v340": "trade_plan_v340", "v342": "trade_plan_v342", "v362": "trade_plan_v362", "v367": "trade_plan_v367", "v376": "trade_plan_v376"}.get(pipeline, "trade_plan")
     return cached(request, key, 20, lambda: db.kv_get(key, {}))
 
 
@@ -438,7 +438,7 @@ def admin_set_pipelines(payload: dict = Body(...), user: dict = Depends(auth.req
 @app.post("/api/admin/run")
 def admin_run(payload: dict = Body(...), user: dict = Depends(auth.require_admin)):
     kind = payload.get("kind", "cycle")
-    fns = {"cycle": pipeline.job_cycle, "signal": pipeline.job_signal, "candles": pipeline.job_candles, "trade_plan": pipeline.job_trade_plan, "shadow": pipeline.job_shadow,
+    fns = {"cycle": pipeline.job_cycle, "phase_plans": pipeline.job_phase_plans, "signal": pipeline.job_signal, "candles": pipeline.job_candles, "trade_plan": pipeline.job_trade_plan, "shadow": pipeline.job_shadow,
            "forward": pipeline.job_forward, "walkforward": pipeline.job_walkforward,
            "walkforward_tm": pipeline.job_walkforward_tm, "check": pipeline.job_check, "summaries": pipeline.job_summaries}
     if not isinstance(kind, str) or kind not in fns:
@@ -549,6 +549,29 @@ def _startup_check():
         clear_cache()
 
 
+def _next_phase_run(now: datetime) -> datetime:
+    """Minute `offset` of the next hour whose clock-shifted 4h bar closes off the standard clock (hour % 4 != 0): the multi-phase
+    pipelines (v376 R2-4P) plan that phase then; phase 0 (hour % 4 == 0) runs inside the regular 4h cycle."""
+    t = now.replace(minute=0, second=0, microsecond=0) + timedelta(minutes=SETTINGS.schedule_offset_minutes)
+    while t <= now or t.hour % 4 == 0:
+        t += timedelta(hours=1)
+    return t
+
+
+def _run_phase_plans(trigger: str = "hourly", patience_s: float = 900.0) -> dict:
+    """The hourly phase-plan job; waits (20 s steps, at most `patience_s`) while another job (e.g. the 15-min refresh) holds the lock.
+    A failure is left to the next refresh cycle, whose trade-plan step re-runs every due phase."""
+    waited = 0.0
+    while True:
+        _heartbeat["t"] = datetime.now(timezone.utc).isoformat()
+        result = pipeline.run_job("phase_plans", pipeline.job_phase_plans, trigger)
+        clear_cache()
+        if result["status"] != "busy" or waited >= patience_s:
+            return result
+        time.sleep(20)
+        waited += 20
+
+
 def _scheduler():
     _keep_awake()
     _heartbeat["t"] = datetime.now(timezone.utc).isoformat()
@@ -568,13 +591,18 @@ def _scheduler():
             log.info("scheduler: next pipeline cycle at %s UTC (%s local); candles refresh every 15 min",
                      nxt.strftime("%Y-%m-%d %H:%M"), nxt.astimezone().strftime("%H:%M"))
             _next_cycle["t"] = nxt.isoformat()
+            nph = _next_phase_run(datetime.now(timezone.utc))  # hourly multi-phase plans (v376), between the 4h cycles
             while (wait := (nxt - datetime.now(timezone.utc)).total_seconds()) > 0:
                 _heartbeat["t"] = datetime.now(timezone.utc).isoformat()
-                time.sleep(min(wait, 900))
+                time.sleep(max(1.0, min(wait, 900, (nph - datetime.now(timezone.utc)).total_seconds())))
                 _heartbeat["t"] = datetime.now(timezone.utc).isoformat()
                 # A sleep/resume or long refresh may cross several closes. Repair now, without waiting for the next one.
                 if _due_slot(db.now_ms()) >= pipeline._ms(nxt) // pipeline.H4_MS * pipeline.H4_MS:
                     break
+                if datetime.now(timezone.utc) >= nph:
+                    _run_phase_plans("hourly")
+                    nph = _next_phase_run(datetime.now(timezone.utc))
+                    continue
                 if (nxt - datetime.now(timezone.utc)).total_seconds() > 60:
                     if not pipeline.refresh_candles_quietly():
                         _run_cycle_until_done("refresh-retry")

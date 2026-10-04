@@ -6,7 +6,7 @@ const vm = require('node:vm');
 
 const source = fs.readFileSync(path.join(__dirname, '../frontend/app.js'), 'utf8').replace(
   '  boot();',
-  '  window.testing = { state, api, refreshSession, logout, onCredential, syncAccountAccess, visiblePipes, planPipe, setPlanPipe, histSource, histBoth, loadPerf, loadPlans, loadEvidence, renderEvidence, loadPipelineSettings, loadUsers, route, location, $, product, renderGoals, renderProductPanels, loadTodo, renderCards };');
+  '  window.testing = { state, api, refreshSession, logout, onCredential, syncAccountAccess, visiblePipes, planPipe, setPlanPipe, histSource, histBoth, loadPerf, loadPlans, loadEvidence, renderEvidence, loadPipelineSettings, loadUsers, route, location, $, product, renderGoals, renderProductPanels, loadTodo, renderCards, renderBoard, renderPlan, PIPES };');
 const user = { email: 'viewer@example.com', role: 'viewer', allowed_pipelines: ['v342', 'v362', 'v315'] };
 const expired = { access_token: 'old', expires_at: 1, user };
 const fresh = { access_token: 'new', expires_at: Date.now() / 1000 + 900, user };
@@ -469,4 +469,83 @@ test('a paper pipeline before its start shows "not started yet" instead of flat 
   ui.state.live.planLoading = false;
   ui.renderCards();
   assert.ok(ui.$('todoCards').innerHTML.includes('chưa tới giờ bắt đầu') && !ui.$('todoCards').innerHTML.includes('ĐỨNG NGOÀI'));
+});
+
+test('v376 (R2·4P) is a BOT pipeline with the same dip treatment as R2', () => {
+  const ui = app(async () => response(200, {}), storage(fresh));
+  const p = ui.PIPES.find(x => x.v === 'v376');
+  assert.ok(p && p.product === 'bot' && p.nm === 'R2·4P');
+  const order = Array.from(ui.PIPES, x => x.v);
+  assert.equal(order.indexOf('v376'), order.indexOf('v321') + 1);
+});
+
+const multiPlan = () => {
+  const ago = new Date(Date.now() - 2 * 3600e3).toISOString(), later = new Date(Date.now() + 3600e3).toISOString();
+  const phase = (n, started) => ({ phase: n, label: `khung +${n}h`, capital: 0.25, freeze: started ? ago : later, started,
+    decision_bar: ago, next_decision: later, net_return_pct: 0, generated_at: ago });
+  const pos = { side: 'LONG', weight: 0.05, avg_entry: 150, sl: 140, tp: 170, break_even: false, opened: ago, upnl_pct: 0.5 };
+  const ord = { kind: 'open', side: 'BUY', price: 148.5, weight: 0.05, valid_until: later, sl_if_filled: 138, tp_if_filled: 165 };
+  const dip = (ph, rung, px) => ({ rung, buy_limit: px, tp: px * 1.02, stop: px * 0.96, stop_kind: 'close5', backstop: px * 0.92, size_frac: 0.02,
+    agent_size: 1, agent_tp: 1, active_from: ago, active_until: later, filled: false, phase: ph, label: `khung +${ph}h`, size_frac_sub: 0.08 });
+  return { pipeline: 'v376', multi_phase: true, phases: [phase(0, true), phase(1, true), phase(2, true), phase(3, false)],
+    freeze: ago, generated_at: ago, decision_bar: ago, next_decision: later, net_return_pct: 0.1, events: [], equity_curve: [],
+    coins: { SOLUSDT: { symbol: 'SOLUSDT', price: 149, target_weight: 0.0125, state: 'position', position: pos, order: ord, dip_size: null,
+      subs: [{ phase: 0, label: 'khung +0h', capital: 0.25, state: 'position', position: pos },
+             { phase: 1, label: 'khung +1h', capital: 0.25, state: 'pending', order: ord },
+             { phase: 2, label: 'khung +2h', capital: 0.25, state: 'flat' },
+             { phase: 3, label: 'khung +3h', capital: 0.25, state: 'flat' }],
+      dips: [dip(2, 3, 141.25), dip(0, 2.5, 143.75)] } } };
+};
+
+test('a multi-phase plan shows every sub-book position, order and dip rung with its phase label', () => {
+  const ui = app(async () => response(200, {}), storage(fresh));
+  ui.state.user.allowed_pipelines = ['v376'];
+  ui.state.selectedPipeline = 'v376';
+  ui.state.live.plan = multiPlan(); ui.state.live.planLoading = false;
+  ui.renderCards();
+  const cards = ui.$('todoCards').innerHTML;
+  assert.ok(!cards.includes('Pipeline bắt đầu chạy paper lúc'));  // one phase started: coin cards, not the start banner
+  assert.ok(cards.includes('id="card-SOLUSDT"'));
+  for (const l of ['khung +0h', 'khung +1h', 'khung +2h']) assert.ok(cards.includes(`<span class="tag phase-tag">${l}</span>`), l);
+  assert.ok(cards.includes('khung +3h: bắt đầu lúc'));
+  assert.ok(cards.includes('Vị thế đang giữ <span class="tag phase-tag">khung +0h</span>') && cards.includes('150.00'));
+  assert.ok(cards.includes('148.50') && cards.includes('141.25') && cards.includes('143.75'));
+  assert.ok(cards.indexOf('Bắt đáy 2.5σ') < cards.indexOf('Bắt đáy 3σ'));  // dips sorted by phase (0 before 2)
+  ui.renderBoard();
+  const board = ui.$('board').innerHTML;
+  assert.ok(board.includes('khung +0h') && board.includes('khung +1h') && board.includes('GIỮ LONG') && board.includes('ĐẶT LIMIT MUA'));
+  assert.ok(board.includes('150.00') && board.includes('148.50') && board.includes('ph-line'));
+  ui.state.live.symbol = 'SOLUSDT'; ui.renderPlan();
+  const panel = ui.$('planPanel').innerHTML;
+  assert.ok(panel.includes('khung +0h') && panel.includes('khung +1h') && panel.includes('khung +2h') && panel.includes('141.25'));
+});
+
+test('a multi-phase plan before every phase starts still shows the start banner', () => {
+  const ui = app(async () => response(200, {}), storage(fresh));
+  ui.state.user.allowed_pipelines = ['v376'];
+  ui.state.selectedPipeline = 'v376';
+  const plan = multiPlan();
+  plan.freeze = new Date(Date.now() + 3600e3).toISOString();
+  plan.phases.forEach(p => { p.started = false; });
+  ui.state.live.plan = plan; ui.state.live.planLoading = false;
+  ui.renderCards();
+  assert.ok(ui.$('todoCards').innerHTML.includes('chưa tới giờ bắt đầu') && !ui.$('todoCards').innerHTML.includes('coin-card'));
+});
+
+test('a single-book plan renders as before (no phase labels)', () => {
+  const ui = app(async () => response(200, {}), storage(fresh));
+  ui.state.user.allowed_pipelines = ['v321'];
+  ui.state.selectedPipeline = 'v321';
+  const later = new Date(Date.now() + 3600e3).toISOString();
+  ui.state.live.plan = { pipeline: 'v321', freeze: '2026-10-01T00:00:00+00:00', generated_at: '2026-10-04T00:05:00+00:00', next_decision: later, events: [],
+    coins: { SOLUSDT: { state: 'position', position: { side: 'LONG', weight: 0.05, avg_entry: 150, sl: 140, tp: 170, break_even: false, upnl_pct: 0.5 },
+      dips: [{ rung: 3, buy_limit: 141.25, tp: 144, stop: 135, stop_kind: 'close5', backstop: 130, size_frac: 0.02, agent_size: 1, agent_tp: 1,
+        active_from: '2026-10-04T00:16:00+00:00', active_until: later, filled: false }] } } };
+  ui.state.live.planLoading = false;
+  ui.renderCards(); ui.renderBoard();
+  const cards = ui.$('todoCards').innerHTML, board = ui.$('board').innerHTML;
+  assert.ok(cards.includes('<span>Vị thế đang giữ</span><span id="cpl-SOLUSDT">') && cards.includes('Bắt đáy 3σ') && cards.includes('141.25'));
+  assert.ok(cards.includes('<span class="ord-kind">Bắt đáy 3σ</span><span class="badge long">MUA</span>'));
+  assert.ok(board.includes('GIỮ LONG') && board.includes('150.00') && !board.includes('ph-line'));
+  assert.ok(!cards.includes('phase-tag') && !board.includes('phase-tag') && !cards.includes('note-bar'));
 });

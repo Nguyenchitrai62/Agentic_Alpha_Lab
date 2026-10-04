@@ -204,7 +204,7 @@ def test_admin_order_and_locks_apply_to_existing_session_and_scheduler(web_clien
     # Warm both caches before changing policy; the same viewer access token must acquire/lose rights immediately.
     client.get("/api/pipelines_summary", headers=viewer)
     client.get("/api/trade_plan?pipeline=v342", headers=viewer)
-    order = ["v315", "v367", "v342", "v301", "v362", "v321", "v295", "v340"]
+    order = ["v315", "v367", "v342", "v301", "v362", "v321", "v295", "v340", "v376"]
     locks = {**original["locked"], "v367": False, "v342": True}
     payload = {"order": order, "locked": locks, "revision": 0}
     response = client.post("/api/admin/pipelines", headers=admin, json=payload)
@@ -305,9 +305,9 @@ def test_viewer_cannot_read_restricted_pipeline(web_client, path):
 def test_pipeline_permissions_and_cache_are_role_safe(web_client):
     client, _, (_, db, auth) = web_client
     admin, viewer = _bearer(auth, "admin@example.com"), _bearer(auth, "viewer@example.com")
-    for pipe in ("v321", "v301", "v295", "v315", "v340", "v342", "v362", "v367"):
+    for pipe in ("v321", "v301", "v295", "v315", "v340", "v342", "v362", "v367", "v376"):
         db.kv_set(f"trade_plan_{pipe}", {"pipeline": pipe, "coins": {"secret": pipe}})
-    assert len(client.get("/api/pipelines_summary", headers=admin).json()) == 8
+    assert len(client.get("/api/pipelines_summary", headers=admin).json()) == 9
     summary = client.get("/api/pipelines_summary", headers=viewer).json()
     assert len(summary) == 5  # MANUAL only; the two best MANUAL pipelines are locked by default
     assert [p for p in summary if summary[p]["locked"]] == ["v367", "v362"]
@@ -498,7 +498,7 @@ def test_plan_priority_uses_product_rank_and_unfinished_cycle(backend):
     _, db, _ = backend
     pipe = importlib.import_module("backend.pipeline")
     slot = 100
-    assert pipe.plan_order(slot) == ["v321", "v301", "v295", "v367", "v362", "v342", "v340", "v315"]
+    assert pipe.plan_order(slot) == ["v321", "v301", "v295", "v367", "v362", "v342", "v376", "v340", "v315"]
     db.kv_set("plan_status_v301", {"completed_slot": slot})
     assert pipe.plan_order(slot)[0] == "v321" and pipe.plan_order(slot)[-1] == "v301"
     db.kv_set("summary_tm_v342", {"monthly_last_year": 9, "gate_dd": 15, "win_hidden": .6})
@@ -533,9 +533,11 @@ def test_plan_failure_still_attempts_all_five_and_retries_unfinished(backend, tm
             raise subprocess.TimeoutExpired(cmd, 1800)
         return subprocess.CompletedProcess(cmd, 0, "", "")
     monkeypatch.setattr(pipe.subprocess, "run", execute)
+    monkeypatch.setattr(pipe.multiphase, "refresh", lambda db_, slot=None: calls.append("v376_R2_4P")
+                        or db_.kv_set("plan_status_v376", {"completed_slot": slot, "completed_at": db_.now_ms()}) or "ok")
     with pytest.raises(RuntimeError, match="v301"):
         pipe.job_trade_plan()
-    assert calls == ["v321_R2", "v301_G2", "v295_CS", "v367_M5", "v362_M4", "v342_M3", "v340_M2", "v315_M1"]
+    assert calls == ["v321_R2", "v301_G2", "v295_CS", "v367_M5", "v362_M4", "v342_M3", "v376_R2_4P", "v340_M2", "v315_M1"]
     assert pipe.plan_order(db.now_ms() // pipe.H4_MS * pipe.H4_MS)[0] == "v301"
     assert not db.kv_get("plan_status_v301")
     assert db.kv_get("plan_status_v315")["completed_at"]
@@ -611,9 +613,10 @@ def test_saved_policy_from_older_catalogue_appends_new_pipeline_locked(backend):
     old = ["v266", "v301", "v269", "v295", "v285", "v342"]  # an older catalogue (v266 / v269 / v285 retired since)
     db.kv_set("pipeline_access_policy", {"order": old, "locked": {p: p == "v301" for p in old}, "revision": 3})
     pol = catalog.policy()
-    assert pol["order"] == ["v301", "v295", "v342", "v321", "v367", "v362", "v340", "v315"]
+    assert pol["order"] == ["v301", "v295", "v342", "v321", "v367", "v362", "v376", "v340", "v315"]
     # MANUAL pipelines missing from the saved locks start locked; bots never carry a lock
-    assert pol["locked"] == {"v301": False, "v295": False, "v342": False, "v321": False, "v367": True, "v362": True, "v340": True, "v315": True}
+    assert pol["locked"] == {"v301": False, "v295": False, "v342": False, "v321": False, "v367": True, "v362": True, "v376": False, "v340": True,
+                             "v315": True}
     assert catalog.allowed({"role": "viewer", "email": "nobody@example.com"}) == ["v342"]
 
 
@@ -628,7 +631,7 @@ def test_bot_tab_is_an_account_grant_without_pipeline_locks(web_client):
     assert client.post("/api/admin/users", headers=admin, json={"email": "viewer@example.com", "pipelines": ["v321"]}).status_code == 400
     assert client.post("/api/admin/users", headers=admin, json={"email": "viewer@example.com", "pipelines": ["bot"]}).status_code == 200
     me = client.get("/api/auth/me", headers=viewer).json()
-    assert me["bot_access"] is True and me["allowed_pipelines"] == ["v321", "v301", "v295", "v342", "v340", "v315"]
+    assert me["bot_access"] is True and me["allowed_pipelines"] == ["v321", "v301", "v295", "v342", "v376", "v340", "v315"]
     summary = client.get("/api/pipelines_summary", headers=viewer).json()
     assert all(not summary[p]["locked"] for p in ("v321", "v301", "v295")) and summary["v367"]["locked"]
     for pipe in ("v321", "v301", "v295"):

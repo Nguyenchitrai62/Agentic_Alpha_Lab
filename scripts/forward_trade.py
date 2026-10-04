@@ -110,11 +110,16 @@ def live_state(start, now, cls=None):
     return (cls or sa.LiveState)(o4, k1)
 
 
-def g2_hooks(grid, cur_bar, start, now, agents="v301_dip_agents"):
-    """sleeve_fill_size + sleeve_tp hooks of the v301 G2 (or v321 R2) pipeline + the current bar's size / TP per coin and rung (for the plan)."""
+def g2_hooks(grid, cur_bar, start, now, agents="v301_dip_agents", market=None):
+    """sleeve_fill_size + sleeve_tp hooks of the v301 G2 (or v321 R2) pipeline + the current bar's size / TP per coin and rung (for the plan).
+    market = optional (bar opens, 1m klines) for the agents' LiveState (scripts/forward_trade_phase.py: opens of a clock-shifted 4h grid);
+    None = the standard 4h grid fetched here (unchanged)."""
     ga = _load(f"{agents}_tm", ROOT / f"scripts/{agents}.py")
     fz = ga.load()
-    ls = live_state(start, now, getattr(ga, "LiveState", None))
+    if market is None:
+        ls = live_state(start, now, getattr(ga, "LiveState", None))
+    else:
+        ls = (getattr(ga, "LiveState", None) or _load("v295_size_agent_mk", ROOT / "scripts/v295_size_agent.py").LiveState)(*market)
     cache = {}
 
     def dec(s, T, r):

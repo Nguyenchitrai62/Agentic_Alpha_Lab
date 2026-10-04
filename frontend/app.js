@@ -436,6 +436,16 @@
 
   // ---- executable trade plan (trade mode): what should be on the exchange now
   const planOf = (sym) => state.live.plan?.coins?.[sym];
+  // multi-phase plans (v376 R2·4P): four clock-shifted sub-books merged into one plan; coins[sym].subs = one single-book-shaped
+  // entry per sub-book, coins[sym].dips carry their phase; all weights are fractions of the TOTAL account
+  const isMulti = () => !!state.live.plan?.multi_phase;
+  const phLabel = (n) => (state.live.plan?.phases || []).find((p) => p.phase === n)?.label ?? `khung +${n}h`;
+  const phTag = (u) => u == null ? "" : `<span class="tag phase-tag">${esc(u.label ?? phLabel(u.phase))}</span>`;
+  const byPhase = (a, b) => Number(a.phase ?? 0) - Number(b.phase ?? 0);
+  const subViews = (sym) => (planOf(sym)?.subs || []).slice().sort(byPhase);
+  const liveSub = (u) => (u.state === "position" && u.position) || (u.state === "pending" && u.order);
+  const sortedDips = (d) => isMulti() ? d.slice().sort((a, b) => byPhase(a, b) || a.rung - b.rung) : d;
+  const phasesPending = () => (state.live.plan?.phases || []).filter((p) => p.started === false).sort(byPhase);
   // paper pipelines (prospective evidence); O1 = the most robust walk-forward foundation, the default view
   // paper pipelines grouped by PRODUCT (one tab each): MANUAL = the Manual tab, a human can follow it (book + bracket dip limits with
   // exchange-native TP / SL; per-pipeline locks); BOT = the Bot tab (full dip ladder, stops watched on 5m closes; the 3 best, no locks,
@@ -447,6 +457,7 @@
     { v: "v340", nm: "M2", tag: "Lệnh xu hướng + 1 lệnh bắt đáy mỗi coin; DD thấp nhất", product: "manual", ds: "Book ×0.75 (SL/TP 4σ/8σ) + 1 lệnh limit bắt đáy 3σ kèm TP và SL sàn 8σ" },
     { v: "v315", nm: "M1", tag: "Chỉ lệnh theo xu hướng, ít lệnh, dễ theo nhất", product: "manual", ds: "Chỉ lệnh book (không bắt đáy), vào bằng limit hồi giá 0.75σ" },
     { v: "v321", nm: "R2", tag: "Thang 5 lệnh bắt đáy mỗi coin, AI chọn khối lượng và chốt lời", product: "bot", ds: "Book CB + thang bắt đáy 2.5–5σ (SL bot theo nến 5m + SL sàn 8σ), agent RL chọn khối lượng & chốt lời" },
+    { v: "v376", nm: "R2·4P", tag: "R2 chạy song song 4 khung giờ, mỗi khung 1/4 vốn - DD thấp hơn", product: "bot", ds: "R2 (book CB + thang bắt đáy 2.5–5σ, agent chọn khối lượng & chốt lời) chạy trên 4 khung 4h lệch 0/1/2/3 giờ (nến bắt đầu 00/04/08.., 01/05/.., 02/06/.., 03/07/.. UTC), mỗi khung 1/4 vốn, không cân bằng lại" },
     { v: "v301", nm: "G2", tag: "Thang 4 lệnh bắt đáy mỗi coin, AI chọn khối lượng và chốt lời", product: "bot", ds: "Như R2 nhưng thang 2.5–4σ, agent học từ 4 độ sâu" },
     { v: "v295", nm: "CS", tag: "Thang 4 lệnh bắt đáy mỗi coin, AI chọn khối lượng", product: "bot", ds: "Book CB + thang bắt đáy 2.5–4σ, agent RL chỉ chọn khối lượng (học từ 35 coin)" },
   ];
@@ -573,6 +584,20 @@
     const plan = state.live.plan, c = planOf(sym);
     if (!plan || !c) return `<p class="muted">Chưa có kế hoạch lệnh cho ${coin(sym)}.</p>`;
     let body;
+    if (isMulti()) {  // one step list per sub-book that has a position / order; phases not started yet: their start time
+      const ph = Object.fromEntries((plan.phases || []).map((p) => [p.phase, p]));
+      const subs = subViews(sym), act = subs.filter(liveSub);
+      body = (act.length ? act.map((u) => `<div class="phase-h">${phTag(u)}</div>` + planBody(sym, u, ph[u.phase]?.next_decision || plan.next_decision)).join("")
+        : planBody(sym, { state: "flat" }, plan.next_decision))
+        + phasesPending().map((p) => `<div class="phase-h">${phTag(p)} <span class="muted small">bắt đầu lúc ${dt(Date.parse(p.freeze))}</span></div>`).join("");
+    } else body = planBody(sym, c, plan.next_decision);
+    if (!withTimeline) return body;
+    const evs = (plan.events || []).filter((e) => e.symbol === sym).slice(-6).reverse();
+    return body + `<div class="timeline">${evs.map((e) => `<div><span class="muted">${dt(Date.parse(e.t))}</span>${e.phase != null && isMulti() ? " " + phTag({ phase: e.phase }) : ""} ${EVVI[e.kind] || e.kind}
+        ${e.kind.startsWith("sl_") ? "" : (e.side === "buy" ? "mua" : "bán")} ${fmtPx(e.price)}${e.why ? ` <span class="muted">(${esc(e.why)})</span>` : ""}</div>`).join("") || '<div class="muted small">Chưa có sự kiện.</div>'}</div>`;
+  }
+  function planBody(sym, c, nextDecision) {  // the step-by-step text of one book (the single plan, or one sub-book of a multi-phase plan)
+    let body;
     const C = coin(sym), px = state.live.prices[sym]?.c, step = (items) => `<ol class="steps">${items.map((x) => `<li>${x}</li>`).join("")}</ol>`;
     if (c.state === "pending") {
       const o = c.order, buy = o.side === "BUY", q = qty(sym, o.weight, o.price);
@@ -586,7 +611,7 @@
       ]);
     } else if (c.state === "position") {
       const p = c.position, L = p.side === "LONG", q = qty(sym, p.weight, p.avg_entry);
-      const slm = lastEvent(sym, ["sl_move"]);
+      const slm = lastEvent(sym, ["sl_move"], c.phase);
       const u = px ? (L ? 1 : -1) * (px / p.avg_entry - 1) * 100 : p.upnl_pct;
       const items = [`Trên sàn phải đang có: <b>${p.side} ${q} ${C}</b> (giá vào TB ${fmtPx(p.avg_entry)}, ≈ ${usdt(p.weight)} USDT)`,
         `Lệnh <b>Stop-loss</b> (Stop Market) tại <b class="down">${fmtPx(p.sl)}</b>${p.break_even ? " — đã dời về hoà vốn" : ""}${recent(slm) ? ` <span class="warn">← vừa đổi lúc ${dt(Date.parse(slm.t))}, hãy sửa lệnh SL trên sàn</span>` : ""}`,
@@ -595,32 +620,32 @@
         const o = c.order, kind = { add: "nhồi thêm", reduce: "chốt bớt", close: "đóng hết vị thế" }[o.kind] || o.kind;
         items.push(`<b>Việc mới:</b> đặt lệnh <b>LIMIT ${o.side === "BUY" ? "MUA" : "BÁN"}</b> tại <b>${fmtPx(o.price)}</b> để <b>${kind}</b>${o.amount ? ` (${pct(o.amount, 0)} vị thế)` : ""}; huỷ nếu đến ${dt(Date.parse(o.valid_until))} chưa khớp`);
       } else {
-        items.push(`Ngoài ra <b>không cần làm gì</b> — cứ để SL/TP chạy tới quyết định kế tiếp (${dt(Date.parse(plan.next_decision))})`);
+        items.push(`Ngoài ra <b>không cần làm gì</b> — cứ để SL/TP chạy tới quyết định kế tiếp (${dt(Date.parse(nextDecision))})`);
       }
       body = `<div class="act ${L ? "long" : "short"}">ĐANG GIỮ ${p.side} ${C} · lãi/lỗ ${sgn(u)}</div>` + step(items);
     } else {
-      const cl = lastEvent(sym, ["book_close", "book_stop", "book_tp"]);
+      const cl = lastEvent(sym, ["book_close", "book_stop", "book_tp"], c.phase);
       body = `<div class="act flat">KHÔNG LÀM GÌ VỚI ${C}</div>` + step([
         `Pipeline không có lệnh nào cho ${C} lúc này.`,
         recent(cl) ? `Vị thế vừa ${{ book_close: "đóng bằng limit", book_stop: "chạm Stop-loss", book_tp: "chạm Take-profit" }[cl.kind]} tại ${fmtPx(cl.price)} — nếu trên sàn còn vị thế / lệnh ${C} thì đóng / huỷ.`
           : `Nếu trên sàn đang có lệnh chờ hoặc vị thế ${C} từ gợi ý cũ: huỷ / đóng để khớp với kế hoạch.`,
-        `Kiểm tra lại ở quyết định kế tiếp: ${dt(Date.parse(plan.next_decision))}.`]);
+        `Kiểm tra lại ở quyết định kế tiếp: ${dt(Date.parse(nextDecision))}.`]);
     }
-    if (!withTimeline) return body;
-    const evs = (plan.events || []).filter((e) => e.symbol === sym).slice(-6).reverse();
-    return body + `<div class="timeline">${evs.map((e) => `<div><span class="muted">${dt(Date.parse(e.t))}</span> ${EVVI[e.kind] || e.kind}
-        ${e.kind.startsWith("sl_") ? "" : (e.side === "buy" ? "mua" : "bán")} ${fmtPx(e.price)}${e.why ? ` <span class="muted">(${esc(e.why)})</span>` : ""}</div>`).join("") || '<div class="muted small">Chưa có sự kiện.</div>'}</div>`;
+    return body;
   }
   function dipBlock(sym) {  // the dip ladder resting in the bar in progress (from the plan): what to have on the exchange now
-    const c = planOf(sym), px = state.live.prices[sym]?.c, d = c?.dips || [];
+    const c = planOf(sym), px = state.live.prices[sym]?.c, d = sortedDips(c?.dips || []), multi = isMulti();
     if (!d.length) return "";
-    const from = Date.parse(d[0].active_from), until = Date.parse(d[0].active_until), now = Date.now();
-    const status = now < from ? `đặt lúc ${dt(from)}` : now > until ? "đã hết hạn" : `đang chờ tới ${dt(until)}`;
+    const now = Date.now(), stOf = (r) => {
+      const from = Date.parse(r.active_from), until = Date.parse(r.active_until);
+      return now < from ? `đặt lúc ${dt(from)}` : now > until ? "đã hết hạn" : `đang chờ tới ${dt(until)}`;
+    };
+    const status = multi ? "mỗi khung giờ một thang riêng" : stOf(d[0]);  // multi-phase: each sub-book's ladder has its own window
     const rows = d.map((r) => {
       const q = qty(sym, r.size_frac, r.buy_limit);
       const ag = [r.agent_size !== 1 ? `<span class="${r.agent_size > 1 ? "up" : "down"}">agent ×${r.agent_size}</span>` : "",
                   r.agent_tp !== 1 ? `TP ${r.agent_tp}σ` : ""].filter(Boolean).join(" · ");
-      return `<tr class="${r.filled ? "dip-filled" : ""}"><td>${r.rung}σ${r.filled ? ' <span class="up" title="đã khớp">✓</span>' : ""}</td>
+      return `<tr class="${r.filled ? "dip-filled" : ""}"><td>${r.rung}σ${r.filled ? ' <span class="up" title="đã khớp">✓</span>' : ""}${multi ? `<span class="note">${phTag(r)} ${stOf(r)}</span>` : ""}</td>
         <td>${fmtPx(r.buy_limit)}${px ? `<span class="note">${((r.buy_limit / px - 1) * 100).toFixed(1)}%</span>` : ""}</td>
         <td class="up">${fmtPx(r.tp)}</td>
         <td class="down">${fmtPx(r.stop)}<span class="note">${r.stop_kind === "close5" ? "bot · nến 5m đóng" : "chạm"}${r.backstop ? ` · sàn ${fmtPx(r.backstop)}` : ""}</span></td>
@@ -636,10 +661,15 @@
   function compactPlan(sym) {
     if (state.live.planLoading) return '<p class="muted">Đang tải kế hoạch lệnh…</p>';
     if (!state.live.plan) return `<p class="muted">Chưa có dữ liệu kế hoạch lệnh cho ${esc(PIPE_LABEL[planPipe()] || "pipeline này")}.</p>`;
+    if (isMulti()) {  // one box per sub-book with a position / order (all flat: the single flat box) + phases not started yet
+      const act = subViews(sym).filter(liveSub);
+      const pend = phasesPending().map((p) => `<div class="muted small">${phTag(p)} bắt đầu lúc ${dt(Date.parse(p.freeze))}</div>`).join("");
+      return (act.length ? act.map((u) => compactPlanCore(sym, u, phTag(u))).join("") : compactPlanCore(sym)) + pend + dipBlock(sym);
+    }
     return compactPlanCore(sym) + dipBlock(sym);
   }
-  function compactPlanCore(sym) {
-    const c = planOf(sym), px = state.live.prices[sym]?.c;
+  function compactPlanCore(sym, c = planOf(sym), tag = "") {  // tag: the phase label of a sub-book (multi-phase plans)
+    const px = state.live.prices[sym]?.c;
     const row = (k, v, d = "", cls = "") => `<div class="pb-row ${cls}"><span class="k">${k}</span><span class="v">${v}</span><span class="d">${d}</span></div>`;
     const rel = (x, base) => (base ? `${x >= base ? "+" : ""}${((x / base - 1) * 100).toFixed(2)}%` : "");
     if (!c || c.state === "flat") {
@@ -648,7 +678,7 @@
     }
     if (c.state === "pending") {
       const o = c.order, buy = o.side === "BUY";
-      return `<div class="plan-box ${buy ? "long" : "short"}"><div class="pb-head"><span class="act-badge ${buy ? "wait-long" : "wait-short"}">${buy ? "LONG" : "SHORT"}</span>
+      return `<div class="plan-box ${buy ? "long" : "short"}"><div class="pb-head"><span class="act-badge ${buy ? "wait-long" : "wait-short"}">${buy ? "LONG" : "SHORT"}</span>${tag}
           <span class="muted small">lệnh limit chờ khớp · ${qty(sym, o.weight, o.price)} ${coin(sym)} (≈ ${usdt(o.weight)} USDT)</span></div>
         ${lotWarn(sym, o.weight, o.price)}
         ${row("Entry", fmtPx(o.price), px ? `cách giá ${((o.price / px - 1) * 100).toFixed(2)}%` : "")}
@@ -657,7 +687,7 @@
         <div class="muted small">Huỷ nếu chưa khớp lúc ${dt(Date.parse(o.valid_until))}</div></div>`;
     }
     const p = c.position, L = p.side === "LONG", u = px ? (L ? 1 : -1) * (px / p.avg_entry - 1) * 100 : p.upnl_pct;
-    return `<div class="plan-box ${L ? "long" : "short"}"><div class="pb-head"><span class="act-badge ${L ? "long" : "short"}">${p.side}</span>
+    return `<div class="plan-box ${L ? "long" : "short"}"><div class="pb-head"><span class="act-badge ${L ? "long" : "short"}">${p.side}</span>${tag}
         <span class="muted small">đang giữ ${qty(sym, p.weight, p.avg_entry)} ${coin(sym)} (≈ ${usdt(p.weight)} USDT) · P/L ${sgn(u)}</span></div>
       ${lotWarn(sym, p.weight, p.avg_entry)}
       ${row("Entry", fmtPx(p.avg_entry))}
@@ -674,13 +704,23 @@
   }
   // orders to place now for one coin, from the selected pipeline's plan: entry / add / reduce / close / stop move / dip limits
   function ordersFor(s) {
-    const c = planOf(s), out = []; if (!c) return out;
+    const c = planOf(s); if (!c) return [];
+    if (!isMulti()) return bookOrders(s, c).concat(dipOrders(c.dips));
+    // multi-phase: every sub-book's book orders (phase order), then the dip rungs sorted by phase, rung; each tagged with its phase
+    return subViews(s).flatMap((u) => bookOrders(s, u).map((o) => ({ ...o, ph: u })))
+      .concat(dipOrders(sortedDips(c.dips || [])).map((o) => ({ ...o, ph: o.dip })));
+  }
+  function dipOrders(dips) {
+    return (dips || []).filter((d) => !d.filled).map((d) => ({ kind: `Bắt đáy ${d.rung}σ`, side: "BUY", price: d.buy_limit, sl: d.stop, tp: d.tp,
+      w: d.size_frac, until: d.active_until, dip: d }));
+  }
+  function bookOrders(s, c) {  // one book (the single plan, or one sub-book): entry / add / reduce / close / stop move
+    const out = [];
     const add = (kind, side, price, sl, tp, w, until) => out.push({ kind, side, price, sl, tp, w, until });
     if (c.state === "pending") add("Vào lệnh xu hướng", c.order.side, c.order.price, c.order.sl_if_filled, c.order.tp_if_filled, c.order.weight, c.order.valid_until);
     if (c.state === "position" && c.order) add({ add: "Nhồi thêm", reduce: "Chốt bớt", close: "Đóng hết" }[c.order.kind] || c.order.kind,
       c.order.side, c.order.price, null, null, c.order.kind === "add" ? c.order.amount : null, c.order.valid_until);
-    if (c.state === "position" && !c.order && recent(lastEvent(s, ["sl_move"]))) add("Sửa stop-loss", null, null, c.position.sl, null, null, null);
-    for (const d of c.dips || []) if (!d.filled) add(`Bắt đáy ${d.rung}σ`, "BUY", d.buy_limit, d.stop, d.tp, d.size_frac, d.active_until);
+    if (c.state === "position" && !c.order && recent(lastEvent(s, ["sl_move"], c.phase))) add("Sửa stop-loss", null, null, c.position.sl, null, null, null);
     return out;
   }
   const kv = (k, v, cls = "") => `<div><dt>${k}</dt><dd class="${cls}">${v}</dd></div>`;
@@ -689,7 +729,7 @@
     const txt = o.side ? `${o.side} ${s} LIMIT ${fmtPx(o.price)}${l ? " qty " + l.txt : ""}${o.sl ? " SL " + fmtPx(o.sl) : ""}${o.tp ? " TP " + fmtPx(o.tp) : ""}`
       : `${s} SL ${fmtPx(o.sl)}`;
     const side = o.side ? `<span class="badge ${o.side === "BUY" ? "long" : "short"}">${o.side === "BUY" ? "MUA" : "BÁN"}</span>` : "";
-    return `<div class="ord"><div class="ord-top"><span class="ord-kind">${esc(o.kind)}</span>${side}
+    return `<div class="ord"><div class="ord-top"><span class="ord-kind">${esc(o.kind)}</span>${o.ph ? phTag(o.ph) : ""}${side}
         <button type="button" class="btn sm copy-btn" data-copy="${esc(txt)}" aria-label="Copy lệnh ${esc(o.kind)} ${coin(s)}">Copy</button></div>
       <dl class="kv">${kv("Giá limit", o.price ? fmtPx(o.price) : "—")}${kv("Khối lượng", l ? `${l.txt} ${coin(s)}` : "—")}
         ${kv("Stop-loss", o.sl ? fmtPx(o.sl) : "—", "down")}${kv("Take-profit", o.tp ? fmtPx(o.tp) : "—", "up")}</dl>
@@ -706,12 +746,14 @@
     if (state.live.planLoading) return '<p class="muted">Đang tải kế hoạch lệnh…</p>';
     if (!state.live.plan) return `<p class="muted">Chưa có dữ liệu kế hoạch lệnh cho ${esc(PIPE_LABEL[planPipe()] || "pipeline này")}.</p>`;
     const c = planOf(s), px = state.live.prices[s]?.c, parts = [];
-    if (c?.state === "position") {
-      const p = c.position, L = p.side === "LONG", u = px ? (L ? 1 : -1) * (px / p.avg_entry - 1) * 100 : p.upnl_pct;
-      parts.push(`<div class="pos ${L ? "long" : "short"}"><div class="pos-h"><span>Vị thế đang giữ</span><span id="cpl-${s}">${sgn(u)}</span></div>
+    const posHtml = (p, tag, id) => {
+      const L = p.side === "LONG", u = px ? (L ? 1 : -1) * (px / p.avg_entry - 1) * 100 : p.upnl_pct;
+      return `<div class="pos ${L ? "long" : "short"}"><div class="pos-h"><span>Vị thế đang giữ${tag ? " " + tag : ""}</span><span${id ? ` id="${id}"` : ""}>${sgn(u)}</span></div>
         <dl class="kv">${kv("Giá vào TB", fmtPx(p.avg_entry))}${kv("Khối lượng", `${qty(s, p.weight, p.avg_entry)} ${coin(s)}`)}
-          ${kv("Stop-loss", fmtPx(p.sl) + (p.break_even ? " · hoà vốn" : ""), "down")}${kv("Take-profit", fmtPx(p.tp), "up")}</dl></div>`);
-    }
+          ${kv("Stop-loss", fmtPx(p.sl) + (p.break_even ? " · hoà vốn" : ""), "down")}${kv("Take-profit", fmtPx(p.tp), "up")}</dl></div>`;
+    };
+    if (isMulti()) { for (const u of subViews(s)) if (u.state === "position" && u.position) parts.push(posHtml(u.position, phTag(u))); }
+    else if (c?.state === "position") parts.push(posHtml(c.position, "", `cpl-${s}`));
     const ords = ordersFor(s);
     if (ords.length) parts.push(`<div class="ord-h">Lệnh cần đặt</div>` + ords.map((o) => orderRow(s, o)).join(""));
     else parts.push(`<p class="coin-idle">${c?.state === "position" ? "Không cần đặt thêm lệnh — giữ nguyên SL/TP." : "Không có lệnh mới cho coin này."}</p>`);
@@ -720,13 +762,16 @@
   function renderCards() {
     const el = $("todoCards"); if (!el) return;
     if (!planPipe()) { el.innerHTML = accessMessage(); return; }
-    const st = state.live.plan?.freeze ? Date.parse(state.live.plan.freeze) : NaN;
-    if (!state.live.planLoading && st > Date.now()) {  // a new paper pipeline before its first traded bar: no orders yet
+    const plan = state.live.plan, st = plan?.freeze ? Date.parse(plan.freeze) : NaN;
+    const anyStarted = !!plan?.multi_phase && (plan.phases || []).some((p) => p.started);  // multi-phase: cards once one sub-book runs
+    if (!state.live.planLoading && st > Date.now() && !anyStarted) {  // a new paper pipeline before its first traded bar: no orders yet
       el.innerHTML = `<p class="note-bar"><b>${esc(PIPE_LABEL[planPipe()] || "")} chưa tới giờ bắt đầu</b>
         <span>Pipeline bắt đầu chạy paper lúc ${dt(st)}; lệnh đầu tiên có sau khi nến 4h đó đóng.</span></p>`;
       return;
     }
-    el.innerHTML = SYMS.map((s) => {
+    const pend = plan?.multi_phase && !state.live.planLoading ? phasesPending() : [];
+    el.innerHTML = (pend.length ? `<p class="note-bar"><b>${esc(PIPE_LABEL[planPipe()] || "")}: ${pend.length} khung giờ chưa tới giờ bắt đầu</b>
+        ${pend.map((p) => `<span>${esc(p.label ?? phLabel(p.phase))}: bắt đầu lúc ${dt(Date.parse(p.freeze))}</span>`).join("")}</p>` : "") + SYMS.map((s) => {
       const p = state.live.prices[s];
       return `<article class="coin-card" id="card-${s}">
         <header class="coin-h"><span class="coin-name">${coin(s)}</span>
@@ -759,12 +804,25 @@
     return l.ok ? "" : `<div class="lot-warn">⚠ Vốn ${equity().toLocaleString("en-US")} USDT quá nhỏ cho lệnh này: sàn yêu cầu tối thiểu ${l.min} ${coin(s)} (≈ ${Math.ceil(l.minUsd)} USDT) — bỏ qua coin này hoặc tăng vốn.</div>`;
   }
   const usdt = (w) => Math.round(w * equity()).toLocaleString("en-US");
-  function lastEvent(sym, kinds) { return (state.live.plan?.events || []).filter((e) => e.symbol === sym && kinds.includes(e.kind)).slice(-1)[0]; }
+  function lastEvent(sym, kinds, phase) {  // phase: only that sub-book's events (multi-phase plans)
+    return (state.live.plan?.events || []).filter((e) => e.symbol === sym && kinds.includes(e.kind) && (phase == null || !isMulti() || e.phase === phase)).slice(-1)[0];
+  }
   const recent = (e) => e && Date.now() - Date.parse(e.t) < 4 * 3600 * 1000;
   function boardCells(s) {
-    const c = planOf(s), px = state.live.prices[s]?.c;
+    if (isMulti()) {  // one line per sub-book with a position / order, tagged with its phase
+      const subs = subViews(s).filter(liveSub);
+      if (subs.length) {
+        const cells = subs.map((u) => [u, boardCellsOf(s, u)]);
+        const col = (k) => cells.map(([u, b]) => `<div class="ph-line">${k === "act" ? phTag(u) : ""}${b[k] || "—"}</div>`).join("");
+        return { act: col("act"), px: col("px"), sl: col("sl"), tp: col("tp"), pl: col("pl"), w: col("w") };
+      }
+    }
+    return boardCellsOf(s, planOf(s));
+  }
+  function boardCellsOf(s, c) {  // one book (the single plan, or one sub-book)
+    const px = state.live.prices[s]?.c;
     if (!c || c.state === "flat") {
-      const cl = lastEvent(s, ["book_close", "book_stop", "book_tp"]);
+      const cl = lastEvent(s, ["book_close", "book_stop", "book_tp"], c?.phase);
       const why = recent(cl) ? `<span class="note">vừa ${{ book_close: "đóng (limit)", book_stop: "chạm SL", book_tp: "chạm TP" }[cl.kind]} @ ${fmtPx(cl.price)}</span>` : "";
       return { act: `<span class="act-badge flat">KHÔNG LÀM GÌ</span>${why}`, px: "—", sl: "—", tp: "—", pl: "", w: "" };
     }
@@ -778,7 +836,7 @@
     }
     const p = c.position, L = p.side === "LONG", k = L ? 1 : -1;
     const u = px ? k * (px / p.avg_entry - 1) * 100 : p.upnl_pct;
-    const slm = lastEvent(s, ["sl_move"]);
+    const slm = lastEvent(s, ["sl_move"], c.phase);
     let todo = "không cần làm gì";
     if (c.order) todo = `đặt LIMIT ${c.order.side === "BUY" ? "MUA" : "BÁN"} @ ${fmtPx(c.order.price)} (${{ add: "nhồi thêm", reduce: "chốt bớt", close: "đóng hết" }[c.order.kind] || c.order.kind})`;
     else if (recent(slm)) todo = `sửa SL thành ${fmtPx(p.sl)}`;
@@ -925,8 +983,8 @@
     const sym = state.live.symbol;
     const rows = (state.live.latest?.sleeve || []).filter((r) => r.symbol === sym);
     // C4 / C5: the dip stop fires on a 5m CLOSE (bot) at 4 / 5 sigma, plus a native 8-sigma touch stop on the exchange
-    const closeK = { v321: 4, v301: 4, v295: 4, v285: 4, v269: 4, v266: 5 }[planPipe()];
-    const dsz = ["v295", "v301", "v321", "v340", "v342", "v362", "v367"].includes(planPipe()) ? (planOf(sym)?.dip_size || {}) : null;  // CS / G2: the agents' decision per rung
+    const closeK = { v321: 4, v376: 4, v301: 4, v295: 4, v285: 4, v269: 4, v266: 5 }[planPipe()];
+    const dsz = ["v295", "v301", "v321", "v376", "v340", "v342", "v362", "v367"].includes(planPipe()) ? (planOf(sym)?.dip_size || {}) : null;  // CS / G2: the agents' decision per rung
     const decOf = (r) => { if (!dsz) return null; const k = Object.keys(dsz).find((x) => Number(x) === Number(r.rung)); return k ? dsz[k] : null; };
     const mulOf = (r) => { const d = decOf(r); return d == null ? 1 : Number(typeof d === "object" ? d.size : d); };
     const tpOf = (r) => { const d = decOf(r); return d && typeof d === "object" ? Number(d.tp) : 1; };

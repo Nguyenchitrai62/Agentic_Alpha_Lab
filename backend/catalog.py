@@ -12,6 +12,9 @@ from .config import SETTINGS
 PIPELINES = {  # product: "manual" = a human can follow it (per-pipeline locks / grants); "bot" = needs a bot (Bot tab: no locks, the 3 best,
                # visible only to admins and to accounts holding the BOT grant)
     "v321": {"candidate": "v321_R2", "product": "bot", "monthly_last_year": 5.655, "gate_dd": 18.39, "win_hidden": 0.560},
+    # v376 R2-4P: R2 on four 4h clocks shifted 0/1/2/3 h, 1/4 capital each (most recent year scored once: 3.902 %/month, DD 18.76 that year; gate DD = full 5-year path 23.08;
+    # book win of the most recent year 0.549 from v376_mix_series; the dev years' conservative DD reaches 23.08 in 2023-24)
+    "v376": {"candidate": "v376_R2_4P", "product": "bot", "monthly_last_year": 3.902, "gate_dd": 23.08, "win_hidden": 0.549},
     "v301": {"candidate": "v301_G2", "product": "bot", "monthly_last_year": 5.349, "gate_dd": 17.09, "win_hidden": 0.558},
     "v295": {"candidate": "v295_CS", "product": "bot", "monthly_last_year": 5.266, "gate_dd": 17.2, "win_hidden": 0.558},
     "v367": {"candidate": "v367_M5", "product": "manual", "monthly_last_year": 5.22, "gate_dd": 18.62, "win_hidden": 0.686},
