@@ -2,7 +2,7 @@
   "schema_version": 1,
   "project": "Agentic Alpha Lab BTC swing research",
   "created_at": "2026-09-06T00:00:00Z",
-  "next_version": 389,
+  "next_version": 390,
   "control": {
     "coordinator_model": "gpt-5.6-sol",
     "coordinator_reasoning": "high",
@@ -54,7 +54,7 @@
     "expected_workers": 3,
     "version_range": [
       45,
-      388
+      389
     ],
     "parent_commit": "1ecf947baddd5ef78444670330e9db62128dad50",
     "cloud_snapshot": {
@@ -16655,7 +16655,7 @@
       "version": "v387",
       "track": "A",
       "direction_key": "v387-bot-eight-clocks",
-      "status": "running",
+      "status": "rejected",
       "parent_versions": [
         "v376"
       ],
@@ -16668,9 +16668,36 @@
       "write_scope": "research/parallel/rounds/parallel-20260906-r2/v387",
       "worker_agent_id": "01a07792-4a6b-7fc3-a08a-af2923b1778a",
       "worker_host_id": "local",
-      "result_manifest": null,
+      "result_manifest": "research\\parallel\\rounds\\parallel-20260906-r2\\v387\\result_manifest.json",
       "registered_at": "2026-10-04T07:26:40.939971Z",
-      "assigned_at": "2026-10-04T07:26:40.939971Z"
+      "assigned_at": "2026-10-04T07:26:40.939971Z",
+      "result_manifest_sha256": "d381142ae2592e9d16ba3270abf0a8b0e4760e106eddd482b4de417ed35978b1",
+      "result_summary": {
+        "scenarios": {
+          "normal": {
+            "monthly_geometric_net_percent": 5.24,
+            "max_drawdown_percent": 23.08,
+            "fills": 0,
+            "months": 48
+          },
+          "fee_stress": {
+            "monthly_geometric_net_percent": 5.24,
+            "max_drawdown_percent": 23.08,
+            "fills": 0,
+            "months": 48
+          },
+          "execution_stress": {
+            "monthly_geometric_net_percent": 5.24,
+            "max_drawdown_percent": 23.08,
+            "fills": 0,
+            "months": 48
+          }
+        },
+        "independent_test": false,
+        "live_approved": false,
+        "audit_notes": "v387_v388_audit/COMPARISON.md: PASS"
+      },
+      "audited_at": "2026-10-04T10:12:06.374924Z"
     },
     {
       "version": "v388",
@@ -16692,7 +16719,28 @@
       "result_manifest": null,
       "registered_at": "2026-10-04T07:46:13.914565Z",
       "assigned_at": "2026-10-04T07:46:13.914565Z"
+    },
+    {
+      "version": "v389",
+      "track": "A",
+      "direction_key": "v389-bot-phase-books",
+      "status": "running",
+      "parent_versions": [
+        "v376"
+      ],
+      "model_family": "hist-gradient-boosting",
+      "objective": "phase-specific CB books (members rebuilt on each shifted 4h grid) for the multi-phase BOT",
+      "data_contract": "members rebuilt walk-forward per phase (s=0 reproduces cached members exactly; label ends < anchor - embargo; truncation test pass); options and spot-premium inputs from the last closed standard bar",
+      "policy_contract": "rows R2_4P (forward-filled standard books) / R2pb_4P (phase books); BOT fitness on the mix; folds k=2,3; most recent year once if transfer",
+      "hypothesis": "fresh books on each clock improve the multi-phase BOT",
+      "parent_commit": "1ecf947baddd5ef78444670330e9db62128dad50",
+      "write_scope": "research/parallel/rounds/parallel-20260906-r2/v389",
+      "worker_agent_id": "01a07792-4a6b-7fc3-a08a-af2923b1778a",
+      "worker_host_id": "local",
+      "result_manifest": null,
+      "registered_at": "2026-10-04T10:12:06.369429Z",
+      "assigned_at": "2026-10-04T10:12:06.369429Z"
     }
   ],
-  "updated_at": "2026-10-04T07:46:13.921109Z"
+  "updated_at": "2026-10-04T10:12:06.374924Z"
 }
