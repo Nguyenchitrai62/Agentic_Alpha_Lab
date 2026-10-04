@@ -7,3 +7,6 @@ Borderline: own `bfx_dlog_ls_4h` same sign all years but t=-3.00 (misses gate). 
 4h-return leg: nothing passes - every feature has mixed signs across 5 syms x 5y (|IC| <= 0.02 on average). The signal is dip-trade-specific, not 4h momentum.
 Caveats: own-coin "all" == majors (non-majors have no Bitfinex series); 2021 n smaller (history starts Feb 2021; SOL May); pooled t assumes independent fills; OLS residual is in-sample screening only.
 Files: `research/diagnostics/newdata_bitfinex/{features,study}_bitfinex.py`, `ic_bitfinex.csv`; `tests/test_newdata_bitfinex.py` (6 passed: hand-checked values, truncation causality on synth + real panel, strict-asof boundary, BNB fallback, dev window/manifest).
+LEADER follow-up 2026-10-04: as agent features (v383 BOT / v384 MANUAL) the four Bitfinex features did not help (rejected). The time-series
+market feature bfx_btc_dlog_ls_24h by tercile: low (L/S falling) beats high in 2021 / 2022 / 2023 / 2025 but reverses in 2024 (all coins
+-19 vs +24 bp) - the same 2024 reversal as Binance OI; a contrarian dip-size rule would fail the 2024 fold, so it was not registered.
