@@ -2,7 +2,7 @@
   "schema_version": 1,
   "project": "Agentic Alpha Lab BTC swing research",
   "created_at": "2026-09-06T00:00:00Z",
-  "next_version": 377,
+  "next_version": 379,
   "control": {
     "coordinator_model": "gpt-5.6-sol",
     "coordinator_reasoning": "high",
@@ -54,7 +54,7 @@
     "expected_workers": 3,
     "version_range": [
       45,
-      376
+      378
     ],
     "parent_commit": "1ecf947baddd5ef78444670330e9db62128dad50",
     "cloud_snapshot": {
@@ -16058,7 +16058,7 @@
       "version": "v374",
       "track": "A",
       "direction_key": "v374-phase-robust-dip-rules",
-      "status": "running",
+      "status": "rejected",
       "parent_versions": [
         "v342"
       ],
@@ -16071,15 +16071,42 @@
       "write_scope": "research/parallel/rounds/parallel-20260906-r2/v374",
       "worker_agent_id": "01a07792-4a6b-7fc3-a08a-af2923b1778a",
       "worker_host_id": "local",
-      "result_manifest": null,
+      "result_manifest": "research\\parallel\\rounds\\parallel-20260906-r2\\v374\\result_manifest.json",
       "registered_at": "2026-10-03T18:38:49.894447Z",
-      "assigned_at": "2026-10-03T18:38:49.894447Z"
+      "assigned_at": "2026-10-03T18:38:49.894447Z",
+      "result_manifest_sha256": "fa1c6fb2d7029c5d841cb119c33e2f6c66678e75033a2a6ef5229066fcc68124",
+      "result_summary": {
+        "scenarios": {
+          "normal": {
+            "monthly_geometric_net_percent": 1.518,
+            "max_drawdown_percent": 19.91,
+            "fills": 0,
+            "months": 48
+          },
+          "fee_stress": {
+            "monthly_geometric_net_percent": 1.518,
+            "max_drawdown_percent": 19.91,
+            "fills": 0,
+            "months": 48
+          },
+          "execution_stress": {
+            "monthly_geometric_net_percent": 1.518,
+            "max_drawdown_percent": 19.91,
+            "fills": 0,
+            "months": 48
+          }
+        },
+        "independent_test": false,
+        "live_approved": false,
+        "audit_notes": "v374_v375_audit/COMPARISON.md: PASS (blind replication; phase builders verified: s=0 equals engine_user.prepare, shifted cells vs raw 1m, no look-ahead in forward-filled books)"
+      },
+      "audited_at": "2026-10-04T00:21:24.852988Z"
     },
     {
       "version": "v375",
       "track": "B",
       "direction_key": "v375-phase-mean-reranking",
-      "status": "running",
+      "status": "rejected",
       "parent_versions": [
         "v367"
       ],
@@ -16092,9 +16119,36 @@
       "write_scope": "research/parallel/rounds/parallel-20260906-r2/v375",
       "worker_agent_id": "01a07791-eecb-7053-8866-dcdbe31e84d7",
       "worker_host_id": "local",
-      "result_manifest": null,
+      "result_manifest": "research\\parallel\\rounds\\parallel-20260906-r2\\v375\\result_manifest.json",
       "registered_at": "2026-10-03T18:43:57.550516Z",
-      "assigned_at": "2026-10-03T18:43:57.550516Z"
+      "assigned_at": "2026-10-03T18:43:57.550516Z",
+      "result_manifest_sha256": "83601f9c11f81e0f20082b98d7a4a5ff5d567441f13f5fae3d6fcba367bb0cb8",
+      "result_summary": {
+        "scenarios": {
+          "normal": {
+            "monthly_geometric_net_percent": 3.763,
+            "max_drawdown_percent": 23.16,
+            "fills": 0,
+            "months": 48
+          },
+          "fee_stress": {
+            "monthly_geometric_net_percent": 3.763,
+            "max_drawdown_percent": 23.16,
+            "fills": 0,
+            "months": 48
+          },
+          "execution_stress": {
+            "monthly_geometric_net_percent": 3.763,
+            "max_drawdown_percent": 23.16,
+            "fills": 0,
+            "months": 48
+          }
+        },
+        "independent_test": false,
+        "live_approved": false,
+        "audit_notes": "v374_v375_audit/COMPARISON.md: PASS (blind replication; phase builders verified: s=0 equals engine_user.prepare, shifted cells vs raw 1m, no look-ahead in forward-filled books)"
+      },
+      "audited_at": "2026-10-04T00:23:50.329593Z"
     },
     {
       "version": "v376",
@@ -16116,7 +16170,49 @@
       "result_manifest": null,
       "registered_at": "2026-10-03T18:55:55.783566Z",
       "assigned_at": "2026-10-03T18:55:55.783566Z"
+    },
+    {
+      "version": "v377",
+      "track": "A",
+      "direction_key": "v377-manual-dd-phase-mean",
+      "status": "running",
+      "parent_versions": [
+        "v367"
+      ],
+      "model_family": "rule-variants",
+      "objective": "lower the honest single-phase DD of the MANUAL M5 by moving risk from the dip limits to the book",
+      "data_contract": "dev years on 4 phase-shifted grids, agents on (per-phase tables), books forward-filled",
+      "policy_contract": "rows M5 / M5_B20 / M5_B20_BM10; goal-1 fitness on phase means; folds k=2,3; most recent year once if transfer",
+      "hypothesis": "a smaller dip budget plus a full-size book lowers the single-phase DD more than the return",
+      "parent_commit": "1ecf947baddd5ef78444670330e9db62128dad50",
+      "write_scope": "research/parallel/rounds/parallel-20260906-r2/v377",
+      "worker_agent_id": "01a07792-4a6b-7fc3-a08a-af2923b1778a",
+      "worker_host_id": "local",
+      "result_manifest": null,
+      "registered_at": "2026-10-04T00:21:24.848340Z",
+      "assigned_at": "2026-10-04T00:21:24.848340Z"
+    },
+    {
+      "version": "v378",
+      "track": "B",
+      "direction_key": "v378-manual-bear-filter",
+      "status": "running",
+      "parent_versions": [
+        "v367"
+      ],
+      "model_family": "rule-variants",
+      "objective": "cut the MANUAL dip limits in a BTC bear regime (below the 200-day mean) to reduce the honest single-phase DD",
+      "data_contract": "dev years on 4 phase-shifted grids, agents on, BTC 200d mean from the full 1m history per phase",
+      "policy_contract": "rows M5 / M5_BH (x0.5) / M5_BZ (off); v310 goal-1 fitness on phase means; folds k=2,3",
+      "hypothesis": "dip limits bleed in bear grinds; a plain trend filter lowers DD across phases",
+      "parent_commit": "1ecf947baddd5ef78444670330e9db62128dad50",
+      "write_scope": "research/parallel/rounds/parallel-20260906-r2/v378",
+      "worker_agent_id": "01a07791-eecb-7053-8866-dcdbe31e84d7",
+      "worker_host_id": "local",
+      "result_manifest": null,
+      "registered_at": "2026-10-04T00:23:50.322804Z",
+      "assigned_at": "2026-10-04T00:23:50.322804Z"
     }
   ],
-  "updated_at": "2026-10-03T18:55:55.789713Z"
+  "updated_at": "2026-10-04T00:23:50.329593Z"
 }
