@@ -2,7 +2,7 @@
   "schema_version": 1,
   "project": "Agentic Alpha Lab BTC swing research",
   "created_at": "2026-09-06T00:00:00Z",
-  "next_version": 386,
+  "next_version": 387,
   "control": {
     "coordinator_model": "gpt-5.6-sol",
     "coordinator_reasoning": "high",
@@ -54,7 +54,7 @@
     "expected_workers": 3,
     "version_range": [
       45,
-      385
+      386
     ],
     "parent_commit": "1ecf947baddd5ef78444670330e9db62128dad50",
     "cloud_snapshot": {
@@ -16511,7 +16511,7 @@
       "version": "v384",
       "track": "B",
       "direction_key": "v384-manual-bfx-agents",
-      "status": "running",
+      "status": "rejected",
       "parent_versions": [
         "v367"
       ],
@@ -16524,9 +16524,36 @@
       "write_scope": "research/parallel/rounds/parallel-20260906-r2/v384",
       "worker_agent_id": "01a07791-eecb-7053-8866-dcdbe31e84d7",
       "worker_host_id": "local",
-      "result_manifest": null,
+      "result_manifest": "research\\parallel\\rounds\\parallel-20260906-r2\\v384\\result_manifest.json",
       "registered_at": "2026-10-04T03:14:11.435818Z",
-      "assigned_at": "2026-10-04T03:14:11.435818Z"
+      "assigned_at": "2026-10-04T03:14:11.435818Z",
+      "result_manifest_sha256": "953857286dc344b9cd8cc9200707162cb590025325fd555aead8119d9bced86a",
+      "result_summary": {
+        "scenarios": {
+          "normal": {
+            "monthly_geometric_net_percent": 4.094,
+            "max_drawdown_percent": 24.4,
+            "fills": 0,
+            "months": 48
+          },
+          "fee_stress": {
+            "monthly_geometric_net_percent": 4.094,
+            "max_drawdown_percent": 24.4,
+            "fills": 0,
+            "months": 48
+          },
+          "execution_stress": {
+            "monthly_geometric_net_percent": 4.094,
+            "max_drawdown_percent": 24.4,
+            "fills": 0,
+            "months": 48
+          }
+        },
+        "independent_test": false,
+        "live_approved": false,
+        "audit_notes": "v383_v384_audit/COMPARISON.md: PASS (Bitfinex joins, anchor windows, tables verified)"
+      },
+      "audited_at": "2026-10-04T07:16:42.320867Z"
     },
     {
       "version": "v385",
@@ -16548,7 +16575,28 @@
       "result_manifest": null,
       "registered_at": "2026-10-04T06:17:06.014929Z",
       "assigned_at": "2026-10-04T06:17:06.014929Z"
+    },
+    {
+      "version": "v386",
+      "track": "B",
+      "direction_key": "v386-bot-crash-breaker",
+      "status": "running",
+      "parent_versions": [
+        "v376"
+      ],
+      "model_family": "rule-variants",
+      "objective": "dip-ladder crash circuit breaker for the multi-phase BOT on the honest evaluation",
+      "data_contract": "dev years on 4 phase grids, agents on per-phase tables",
+      "policy_contract": "rows R2_4P / R2BK1_4P (X=0.010) / R2BK2_4P (X=0.020); BOT fitness on the mix; folds k=2,3; most recent year once if transfer",
+      "hypothesis": "stopping new dip fills once a bar's rungs lose X of equity cuts the flash-crash drawdown",
+      "parent_commit": "1ecf947baddd5ef78444670330e9db62128dad50",
+      "write_scope": "research/parallel/rounds/parallel-20260906-r2/v386",
+      "worker_agent_id": "01a07791-eecb-7053-8866-dcdbe31e84d7",
+      "worker_host_id": "local",
+      "result_manifest": null,
+      "registered_at": "2026-10-04T07:16:42.315819Z",
+      "assigned_at": "2026-10-04T07:16:42.315819Z"
     }
   ],
-  "updated_at": "2026-10-04T06:17:06.021032Z"
+  "updated_at": "2026-10-04T07:16:42.320867Z"
 }
