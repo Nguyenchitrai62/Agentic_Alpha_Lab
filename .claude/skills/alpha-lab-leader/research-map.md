@@ -1,6 +1,6 @@
 # Research map (update after every rotation)
 
-Last update: 2026-10-04 (after v385): honest 4-phase harness is the standard; BOT = R2-4P (v376, four clock-shifted sub-books); v377-v385 rejected (dip budget, bear filter, governor, phase-augmented agents, book family, Bitfinex agents, depth sizing); live liquidation collector running. Next: prospective paper evidence + liquidation data after a few months.
+Last update: 2026-10-04 (after v389): honest 4-phase harness is the standard; BOT = R2-4P (v376); MANUAL = M5. v377-v389 rejected on the honest harness (dip budget, bear filter, governor, phase-augmented agents, book family, Bitfinex agents, one-shot depth sizing, crash breaker, 8 clocks, wider dip stops, phase-specific books). Closed quick checks: per-coin dip weights, weekend dips, funding-settlement trades. Next: paper evidence + live liquidation data (backend/liquidations.py).
 
 ## Honest status
 
