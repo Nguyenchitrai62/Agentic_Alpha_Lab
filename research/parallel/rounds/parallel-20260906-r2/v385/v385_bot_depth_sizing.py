@@ -99,7 +99,7 @@ def worker(args):
         D = depth_rel()
         base = kw["sleeve_fill_size"]
         lo, hi = q
-        arr = {cols.index(s): (D[s].index.to_numpy(), D[s].to_numpy()) for s in SYMS}
+        arr = {cols.index(s): (D[s].index.tz_convert(None).to_numpy(), D[s].to_numpy()) for s in SYMS}  # POST-REGISTRATION FIX (disclosed): naive UTC datetime64 (the first run crashed on a tz comparison before any result)
 
         def mult(i, a, f):
             t = (idx[i] + pd.Timedelta(hours=4) + pd.Timedelta(minutes=int(f))).to_datetime64()

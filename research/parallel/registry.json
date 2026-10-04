@@ -2,7 +2,7 @@
   "schema_version": 1,
   "project": "Agentic Alpha Lab BTC swing research",
   "created_at": "2026-09-06T00:00:00Z",
-  "next_version": 385,
+  "next_version": 386,
   "control": {
     "coordinator_model": "gpt-5.6-sol",
     "coordinator_reasoning": "high",
@@ -54,7 +54,7 @@
     "expected_workers": 3,
     "version_range": [
       45,
-      384
+      385
     ],
     "parent_commit": "1ecf947baddd5ef78444670330e9db62128dad50",
     "cloud_snapshot": {
@@ -16463,7 +16463,7 @@
       "version": "v383",
       "track": "A",
       "direction_key": "v383-bot-bfx-agents",
-      "status": "running",
+      "status": "rejected",
       "parent_versions": [
         "v376"
       ],
@@ -16476,9 +16476,36 @@
       "write_scope": "research/parallel/rounds/parallel-20260906-r2/v383",
       "worker_agent_id": "01a07792-4a6b-7fc3-a08a-af2923b1778a",
       "worker_host_id": "local",
-      "result_manifest": null,
+      "result_manifest": "research\\parallel\\rounds\\parallel-20260906-r2\\v383\\result_manifest.json",
       "registered_at": "2026-10-04T03:14:11.125113Z",
-      "assigned_at": "2026-10-04T03:14:11.125113Z"
+      "assigned_at": "2026-10-04T03:14:11.125113Z",
+      "result_manifest_sha256": "e015cbdd7eca5cc5300f7f5e0c48bbf7bfa0cd8f647467332528b26af6dcffb7",
+      "result_summary": {
+        "scenarios": {
+          "normal": {
+            "monthly_geometric_net_percent": 5.24,
+            "max_drawdown_percent": 23.08,
+            "fills": 0,
+            "months": 48
+          },
+          "fee_stress": {
+            "monthly_geometric_net_percent": 5.24,
+            "max_drawdown_percent": 23.08,
+            "fills": 0,
+            "months": 48
+          },
+          "execution_stress": {
+            "monthly_geometric_net_percent": 5.24,
+            "max_drawdown_percent": 23.08,
+            "fills": 0,
+            "months": 48
+          }
+        },
+        "independent_test": false,
+        "live_approved": false,
+        "audit_notes": "v383_v384_audit/COMPARISON.md: PASS (Bitfinex joins, anchor windows, tables verified)"
+      },
+      "audited_at": "2026-10-04T06:17:06.021032Z"
     },
     {
       "version": "v384",
@@ -16500,7 +16527,28 @@
       "result_manifest": null,
       "registered_at": "2026-10-04T03:14:11.435818Z",
       "assigned_at": "2026-10-04T03:14:11.435818Z"
+    },
+    {
+      "version": "v385",
+      "track": "A",
+      "direction_key": "v385-bot-depth-sizing",
+      "status": "running",
+      "parent_versions": [
+        "v376"
+      ],
+      "model_family": "rule-variants",
+      "objective": "order-book-depth dip sizing on R2-4P, one-shot most-recent-year test",
+      "data_contract": "new data: Binance USD-M bookDepth 2023-01..2026-09 (per-minute +-1 % notional), thresholds from pre-2025-09-16 major fills; 4 phase grids",
+      "policy_contract": "rows R2_4P / R2depth_4P; most recent year mix once; adopt iff +0.20 %/mo and DD <= ref + 1",
+      "hypothesis": "thin books revert better: sizing dip fills by relative depth lifts the BOT on unseen data",
+      "parent_commit": "1ecf947baddd5ef78444670330e9db62128dad50",
+      "write_scope": "research/parallel/rounds/parallel-20260906-r2/v385",
+      "worker_agent_id": "01a07792-4a6b-7fc3-a08a-af2923b1778a",
+      "worker_host_id": "local",
+      "result_manifest": null,
+      "registered_at": "2026-10-04T06:17:06.014929Z",
+      "assigned_at": "2026-10-04T06:17:06.014929Z"
     }
   ],
-  "updated_at": "2026-10-04T03:14:11.441019Z"
+  "updated_at": "2026-10-04T06:17:06.021032Z"
 }
