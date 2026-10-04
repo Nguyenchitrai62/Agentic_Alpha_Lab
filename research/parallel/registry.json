@@ -2,7 +2,7 @@
   "schema_version": 1,
   "project": "Agentic Alpha Lab BTC swing research",
   "created_at": "2026-09-06T00:00:00Z",
-  "next_version": 387,
+  "next_version": 388,
   "control": {
     "coordinator_model": "gpt-5.6-sol",
     "coordinator_reasoning": "high",
@@ -54,7 +54,7 @@
     "expected_workers": 3,
     "version_range": [
       45,
-      386
+      387
     ],
     "parent_commit": "1ecf947baddd5ef78444670330e9db62128dad50",
     "cloud_snapshot": {
@@ -16559,7 +16559,7 @@
       "version": "v385",
       "track": "A",
       "direction_key": "v385-bot-depth-sizing",
-      "status": "running",
+      "status": "rejected",
       "parent_versions": [
         "v376"
       ],
@@ -16572,9 +16572,36 @@
       "write_scope": "research/parallel/rounds/parallel-20260906-r2/v385",
       "worker_agent_id": "01a07792-4a6b-7fc3-a08a-af2923b1778a",
       "worker_host_id": "local",
-      "result_manifest": null,
+      "result_manifest": "research\\parallel\\rounds\\parallel-20260906-r2\\v385\\result_manifest.json",
       "registered_at": "2026-10-04T06:17:06.014929Z",
-      "assigned_at": "2026-10-04T06:17:06.014929Z"
+      "assigned_at": "2026-10-04T06:17:06.014929Z",
+      "result_manifest_sha256": "64e5f0642fdc6a4f78b7005d9791d44a5ce128158ee58c23e35350d0ba140da2",
+      "result_summary": {
+        "scenarios": {
+          "normal": {
+            "monthly_geometric_net_percent": 3.373,
+            "max_drawdown_percent": 24.25,
+            "fills": 0,
+            "months": 12
+          },
+          "fee_stress": {
+            "monthly_geometric_net_percent": 3.373,
+            "max_drawdown_percent": 24.25,
+            "fills": 0,
+            "months": 12
+          },
+          "execution_stress": {
+            "monthly_geometric_net_percent": 3.373,
+            "max_drawdown_percent": 24.25,
+            "fills": 0,
+            "months": 12
+          }
+        },
+        "independent_test": true,
+        "live_approved": false,
+        "audit_notes": "v385_v386_audit/COMPARISON.md: PASS (depth thresholds and as-of rule verified; crash note verified)"
+      },
+      "audited_at": "2026-10-04T07:26:40.945299Z"
     },
     {
       "version": "v386",
@@ -16596,7 +16623,28 @@
       "result_manifest": null,
       "registered_at": "2026-10-04T07:16:42.315819Z",
       "assigned_at": "2026-10-04T07:16:42.315819Z"
+    },
+    {
+      "version": "v387",
+      "track": "A",
+      "direction_key": "v387-bot-eight-clocks",
+      "status": "running",
+      "parent_versions": [
+        "v376"
+      ],
+      "model_family": "rule-variants",
+      "objective": "eight half-hour-shifted clocks instead of four for the multi-phase BOT",
+      "data_contract": "dev years on 8 phase grids, agents on per-phase tables (half-hour tables rebuilt with the same models)",
+      "policy_contract": "rows R2_4P / R2_8P; BOT fitness on the mix; folds k=2,3; most recent year once if transfer",
+      "hypothesis": "more clocks diversify further and lower the mix DD at equal return",
+      "parent_commit": "1ecf947baddd5ef78444670330e9db62128dad50",
+      "write_scope": "research/parallel/rounds/parallel-20260906-r2/v387",
+      "worker_agent_id": "01a07792-4a6b-7fc3-a08a-af2923b1778a",
+      "worker_host_id": "local",
+      "result_manifest": null,
+      "registered_at": "2026-10-04T07:26:40.939971Z",
+      "assigned_at": "2026-10-04T07:26:40.939971Z"
     }
   ],
-  "updated_at": "2026-10-04T07:16:42.320867Z"
+  "updated_at": "2026-10-04T07:26:40.945299Z"
 }
