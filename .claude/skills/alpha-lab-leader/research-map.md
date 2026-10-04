@@ -1,6 +1,6 @@
 # Research map (update after every rotation)
 
-Last update: 2026-10-04 (system audit clean; v373 rejected; PHASE LUCK: dip results depend strongly on the 4h grid phase - select dip rules on the 4-phase mean from now on).
+Last update: 2026-10-04 (after v385): honest 4-phase harness is the standard; BOT = R2-4P (v376, four clock-shifted sub-books); v377-v385 rejected (dip budget, bear filter, governor, phase-augmented agents, book family, Bitfinex agents, depth sizing); live liquidation collector running. Next: prospective paper evidence + liquidation data after a few months.
 
 ## Honest status
 
