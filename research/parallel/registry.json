@@ -2,7 +2,7 @@
   "schema_version": 1,
   "project": "Agentic Alpha Lab BTC swing research",
   "created_at": "2026-09-06T00:00:00Z",
-  "next_version": 388,
+  "next_version": 389,
   "control": {
     "coordinator_model": "gpt-5.6-sol",
     "coordinator_reasoning": "high",
@@ -54,7 +54,7 @@
     "expected_workers": 3,
     "version_range": [
       45,
-      387
+      388
     ],
     "parent_commit": "1ecf947baddd5ef78444670330e9db62128dad50",
     "cloud_snapshot": {
@@ -16607,7 +16607,7 @@
       "version": "v386",
       "track": "B",
       "direction_key": "v386-bot-crash-breaker",
-      "status": "running",
+      "status": "rejected",
       "parent_versions": [
         "v376"
       ],
@@ -16620,9 +16620,36 @@
       "write_scope": "research/parallel/rounds/parallel-20260906-r2/v386",
       "worker_agent_id": "01a07791-eecb-7053-8866-dcdbe31e84d7",
       "worker_host_id": "local",
-      "result_manifest": null,
+      "result_manifest": "research\\parallel\\rounds\\parallel-20260906-r2\\v386\\result_manifest.json",
       "registered_at": "2026-10-04T07:16:42.315819Z",
-      "assigned_at": "2026-10-04T07:16:42.315819Z"
+      "assigned_at": "2026-10-04T07:16:42.315819Z",
+      "result_manifest_sha256": "801f3d9c072471a934048507874e0e16b640266119fe36bfad34ccc3a5783179",
+      "result_summary": {
+        "scenarios": {
+          "normal": {
+            "monthly_geometric_net_percent": 5.24,
+            "max_drawdown_percent": 23.08,
+            "fills": 0,
+            "months": 48
+          },
+          "fee_stress": {
+            "monthly_geometric_net_percent": 5.24,
+            "max_drawdown_percent": 23.08,
+            "fills": 0,
+            "months": 48
+          },
+          "execution_stress": {
+            "monthly_geometric_net_percent": 5.24,
+            "max_drawdown_percent": 23.08,
+            "fills": 0,
+            "months": 48
+          }
+        },
+        "independent_test": false,
+        "live_approved": false,
+        "audit_notes": "v385_v386_audit/COMPARISON.md: PASS (depth thresholds and as-of rule verified; crash note verified)"
+      },
+      "audited_at": "2026-10-04T07:46:13.921109Z"
     },
     {
       "version": "v387",
@@ -16644,7 +16671,28 @@
       "result_manifest": null,
       "registered_at": "2026-10-04T07:26:40.939971Z",
       "assigned_at": "2026-10-04T07:26:40.939971Z"
+    },
+    {
+      "version": "v388",
+      "track": "B",
+      "direction_key": "v388-bot-stop-distance",
+      "status": "running",
+      "parent_versions": [
+        "v376"
+      ],
+      "model_family": "rule-variants",
+      "objective": "dip-rung close-stop distance of the multi-phase BOT on the honest evaluation",
+      "data_contract": "dev years on 4 phase grids, agents on per-phase tables",
+      "policy_contract": "rows R2_4P (4 sigma) / R2S5_4P / R2S6_4P; BOT fitness on the mix; folds k=2,3; most recent year once if transfer",
+      "hypothesis": "wider bot close-stops keep the crash recoveries that pay for the dip fills",
+      "parent_commit": "1ecf947baddd5ef78444670330e9db62128dad50",
+      "write_scope": "research/parallel/rounds/parallel-20260906-r2/v388",
+      "worker_agent_id": "01a07791-eecb-7053-8866-dcdbe31e84d7",
+      "worker_host_id": "local",
+      "result_manifest": null,
+      "registered_at": "2026-10-04T07:46:13.914565Z",
+      "assigned_at": "2026-10-04T07:46:13.914565Z"
     }
   ],
-  "updated_at": "2026-10-04T07:26:40.945299Z"
+  "updated_at": "2026-10-04T07:46:13.921109Z"
 }
