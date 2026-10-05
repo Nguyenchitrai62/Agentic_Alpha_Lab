@@ -27,7 +27,7 @@ from bot.paper import PaperExchange
 ROOT = Path(__file__).resolve().parents[1]
 PLAN = ROOT / "artifacts/research/advisor_shadow/trade_plan_v376.json"
 SYMS = ["BTCUSDT", "ETHUSDT", "SOLUSDT", "BNBUSDT", "XRPUSDT"]
-STALE_PLAN = pd.Timedelta(hours=2)
+STALE_PLAN = pd.Timedelta(hours=4, minutes=30)  # a 4h plan is valid until the next bar plan (+ generation delay)
 
 
 def env(name: str) -> str | None:
