@@ -415,3 +415,138 @@ def test_bear_trim_default_off_identity():
                dict(bear_book=False, bear=True, last_close={"BTCUSDT": 80000.0})):
         same = mirror.desired(p, now, 10000, {k: dict(v) for k, v in led.items()}, **kw)
         assert set(same) == set(old) and all(abs(same[k].qty - old[k].qty) < 1e-12 for k in old)
+
+
+def _dip_at(rung, bar_open, phase=0, lv=78000.0, frac=0.05, stop=None):
+    a0 = pd.Timestamp(bar_open) + pd.Timedelta(minutes=16)
+    return {"rung": rung, "phase": phase, "buy_limit": lv, "tp": lv * 1.01, "stop": stop or lv * 0.96,
+            "backstop": lv * 0.92, "size_frac": frac,
+            "active_from": str(a0), "active_until": str(a0 + pd.Timedelta(minutes=223))}
+
+
+def _stopped_ledger(sym="BTCUSDT", phase=0, s=None):
+    s = pd.Timestamp(s or (T0 + pd.Timedelta(hours=1)))
+    led = {"dSTOP": dict(kind="dip", phase=phase, symbol=sym, side=1, qty=0.0, entry=78000.0,
+                         tp=78000.0 * 1.01, stop5=78000.0 * 0.96, backstop=78000.0 * 0.92,
+                         t_exit=str(T0 + pd.Timedelta(hours=4)), frac=0.05, dist=0.04, opened=str(T0))}
+    mirror.note_dip_stop(led, "dSTOP", s)
+    return led
+
+
+def test_dip_cooldown_blocks_in_window_allows_after():
+    s = T0 + pd.Timedelta(hours=1)
+    led = _stopped_ledger(s=s)
+    b_blocked = T0 + pd.Timedelta(hours=4)
+    p = plan(dips=[_dip_at(2.5, b_blocked)])
+    now = b_blocked + pd.Timedelta(minutes=20)
+    assert mirror.desired(p, now, 10000, led)  # guard: off by default something rests
+    assert mirror.desired(p, now, 10000, led, dip_cooldown_h=24) == {}
+    b_after = s + pd.Timedelta(hours=24, minutes=1)
+    p2 = plan(dips=[_dip_at(2.5, b_after - pd.Timedelta(minutes=20) + pd.Timedelta(minutes=20))])
+    # rebuild with exact bar so now sits inside the window
+    bar2 = s + pd.Timedelta(hours=25)
+    p2 = plan(dips=[_dip_at(2.5, bar2)])
+    now2 = bar2 + pd.Timedelta(minutes=20)
+    assert mirror.desired(p2, now2, 10000, led, dip_cooldown_h=24)  # s+25h > s+24h: allowed
+    # exact upper edge s+H is still blocked, one minute later is free
+    bar_edge = s + pd.Timedelta(hours=24)
+    pe = plan(dips=[_dip_at(2.5, bar_edge)])
+    assert mirror.desired(pe, bar_edge + pd.Timedelta(minutes=20), 10000, led, dip_cooldown_h=24) == {}
+    bar_free = s + pd.Timedelta(hours=24, minutes=1)
+    pf = plan(dips=[_dip_at(2.5, bar_free)])
+    assert mirror.desired(pf, bar_free + pd.Timedelta(minutes=20), 10000, led, dip_cooldown_h=24)
+    # per-phase and per-coin isolation: phase 1 and ETH rungs are unaffected by a phase-0 BTC stop
+    p_ph1 = {"generated_at": str(T0), "phases": [{"phase": p, "capital": 0.25} for p in range(4)],
+             "coins": {"BTCUSDT": {"subs": [], "dips": [_dip_at(2.5, b_blocked, phase=1)]}}}
+    assert mirror.desired(p_ph1, now, 10000, led, dip_cooldown_h=24)
+    p_eth = {"generated_at": str(T0), "phases": [{"phase": 0, "capital": 0.25}],
+             "coins": {"ETHUSDT": {"subs": [], "dips": [_dip_at(2.5, b_blocked)]}}}
+    assert mirror.desired(p_eth, now, 10000, led, dip_cooldown_h=24)
+
+
+def test_dip_cooldown_same_bar_and_open_pieces_unaffected():
+    s = T0 + pd.Timedelta(minutes=30)
+    led = _stopped_ledger(s=s)
+    # same holding bar (B = T0 < s): s < B is false -> not blocked
+    p = plan(dips=[_dip_at(2.5, T0), _dip_at(3.0, T0)])
+    now = T0 + pd.Timedelta(minutes=40)
+    assert len(mirror.desired(p, now, 10000, {}, dip_cooldown_h=24)) == 2
+    assert len(mirror.desired(p, now, 10000, led, dip_cooldown_h=24)) == 2
+    # open pieces keep their TP + backstop even while later bars are cooled
+    o = next(iter(mirror.desired(plan(dips=[dip(2.5)]), T0 + pd.Timedelta(minutes=20), 10000, {}).values()))
+    led2 = _stopped_ledger(s=T0 + pd.Timedelta(hours=1))
+    mirror.apply_fill(led2, o, 0.006, 78000.0, T0 + pd.Timedelta(minutes=21))
+    b_next = T0 + pd.Timedelta(hours=4)
+    p_next = plan(dips=[_dip_at(2.5, b_next)])
+    w = mirror.desired(p_next, b_next + pd.Timedelta(minutes=20), 10000, led2, dip_cooldown_h=24)
+    kinds = {x.kind for x in w.values()}
+    assert kinds == {"tp", "stop"}  # the open rung is protected; no NEW entry bid rests
+    assert not [x for x in w.values() if x.kind == "entry"]
+
+
+def test_dip_cooldown_tp_and_time_exits_do_not_trigger():
+    # a closed dip piece with no stop marker (TP / time exit) never cools
+    led = {"dTP": dict(kind="dip", phase=0, symbol="BTCUSDT", side=1, qty=0.0, entry=78000.0,
+                       tp=78000.0 * 1.01, stop5=78000.0 * 0.96, backstop=78000.0 * 0.92,
+                       t_exit=str(T0 + pd.Timedelta(hours=4)), frac=0.05, dist=0.04, opened=str(T0))}
+    b_next = T0 + pd.Timedelta(hours=4)
+    p = plan(dips=[_dip_at(2.5, b_next)])
+    now = b_next + pd.Timedelta(minutes=20)
+    assert mirror.desired(p, now, 10000, led, dip_cooldown_h=24)
+    # a TP fill via apply_fill leaves no marker either
+    o = next(iter(mirror.desired(plan(dips=[dip(2.5)]), T0 + pd.Timedelta(minutes=20), 10000, {}).values()))
+    led2: dict = {}
+    mirror.apply_fill(led2, o, 0.006, 78000.0, T0 + pd.Timedelta(minutes=21))
+    (pid,) = led2
+    tp_order = next(x for x in mirror.desired(plan(), T0 + pd.Timedelta(minutes=30), 10000, led2).values() if x.kind == "tp")
+    mirror.apply_fill(led2, tp_order, 0.006, 78000.0 * 1.01, T0 + pd.Timedelta(minutes=40))
+    assert "stop_exit_t" not in led2[pid]
+    assert mirror.desired(p, now, 10000, led2, dip_cooldown_h=24)
+
+
+def test_dip_sl_coin_changes_stop_and_budget_of_that_coin_only():
+    row = _mkrow(2.0, open_px=100.0, sigma=0.01)
+    lv = float(row["buy_limit"])
+    assert abs(mirror.dip_stop_price(row, "XRPUSDT", None) - float(row["stop"])) < 1e-12
+    assert abs(mirror.dip_stop_price(row, "XRPUSDT", {}) - float(row["stop"])) < 1e-12
+    want = lv * (1.0 - 5.5 * 0.01)
+    assert abs(mirror.dip_stop_price(row, "XRPUSDT", {"XRPUSDT": 5.5}) - want) < 1e-9
+    assert abs(mirror.dip_risk_dist(row, "XRPUSDT", {"XRPUSDT": 5.5}) - 5.5 * 0.01) < 1e-12
+    # desired(): the XRP bid carries the wider stop, BTC is untouched
+    coins = {"BTCUSDT": {"subs": [], "dips": [_mkrow(2.0)]},
+             "XRPUSDT": {"subs": [], "dips": [_mkrow(2.0)]}}
+    p = {"generated_at": str(T0), "phases": [{"phase": 0, "capital": 0.25}], "coins": coins}
+    now = T0 + pd.Timedelta(minutes=20)
+    w = mirror.desired(p, now, 10000, {}, dip_sl_coin={"XRPUSDT": 5.5})
+    by_sym = {o.symbol: o for o in w.values()}
+    assert abs(by_sym["XRPUSDT"].meta["stop"] - want) < 1e-9
+    assert abs(by_sym["BTCUSDT"].meta["stop"] - float(_mkrow(2.0)["stop"])) < 1e-12
+    # budget: wider XRP stop costs more, so fewer XRP rungs fit while BTC still fits two
+    def _xrp_plan(rungs):
+        return {"generated_at": str(T0), "phases": [{"phase": 0, "capital": 0.25}],
+                "coins": {"XRPUSDT": {"subs": [], "dips": [dict(_mkrow(r, open_px=100.0, sigma=0.01), size_frac=0.5) for r in rungs]}}}
+    qx0 = _xrp_plan([2.5, 3.0])
+    assert len(mirror.desired(qx0, now, 10000, {})) == 2  # 0.5*0.06 x2 = 0.06 fits the 0.065 budget
+    assert len(mirror.desired(qx0, now, 10000, {}, dip_sl_coin={"XRPUSDT": 5.5})) == 1  # 0.5*0.075 x2 = 0.075 does not
+    qb = plan(dips=[dip(2.5, frac=0.5), dip(3.0, frac=0.5)])
+    assert len(mirror.desired(qb, now, 10000, {})) == 2
+    assert len(mirror.desired(qb, now, 10000, {}, dip_sl_coin={"XRPUSDT": 5.5})) == 2  # BTC untouched by the XRP override
+
+
+def test_dip_cascade_defaults_reproduce_old_outputs():
+    p = plan([pending()], dips=[dip(2.5), dip(3.0)])
+    now = T0 + pd.Timedelta(minutes=20)
+    led = {"dSTOP": dict(kind="dip", phase=0, symbol="BTCUSDT", side=1, qty=0.0, opened=str(T0),
+                         stop_exit_t=str(T0 + pd.Timedelta(hours=1)))}
+    old = mirror.desired(p, now, 10000, {})
+    for kw in (dict(), dict(dip_cooldown_h=0.0), dict(dip_cooldown_h=0), dict(dip_sl_coin=None),
+               dict(dip_sl_coin={}), dict(dip_sl_coin={"BTCUSDT": 4.0}),
+               dict(dip_cooldown_h=0.0, dip_sl_coin=None)):
+        same = mirror.desired(p, now, 10000, {}, **kw)
+        assert set(same) == set(old)
+        for k in old:
+            assert abs(same[k].qty - old[k].qty) < 1e-12 and same[k].price == old[k].price
+            assert same[k].trigger == old[k].trigger and same[k].meta.get("stop") == old[k].meta.get("stop")
+    # a recorded stop is ignored while the cooldown is off
+    off = mirror.desired(p, now, 10000, led)
+    assert set(off) == set(old)

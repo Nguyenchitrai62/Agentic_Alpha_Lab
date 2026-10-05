@@ -30,6 +30,26 @@ SYMS = ["BTCUSDT", "ETHUSDT", "SOLUSDT", "BNBUSDT", "XRPUSDT"]
 STALE_PLAN = pd.Timedelta(hours=4, minutes=30)  # a 4h plan is valid until the next bar plan (+ generation delay)
 
 
+def parse_dip_sl_coin(items) -> dict:
+    """Parse repeatable --dip-sl-coin SYMBOL=M into {SYMBOL: M} (v417 row X)."""
+    out: dict = {}
+    for it in items or []:
+        try:
+            sym, m = str(it).split("=", 1)
+        except ValueError:
+            sys.exit(f"bad --dip-sl-coin {it!r}: want SYMBOL=M")
+        sym, m = sym.strip().upper(), m.strip()
+        if sym not in SYMS:
+            sys.exit(f"bad --dip-sl-coin {it!r}: symbol must be one of {','.join(SYMS)}")
+        try:
+            out[sym] = float(m)
+        except ValueError:
+            sys.exit(f"bad --dip-sl-coin {it!r}: M must be a number")
+        if not out[sym] > 0:
+            sys.exit(f"bad --dip-sl-coin {it!r}: M must be positive")
+    return out
+
+
 def env(name: str) -> str | None:
     if os.environ.get(name):
         return os.environ[name]
@@ -65,10 +85,13 @@ def to_exchange(o: mirror.Order, inst: dict) -> dict | None:
 
 class Runner:
     def __init__(self, mode: str, plan_path: Path, equity: float | None, risk_mult: float = 1.0, corr: bool = False,
-                 tag: str | None = None, dip_mult: float = 1.0, bear_book: bool = False):
+                 tag: str | None = None, dip_mult: float = 1.0, bear_book: bool = False,
+                 dip_cooldown_h: float = 0.0, dip_sl_coin: dict | None = None):
         self.mode, self.plan_path = mode, plan_path
         self.risk_mult, self.corr, self.tag, self.dip_mult = float(risk_mult), bool(corr), tag or None, float(dip_mult)
         self.bear_book = bool(bear_book)
+        self.dip_cooldown_h = float(dip_cooldown_h or 0.0)
+        self.dip_sl_coin = dict(dip_sl_coin or {})
         self._bear_at = None
         self._bear = False
         self.dir = ROOT / "artifacts/bot" / (mode if not self.tag else f"{mode}_{self.tag}")
@@ -125,6 +148,17 @@ class Runner:
             mirror.apply_fill(self.state["ledger"], o, float(e["execQty"]), float(e["execPrice"]), pd.Timestamp(int(e["execTime"]), unit="ms", tz="UTC"))
             seen.add(e["execId"])
             self.log(dict(op="fill", link=link, qty=e["execQty"], price=e["execPrice"]))
+            if o.kind == "stop":
+                pc = self.state["ledger"].get(o.piece)
+                if isinstance(pc, dict) and pc.get("kind") == "dip":
+                    # native backstop stop-out (TP fills have kind tp and never trigger the cooldown)
+                    try:
+                        t_exit = pd.Timestamp(int(e["execTime"]), unit="ms", tz="UTC")
+                    except (TypeError, ValueError):
+                        t_exit = pd.Timestamp.now(tz="UTC")
+                    mirror.note_dip_stop(self.state["ledger"], o.piece, t_exit)
+                    if self.dip_cooldown_h > 0:
+                        self.log(dict(op="dip_cool", piece=o.piece, symbol=pc.get("symbol"), t=str(t_exit)))
             self.state["last_exec_ms"] = max(int(self.state.get("last_exec_ms") or 0), int(e["execTime"]))
         self.state["seen_exec"] = list(seen)
 
@@ -211,6 +245,11 @@ class Runner:
             if pc.get("exit_sent") and now - pd.Timestamp(pc["exit_sent"]) < pd.Timedelta(minutes=2):
                 continue  # a market exit is in flight; wait for its fill before sending another
             pc["exit_sent"] = str(now)
+            if why == "close5_stop" and pc.get("kind") == "dip":
+                # bot close-stop stop-out (time exits and TP fills never trigger the cooldown)
+                mirror.note_dip_stop(led, pid, now)
+                if self.dip_cooldown_h > 0:
+                    self.log(dict(op="dip_cool", piece=pid, symbol=pc.get("symbol"), t=str(now)))
             link = f"{pid}X{mirror.t36(now)}"
             qty = round_step(pc["qty"], self.inst[pc["symbol"]]["qty_step"])
             payload = dict(symbol=pc["symbol"], side="Sell" if pc["side"] > 0 else "Buy", orderType="Market", qty=qty, reduceOnly=True,
@@ -225,7 +264,8 @@ class Runner:
         lc = self.last_close_1m() if (self.corr or self.bear_book) else None
         want = mirror.desired(plan, now, equity, led, risk_mult=self.risk_mult, corr=self.corr,
                               last_close=lc, dip_mult=self.dip_mult,
-                              bear_book=self.bear_book, bear=bear)
+                              bear_book=self.bear_book, bear=bear,
+                              dip_cooldown_h=self.dip_cooldown_h, dip_sl_coin=self.dip_sl_coin)
         if self.bear_book:
             if bear:
                 for o in want.values():
@@ -301,6 +341,8 @@ def main():
     ap.add_argument("--corr-size", action="store_true", help="shrink each dip rung by 1/(1+n) flushing peers (default off = unchanged)")
     ap.add_argument("--dip-mult", type=float, default=1.0, help="scale dip rung sizes only (v406/v408 R2B1D16/D18: 1.6/1.8; default 1.0 = unchanged)")
     ap.add_argument("--bear-book", action="store_true", help="halve book LONG entry/add qty while BTC trades below its 200-day mean (default off = unchanged)")
+    ap.add_argument("--dip-cooldown-h", type=float, default=0.0, help="dip stop cooldown hours per coin+phase after a dip stop-out (v417 row C; default 0 = off)")
+    ap.add_argument("--dip-sl-coin", action="append", default=[], metavar="SYMBOL=M", help="per-coin dip close-stop multiple replacing 4 sigma (repeatable, e.g. XRPUSDT=5.5; default none = unchanged)")
     ap.add_argument("--tag", default=None, help="state dir artifacts/bot/<mode>[_<tag>] (default no tag = unchanged paths)")
     a = ap.parse_args()
     if a.mode == "live" and os.environ.get("BOT_ALLOW_LIVE") != "yes-real-money":
@@ -309,7 +351,7 @@ def main():
     (ROOT / "artifacts/bot" / mode_dir).mkdir(parents=True, exist_ok=True)
     _lock = single_instance(ROOT / "artifacts/bot" / mode_dir / "runner.lock") if not a.once else None
     r = Runner(a.mode, Path(a.plan), a.equity, risk_mult=a.risk_mult, corr=a.corr_size, tag=a.tag, dip_mult=a.dip_mult,
-             bear_book=a.bear_book)
+             bear_book=a.bear_book, dip_cooldown_h=a.dip_cooldown_h, dip_sl_coin=parse_dip_sl_coin(a.dip_sl_coin))
     while True:
         try:
             r.cycle()

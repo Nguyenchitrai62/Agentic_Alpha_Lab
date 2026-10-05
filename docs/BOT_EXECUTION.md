@@ -49,3 +49,9 @@ for fresh plans; a new fill has no exit orders until the next cycle (<= 20 s) pl
   and logs `op='bear_state'` on change.
 - Closed gap (2026-10-05, bot_beartrim): `--bear-book` halves NEW book long entries / adds in the bear regime; the research engine (v410) halves the book
   long TARGET; the bot now also trims each open book long once per bear episode to half its plan size with one reduce-only limit.
+- Dip stop-cascade controls (registry v417 rows C/X, default off): `run.py --dip-cooldown-h H` (default 0) records each dip
+  stop-out (bot close5 market exit or native backstop fill; TP / time exits never) as `stop_exit_t` on its piece via
+  `mirror.note_dip_stop`, and `desired(..., dip_cooldown_h)` places no NEW dip rung of the same coin+phase whose bar open B
+  satisfies s < B <= s+H (open pieces keep TP/backstop; same-bar B <= s unaffected). `--dip-sl-coin SYM=M` (repeatable)
+  replaces the 4-sigma dip close-stop for that coin (`mirror.dip_stop_price`, budget `frac*(M*sigma+GAP)`; backstop 8 sigma
+  unchanged). Defaults reproduce every old order bit-for-bit.

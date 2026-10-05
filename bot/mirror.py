@@ -23,6 +23,7 @@ import pandas as pd
 GRACE_MIN = 3
 BUDGET, GAP = 0.26, 0.02
 ENTRY_DELAY_MIN = 5  # user rule: no new order fills in the first 5 minutes after the 4h close
+DIP_SL_DEFAULT = 4.0  # global dip close-stop multiple (v417 row X overrides per coin)
 
 
 def t36(ts) -> str:
@@ -77,6 +78,113 @@ def _open_sigma(row: dict) -> tuple[float, float]:
     if denom <= 0:
         return 0.0, 0.0
     return lv / denom, sigma
+
+
+def _dip_M(sym: str, dip_sl_coin) -> float:
+    """Per-coin dip close-stop multiple (default 4 sigma; v417 row X: XRP 5.5)."""
+    if not dip_sl_coin:
+        return DIP_SL_DEFAULT
+    try:
+        v = dip_sl_coin.get(sym, DIP_SL_DEFAULT)
+    except AttributeError:
+        return DIP_SL_DEFAULT
+    try:
+        return float(v)
+    except (TypeError, ValueError):
+        return DIP_SL_DEFAULT
+
+
+def dip_stop_price(row: dict, sym: str, dip_sl_coin=None) -> float:
+    """Dip close-stop price with the per-coin multiple: stop = buy_limit * (1 - M * sigma4),
+    sigma4 = (1 - row_stop / buy_limit) / 4. Default (M == 4) returns the row stop bit-for-bit."""
+    base = float(row["stop"])
+    m = _dip_M(sym, dip_sl_coin)
+    if m == DIP_SL_DEFAULT:
+        return base
+    lv = float(row["buy_limit"])
+    if not lv:
+        return base
+    sigma4 = (1.0 - base / lv) / 4.0
+    if not sigma4 > 0:
+        return base
+    return lv * (1.0 - m * sigma4)
+
+
+def dip_risk_dist(row: dict, sym: str, dip_sl_coin=None) -> float:
+    """Dip budget distance with the per-coin stop: (buy_limit - stop_M) / buy_limit.
+    Default returns the row distance bit-for-bit."""
+    lv = float(row["buy_limit"])
+    if not lv:
+        return 0.0
+    m = _dip_M(sym, dip_sl_coin)
+    if m == DIP_SL_DEFAULT:
+        return (lv - float(row["stop"])) / lv
+    return (lv - dip_stop_price(row, sym, dip_sl_coin)) / lv
+
+
+def note_dip_stop(ledger: dict, pid: str, t) -> None:
+    """Record a dip stop-out exit time on its piece (bot close5 stop or native backstop fill).
+    TP / time exits must never call this. desired() with dip_cooldown_h > 0 blocks new rungs of the
+    same (phase, coin) whose holding-bar open B satisfies s < B <= s + H."""
+    try:
+        pc = ledger.get(pid)
+    except AttributeError:
+        return
+    if not isinstance(pc, dict):
+        return
+    try:
+        pc["stop_exit_t"] = str(pd.Timestamp(t))
+    except (TypeError, ValueError):
+        return
+
+
+def _dip_stop_times(ledger: dict) -> list:
+    """All recorded dip stop-out times as [(phase, symbol, Timestamp)]."""
+    out = []
+    try:
+        items = list(ledger.items())
+    except AttributeError:
+        return out
+    for _pid, pc in items:
+        if not isinstance(pc, dict):
+            continue
+        if pc.get("kind") != "dip":
+            continue
+        s_raw = pc.get("stop_exit_t", pc.get("stop_exit"))
+        if s_raw is None and pc.get("exit_reason") in ("close5_stop", "stop", "backstop", "rung_sl") and pc.get("exit_t") is not None:
+            s_raw = pc.get("exit_t")
+        if s_raw is None:
+            continue
+        try:
+            s = pd.Timestamp(s_raw)
+        except (TypeError, ValueError):
+            continue
+        out.append((pc.get("phase"), pc.get("symbol"), s))
+    return out
+
+
+def dip_cooled(symbol: str, phase, bar_open, ledger: dict, dip_cooldown_h) -> bool:
+    """True when a new dip rung of (phase, symbol) with holding-bar open bar_open is inside a stop cooldown:
+    any stop-out s of the same (phase, coin) with s < bar_open <= s + H hours (v417 row C)."""
+    try:
+        h = float(dip_cooldown_h or 0.0)
+    except (TypeError, ValueError):
+        return False
+    if not h > 0:
+        return False
+    try:
+        b = pd.Timestamp(bar_open)
+    except (TypeError, ValueError):
+        return False
+    for ph2, sym2, s in _dip_stop_times(ledger):
+        if sym2 != symbol or ph2 != phase:
+            continue
+        try:
+            if s < b <= s + pd.Timedelta(hours=h):
+                return True
+        except (TypeError, ValueError):
+            continue
+    return False
 
 
 def corr_mult(plan_dips_for_phase, last_close: dict | None, a_sym: str) -> float:
@@ -136,7 +244,8 @@ def is_bear(opens) -> bool:
 
 def desired(plan: dict, now, equity: float, ledger: dict, budget: float = BUDGET, risk_mult: float = 1.0,
             corr: bool = False, last_close: dict | None = None, dip_mult: float = 1.0,
-            bear_book: bool = False, bear: bool = False) -> dict[str, Order]:
+            bear_book: bool = False, bear: bool = False, dip_cooldown_h: float = 0.0,
+            dip_sl_coin: dict | None = None) -> dict[str, Order]:
     """The order set that should rest on the exchange now (link id -> Order). Quantities are in coins, before exchange rounding."""
     now = pd.Timestamp(now)
     out: dict[str, Order] = {}
@@ -211,8 +320,11 @@ def desired(plan: dict, now, equity: float, ledger: dict, budget: float = BUDGET
                 continue
             bids.append((float(d["rung"]), d["phase"], sym, pid, d, bar))
     for rung, ph, sym, pid, d, bar in sorted(bids, key=lambda b: (b[0], b[1], b[2])):
+        if dip_cooled(sym, ph, bar, ledger, dip_cooldown_h):
+            continue  # v417 row C: stop cooldown s < B <= s + H (per phase sub-book); open/resting pieces unaffected
         frac, lv = float(d["size_frac"]), float(d["buy_limit"])
-        dist = (lv - float(d["stop"])) / lv
+        stop_px = dip_stop_price(d, sym, dip_sl_coin)  # v417 row X: per-coin close-stop (default = row stop)
+        dist = (lv - stop_px) / lv if lv else 0.0
         # engine rule (v400 / v406): the budget 0.26 k counts the ACTUAL rung size (risk k, dip_mult and the corr multiplier included), so
         # k and dip_mult cancel (v406 scales the budget by the same dip multiplier):
         # admit while sum(frac * corr_mult * (dist + gap)) <= 0.26 x sub capital
@@ -222,7 +334,7 @@ def desired(plan: dict, now, equity: float, ledger: dict, budget: float = BUDGET
             continue
         used[ph] = used.get(ph, 0.0) + cost
         out[pid + "E"] = Order(pid + "E", sym, "Buy", frac * equity / lv * rk * mult * float(dip_mult), "entry", price=lv, position_idx=1, piece=pid,
-                               meta=dict(kind="dip", phase=ph, tp=float(d["tp"]), stop=float(d["stop"]), backstop=d.get("backstop"),
+                               meta=dict(kind="dip", phase=ph, tp=float(d["tp"]), stop=stop_px, backstop=d.get("backstop"),
                                          t_exit=str(bar + pd.Timedelta(hours=4)), frac=frac * mult, dist=dist))
     if bear_book and bear:
         # Bear-regime trim of open book longs (closes the BOT_EXECUTION.md known gap): the research engine (v410)
