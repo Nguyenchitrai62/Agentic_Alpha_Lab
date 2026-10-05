@@ -65,9 +65,9 @@ def to_exchange(o: mirror.Order, inst: dict) -> dict | None:
 
 class Runner:
     def __init__(self, mode: str, plan_path: Path, equity: float | None, risk_mult: float = 1.0, corr: bool = False,
-                 tag: str | None = None):
+                 tag: str | None = None, dip_mult: float = 1.0):
         self.mode, self.plan_path = mode, plan_path
-        self.risk_mult, self.corr, self.tag = float(risk_mult), bool(corr), tag or None
+        self.risk_mult, self.corr, self.tag, self.dip_mult = float(risk_mult), bool(corr), tag or None, float(dip_mult)
         self.dir = ROOT / "artifacts/bot" / (mode if not self.tag else f"{mode}_{self.tag}")
         self.dir.mkdir(parents=True, exist_ok=True)
         self.state_f = self.dir / "state.json"
@@ -196,7 +196,7 @@ class Runner:
                 if self.mode == "dry":
                     pc["qty"] = 0.0
         want = mirror.desired(plan, now, equity, led, risk_mult=self.risk_mult, corr=self.corr,
-                              last_close=self.last_close_1m() if self.corr else None)
+                              last_close=self.last_close_1m() if self.corr else None, dip_mult=self.dip_mult)
         if stale:
             want = {k: o for k, o in want.items() if o.kind in ("tp", "stop", "reduce")}
             self.log(dict(op="stale_plan", generated_at=plan["generated_at"]))
@@ -210,7 +210,7 @@ class Runner:
                             trigger=float(p["triggerPrice"]) if "triggerPrice" in p else None)  # compare / amend in exchange units
                 rounded[k] = (o, p)
         acts = mirror.diff({k: o for k, (o, _) in rounded.items()}, self.have(),
-                           amend_entry_qty=(self.corr or self.risk_mult != 1.0))
+                           amend_entry_qty=(self.corr or self.risk_mult != 1.0 or self.dip_mult != 1.0))
         for a in acts:
             if a["op"] == "place":
                 o = a["order"]
@@ -262,6 +262,7 @@ def main():
     ap.add_argument("--interval", type=float, default=20.0)
     ap.add_argument("--risk-mult", type=float, default=1.0, help="scale all book/dip sizes and the dip budget (default 1.0 = unchanged)")
     ap.add_argument("--corr-size", action="store_true", help="shrink each dip rung by 1/(1+n) flushing peers (default off = unchanged)")
+    ap.add_argument("--dip-mult", type=float, default=1.0, help="scale dip rung sizes only (v406/v408 R2B1D16/D18: 1.6/1.8; default 1.0 = unchanged)")
     ap.add_argument("--tag", default=None, help="state dir artifacts/bot/<mode>[_<tag>] (default no tag = unchanged paths)")
     a = ap.parse_args()
     if a.mode == "live" and os.environ.get("BOT_ALLOW_LIVE") != "yes-real-money":
@@ -269,7 +270,7 @@ def main():
     mode_dir = a.mode if not a.tag else f"{a.mode}_{a.tag}"
     (ROOT / "artifacts/bot" / mode_dir).mkdir(parents=True, exist_ok=True)
     _lock = single_instance(ROOT / "artifacts/bot" / mode_dir / "runner.lock") if not a.once else None
-    r = Runner(a.mode, Path(a.plan), a.equity, risk_mult=a.risk_mult, corr=a.corr_size, tag=a.tag)
+    r = Runner(a.mode, Path(a.plan), a.equity, risk_mult=a.risk_mult, corr=a.corr_size, tag=a.tag, dip_mult=a.dip_mult)
     while True:
         try:
             r.cycle()

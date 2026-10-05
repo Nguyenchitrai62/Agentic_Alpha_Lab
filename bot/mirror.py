@@ -119,7 +119,7 @@ def corr_mult(plan_dips_for_phase, last_close: dict | None, a_sym: str) -> float
 
 
 def desired(plan: dict, now, equity: float, ledger: dict, budget: float = BUDGET, risk_mult: float = 1.0,
-            corr: bool = False, last_close: dict | None = None) -> dict[str, Order]:
+            corr: bool = False, last_close: dict | None = None, dip_mult: float = 1.0) -> dict[str, Order]:
     """The order set that should rest on the exchange now (link id -> Order). Quantities are in coins, before exchange rounding."""
     now = pd.Timestamp(now)
     out: dict[str, Order] = {}
@@ -190,14 +190,15 @@ def desired(plan: dict, now, equity: float, ledger: dict, budget: float = BUDGET
     for rung, ph, sym, pid, d, bar in sorted(bids, key=lambda b: (b[0], b[1], b[2])):
         frac, lv = float(d["size_frac"]), float(d["buy_limit"])
         dist = (lv - float(d["stop"])) / lv
-        # engine rule (v400): the budget 0.26 k counts the ACTUAL rung size (risk k and corr multiplier included), so k cancels:
+        # engine rule (v400 / v406): the budget 0.26 k counts the ACTUAL rung size (risk k, dip_mult and the corr multiplier included), so
+        # k and dip_mult cancel (v406 scales the budget by the same dip multiplier):
         # admit while sum(frac * corr_mult * (dist + gap)) <= 0.26 x sub capital
         mult = corr_mult(dips_by_phase.get(ph, {}), last_close, sym) if corr else 1.0
         cost = frac * mult * (dist + GAP)
         if used.get(ph, 0.0) + cost > budget * caps.get(ph, 0.25) + 1e-12:
             continue
         used[ph] = used.get(ph, 0.0) + cost
-        out[pid + "E"] = Order(pid + "E", sym, "Buy", frac * equity / lv * rk * mult, "entry", price=lv, position_idx=1, piece=pid,
+        out[pid + "E"] = Order(pid + "E", sym, "Buy", frac * equity / lv * rk * mult * float(dip_mult), "entry", price=lv, position_idx=1, piece=pid,
                                meta=dict(kind="dip", phase=ph, tp=float(d["tp"]), stop=float(d["stop"]), backstop=d.get("backstop"),
                                          t_exit=str(bar + pd.Timedelta(hours=4)), frac=frac * mult, dist=dist))
     return out

@@ -239,3 +239,13 @@ def test_corr_shrink_admits_more_rungs_like_the_engine():
     w = mirror.desired(q, T0 + pd.Timedelta(minutes=20), 10000, {}, corr=True, last_close=lc)
     btc = [o for o in w.values() if o.symbol == "BTCUSDT"]
     assert len(btc) == 3 and all(abs(o.meta["frac"] - 0.1) < 1e-12 for o in btc)
+
+
+def test_dip_mult_scales_only_dip_qty_and_keeps_admission():
+    q = plan([pending()], dips=[dip(2.5, frac=0.4), dip(3.0, frac=0.4), dip(4.0, frac=0.4)])
+    b0 = mirror.desired(q, T0 + pd.Timedelta(minutes=20), 10000, {})
+    w = mirror.desired(q, T0 + pd.Timedelta(minutes=20), 10000, {}, dip_mult=1.8)
+    assert set(w) == set(b0)
+    for k in w:
+        ratio = w[k].qty / b0[k].qty
+        assert abs(ratio - (1.8 if w[k].meta.get("kind") == "dip" else 1.0)) < 1e-12
