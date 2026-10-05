@@ -72,3 +72,20 @@ test sizes: identical to score_hgb_mono.json. 1m data read with a pyarrow filter
   Note: over ALL bars ~43 % of rungs are sized up (on filled rungs 22-39 %) - the rule sizes up often; the engine's risk budget matters.
 - Check 3 (causality): 20 random (phase, T, sym) recomputed from 1m data truncated at T + 1 min (minute 0 kept) on the shifted grid and
   hourly data truncated to t < T: all 23 features identical (max |diff| 0.0).
+
+## Hidden-year tables for V2 (leader-authorised feature read 2025-09-24 .. 2026-09-24 12:00; no outcome read or computed)
+`build_hidden_tables.py` -> `tables/ctx_v2_hidden_s{0..3}.parquet` (T, sym, rung, size), audit features `ctx_v2_hidden_feat_s*.parquet`,
+`tables/check_hidden.json`, log `hidden_build.log`.
+- Fold-4 model: anchor 2025-09-24, 61,518 training rows, max t_exit 2025-09-16 16:00 (< 2025-09-17), mu 0.002810, seeds 40 / 41, same
+  features / constraints / rule.
+- Data: majors 1m end at 2026-09-23 23:59 (files contain nothing later) -> the last 3 bars per phase (T = 2026-09-24 00:00..08:00 + s h,
+  75 rows) are neutral 1.0 (the model would otherwise have sized NaN-feature rows mostly 1.5). No other row has a NaN feature.
+  Hourly extension resampled from 1m exactly as prep_features; on the overlap 2025-08-01..2025-09-23 it is identical to hourly.parquet for all
+  35 coins. Hidden-year coverage: 32 coins full (8760 h); SXPUSDT ends 2026-06-01 23:00; EOSUSDT (last hour 2025-05-21) and YFIIUSDT (2022-04-12)
+  have no hidden-year data -> absent from the cross-sectional stats (builder rule, >= 8 coins; 32-33 present).
+- Check (1) overlap with ctx_v2_s (T = 2025-09-24 00:00..08:00 + s h, previously neutral 1.0): 75 rows per phase, changed by the fold-4
+  model: s0 34 (-> 1.5), s1 1, s2 27, s3 2. Pre-cut bars 2025-09-01..09-23 recomputed with the extended data: features bit-identical to
+  ctx_v2_feat_s* (3450 rows per phase).
+- Check (2): 54,825 rows per phase (10,965 bars x 5). Size 0.5 / 1.0 / 1.5: s0 922 / 33196 / 20707; s1 1046 / 32715 / 21064;
+  s2 1081 / 33427 / 20317; s3 996 / 33853 / 19976 (up share ~37 % vs ~43 % in dev).
+- Check (3): 20 random (phase, T, sym) hidden-year rows recomputed with 1m truncated at T + 1 min and hourly at t < T: identical (0.0).
