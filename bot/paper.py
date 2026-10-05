@@ -163,4 +163,8 @@ class PaperExchange:
                     continue  # bar in progress / already processed
                 self._minute(sym, t, *(float(x) for x in r[1:5]))
                 self.s["last_ms"][sym] = t + 60_000
+        hour = str(pd.Timestamp(now_ms, unit="ms", tz="UTC").floor("h"))
+        curve = self.s.setdefault("equity_curve", [])
+        if not curve or curve[-1][0] != hour:  # one mark-to-market point per hour (first cycle of the hour)
+            curve.append([hour, round(self.equity_usdt(), 4)])
         self.save()

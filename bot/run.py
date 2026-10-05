@@ -150,7 +150,7 @@ class Runner:
         equity = self.equity_arg if self.mode == "dry" else self.ex.equity_usdt()
         self.sync_fills()
         led = self.state["ledger"]
-        live = {(sub["phase"], sym) for sym, c in plan["coins"].items() for sub in c.get("subs", []) if sub.get("position")}
+        live = mirror.plan_book_live(plan)
         for pc in led.values():
             if pc["kind"] == "book" and pc["qty"] > 0:
                 if (pc["phase"], pc["symbol"]) in live:

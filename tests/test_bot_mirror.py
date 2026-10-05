@@ -144,3 +144,14 @@ def test_paper_exchange_fills(tmp_path):
     assert abs(ex.s["cash"] - exp_cash) < 1e-9
     ex.step(pd.Timestamp(m0 + 4 * 60_000, unit="ms", tz="UTC"))               # reduce-only TP with a flat position is dropped
     assert "t" not in ex.s["orders"]
+
+
+def test_fill_before_plan_refresh_is_protected_and_not_closed():
+    o = next(iter(mirror.desired(plan([pending()]), T0 + pd.Timedelta(minutes=6), 10000, {}).values()))
+    led = {}
+    mirror.apply_fill(led, o, 0.025, 80000.0, T0 + pd.Timedelta(minutes=7))
+    stale = plan([pending()])                                                        # the plan still shows the pending entry
+    w = mirror.desired(stale, T0 + pd.Timedelta(minutes=8), 10000, led)
+    assert {x.kind for x in w.values()} == {"stop", "tp"}
+    assert next(x for x in w.values() if x.kind == "stop").trigger == 70000.0      # the entry's attached SL
+    assert mirror.exits(stale, T0 + pd.Timedelta(minutes=30), led, {}) == []

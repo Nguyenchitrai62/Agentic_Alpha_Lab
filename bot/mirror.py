@@ -88,6 +88,8 @@ def desired(plan: dict, now, equity: float, ledger: dict, budget: float = BUDGET
                 continue
             pc = ledger[piece]
             pos = sub.get("position")
+            if not pos and pc.get("sl") and pc.get("tp"):  # filled before the plan saw it: protect with the entry's attached levels
+                pos = {"sl": pc["sl"], "tp": pc["tp"]}
             if pos:  # exits of the open book piece follow the plan's current SL / TP
                 pc_side = "Sell" if pc["side"] > 0 else "Buy"
                 out[piece + "S"] = Order(piece + "S", sym, pc_side, pc["qty"], "stop", trigger=float(pos["sl"]), reduce_only=True,
@@ -139,11 +141,18 @@ def desired(plan: dict, now, equity: float, ledger: dict, budget: float = BUDGET
     return out
 
 
+def plan_book_live(plan: dict) -> set:
+    """(phase, symbol) whose sub-book still holds or awaits a book position in the plan (a pending entry may already have filled on the
+    exchange before the hourly plan refresh, so it is not a divergence)."""
+    return {(sub["phase"], sym) for sym, c in (plan.get("coins") or {}).items() for sub in c.get("subs", [])
+            if sub.get("position") or sub.get("state") == "pending"}
+
+
 def exits(plan: dict, now, ledger: dict, last5: dict) -> list[tuple[str, str]]:
     """Bot market exits now: [(piece id, reason)]. last5: symbol -> (close time of the last CLOSED 5m bar, close price)."""
     now = pd.Timestamp(now)
     out = []
-    book_live = {(sub["phase"], sym) for sym, c in (plan.get("coins") or {}).items() for sub in c.get("subs", []) if sub.get("position")}
+    book_live = plan_book_live(plan)
     for pid, pc in ledger.items():
         if pc["qty"] <= 0:
             continue
@@ -192,6 +201,8 @@ def apply_fill(ledger: dict, order: Order, qty: float, price: float, t) -> None:
         tot = pc["qty"] + qty
         pc["entry"] = (pc["entry"] * pc["qty"] + price * qty) / tot if tot > 0 else price
         pc["qty"] = tot
+        if m["kind"] == "book":
+            pc.update(sl=m.get("sl"), tp=m.get("tp"))
         if m["kind"] == "dip":
             pc.update(tp=m["tp"], stop5=m["stop"], backstop=m.get("backstop"), t_exit=m["t_exit"], frac=m["frac"], dist=m["dist"])
     elif order.kind == "add" and pid in ledger:
