@@ -21,7 +21,7 @@ ROOT = Path(__file__).resolve().parents[1]
 PLANS = ROOT / "artifacts/research/advisor_shadow"
 DB = ROOT / "artifacts/web/app.db"
 DEV0, DEV1 = pd.Timestamp("2021-09-24", tz="UTC"), pd.Timestamp("2025-09-24", tz="UTC")
-NAMES = {"bot_paper": "R2-4P bot on Bybit (paper)", "bot_paper_d18": "R2B1D18 bot on Bybit (paper, v408)", "v367": "M5 (MANUAL)", "v362": "M4 (MANUAL)", "v342": "M3 (MANUAL)", "v340": "M2 (MANUAL)", "v315": "M1 (MANUAL)", "v321": "R2 (BOT)", "v301": "G2 (BOT)", "v295": "CS (BOT)", "v285": "D2", "v269": "M1-old",
+NAMES = {"bot_paper": "R2-4P bot on Bybit (paper)", "bot_paper_d17bf": "R2B1D17BF bot on Bybit (paper, v411)", "v367": "M5 (MANUAL)", "v362": "M4 (MANUAL)", "v342": "M3 (MANUAL)", "v340": "M2 (MANUAL)", "v315": "M1 (MANUAL)", "v321": "R2 (BOT)", "v301": "G2 (BOT)", "v295": "CS (BOT)", "v285": "D2", "v269": "M1-old",
          "v266": "C5"}
 
 
@@ -54,9 +54,9 @@ def main():
     bot = ROOT / "artifacts/bot/paper/exchange.json"  # the order-mirror bot on a paper account filled from live Bybit 1m klines (bot/paper.py)
     if bot.exists():
         sources.append(("bot_paper", json.loads(bot.read_text()).get("equity_curve") or []))
-    bot_b1 = ROOT / "artifacts/bot/paper_d18/exchange.json"  # R2B1D18 (v408): correlation-aware dip size + dips x1.8, same bot / plan
+    bot_b1 = ROOT / "artifacts/bot/paper_d17bf/exchange.json"  # R2B1D17BF (v411): correlation-aware dip size + dips x1.7 + bear-book, same bot / plan
     if bot_b1.exists():
-        sources.append(("bot_paper_d18", json.loads(bot_b1.read_text()).get("equity_curve") or []))
+        sources.append(("bot_paper_d17bf", json.loads(bot_b1.read_text()).get("equity_curve") or []))
     for v, curve in sources:
         if len(curve) < 2:
             continue
