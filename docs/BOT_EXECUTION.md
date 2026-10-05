@@ -72,6 +72,17 @@ for fresh plans; a new fill has no exit orders until the next cycle (<= 20 s) pl
   admitted bid is cut to the remaining room and the rest are dropped, recomputed every cycle (resting bids amend qty
   down/up, never chase price). Book orders and protection (tp/stop/reduce) are never touched.
 
+## CHANGES (bot_adopt: optional --adopt-fresh, default off)
+- `python -m bot.run --adopt-fresh`: when a phase sub-plan holds a book POSITION the bot does not hold for that
+  (phase, symbol) and the plan position is fresh, place the SAME limit the engine had (side from
+  `position.side`, price = `position.avg_entry`, size = `position.weight` x equity / price with the usual
+  risk_mult / bear-book halving, valid until the window end; GTC like any book entry) with its stop/TP attached
+  (`position.sl`/`position.tp`). Plan fields: `position.opened` = the engine holding-bar start (= entry bar close,
+  e.g. `2026-10-04 12:00:00+00:00`) and `position.avg_entry` = the engine limit price; window = opened + 5 min ..
+  opened + 65 min (the engine 60-min book entry window from minute 5). Fills only on a later trade-through (no
+  chasing); after the window it cancels like any expired entry. Never adopts older positions, never market-enters,
+  never adopts dips. Default off reproduces every old order bit-for-bit.
+
 ## Failure modes (tests/test_bot_resilience.py, fake exchange, no network)
 - Restart mid-position: new Runner adopts state.json + exchange stops/TPs, no duplicate entries, filled rungs never re-placed.
 - Partial dip fill: TP/stop size to the filled qty, remainder stays resting (same link), budget counts only the filled part.

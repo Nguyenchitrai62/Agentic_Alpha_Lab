@@ -86,10 +86,12 @@ def to_exchange(o: mirror.Order, inst: dict) -> dict | None:
 class Runner:
     def __init__(self, mode: str, plan_path: Path, equity: float | None, risk_mult: float = 1.0, corr: bool = False,
                  tag: str | None = None, dip_mult: float = 1.0, bear_book: bool = False,
-                 dip_cooldown_h: float = 0.0, dip_sl_coin: dict | None = None, dip_gross_cap: float | None = None):
+                 dip_cooldown_h: float = 0.0, dip_sl_coin: dict | None = None, dip_gross_cap: float | None = None,
+                 adopt_fresh: bool = False):
         self.mode, self.plan_path = mode, plan_path
         self.risk_mult, self.corr, self.tag, self.dip_mult = float(risk_mult), bool(corr), tag or None, float(dip_mult)
         self.bear_book = bool(bear_book)
+        self.adopt_fresh = bool(adopt_fresh)
         self.dip_cooldown_h = float(dip_cooldown_h or 0.0)
         self.dip_sl_coin = dict(dip_sl_coin or {})
         try:
@@ -389,11 +391,12 @@ class Runner:
         bear = self.bear_now(now)
         lc = self.last_close_1m() if (self.corr or self.bear_book) else None
         _gross = getattr(self, "dip_gross_cap", 0.0) or 0.0
+        _adopt = bool(getattr(self, "adopt_fresh", False))
         want = mirror.desired(plan, now, equity, led, risk_mult=self.risk_mult, corr=self.corr,
                               last_close=lc, dip_mult=self.dip_mult,
                               bear_book=self.bear_book, bear=bear,
                               dip_cooldown_h=self.dip_cooldown_h, dip_sl_coin=self.dip_sl_coin,
-                              dip_gross_cap=_gross)
+                              dip_gross_cap=_gross, adopt_fresh=_adopt)
         if self.bear_book:
             if bear:
                 for o in want.values():
@@ -524,6 +527,7 @@ def main():
     ap.add_argument("--dip-cooldown-h", type=float, default=0.0, help="dip stop cooldown hours per coin+phase after a dip stop-out (v417 row C; default 0 = off)")
     ap.add_argument("--dip-sl-coin", action="append", default=[], metavar="SYMBOL=M", help="per-coin dip close-stop multiple replacing 4 sigma (repeatable, e.g. XRPUSDT=5.5; default none = unchanged)")
     ap.add_argument("--dip-gross-cap", type=float, default=0.0, metavar="G", help="per-phase dip gross-notional cap: open dip notional + resting dip bids <= G x sub equity (default 0 = off)")
+    ap.add_argument("--adopt-fresh", action="store_true", help="adopt a fresh paper book position the bot missed (same limit at the plan entry price inside its 5..65 min window, default off = unchanged)")
     ap.add_argument("--tag", default=None, help="state dir artifacts/bot/<mode>[_<tag>] (default no tag = unchanged paths)")
     a = ap.parse_args()
     if a.mode == "live" and os.environ.get("BOT_ALLOW_LIVE") != "yes-real-money":
@@ -533,7 +537,7 @@ def main():
     _lock = single_instance(ROOT / "artifacts/bot" / mode_dir / "runner.lock") if not a.once else None
     r = Runner(a.mode, Path(a.plan), a.equity, risk_mult=a.risk_mult, corr=a.corr_size, tag=a.tag, dip_mult=a.dip_mult,
              bear_book=a.bear_book, dip_cooldown_h=a.dip_cooldown_h, dip_sl_coin=parse_dip_sl_coin(a.dip_sl_coin),
-             dip_gross_cap=a.dip_gross_cap)
+             dip_gross_cap=a.dip_gross_cap, adopt_fresh=a.adopt_fresh)
     while True:
         try:
             r.cycle()

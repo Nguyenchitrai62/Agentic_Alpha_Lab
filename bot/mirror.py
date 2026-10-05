@@ -27,6 +27,7 @@ import pandas as pd
 GRACE_MIN = 3
 BUDGET, GAP = 0.26, 0.02
 ENTRY_DELAY_MIN = 5  # user rule: no new order fills in the first 5 minutes after the 4h close
+ADOPT_WINDOW_MIN = 65  # --adopt-fresh validity: entry bar close + 5 min .. + 65 min (same 60-min book entry window the engine had)
 DIP_SL_DEFAULT = 4.0  # global dip close-stop multiple (v417 row X overrides per coin)
 DUST_REL = 1e-9  # remainders at/below this fraction of the piece size are float dust, not money (bot_bookgap)
 EXIT_INFLIGHT_MIN = 2.0  # runner market-exit throttle: a piece with exit_sent this fresh has an exit in flight (bot_bookgap)
@@ -281,7 +282,8 @@ def is_bear(opens) -> bool:
 def desired(plan: dict, now, equity: float, ledger: dict, budget: float = BUDGET, risk_mult: float = 1.0,
             corr: bool = False, last_close: dict | None = None, dip_mult: float = 1.0,
             bear_book: bool = False, bear: bool = False, dip_cooldown_h: float = 0.0,
-            dip_sl_coin: dict | None = None, dip_gross_cap: float | None = None) -> dict[str, Order]:
+            dip_sl_coin: dict | None = None, dip_gross_cap: float | None = None,
+            adopt_fresh: bool = False) -> dict[str, Order]:
     """The order set that should rest on the exchange now (link id -> Order). Quantities are in coins, before exchange rounding."""
     now = pd.Timestamp(now)
     out: dict[str, Order] = {}
@@ -308,6 +310,46 @@ def desired(plan: dict, now, equity: float, ledger: dict, budget: float = BUDGET
                     out[pid + "E"] = Order(pid + "E", sym, "Buy" if sgn > 0 else "Sell", eqty,
                                            "entry", price=float(o["price"]), position_idx=_pidx(sgn), piece=pid,
                                            meta=dict(sl=o.get("sl_if_filled"), tp=o.get("tp_if_filled"), phase=ph, kind="book"))
+            if adopt_fresh and sub.get("state") == "position" and sub.get("position") and piece is None:
+                # --adopt-fresh (bot_bookgap): the paper plan already FILLED its book entry limit before the bot
+                # saw a pending order, so the sub-plan shows a fresh POSITION. Re-place the SAME limit the engine
+                # had (side + plan entry price + plan size, PostOnly/GTC like any book entry) with its stop/TP
+                # attached; it fills only on a later trade-through (no chasing) and expires with the window.
+                # Plan fields used: position.opened = the engine's holding-bar start (= entry bar close, e.g.
+                # "2026-10-04 12:00:00+00:00", str(grid[open_i] + 4h) in forward_trade_phase.py) and
+                # position.avg_entry = the engine's limit fill price (= its resting limit price); position.weight
+                # = the merged total-account fraction (weight_sub x sub capital); position.sl/tp = attached exits.
+                # Window: opened + 5 min .. opened + 65 min (the engine's 60-min book entry window from minute 5).
+                # Never adopts dips, never market-enters, never adopts a position older than the window.
+                pos = sub.get("position")
+                try:
+                    opened = _ts(pos.get("opened"))
+                    entry_px = float(pos.get("avg_entry"))
+                    w = pos.get("weight")
+                    w = float(w) if w is not None else float(pos.get("weight_sub", 0.0) or 0.0) * float(caps.get(ph, 0.25))
+                    side_s = pos.get("side")
+                    sgn2 = 1 if side_s == "LONG" else (-1 if side_s == "SHORT" else 0)
+                    sl2 = float(pos.get("sl"))
+                    tp2 = float(pos.get("tp"))
+                except (TypeError, ValueError, AttributeError):
+                    opened, entry_px, w, sgn2 = None, 0.0, 0.0, 0
+                    sl2 = tp2 = 0.0
+                if opened is not None and entry_px > 0 and w > 0 and sgn2 != 0 and sl2 > 0 and tp2 > 0:
+                    apid = book_pid(ph, sym, opened)
+                    if apid not in ledger and apid + "E" not in out:
+                        try:
+                            ok2 = opened + pd.Timedelta(minutes=ENTRY_DELAY_MIN) <= now < opened + pd.Timedelta(minutes=ADOPT_WINDOW_MIN)
+                        except (TypeError, ValueError):
+                            ok2 = False
+                        if ok2:
+                            aqty = w * float(equity) / entry_px * rk
+                            if bear_book and bear and sgn2 > 0:
+                                aqty *= 0.5
+                            out[apid + "E"] = Order(apid + "E", sym, "Buy" if sgn2 > 0 else "Sell", aqty,
+                                                   "entry", price=entry_px, position_idx=_pidx(sgn2), piece=apid,
+                                                   meta=dict(sl=sl2, tp=tp2, phase=ph, kind="book", adopt=True,
+                                                             opened=str(opened),
+                                                             valid_until=str(opened + pd.Timedelta(minutes=ADOPT_WINDOW_MIN))))
             if piece is None:
                 continue
             pc = ledger[piece]

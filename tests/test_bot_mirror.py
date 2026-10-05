@@ -718,3 +718,70 @@ def test_bookgap_inflight_suppresses_book_exits_and_restores():
     led[pid]["exit_sent"] = str(now)  # divergence market exit in flight
     assert mirror.desired(plan([pos]), now + pd.Timedelta(minutes=1), 10000, led) == {}
     assert {x.kind for x in mirror.desired(plan([pos]), now + pd.Timedelta(minutes=3), 10000, led).values()} == {"stop", "tp"}
+
+
+# ---- bot_adopt: optional --adopt-fresh (default off) ----
+
+def _fresh_pos(opened=None, phase=0, side="LONG", weight=0.2, price=80000.0, sl=70000.0, tp=95000.0):
+    return {"phase": phase, "state": "position",
+            "position": {"side": side, "weight": weight, "avg_entry": price, "sl": sl, "tp": tp,
+                         "break_even": False, "opened": str(opened or T0), "upnl_pct": 0.0}}
+
+
+def test_adopt_fresh_places_same_limit_at_plan_price():
+    p = plan([_fresh_pos()])
+    now = T0 + pd.Timedelta(minutes=6)
+    w = mirror.desired(p, now, 10000, {}, adopt_fresh=True)
+    assert len(w) == 1
+    (link, o), = w.items()
+    assert link == mirror.book_pid(0, "BTCUSDT", T0) + "E"
+    assert o.kind == "entry" and o.side == "Buy" and o.position_idx == 1
+    assert o.price == 80000.0 and abs(o.qty - 0.2 * 10000 / 80000) < 1e-12
+    assert o.meta.get("sl") == 70000.0 and o.meta.get("tp") == 95000.0
+    # short side mirrors to Sell / positionIdx 2
+    ps = plan([_fresh_pos(side="SHORT")])
+    (os,) = mirror.desired(ps, now, 10000, {}, adopt_fresh=True).values()
+    assert os.side == "Sell" and os.position_idx == 2
+
+
+def test_adopt_fresh_window_only():
+    p = plan([_fresh_pos()])
+    assert mirror.desired(p, T0 + pd.Timedelta(minutes=4), 10000, {}, adopt_fresh=True) == {}
+    assert mirror.desired(p, T0 + pd.Timedelta(minutes=6), 10000, {}, adopt_fresh=True) != {}
+    assert mirror.desired(p, T0 + pd.Timedelta(minutes=64), 10000, {}, adopt_fresh=True) != {}
+    assert mirror.desired(p, T0 + pd.Timedelta(minutes=65), 10000, {}, adopt_fresh=True) == {}
+    assert mirror.desired(p, T0 + pd.Timedelta(hours=2), 10000, {}, adopt_fresh=True) == {}
+
+
+def test_adopt_fresh_no_duplicate_hold_or_pending():
+    p = plan([_fresh_pos()])
+    now = T0 + pd.Timedelta(minutes=6)
+    # bot already holds this (phase, symbol): protection only, no second entry
+    led = {"pL": dict(kind="book", phase=0, symbol="BTCUSDT", side=1, qty=0.025, sl=70000.0, tp=95000.0)}
+    w = mirror.desired(p, now, 10000, led, adopt_fresh=True)
+    assert {x.kind for x in w.values()} == {"stop", "tp"}
+    assert not [x for x in w.values() if x.kind == "entry"]
+    # a normal pending already wants this (phase, symbol): exactly one entry, no extra adopt
+    pp = plan([pending()])
+    w2 = mirror.desired(pp, now, 10000, {}, adopt_fresh=True)
+    assert len(w2) == 1 and next(iter(w2.values())).kind == "entry"
+    # an already-adopted pid in the ledger never refires, even with qty 0 (closed)
+    apid = mirror.book_pid(0, "BTCUSDT", T0)
+    closed = {apid: dict(kind="book", phase=0, symbol="BTCUSDT", side=1, qty=0.0, sl=70000.0, tp=95000.0)}
+    assert mirror.desired(p, now, 10000, closed, adopt_fresh=True) == {}
+
+
+def test_adopt_fresh_fill_gets_protection_and_flag_off_is_old():
+    p = plan([_fresh_pos()])
+    now = T0 + pd.Timedelta(minutes=6)
+    o = next(iter(mirror.desired(p, now, 10000, {}, adopt_fresh=True).values()))
+    led: dict = {}
+    mirror.apply_fill(led, o, o.qty, 80000.0, T0 + pd.Timedelta(minutes=7))
+    (pid,) = led
+    assert abs(led[pid]["qty"] - o.qty) < 1e-12 and led[pid]["sl"] == 70000.0 and led[pid]["tp"] == 95000.0
+    w = mirror.desired(p, T0 + pd.Timedelta(minutes=30), 10000, led, adopt_fresh=True)
+    assert {x.kind for x in w.values()} == {"stop", "tp"}
+    assert not [x for x in w.values() if x.kind == "entry"]
+    # flag off (default): the fresh position is ignored bit-for-bit like before
+    assert mirror.desired(p, now, 10000, {}) == {}
+    assert mirror.desired(p, now, 10000, {}, adopt_fresh=False) == {}
