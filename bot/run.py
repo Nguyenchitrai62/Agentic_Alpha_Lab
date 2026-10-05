@@ -64,9 +64,11 @@ def to_exchange(o: mirror.Order, inst: dict) -> dict | None:
 
 
 class Runner:
-    def __init__(self, mode: str, plan_path: Path, equity: float | None):
+    def __init__(self, mode: str, plan_path: Path, equity: float | None, risk_mult: float = 1.0, corr: bool = False,
+                 tag: str | None = None):
         self.mode, self.plan_path = mode, plan_path
-        self.dir = ROOT / "artifacts/bot" / mode
+        self.risk_mult, self.corr, self.tag = float(risk_mult), bool(corr), tag or None
+        self.dir = ROOT / "artifacts/bot" / (mode if not self.tag else f"{mode}_{self.tag}")
         self.dir.mkdir(parents=True, exist_ok=True)
         self.state_f = self.dir / "state.json"
         self.state = json.loads(self.state_f.read_text()) if self.state_f.exists() else dict(ledger={}, links={}, last_exec_ms=None)
@@ -141,6 +143,27 @@ class Runner:
                 out[s] = (pd.Timestamp(int(k[1][0]), unit="ms", tz="UTC") + pd.Timedelta(minutes=5), float(k[1][4]))
         return out
 
+    def last_close_1m(self) -> dict:
+        """Last CLOSED 1m close per symbol (for correlation-aware dip sizing). Paper: the simulated exchange's
+        last_close; testnet / live / dry: Bybit public klines (interval 1, limit 2, take the closed bar)."""
+        if self.mode == "paper":
+            try:
+                return {s: float(v) for s, v in self.ex.s.get("last_close", {}).items() if v is not None}
+            except (AttributeError, TypeError, ValueError):
+                return {}
+        out: dict = {}
+        for s in SYMS:
+            try:
+                k = self.ex.klines(s, "1", 2)  # newest first: [0] = bar in progress, [1] = last closed bar
+            except Exception:
+                continue
+            if len(k) > 1:
+                try:
+                    out[s] = float(k[1][4])
+                except (TypeError, ValueError, IndexError):
+                    continue
+        return out
+
     def cycle(self):
         now = pd.Timestamp.now(tz="UTC")
         plan = json.loads(self.plan_path.read_text())
@@ -172,7 +195,8 @@ class Runner:
                                                                           reduce_only=True, position_idx=payload["positionIdx"], piece=pid)))
                 if self.mode == "dry":
                     pc["qty"] = 0.0
-        want = mirror.desired(plan, now, equity, led)
+        want = mirror.desired(plan, now, equity, led, risk_mult=self.risk_mult, corr=self.corr,
+                              last_close=self.last_close_1m() if self.corr else None)
         if stale:
             want = {k: o for k, o in want.items() if o.kind in ("tp", "stop", "reduce")}
             self.log(dict(op="stale_plan", generated_at=plan["generated_at"]))
@@ -185,7 +209,8 @@ class Runner:
                 o = replace(o, qty=float(p["qty"]), price=float(p["price"]) if "price" in p else None,
                             trigger=float(p["triggerPrice"]) if "triggerPrice" in p else None)  # compare / amend in exchange units
                 rounded[k] = (o, p)
-        acts = mirror.diff({k: o for k, (o, _) in rounded.items()}, self.have())
+        acts = mirror.diff({k: o for k, (o, _) in rounded.items()}, self.have(),
+                           amend_entry_qty=(self.corr or self.risk_mult != 1.0))
         for a in acts:
             if a["op"] == "place":
                 o = a["order"]
@@ -235,12 +260,16 @@ def main():
     ap.add_argument("--equity", type=float, default=1000.0, help="dry run / paper start: account equity in USDT")
     ap.add_argument("--once", action="store_true")
     ap.add_argument("--interval", type=float, default=20.0)
+    ap.add_argument("--risk-mult", type=float, default=1.0, help="scale all book/dip sizes and the dip budget (default 1.0 = unchanged)")
+    ap.add_argument("--corr-size", action="store_true", help="shrink each dip rung by 1/(1+n) flushing peers (default off = unchanged)")
+    ap.add_argument("--tag", default=None, help="state dir artifacts/bot/<mode>[_<tag>] (default no tag = unchanged paths)")
     a = ap.parse_args()
     if a.mode == "live" and os.environ.get("BOT_ALLOW_LIVE") != "yes-real-money":
         sys.exit("live trading is locked: the account owner must set BOT_ALLOW_LIVE=yes-real-money")
-    (ROOT / "artifacts/bot" / a.mode).mkdir(parents=True, exist_ok=True)
-    _lock = single_instance(ROOT / "artifacts/bot" / a.mode / "runner.lock") if not a.once else None
-    r = Runner(a.mode, Path(a.plan), a.equity)
+    mode_dir = a.mode if not a.tag else f"{a.mode}_{a.tag}"
+    (ROOT / "artifacts/bot" / mode_dir).mkdir(parents=True, exist_ok=True)
+    _lock = single_instance(ROOT / "artifacts/bot" / mode_dir / "runner.lock") if not a.once else None
+    r = Runner(a.mode, Path(a.plan), a.equity, risk_mult=a.risk_mult, corr=a.corr_size, tag=a.tag)
     while True:
         try:
             r.cycle()

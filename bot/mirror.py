@@ -66,11 +66,70 @@ def _pidx(side_sign: int) -> int:
     return 1 if side_sign > 0 else 2
 
 
-def desired(plan: dict, now, equity: float, ledger: dict, budget: float = BUDGET) -> dict[str, Order]:
+def _open_sigma(row: dict) -> tuple[float, float]:
+    """Bar open and 4h sigma implied by a dip row: buy_limit = open(1 - rung*sigma), stop = buy_limit(1 - 4*sigma)."""
+    lv = float(row["buy_limit"])
+    if not lv:
+        return 0.0, 0.0
+    sigma = (1.0 - float(row["stop"]) / lv) / 4.0
+    rung = float(row.get("rung", 0.0))
+    denom = 1.0 - rung * sigma
+    if denom <= 0:
+        return 0.0, 0.0
+    return lv / denom, sigma
+
+
+def corr_mult(plan_dips_for_phase, last_close: dict | None, a_sym: str) -> float:
+    """Correlation-aware size multiplier for coin a: 1 / (1 + n), n = number of OTHER majors whose last CLOSED 1m
+    close is at least 2.5 sigma_4h below their own current bar open (same phase / sub-book).
+
+    plan_dips_for_phase: {symbol -> dip row or list of dip rows of that phase} (each row has rung / buy_limit / stop;
+    any rung row of that coin and phase may be used). A list of dip dicts with a "symbol" key is also accepted.
+    last_close: {symbol -> last closed 1m close}. Missing coins are skipped (not counted).
+    """
+    if not last_close:
+        return 1.0
+    if isinstance(plan_dips_for_phase, list):
+        grouped: dict = {}
+        for r in plan_dips_for_phase:
+            s = r.get("symbol")
+            if s is None:
+                continue
+            grouped.setdefault(s, []).append(r)
+        plan_dips_for_phase = grouped
+    n = 0
+    for b, rows in (plan_dips_for_phase or {}).items():
+        if b == a_sym:
+            continue
+        if b not in last_close or last_close[b] is None:
+            continue
+        row = rows[0] if isinstance(rows, list) else rows
+        try:
+            open_b, sigma_b = _open_sigma(row)
+        except (KeyError, TypeError, ValueError, ZeroDivisionError):
+            continue
+        if sigma_b <= 0 or open_b <= 0:
+            continue
+        try:
+            if float(last_close[b]) <= open_b * (1.0 - 2.5 * sigma_b):
+                n += 1
+        except (TypeError, ValueError):
+            continue
+    return 1.0 / (1.0 + n)
+
+
+def desired(plan: dict, now, equity: float, ledger: dict, budget: float = BUDGET, risk_mult: float = 1.0,
+            corr: bool = False, last_close: dict | None = None) -> dict[str, Order]:
     """The order set that should rest on the exchange now (link id -> Order). Quantities are in coins, before exchange rounding."""
     now = pd.Timestamp(now)
     out: dict[str, Order] = {}
+    rk = float(risk_mult)
     caps = {p["phase"]: float(p.get("capital", 0.25)) for p in plan.get("phases", [])}
+    dips_by_phase: dict = {}
+    if corr:
+        for s2, c2 in (plan.get("coins") or {}).items():
+            for d2 in c2.get("dips", []):
+                dips_by_phase.setdefault(d2.get("phase"), {}).setdefault(s2, []).append(d2)
     for sym, c in (plan.get("coins") or {}).items():
         for sub in c.get("subs", []):
             ph = sub["phase"]
@@ -81,7 +140,7 @@ def desired(plan: dict, now, equity: float, ledger: dict, budget: float = BUDGET
                 ok = _ts(o["issued"]) + pd.Timedelta(minutes=ENTRY_DELAY_MIN) <= now < _ts(o["valid_until"])
                 if ok and pid not in ledger:
                     sgn = 1 if o["side"] == "BUY" else -1
-                    out[pid + "E"] = Order(pid + "E", sym, "Buy" if sgn > 0 else "Sell", float(o["weight"]) * equity / float(o["price"]),
+                    out[pid + "E"] = Order(pid + "E", sym, "Buy" if sgn > 0 else "Sell", float(o["weight"]) * equity / float(o["price"]) * rk,
                                            "entry", price=float(o["price"]), position_idx=_pidx(sgn), piece=pid,
                                            meta=dict(sl=o.get("sl_if_filled"), tp=o.get("tp_if_filled"), phase=ph, kind="book"))
             if piece is None:
@@ -99,7 +158,7 @@ def desired(plan: dict, now, equity: float, ledger: dict, budget: float = BUDGET
                 if o and o.get("kind") in ("add", "reduce", "close") and now < _ts(o["valid_until"]):
                     tag = f"{piece}{o['kind'][0].upper()}{t36(o['valid_until'])}"
                     if o["kind"] == "add":
-                        out[tag] = Order(tag, sym, "Buy" if pc["side"] > 0 else "Sell", float(o["amount"]) * equity / float(o["price"]), "add",
+                        out[tag] = Order(tag, sym, "Buy" if pc["side"] > 0 else "Sell", float(o["amount"]) * equity / float(o["price"]) * rk, "add",
                                          price=float(o["price"]), position_idx=_pidx(pc["side"]), piece=piece)
                     else:
                         q = pc["qty"] if o["kind"] == "close" else pc["qty"] * min(1.0, float(o["amount"]))
@@ -131,13 +190,16 @@ def desired(plan: dict, now, equity: float, ledger: dict, budget: float = BUDGET
     for rung, ph, sym, pid, d, bar in sorted(bids, key=lambda b: (b[0], b[1], b[2])):
         frac, lv = float(d["size_frac"]), float(d["buy_limit"])
         dist = (lv - float(d["stop"])) / lv
-        cost = frac * (dist + GAP)
+        # engine rule (v400): the budget 0.26 k counts the ACTUAL rung size (risk k and corr multiplier included), so k cancels:
+        # admit while sum(frac * corr_mult * (dist + gap)) <= 0.26 x sub capital
+        mult = corr_mult(dips_by_phase.get(ph, {}), last_close, sym) if corr else 1.0
+        cost = frac * mult * (dist + GAP)
         if used.get(ph, 0.0) + cost > budget * caps.get(ph, 0.25) + 1e-12:
             continue
         used[ph] = used.get(ph, 0.0) + cost
-        out[pid + "E"] = Order(pid + "E", sym, "Buy", frac * equity / lv, "entry", price=lv, position_idx=1, piece=pid,
+        out[pid + "E"] = Order(pid + "E", sym, "Buy", frac * equity / lv * rk * mult, "entry", price=lv, position_idx=1, piece=pid,
                                meta=dict(kind="dip", phase=ph, tp=float(d["tp"]), stop=float(d["stop"]), backstop=d.get("backstop"),
-                                         t_exit=str(bar + pd.Timedelta(hours=4)), frac=frac, dist=dist))
+                                         t_exit=str(bar + pd.Timedelta(hours=4)), frac=frac * mult, dist=dist))
     return out
 
 
@@ -168,7 +230,7 @@ def exits(plan: dict, now, ledger: dict, last5: dict) -> list[tuple[str, str]]:
     return out
 
 
-def diff(want: dict[str, Order], have: dict[str, dict], rel_tol: float = 1e-6) -> list[dict]:
+def diff(want: dict[str, Order], have: dict[str, dict], rel_tol: float = 1e-6, amend_entry_qty: bool = False) -> list[dict]:
     """Actions turning the resting set `have` (link -> {price, trigger, qty}) into `want`. Bot-owned links only."""
     acts = []
     for link, h in have.items():
@@ -184,7 +246,7 @@ def diff(want: dict[str, Order], have: dict[str, dict], rel_tol: float = 1e-6) -
             ch["price"] = o.price
         if o.trigger is not None and abs(float(h.get("trigger") or 0) - o.trigger) > rel_tol * o.trigger:
             ch["trigger"] = o.trigger
-        if abs(float(h.get("qty") or 0) - o.qty) > max(rel_tol * o.qty, 1e-12) and o.kind in ("tp", "stop"):
+        if abs(float(h.get("qty") or 0) - o.qty) > max(rel_tol * o.qty, 1e-12) and (o.kind in ("tp", "stop") or (amend_entry_qty and o.kind == "entry")):
             ch["qty"] = o.qty
         if ch:
             acts.append(dict(op="amend", link=link, symbol=o.symbol, **ch))

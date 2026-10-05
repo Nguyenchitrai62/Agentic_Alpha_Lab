@@ -30,3 +30,14 @@ into exchange orders. Logic: `bot/mirror.py` (pure, tests in `tests/test_bot_mir
 State: `artifacts/bot/<mode>/state.json`; every action: `artifacts/bot/<mode>/actions.jsonl`.
 Known caveats: plan levels come from Binance prices (Bybit within ~2 bps, BNB ~10 bps cheaper on Bybit); the backend must run
 for fresh plans; a new fill has no exit orders until the next cycle (<= 20 s) places its stop and TP.
+
+## CHANGES (v399/R2B1_130: correlation-aware dip sizing + risk multiplier, default off)
+- `mirror.corr_mult(dips_of_phase, last_close, a) = 1/(1+n)`: n = other majors in the same phase whose last closed 1m
+  close <= open_b*(1-2.5*sigma_b), with open/sigma from any rung row (`sigma=(1-stop/buy_limit)/4`,
+  `open=buy_limit/(1-rung*sigma)`). `desired(..., risk_mult=1.0, corr=False, last_close=None)`: book entry/add qty x
+  risk_mult; dip qty x risk_mult x corr_mult (when corr); budget `BUDGET x risk_mult` with UNSCALED-by-corr admission
+  (shallow-first), so corr only shrinks size. Defaults keep every order identical.
+- `run.py`: `--risk-mult` (default 1.0), `--corr-size` (default off), `--tag` (state dir
+  `artifacts/bot/<mode>[_<tag>]`, default unchanged); paper passes the paper exchange `last_close`, other modes fetch
+  the last closed 1m close per symbol (Bybit klines interval 1, limit 2, closed bar). Resting `entry` bids are amended
+  on qty change ONLY when corr/risk options are on (`diff(..., amend_entry_qty=True)`; tp/stop amend as before).

@@ -155,3 +155,87 @@ def test_fill_before_plan_refresh_is_protected_and_not_closed():
     assert {x.kind for x in w.values()} == {"stop", "tp"}
     assert next(x for x in w.values() if x.kind == "stop").trigger == 70000.0      # the entry's attached SL
     assert mirror.exits(stale, T0 + pd.Timedelta(minutes=30), led, {}) == []
+
+
+def _mkrow(rung, open_px=100.0, sigma=0.01, phase=0):
+    """Dip row with known bar open / sigma: buy_limit = open(1 - rung*sigma), stop = buy_limit(1 - 4*sigma)."""
+    lv = open_px * (1.0 - rung * sigma)
+    return {"rung": rung, "phase": phase, "buy_limit": lv, "tp": lv * 1.01, "stop": lv * (1.0 - 4.0 * sigma),
+            "backstop": lv * 0.9, "size_frac": 0.05,
+            "active_from": str(T0 + pd.Timedelta(minutes=16)), "active_until": str(T0 + pd.Timedelta(minutes=239))}
+
+
+def test_corr_mult_counts_flushing_peers():
+    dips = {"BTCUSDT": [_mkrow(2.0)], "ETHUSDT": [_mkrow(2.0)], "SOLUSDT": [_mkrow(3.0)], "BNBUSDT": [_mkrow(2.5)]}
+    # threshold = 100 * (1 - 2.5 * 0.01) = 97.5 for every coin
+    assert mirror.corr_mult(dips, {"BTCUSDT": 100.0, "ETHUSDT": 100.0, "SOLUSDT": 100.0, "BNBUSDT": 100.0}, "BTCUSDT") == 1.0
+    assert mirror.corr_mult(dips, {"BTCUSDT": 100.0, "ETHUSDT": 97.0, "SOLUSDT": 100.0, "BNBUSDT": 100.0}, "BTCUSDT") == 0.5
+    got = mirror.corr_mult(dips, {"BTCUSDT": 100.0, "ETHUSDT": 97.0, "SOLUSDT": 96.0, "BNBUSDT": 90.0}, "BTCUSDT")
+    assert abs(got - 0.25) < 1e-12
+    # the coin itself never counts, even when it flushes
+    assert mirror.corr_mult(dips, {"BTCUSDT": 90.0, "ETHUSDT": 100.0, "SOLUSDT": 100.0, "BNBUSDT": 100.0}, "BTCUSDT") == 1.0
+    # missing coins / no data are skipped, never counted
+    assert mirror.corr_mult(dips, {"ETHUSDT": 90.0}, "BTCUSDT") == 0.5
+    assert mirror.corr_mult(dips, {}, "BTCUSDT") == 1.0
+    assert mirror.corr_mult(dips, None, "BTCUSDT") == 1.0
+    # boundary: exactly at 2.5 sigma counts, just above does not
+    assert mirror.corr_mult(dips, {"ETHUSDT": 97.5, "SOLUSDT": 100.0, "BNBUSDT": 100.0}, "BTCUSDT") == 0.5
+    assert mirror.corr_mult(dips, {"ETHUSDT": 97.5001, "SOLUSDT": 100.0, "BNBUSDT": 100.0}, "BTCUSDT") == 1.0
+
+
+def test_desired_risk_mult_scales_qty_and_budget():
+    p = plan([pending(price=80000.0, weight=0.2)])
+    base = next(iter(mirror.desired(p, T0 + pd.Timedelta(minutes=6), 10000, {}).values()))
+    scaled = next(iter(mirror.desired(p, T0 + pd.Timedelta(minutes=6), 10000, {}, risk_mult=1.3).values()))
+    assert abs(scaled.qty / base.qty - 1.3) < 1e-12
+    # budget (engine v400 rule): the budget 0.26 k counts sizes that include k, so k cancels - the admitted set is unchanged and only
+    # the quantities scale; cost 0.4 * (0.04 + 0.02) = 0.024 vs 0.065 per sub-book admits 2 rungs either way
+    q = plan(dips=[dip(2.5, frac=0.4), dip(3.0, frac=0.4), dip(4.0, frac=0.4)])
+    assert len(mirror.desired(q, T0 + pd.Timedelta(minutes=20), 10000, {})) == 2
+    w = mirror.desired(q, T0 + pd.Timedelta(minutes=20), 10000, {}, risk_mult=1.3)
+    assert len(w) == 2
+    qb = mirror.desired(plan(dips=[dip(2.5, frac=0.4)]), T0 + pd.Timedelta(minutes=20), 10000, {})
+    (kb,) = qb
+    assert abs(w[kb].qty / qb[kb].qty - 1.3) < 1e-12
+
+
+def test_default_off_equals_old_outputs():
+    p = plan([pending()], dips=[dip(2.5), dip(3.0)])
+    now = T0 + pd.Timedelta(minutes=20)
+    old = mirror.desired(p, now, 10000, {})
+    same = mirror.desired(p, now, 10000, {}, risk_mult=1.0, corr=False, last_close=None)
+    assert set(same) == set(old) and all(abs(same[k].qty - old[k].qty) < 1e-12 for k in old)
+    # corr off ignores last_close entirely
+    ignored = mirror.desired(p, now, 10000, {}, risk_mult=1.0, corr=False, last_close={"BTCUSDT": 1.0})
+    assert set(ignored) == set(old) and all(abs(ignored[k].qty - old[k].qty) < 1e-12 for k in old)
+    # diff default ignores entry qty changes (old behaviour)
+    o = mirror.Order("e1", "BTCUSDT", "Buy", 0.01, "entry", price=80000.0)
+    want = {"e1": mirror.Order("e1", "BTCUSDT", "Buy", 0.02, "entry", price=80000.0)}
+    assert mirror.diff(want, {"e1": dict(symbol="BTCUSDT", price=80000.0, qty=0.01)}) == []
+
+
+def test_corr_shrinks_dip_and_amends_resting_bid():
+    coins = {"BTCUSDT": {"subs": [], "dips": [_mkrow(2.0)]}, "ETHUSDT": {"subs": [], "dips": [_mkrow(2.0)]}}
+    p = {"generated_at": str(T0), "phases": [{"phase": 0, "capital": 0.25}], "coins": coins}
+    now = T0 + pd.Timedelta(minutes=20)
+    w0 = mirror.desired(p, now, 10000, {}, corr=True, last_close={"BTCUSDT": 100.0, "ETHUSDT": 100.0})
+    w1 = mirror.desired(p, now, 10000, {}, corr=True, last_close={"BTCUSDT": 100.0, "ETHUSDT": 90.0})
+    (k0,) = [k for k, o in w0.items() if o.symbol == "BTCUSDT"]
+    (k1,) = [k for k, o in w1.items() if o.symbol == "BTCUSDT"]
+    assert k0 == k1 and abs(w1[k1].qty / w0[k0].qty - 0.5) < 1e-12  # n 0 -> 1 halves the rung
+    have = {k: dict(symbol=o.symbol, price=o.price, qty=o.qty) for k, o in w0.items()}
+    assert mirror.diff(w1, have) == []  # default: entry qty changes never amend
+    acts = mirror.diff(w1, have, amend_entry_qty=True)
+    assert acts == [dict(op="amend", link=k0, symbol="BTCUSDT", qty=w1[k1].qty)]
+
+
+def test_corr_shrink_admits_more_rungs_like_the_engine():
+    # three other coins flushing -> mult 1/4 -> cost 0.4 * 0.25 * 0.06 = 0.006 per rung -> all 3 BTC rungs fit the 0.065 budget
+    flushed = {s: 1.0 for s in ("ETHUSDT", "SOLUSDT", "XRPUSDT")}
+    q = plan(dips=[dip(2.5, frac=0.4), dip(3.0, frac=0.4), dip(4.0, frac=0.4)])
+    for s in flushed:
+        q["coins"][s] = {"subs": [], "dips": [dict(dip(2.5), buy_limit=100.0, stop=96.0)]}
+    lc = dict(flushed, BTCUSDT=79000.0)
+    w = mirror.desired(q, T0 + pd.Timedelta(minutes=20), 10000, {}, corr=True, last_close=lc)
+    btc = [o for o in w.values() if o.symbol == "BTCUSDT"]
+    assert len(btc) == 3 and all(abs(o.meta["frac"] - 0.1) < 1e-12 for o in btc)
