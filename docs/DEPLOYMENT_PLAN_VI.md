@@ -74,3 +74,9 @@ Chọn walk-forward (mỗi năm chọn trong 31 biến thể chỉ bằng các n
 trên 4 năm kiểm, LOO không ổn định) -> giữ cố định D17BF (+ trần 2x), không đổi cấu hình theo kết quả gần đây.
 Bối cảnh 2026-09 (dữ liệu cuối): trên MA200, biến động thấp, xu hướng 90 ngày +35 %. Lịch sử nhóm này: 21 tháng, trung bình +8,1 %,
 trung vị +5,0 %, 29 % tháng âm, tệ nhất -7,5 % (2024-01). Chỉ là bối cảnh, không phải dự báo.
+
+## Tuần xấu trông thế nào (OpenCode oc_stresshist, D17BF + trần 2x)
+
+Tuần tệ nhất lịch sử: 2023-12-27..2024-01-03 -12,3 % (DD 13,9 %, hồi lại sau ~54 ngày; không trần: -14,7 % / DD 16,3 %).
+Các tuần xấu khác: 2025-10-10 -9,7 % (hồi ~134 ngày), 2024-07 -9,6 %, 2023-06 -8,6 %, 2024-06 -8,9 %; FTX 2022-11 -2,2 % (DD 9,2 %),
+LUNA 2022-05 -3,0 % (DD 9,7 %). Hãy chuẩn bị tâm lý: vài lần mỗi năm mất 8-12 % trong một tuần và mất 1-4 tháng để về đỉnh cũ.
