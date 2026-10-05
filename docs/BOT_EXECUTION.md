@@ -55,6 +55,12 @@ for fresh plans; a new fill has no exit orders until the next cycle (<= 20 s) pl
   satisfies s < B <= s+H (open pieces keep TP/backstop; same-bar B <= s unaffected). `--dip-sl-coin SYM=M` (repeatable)
   replaces the 4-sigma dip close-stop for that coin (`mirror.dip_stop_price`, budget `frac*(M*sigma+GAP)`; backstop 8 sigma
   unchanged). Defaults reproduce every old order bit-for-bit.
+- Dip gross-notional cap (research v421 G2 / v422 engine hook `sleeve_gross_cap`, default off): `run.py --dip-gross-cap G`
+  (default 0 = off) keeps, per phase sub-book, open filled dip notional + resting dip entry bids <= G x sub equity
+  (sub equity = equity x the phase cap used by the budget rule). The room (G x sub equity - open dip notional of that
+  phase) is allocated to the resting bids in admission order (shallow rung first, then phase, then symbol); the last
+  admitted bid is cut to the remaining room and the rest are dropped, recomputed every cycle (resting bids amend qty
+  down/up, never chase price). Book orders and protection (tp/stop/reduce) are never touched.
 
 ## Failure modes (tests/test_bot_resilience.py, fake exchange, no network)
 - Restart mid-position: new Runner adopts state.json + exchange stops/TPs, no duplicate entries, filled rungs never re-placed.

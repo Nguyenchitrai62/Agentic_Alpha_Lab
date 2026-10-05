@@ -245,7 +245,7 @@ def is_bear(opens) -> bool:
 def desired(plan: dict, now, equity: float, ledger: dict, budget: float = BUDGET, risk_mult: float = 1.0,
             corr: bool = False, last_close: dict | None = None, dip_mult: float = 1.0,
             bear_book: bool = False, bear: bool = False, dip_cooldown_h: float = 0.0,
-            dip_sl_coin: dict | None = None) -> dict[str, Order]:
+            dip_sl_coin: dict | None = None, dip_gross_cap: float | None = None) -> dict[str, Order]:
     """The order set that should rest on the exchange now (link id -> Order). Quantities are in coins, before exchange rounding."""
     now = pd.Timestamp(now)
     out: dict[str, Order] = {}
@@ -391,9 +391,82 @@ def desired(plan: dict, now, equity: float, ledger: dict, budget: float = BUDGET
         if not px > 0:
             continue
         out[pid + "E"] = Order(pid + "E", pc["symbol"], "Buy", rem, "entry", price=px, position_idx=1, piece=pid,
-                               meta=dict(kind="dip", phase=pc.get("phase", 0), tp=pc.get("tp"), stop=pc.get("stop5"),
-                                         backstop=pc.get("backstop"), t_exit=str(t_exit),
-                                         frac=float(pc.get("frac", 0.0)), dist=float(pc.get("dist", 0.0))))
+                                meta=dict(kind="dip", phase=pc.get("phase", 0), tp=pc.get("tp"), stop=pc.get("stop5"),
+                                          backstop=pc.get("backstop"), t_exit=str(t_exit),
+                                          frac=float(pc.get("frac", 0.0)), dist=float(pc.get("dist", 0.0))))
+    if dip_gross_cap is not None:
+        try:
+            _g = float(dip_gross_cap)
+        except (TypeError, ValueError):
+            _g = 0.0
+        if _g > 0:
+            # Optional dip gross-notional cap (engine sleeve_gross_cap mirror, conservative):
+            # per phase sub-book, open filled dip notional + resting dip entry bids <= G x sub equity,
+            # sub equity = equity x the phase cap used by the budget rule. The room left
+            # (G x sub equity - open dip notional) is allocated to the resting bids in the same
+            # order desired() already admits them (shallow rung first, then phase, then symbol,
+            # i.e. out insertion order per phase); the last admitted bid is cut to the remaining
+            # room and the rest are dropped. Recomputed every cycle (runner amends qty, never price).
+            # Book orders and protection (tp/stop/reduce) are never touched.
+            try:
+                _eq = float(equity)
+            except (TypeError, ValueError):
+                _eq = 0.0
+            _open: dict = {}
+            try:
+                _items = list(ledger.values())
+            except AttributeError:
+                _items = []
+            for _pc in _items:
+                if not isinstance(_pc, dict) or _pc.get("kind") != "dip":
+                    continue
+                try:
+                    _q = float(_pc.get("qty", 0.0) or 0.0)
+                except (TypeError, ValueError):
+                    continue
+                if _q <= 0:
+                    continue
+                _px = _pc.get("entry", _pc.get("entry_px"))
+                try:
+                    _px = float(_px)
+                except (TypeError, ValueError):
+                    continue
+                if not _px > 0:
+                    continue
+                _ph = _pc.get("phase", 0)
+                _open[_ph] = _open.get(_ph, 0.0) + _q * _px
+            _by_ph: dict = {}
+            for _link, _o in out.items():
+                if _o.kind != "entry" or _o.meta.get("kind") != "dip":
+                    continue
+                _by_ph.setdefault(_o.meta.get("phase", 0), []).append(_link)
+            for _ph, _links in _by_ph.items():
+                try:
+                    _sub_eq = _eq * float(caps.get(_ph, 0.25))
+                except (TypeError, ValueError):
+                    _sub_eq = _eq * 0.25
+                _room = _g * _sub_eq - _open.get(_ph, 0.0)
+                for _link in _links:
+                    _o = out.get(_link)
+                    if _o is None:
+                        continue
+                    try:
+                        _not = float(_o.qty) * float(_o.price)
+                    except (TypeError, ValueError):
+                        continue
+                    if _room <= 1e-12:
+                        del out[_link]
+                    elif _not <= _room + 1e-12:
+                        _room -= _not
+                    else:
+                        _f = _room / _not if _not > 0 else 0.0
+                        try:
+                            _old_frac = float(_o.meta.get("frac", 0.0) or 0.0)
+                        except (TypeError, ValueError):
+                            _old_frac = 0.0
+                        _o.qty = _room / float(_o.price) if _o.price else 0.0
+                        _o.meta["frac"] = _old_frac * _f
+                        _room = 0.0
     if bear_book and bear:
         # Bear-regime trim of open book longs (closes the BOT_EXECUTION.md known gap): the research engine (v410)
         # halves the book LONG target in bear, so existing longs are trimmed toward the halved target. For every open
