@@ -8,6 +8,7 @@ Không sửa các ngưỡng sau khi đã thấy dữ liệu paper (nếu sửa p
 | Sản phẩm | Pipeline | %/tháng kỳ vọng | DD kỳ vọng | Ghi chú |
 |---|---|---|---|---|
 | BOT | R2-4P (v376) | 4.8 (thước đo cân lại mỗi năm, 5 năm; từng năm 2.0 / 3.8 / 4.0 / 10.6 / 3.9); thực tế trên Bybit + ma sát ~3.5-4.4 | 25 (năm xấu nhất), tới ~28 khi trượt stop / giá Bybit | cần bot chạy 24/7, 4 khung giờ lệch 1h; không năm lỗ trong mọi kịch bản ma sát (research/diagnostics/r2_4p_robust5) |
+| BOT mới (ứng viên, paper từ 2026-10-05) | R2B1D18 (v408) / R2B1D16 (v406) | 5.45 / 5.14 (5 năm 2021-2026; ma sát thực tế D16: 4.8-5.1) | năm xấu nhất 19.1 / 17.3; toàn đường cong 17.6 / 16.4 | size dip theo tương quan (cần bot chỉnh lệnh theo phút), tỉ lệ thắng 65 %, không năm lỗ; cổng nền PASS (audit OpenCode); bot: `--corr-size --dip-mult 1.8` |
 | MANUAL | M4 / M5 | ~3.5 với người thật (trễ 15', bỏ nến đêm) | 22-24 % (pha xấu 32-34 %) | dùng ~80 % vốn -> ~2.8 %/tháng, DD < 20 % |
 
 Mục tiêu 5 %/tháng với DD <= 20 % CHƯA đạt một cách trung thực; các con số trên là trần của thông tin hiện có.
