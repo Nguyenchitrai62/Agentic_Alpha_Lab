@@ -39,3 +39,10 @@ Cập nhật 2026-10-05: thước đo cũ (mix 4 pha liên tục) phóng đại 
 - DD tài khoản > 20 %: dừng mở lệnh mới, chỉ giữ SL/TP; xem xét lại trước khi chạy tiếp.
 - Lỗ một tháng > 10 %: giảm vốn dùng một nửa trong tháng kế tiếp.
 - Phân vị lợi nhuận thực < 5 sau >= 8 tuần: dừng (mô hình không còn khớp với nghiên cứu).
+
+## Rủi ro thống kê của R2B1D17BF (bootstrap, OpenCode oc_mcdd, 2026-10-05)
+
+Bootstrap khối dừng (khối TB 20 ngày, 10.000 năm giả lập từ 5 năm 2021-09..2026-09, metric reset theo năm):
+- Xác suất một năm 12 tháng lỗ: ~0,7 %. Trung vị lợi nhuận ~5,1 %/tháng (p5 1,5 / p95 10,3); chỉ ~52 % năm đạt >= 5 %/tháng.
+- DD đánh dấu 1 ngày: trung vị 14,5 %, p95 22,6 %; P(DD > 20 %) ~11 %, P(DD > 25 %) ~2 %.
+- Nghĩa là: kỳ vọng hợp lý là 4-6 %/tháng với DD 12-18 %, nhưng khoảng 1/9 năm có thể chạm DD > 20 %. Vốn nên là số tiền chịu được DD 25 %.
