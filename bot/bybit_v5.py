@@ -78,6 +78,29 @@ class Bybit:
         """Newest first: [start_ms, open, high, low, close, volume, turnover]."""
         return self.public("/v5/market/kline", category="linear", symbol=symbol, interval=interval, limit=limit)["list"]
 
+    def klines_4h_opens(self, symbol: str, n: int = 1200) -> list:
+        """Last n 4h opens oldest-first (closed and current bars; the current bar's open is known)."""
+        rows: list = []
+        end = None
+        while len(rows) < int(n):
+            batch_limit = min(1000, int(n) - len(rows))
+            kw: dict = dict(category="linear", symbol=symbol, interval="240", limit=batch_limit)
+            if end is not None:
+                kw["end"] = end
+            batch = self.public("/v5/market/kline", **kw)["list"]
+            if not batch:
+                break
+            rows.extend(batch)
+            if len(batch) < batch_limit:
+                break
+            oldest = min(int(r[0]) for r in batch)
+            nxt = oldest - 1
+            if end is not None and nxt >= int(end):
+                break
+            end = nxt
+        rows = sorted(rows, key=lambda r: int(r[0]))[-int(n):]
+        return [float(r[1]) for r in rows]
+
     # ---- account / orders ------------------------------------------------------------------------------------------------------
     def equity_usdt(self) -> float:
         acc = self.get("/v5/account/wallet-balance", accountType="UNIFIED")["list"][0]

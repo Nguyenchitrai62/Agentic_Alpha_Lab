@@ -41,3 +41,11 @@ for fresh plans; a new fill has no exit orders until the next cycle (<= 20 s) pl
   `artifacts/bot/<mode>[_<tag>]`, default unchanged); paper passes the paper exchange `last_close`, other modes fetch
   the last closed 1m close per symbol (Bybit klines interval 1, limit 2, closed bar). Resting `entry` bids are amended
   on qty change ONLY when corr/risk options are on (`diff(..., amend_entry_qty=True)`; tp/stop amend as before).
+- Bear-regime book filter (registry v410, R2B1D18BF; default off): `mirror.is_bear(opens)` is True while the latest
+  BTCUSDT 4h bar OPEN < the mean of the last 1200 4h opens including it (min 600); `desired(..., bear_book=False,
+  bear=False)` halves book ENTRY/ADD qty on the LONG side only when both flags are set (shorts, reduce/close/tp/stop,
+  dips unchanged). `bybit_v5.Bybit.klines_4h_opens(symbol, n=1200)` pages the public kline endpoint (interval 240,
+  limit 1000, `end` cursor) oldest-first; `run.py --bear-book` recomputes bear from BTCUSDT every 10 minutes (cached)
+  and logs `op='bear_state'` on change.
+- Known gap (2026-10-05): `--bear-book` halves NEW book long entries / adds in the bear regime; the research engine (v410) halves the book
+  long TARGET, so existing longs are also trimmed by the grid trader when the regime turns - the bot does not trim open longs yet.

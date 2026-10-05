@@ -249,3 +249,84 @@ def test_dip_mult_scales_only_dip_qty_and_keeps_admission():
     for k in w:
         ratio = w[k].qty / b0[k].qty
         assert abs(ratio - (1.8 if w[k].meta.get("kind") == "dip" else 1.0)) < 1e-12
+
+
+def test_is_bear_synthetic():
+    assert mirror.is_bear([100.0] * 600) is False            # last == mean -> not below
+    assert mirror.is_bear([100.0] * 599 + [90.0]) is True    # 600 bars, last below the mean
+    assert mirror.is_bear([100.0] * 1200) is False
+    assert mirror.is_bear([100.0] * 1199 + [90.0]) is True
+    assert mirror.is_bear([100.0] * 599) is False            # below the 600-bar minimum
+    assert mirror.is_bear([]) is False
+    # windowing: only the last 1200 count (first 500 at 1000 would flip the full mean, not the window mean)
+    assert mirror.is_bear([1000.0] * 500 + [100.0] * 1200) is False
+    assert mirror.is_bear([1000.0] * 500 + [100.0] * 1199 + [90.0]) is True
+
+
+def _add_plan(side="LONG", amount=0.1, price=80000.0):
+    sub = {"phase": 0, "state": "position", "position": {"side": side, "sl": 70000.0, "tp": 95000.0},
+           "order": {"kind": "add", "amount": amount, "price": price, "valid_until": str(T0 + pd.Timedelta(hours=4))}}
+    return plan([sub])
+
+
+def test_bear_book_halves_long_entry_and_add_only():
+    now = T0 + pd.Timedelta(minutes=6)
+    pl = plan([pending(side="BUY")])
+    base = next(iter(mirror.desired(pl, now, 10000, {}).values()))
+    halved = next(iter(mirror.desired(pl, now, 10000, {}, bear_book=True, bear=True).values()))
+    assert abs(halved.qty / base.qty - 0.5) < 1e-12 and halved.side == "Buy"
+    ps = plan([pending(side="SELL")])
+    sbase = next(iter(mirror.desired(ps, now, 10000, {}).values()))
+    ssame = next(iter(mirror.desired(ps, now, 10000, {}, bear_book=True, bear=True).values()))
+    assert abs(ssame.qty - sbase.qty) < 1e-12 and ssame.side == "Sell"
+    # adds: long halved, short unchanged
+    now2 = T0 + pd.Timedelta(hours=1)
+    led_l = {"pL": dict(kind="book", phase=0, symbol="BTCUSDT", side=1, qty=0.025, sl=70000.0, tp=95000.0)}
+    bl = mirror.desired(_add_plan("LONG"), now2, 10000, led_l)
+    hl = mirror.desired(_add_plan("LONG"), now2, 10000, led_l, bear_book=True, bear=True)
+    assert set(bl) == set(hl)
+    (kl,) = [k for k, o in bl.items() if o.kind == "add"]
+    assert abs(hl[kl].qty / bl[kl].qty - 0.5) < 1e-12
+    led_s = {"pS": dict(kind="book", phase=0, symbol="BTCUSDT", side=-1, qty=0.025, sl=70000.0, tp=95000.0)}
+    bs = mirror.desired(_add_plan("SHORT"), now2, 10000, led_s)
+    hs = mirror.desired(_add_plan("SHORT"), now2, 10000, led_s, bear_book=True, bear=True)
+    assert set(bs) == set(hs)
+    (ks,) = [k for k, o in bs.items() if o.kind == "add"]
+    assert abs(hs[ks].qty - bs[ks].qty) < 1e-12
+    # dips unchanged under the bear filter
+    q = plan(dips=[dip(2.5), dip(3.0)])
+    d0 = mirror.desired(q, T0 + pd.Timedelta(minutes=20), 10000, {})
+    d1 = mirror.desired(q, T0 + pd.Timedelta(minutes=20), 10000, {}, bear_book=True, bear=True)
+    assert set(d1) == set(d0) and all(abs(d1[k].qty - d0[k].qty) < 1e-12 for k in d0)
+
+
+def test_bear_book_default_off_identity():
+    p = plan([pending()], dips=[dip(2.5), dip(3.0)])
+    now = T0 + pd.Timedelta(minutes=20)
+    old = mirror.desired(p, now, 10000, {})
+    assert old  # guard: the fixture is non-empty
+    for kw in (dict(bear_book=False, bear=False), dict(bear_book=False, bear=True), dict(bear_book=True, bear=False),
+               dict(bear_book=False), dict(), dict(bear=False)):
+        same = mirror.desired(p, now, 10000, {}, **kw)
+        assert set(same) == set(old) and all(abs(same[k].qty - old[k].qty) < 1e-12 for k in old)
+
+
+def test_klines_4h_opens_pages_oldest_first():
+    from bot.bybit_v5 import Bybit
+    n_all, step = 1200, 14_400_000
+    t0 = 1_700_000_000_000
+    all_rows = [[t0 + i * step, 100.0 + i] for i in range(n_all)]
+    calls = []
+
+    def fake_public(path, **kw):
+        calls.append(dict(kw))
+        assert path == "/v5/market/kline" and kw["interval"] == "240" and kw["limit"] <= 1000
+        rows = [r for r in all_rows if kw.get("end") is None or r[0] <= int(kw["end"])]
+        rows = sorted(rows, key=lambda r: r[0], reverse=True)[:kw["limit"]]
+        return {"list": [[str(r[0]), str(r[1]), str(r[1]), str(r[1]), str(r[1]), "1", "1"] for r in rows]}
+
+    b = Bybit(base="https://api.bybit.com")
+    b.public = fake_public
+    opens = b.klines_4h_opens("BTCUSDT")
+    assert opens == [100.0 + i for i in range(n_all)]
+    assert len(calls) == 2 and calls[0].get("end") is None and calls[1]["limit"] == 200

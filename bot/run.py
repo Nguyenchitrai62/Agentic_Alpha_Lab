@@ -65,9 +65,12 @@ def to_exchange(o: mirror.Order, inst: dict) -> dict | None:
 
 class Runner:
     def __init__(self, mode: str, plan_path: Path, equity: float | None, risk_mult: float = 1.0, corr: bool = False,
-                 tag: str | None = None, dip_mult: float = 1.0):
+                 tag: str | None = None, dip_mult: float = 1.0, bear_book: bool = False):
         self.mode, self.plan_path = mode, plan_path
         self.risk_mult, self.corr, self.tag, self.dip_mult = float(risk_mult), bool(corr), tag or None, float(dip_mult)
+        self.bear_book = bool(bear_book)
+        self._bear_at = None
+        self._bear = False
         self.dir = ROOT / "artifacts/bot" / (mode if not self.tag else f"{mode}_{self.tag}")
         self.dir.mkdir(parents=True, exist_ok=True)
         self.state_f = self.dir / "state.json"
@@ -164,6 +167,29 @@ class Runner:
                     continue
         return out
 
+    def bear_now(self, now) -> bool:
+        """Bear regime from BTCUSDT 4h opens (cached 10 minutes). Off -> False without any fetch."""
+        if not self.bear_book:
+            return False
+        now = pd.Timestamp(now)
+        if self._bear_at is not None and now - self._bear_at < pd.Timedelta(minutes=10):
+            return self._bear
+        try:
+            pub = getattr(self.ex, "pub", self.ex)
+            fn = getattr(pub, "klines_4h_opens", None) or getattr(self.ex, "klines_4h_opens", None)
+            opens = fn("BTCUSDT") if fn is not None else []
+        except Exception:
+            return self._bear if self._bear_at is not None else False
+        b = bool(mirror.is_bear(opens))
+        try:
+            n = len(opens)
+        except TypeError:
+            n = 0
+        if self._bear_at is None or b != self._bear:
+            self.log(dict(op="bear_state", bear=b, opens=n))
+        self._bear, self._bear_at = b, now
+        return b
+
     def cycle(self):
         now = pd.Timestamp.now(tz="UTC")
         plan = json.loads(self.plan_path.read_text())
@@ -195,8 +221,10 @@ class Runner:
                                                                           reduce_only=True, position_idx=payload["positionIdx"], piece=pid)))
                 if self.mode == "dry":
                     pc["qty"] = 0.0
+        bear = self.bear_now(now)
         want = mirror.desired(plan, now, equity, led, risk_mult=self.risk_mult, corr=self.corr,
-                              last_close=self.last_close_1m() if self.corr else None, dip_mult=self.dip_mult)
+                              last_close=self.last_close_1m() if self.corr else None, dip_mult=self.dip_mult,
+                              bear_book=self.bear_book, bear=bear)
         if stale:
             want = {k: o for k, o in want.items() if o.kind in ("tp", "stop", "reduce")}
             self.log(dict(op="stale_plan", generated_at=plan["generated_at"]))
@@ -263,6 +291,7 @@ def main():
     ap.add_argument("--risk-mult", type=float, default=1.0, help="scale all book/dip sizes and the dip budget (default 1.0 = unchanged)")
     ap.add_argument("--corr-size", action="store_true", help="shrink each dip rung by 1/(1+n) flushing peers (default off = unchanged)")
     ap.add_argument("--dip-mult", type=float, default=1.0, help="scale dip rung sizes only (v406/v408 R2B1D16/D18: 1.6/1.8; default 1.0 = unchanged)")
+    ap.add_argument("--bear-book", action="store_true", help="halve book LONG entry/add qty while BTC trades below its 200-day mean (default off = unchanged)")
     ap.add_argument("--tag", default=None, help="state dir artifacts/bot/<mode>[_<tag>] (default no tag = unchanged paths)")
     a = ap.parse_args()
     if a.mode == "live" and os.environ.get("BOT_ALLOW_LIVE") != "yes-real-money":
@@ -270,7 +299,8 @@ def main():
     mode_dir = a.mode if not a.tag else f"{a.mode}_{a.tag}"
     (ROOT / "artifacts/bot" / mode_dir).mkdir(parents=True, exist_ok=True)
     _lock = single_instance(ROOT / "artifacts/bot" / mode_dir / "runner.lock") if not a.once else None
-    r = Runner(a.mode, Path(a.plan), a.equity, risk_mult=a.risk_mult, corr=a.corr_size, tag=a.tag, dip_mult=a.dip_mult)
+    r = Runner(a.mode, Path(a.plan), a.equity, risk_mult=a.risk_mult, corr=a.corr_size, tag=a.tag, dip_mult=a.dip_mult,
+             bear_book=a.bear_book)
     while True:
         try:
             r.cycle()

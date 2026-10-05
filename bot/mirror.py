@@ -118,8 +118,25 @@ def corr_mult(plan_dips_for_phase, last_close: dict | None, a_sym: str) -> float
     return 1.0 / (1.0 + n)
 
 
+def is_bear(opens) -> bool:
+    """Bear regime: latest 4h bar OPEN < simple mean of the last 1200 4h opens including it (min 600 bars)."""
+    try:
+        seq = list(opens or [])
+    except TypeError:
+        return False
+    if len(seq) < 600:
+        return False
+    window = seq[-1200:]
+    try:
+        mean = sum(float(x) for x in window) / len(window)
+        return float(window[-1]) < mean
+    except (TypeError, ValueError):
+        return False
+
+
 def desired(plan: dict, now, equity: float, ledger: dict, budget: float = BUDGET, risk_mult: float = 1.0,
-            corr: bool = False, last_close: dict | None = None, dip_mult: float = 1.0) -> dict[str, Order]:
+            corr: bool = False, last_close: dict | None = None, dip_mult: float = 1.0,
+            bear_book: bool = False, bear: bool = False) -> dict[str, Order]:
     """The order set that should rest on the exchange now (link id -> Order). Quantities are in coins, before exchange rounding."""
     now = pd.Timestamp(now)
     out: dict[str, Order] = {}
@@ -140,7 +157,10 @@ def desired(plan: dict, now, equity: float, ledger: dict, budget: float = BUDGET
                 ok = _ts(o["issued"]) + pd.Timedelta(minutes=ENTRY_DELAY_MIN) <= now < _ts(o["valid_until"])
                 if ok and pid not in ledger:
                     sgn = 1 if o["side"] == "BUY" else -1
-                    out[pid + "E"] = Order(pid + "E", sym, "Buy" if sgn > 0 else "Sell", float(o["weight"]) * equity / float(o["price"]) * rk,
+                    eqty = float(o["weight"]) * equity / float(o["price"]) * rk
+                    if bear_book and bear and sgn > 0:
+                        eqty *= 0.5
+                    out[pid + "E"] = Order(pid + "E", sym, "Buy" if sgn > 0 else "Sell", eqty,
                                            "entry", price=float(o["price"]), position_idx=_pidx(sgn), piece=pid,
                                            meta=dict(sl=o.get("sl_if_filled"), tp=o.get("tp_if_filled"), phase=ph, kind="book"))
             if piece is None:
@@ -158,7 +178,10 @@ def desired(plan: dict, now, equity: float, ledger: dict, budget: float = BUDGET
                 if o and o.get("kind") in ("add", "reduce", "close") and now < _ts(o["valid_until"]):
                     tag = f"{piece}{o['kind'][0].upper()}{t36(o['valid_until'])}"
                     if o["kind"] == "add":
-                        out[tag] = Order(tag, sym, "Buy" if pc["side"] > 0 else "Sell", float(o["amount"]) * equity / float(o["price"]) * rk, "add",
+                        aqty = float(o["amount"]) * equity / float(o["price"]) * rk
+                        if bear_book and bear and pc["side"] > 0:
+                            aqty *= 0.5
+                        out[tag] = Order(tag, sym, "Buy" if pc["side"] > 0 else "Sell", aqty, "add",
                                          price=float(o["price"]), position_idx=_pidx(pc["side"]), piece=piece)
                     else:
                         q = pc["qty"] if o["kind"] == "close" else pc["qty"] * min(1.0, float(o["amount"]))
