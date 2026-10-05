@@ -25,4 +25,4 @@ into exchange orders. Logic: `bot/mirror.py` (pure, tests in `tests/test_bot_mir
 
 State: `artifacts/bot/<mode>/state.json`; every action: `artifacts/bot/<mode>/actions.jsonl`.
 Known caveats: plan levels come from Binance prices (Bybit within ~2 bps, BNB ~10 bps cheaper on Bybit); the backend must run
-for fresh plans; the 20-s loop means a dip fill is protected by its native backstop until the next cycle places the TP.
+for fresh plans; a new fill has no exit orders until the next cycle (<= 20 s) places its stop and TP.

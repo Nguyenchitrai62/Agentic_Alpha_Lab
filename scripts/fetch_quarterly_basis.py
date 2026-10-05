@@ -334,19 +334,27 @@ def parse_kline_zip(raw: bytes) -> pd.DataFrame:
     return d[["open_time", "open", "high", "low", "close", "volume"]].reset_index(drop=True)
 
 
-def ensure_contract_parquet(venue: str, contract: str) -> tuple[dict, bool]:
+def ensure_contract_parquet(venue: str, contract: str,
+                            prior: dict | None = None) -> tuple[dict, bool]:
     """Download (skip if present) + parse one contract; returns (manifest_entry, downloaded)."""
     kind = "um" if venue == "um" else "cm"
     path = OUT / f"{kind}_{contract}_1h.parquet"
-    if path.exists():
+    if path.exists() and prior and isinstance(prior.get("source_urls"), list):
         d = pd.read_parquet(path)
         return ({"contract": contract, "venue": kind, "file": path.name,
                  "rows": int(len(d)), "first_open_time": str(d["open_time"].iloc[0]),
                  "last_open_time": str(d["open_time"].iloc[-1]),
                  "sha256": hashlib.sha256(path.read_bytes()).hexdigest(),
-                 "source_urls": "cached-local (not re-downloaded)"}, False)
+                 "source_urls": prior["source_urls"]}, False)
     monthly, daily = contract_zip_keys(venue, contract)
     urls = [BASE + k for k in monthly + daily]
+    if path.exists():  # cached but URL provenance missing -> re-list only, no download
+        d = pd.read_parquet(path)
+        return ({"contract": contract, "venue": kind, "file": path.name,
+                 "rows": int(len(d)), "first_open_time": str(d["open_time"].iloc[0]),
+                 "last_open_time": str(d["open_time"].iloc[-1]),
+                 "sha256": hashlib.sha256(path.read_bytes()).hexdigest(),
+                 "source_urls": urls}, False)
     parts, missing = [], []
     for key, url in zip(monthly + daily, urls):
         try:
@@ -423,10 +431,17 @@ def main() -> None:
     contracts = list_delivery_contracts()
     print(f"delivery contracts: UM={len(contracts['um'])} CM={len(contracts['cm'])}",
           flush=True)
+    prior_files: dict = {}
+    if (OUT / "manifest.json").exists():
+        try:
+            prior_files = json.loads((OUT / "manifest.json").read_text()).get("files", {})
+        except (json.JSONDecodeError, OSError):
+            prior_files = {}
     files: dict[str, dict] = {}
     for venue in ("um", "cm"):
         for contract in contracts[venue]:
-            entry, _ = ensure_contract_parquet(venue, contract)
+            entry, _ = ensure_contract_parquet(
+                venue, contract, prior_files.get(f"{venue}_{contract}"))
             files[f"{venue}_{contract}"] = entry
             (OUT / "manifest.json").write_text(json.dumps(
                 {"source": BASE, "files": files}, indent=1))

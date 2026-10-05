@@ -2,7 +2,7 @@
   "schema_version": 1,
   "project": "Agentic Alpha Lab BTC swing research",
   "created_at": "2026-09-06T00:00:00Z",
-  "next_version": 390,
+  "next_version": 391,
   "control": {
     "coordinator_model": "gpt-5.6-sol",
     "coordinator_reasoning": "high",
@@ -54,7 +54,7 @@
     "expected_workers": 3,
     "version_range": [
       45,
-      389
+      390
     ],
     "parent_commit": "1ecf947baddd5ef78444670330e9db62128dad50",
     "cloud_snapshot": {
@@ -16724,7 +16724,7 @@
       "version": "v389",
       "track": "A",
       "direction_key": "v389-bot-phase-books",
-      "status": "running",
+      "status": "rejected",
       "parent_versions": [
         "v376"
       ],
@@ -16737,10 +16737,58 @@
       "write_scope": "research/parallel/rounds/parallel-20260906-r2/v389",
       "worker_agent_id": "01a07792-4a6b-7fc3-a08a-af2923b1778a",
       "worker_host_id": "local",
-      "result_manifest": null,
+      "result_manifest": "research\\parallel\\rounds\\parallel-20260906-r2\\v389\\result_manifest.json",
       "registered_at": "2026-10-04T10:12:06.369429Z",
-      "assigned_at": "2026-10-04T10:12:06.369429Z"
+      "assigned_at": "2026-10-04T10:12:06.369429Z",
+      "result_manifest_sha256": "0ac5f48c009c946e33a8f10e25f9b36238dfeed8fa1ee30545f08790305ed62d",
+      "result_summary": {
+        "scenarios": {
+          "normal": {
+            "monthly_geometric_net_percent": 5.24,
+            "max_drawdown_percent": 23.08,
+            "fills": 0,
+            "months": 48
+          },
+          "fee_stress": {
+            "monthly_geometric_net_percent": 5.24,
+            "max_drawdown_percent": 23.08,
+            "fills": 0,
+            "months": 48
+          },
+          "execution_stress": {
+            "monthly_geometric_net_percent": 5.24,
+            "max_drawdown_percent": 23.08,
+            "fills": 0,
+            "months": 48
+          }
+        },
+        "independent_test": false,
+        "live_approved": false,
+        "audit_notes": "v389_audit/COMPARISON.md: PASS (replication matches; leakage checks pass). Disclosure: the auditor listed/read the v389 result JSON and run log during orientation before writing its replicate script, so blindness holds only at the script level, not agent level."
+      },
+      "audited_at": "2026-10-05T04:36:38.995027Z"
+    },
+    {
+      "version": "v390",
+      "track": "A",
+      "direction_key": "v390-bot-exante-book-risk",
+      "status": "running",
+      "parent_versions": [
+        "v389"
+      ],
+      "model_family": "hist-gradient-boosting",
+      "objective": "BOT R2-4P with ex-ante covariance book risk sizing (book_size hook), honest 4-phase harness",
+      "data_contract": "Binance USD-M 1m/4h majors, dev 2021-09-24..2025-09-23 for selection; trailing 360-bar covariance of 4h opens up to the decision row",
+      "policy_contract": "R2 rules unchanged; new book entries scaled by s_ex/s_hist (de-risk only or clipped 0.5-1.5); dip rungs unchanged",
+      "hypothesis": "Ex-ante sizing cuts the book's one-way concentration drawdown without losing return",
+      "parent_commit": "1ecf947baddd5ef78444670330e9db62128dad50",
+      "write_scope": "research/parallel/rounds/parallel-20260906-r2/v390",
+      "worker_agent_id": "01a07792-4a6b-7fc3-a08a-af2923b1778a",
+      "worker_host_id": "local",
+      "result_manifest": null,
+      "registered_at": "2026-10-05T04:36:38.988600Z",
+      "assigned_at": "2026-10-05T04:36:38.988600Z"
     }
   ],
-  "updated_at": "2026-10-04T10:12:06.374924Z"
+  "updated_at": "2026-10-05T04:36:38.995027Z"
 }
