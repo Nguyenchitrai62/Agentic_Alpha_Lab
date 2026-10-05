@@ -56,3 +56,11 @@ một năm xấu có thể chỉ ~3 %/tháng.
 KPI (oc_kpi): 41 % số tháng >= +5 %, 72 % số tháng không lỗ, chuỗi lỗ dài nhất 2 tháng; win book 51,5 %, rung dip 68,7 %, tất cả 65,5 %.
 Lưu ý đòn bẩy: notional dip có lúc tới ~6,4x vốn khi thị trường yên (stop gần) - đặt đòn bẩy tài khoản Bybit đủ cao (cross margin) và
 cân nhắc trần notional (v421 G2: cùng lợi nhuận, DD năm 16,9; đang kiểm tra robustness).
+
+## Cú sốc giá tức thì (OpenCode oc_gapstress) - lý do nên bật trần notional dip
+
+Giả lập: mọi phút có vị thế mở trong 5 năm, cả 5 coin sụt tức thì (sàn sập / flash crash nhảy qua mọi stop), đóng ở giá sập.
+Sụt -10 %: trung vị lỗ 0,85 % vốn, p99 13 %, nhưng phút tệ nhất (mọi thang dip đầy cùng lúc, vd 2025-08-14) lỗ 58 % vốn (một phase 71 %).
+Với trần notional dip 2x vốn (v421 G2, `--dip-gross-cap 2.0`): phút tệ nhất còn 33,5 % (3x: 39 %); trung vị và p99 không đổi.
+Lịch sử 5 năm: G2 5,41 %/tháng, DD năm 16,9 / toàn giai đoạn 16,8 (D17BF 5,43 / 18,3 / 16,9). Khuyến nghị: chạy thật nên bật
+`--dip-gross-cap 2.0` (đang có bot paper d17bfg2 song song d17bf và g2k20 để so sánh tiến cứu).
