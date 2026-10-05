@@ -1,0 +1,3 @@
+# OpenCode task ops_testsuite
+Read AGENTS.md. Write ONLY docs/opencode/TESTSUITE_REPORT_20261006.md. No code edits, no commits.
+Run `.venv/Scripts/python.exe -m pytest -q tests -p no:randomly` (it is long; run it once, in the background if needed, capture the summary) and classify every failure / error: pre-existing frozen-hash drift (e.g. tests/test_r78_nonwait.py::test_prespec_frozen_shas), tests of research folders whose files are missing or ignored, tests that need data not on disk, real regressions in tracked code (bot/, backend/, scripts/, engine_user). For each: test id, error line, cause, and the minimal fix the leader should apply (or "mark skip with reason"). Do not apply fixes.
