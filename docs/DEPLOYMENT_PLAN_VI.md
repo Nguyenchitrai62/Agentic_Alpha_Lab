@@ -46,3 +46,13 @@ Bootstrap khối dừng (khối TB 20 ngày, 10.000 năm giả lập từ 5 năm
 - Xác suất một năm 12 tháng lỗ: ~0,7 %. Trung vị lợi nhuận ~5,1 %/tháng (p5 1,5 / p95 10,3); chỉ ~52 % năm đạt >= 5 %/tháng.
 - DD đánh dấu 1 ngày: trung vị 14,5 %, p95 22,6 %; P(DD > 20 %) ~11 %, P(DD > 25 %) ~2 %.
 - Nghĩa là: kỳ vọng hợp lý là 4-6 %/tháng với DD 12-18 %, nhưng khoảng 1/9 năm có thể chạm DD > 20 %. Vốn nên là số tiền chịu được DD 25 %.
+
+## Cửa sổ 12 tháng trượt (OpenCode oc_rolling17, 49 cửa sổ bắt đầu ngày 24 mỗi tháng 2021-09..2025-09)
+
+R2B1D17BF: không cửa sổ nào lỗ; %/tháng min 2,73 / p10 3,25 / trung vị 4,89 / p90 8,88 / max 11,71; DD min 8,3 / trung vị 13,5 /
+p90 18,3 / max 18,7; 49 % cửa sổ đạt >= 5 %/tháng, 61 % có DD < 15, 100 % có DD < 20. Kỳ vọng thực tế: khoảng 5 %/tháng trung vị,
+một năm xấu có thể chỉ ~3 %/tháng.
+
+KPI (oc_kpi): 41 % số tháng >= +5 %, 72 % số tháng không lỗ, chuỗi lỗ dài nhất 2 tháng; win book 51,5 %, rung dip 68,7 %, tất cả 65,5 %.
+Lưu ý đòn bẩy: notional dip có lúc tới ~6,4x vốn khi thị trường yên (stop gần) - đặt đòn bẩy tài khoản Bybit đủ cao (cross margin) và
+cân nhắc trần notional (v421 G2: cùng lợi nhuận, DD năm 16,9; đang kiểm tra robustness).
