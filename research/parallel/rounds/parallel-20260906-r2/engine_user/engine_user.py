@@ -74,7 +74,7 @@ def prepare(books, opens):
 
 
 def simulate(books, opens, prep, m_sl=3.0, m_sleeve_sl=2.0, sleeve=True, target=0.25, cap=2.0, d_limit=D_LIMIT, win_end=60, sleeve_risk_budget=None, gap=0.02, m_sleeve_tp=1.0, rung_scale_fixed=None, size_mult=1.0, rungs=RUNGS, m_tp=None, hourly=False, align=None, events=None, bars=None, exec_policy=None, fixed_levels=False, attrib=None, trade=None, win_start=2, state_out=None, sleeve_filter=None, sleeve_tp=None, strat_vt=None, sleeve_start=16, risk_mult=None, sleeve_breaker=None, sleeve_stop_mode="touch", sleeve_backstop=None, sleeve_budget_sl=None, book_stop_mode="touch", book_backstop=None, sleeve_exit_agent=None, sleeve_lock_cut=False, sleeve_fill_size=None, path_out=None, book_size=None, gov=None, sleeve_hedge=None,
-             sleeve_fill_minute_stop=False, fill_through_bps=0.0, stop_slip=0.0, timeout_exit_minute=0, funding_rates=None, sleeve_sl_coin=None):
+             sleeve_fill_minute_stop=False, fill_through_bps=0.0, stop_slip=0.0, timeout_exit_minute=0, funding_rates=None, sleeve_sl_coin=None, sleeve_gross_cap=None):
     # Execution-realism stress hooks (system audit 2026-10-03; every default reproduces the audited results bit-for-bit):
     # sleeve_fill_minute_stop: True -> a dip rung's touch stop (touch mode) / native backstop (close modes) is also checked in the
     #   FILL minute itself: if that minute's low <= the level, the rung exits at the level as a taker stop in the fill minute
@@ -115,6 +115,8 @@ def simulate(books, opens, prep, m_sl=3.0, m_sleeve_sl=2.0, sleeve=True, target=
     # sleeve_stop_mode: "touch" (default: a 1m low through the stop, fill at min(stop, open)); "close1" / "close5": the market stop
     #   triggers when a 1m close / a 5m-block close (minutes 4, 9, ... of the bar) is at or below the stop and fills at the next minute's
     #   open (next bar open after minute 239); a same-minute TP touch and close trigger resolve stop-first.
+    # sleeve_gross_cap: optional float G; a new dip rung is cut to the room left under G (sum of the notional / equity of the rungs still
+    #   open at the fill minute plus the new one <= G) and skipped when no room is left. None = unchanged.
     # sleeve_sl_coin: optional callable (i, a) -> dip close-stop multiple for coin a at bar i (decided at the bar open); it replaces
     #   m_sleeve_sl for that rung's stop AND its risk-budget cost. None = m_sleeve_sl for every coin (bit-for-bit unchanged).
     # sleeve_fill_size: optional callable (i, a, rung_index, fill_minute) -> size multiplier of a dip rung decided AT the fill (data up
@@ -694,6 +696,11 @@ def simulate(books, opens, prep, m_sl=3.0, m_sleeve_sl=2.0, sleeve=True, target=
                         over = risk_open + rn * (sleeve_budget_sl * sg + gap) > sleeve_risk_budget + 1e-12
                     if over:
                         continue
+                if sleeve_gross_cap is not None:
+                    room = sleeve_gross_cap - sum(t[7] for t in taken if t[4] > f)
+                    if room <= 1e-12:
+                        continue
+                    rn = min(rn, room)
                 Ha, La, Ca, Oa = (X[i, :, a].astype(float) for X in (H, L, C, O))
                 tp = lv * (1 + (m_sleeve_tp if sleeve_tp is None else float(sleeve_tp(i, a, r, f))) * sg)
                 sl = lv * (1 - _msl(a) * sg)
