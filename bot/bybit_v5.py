@@ -41,7 +41,13 @@ class Bybit:
         return d.get("result", {})
 
     def public(self, path: str, **params):
-        return self._check(self.s.get(self.base + path, params=params, timeout=self.timeout))
+        for attempt in range(4):  # 10006 = IP rate limit: back off and retry (public market data only)
+            try:
+                return self._check(self.s.get(self.base + path, params=params, timeout=self.timeout))
+            except BybitError as e:
+                if "10006" not in str(e) or attempt == 3:
+                    raise
+                time.sleep(1.5 * (attempt + 1))
 
     def _headers(self, payload: str):
         if not (self.key and self.secret):
