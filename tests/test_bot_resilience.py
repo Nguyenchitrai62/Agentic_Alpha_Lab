@@ -151,8 +151,11 @@ def test_1_restart_adopts_open_dip_without_duplicates(tmp_path):
                getattr(a.get("order"), "piece", "") != pid or getattr(a.get("order"), "kind", "") != "entry"
                for a in places)
     assert not [a for a in places if getattr(a.get("order"), "kind", "") == "entry"]
-    # protection still rests on the exchange
-    assert any(k.endswith("T") for k in ex.orders) and any(k.endswith("S") for k in ex.orders)
+    # protection still rests on the exchange - unless the piece is being closed at market (wall-clock cycle after the bar end
+    # triggers the time exit; bot_bookgap: no sibling orders while a market exit is in flight)
+    protected = any(k.endswith("T") for k in ex.orders) and any(k.endswith("S") for k in ex.orders)
+    closing = any(rec.get("op") == "market_exit" for rec in getattr(r, "logs", [])) or any(a.get("op") == "market_exit" for a in acts)
+    assert protected or closing
 
 
 def test_2_partial_fill_sizes_protection_and_keeps_remainder(tmp_path):
@@ -255,7 +258,7 @@ def test_6_missing_or_corrupt_plan_keeps_protection(tmp_path):
     acts = r.cycle()  # must not crash
     assert any(rec.get("op") == "plan_error" for rec in r.logs)
     assert not [a for a in acts if a["op"] == "place" and getattr(a.get("order"), "kind", "") == "entry"]
-    assert any(k.endswith("T") or k.endswith("S") for k in ex.orders)
+    assert any(k.endswith("T") or k.endswith("S") for k in ex.orders) or any(rec.get("op") == "market_exit" for rec in getattr(r, "logs", []))
     # missing file behaves the same
     r.plan_path.unlink()
     acts2 = r.cycle()

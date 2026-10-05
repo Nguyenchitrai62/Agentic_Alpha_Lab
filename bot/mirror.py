@@ -13,6 +13,10 @@ PLAN for new orders; when the plan's book position is gone (paper exit) but the 
 closed at market (logged as a divergence).
 Dip risk budget per sub-book (engine rule): sum over open rungs and resting bids of size * (stop distance + 0.02) <= budget * sub capital;
 bids are admitted shallow-first, so the resting set never lets simultaneous fills exceed the budget.
+A piece with a market exit in flight (exit_sent < 2 min old) carries no other resting order, so the market exit and a
+TP/stop/reduce can never both fill for the full piece qty out of the shared (symbol, positionIdx) net (bot_bookgap).
+Fill remainders at/below 1e-9 of the piece size are float dust and are clamped to exactly 0, so closed pieces never
+refire exits every 2 minutes (bot_bookgap).
 """
 from __future__ import annotations
 
@@ -24,6 +28,38 @@ GRACE_MIN = 3
 BUDGET, GAP = 0.26, 0.02
 ENTRY_DELAY_MIN = 5  # user rule: no new order fills in the first 5 minutes after the 4h close
 DIP_SL_DEFAULT = 4.0  # global dip close-stop multiple (v417 row X overrides per coin)
+DUST_REL = 1e-9  # remainders at/below this fraction of the piece size are float dust, not money (bot_bookgap)
+EXIT_INFLIGHT_MIN = 2.0  # runner market-exit throttle: a piece with exit_sent this fresh has an exit in flight (bot_bookgap)
+
+
+def _market_inflight(pc: dict, now) -> bool:
+    """True while a market exit of this piece may still be in flight (exit_sent < 2 min old).
+
+    While in flight the piece must carry no other resting order (no TP/stop/reduce/add,
+    no entry remainder): otherwise the market exit and the resting order can both fill
+    for the full piece qty (market sorts before limits in the same minute), spending the
+    shared (symbol, positionIdx) net twice and stranding the victim piece whose exchange
+    balance was consumed (bot_bookgap: 25,435 exit placements for 143 fills). Once the
+    marker is stale the protection is emitted again, so a failed exit never disarms a piece.
+    """
+    try:
+        sent = pc.get("exit_sent")
+        if sent is None:
+            return False
+        age_min = (pd.Timestamp(now) - pd.Timestamp(sent)).total_seconds() / 60.0
+        return 0.0 <= age_min < EXIT_INFLIGHT_MIN
+    except (TypeError, ValueError, AttributeError):
+        return False
+
+
+def _zero_dust(left: float, ref: float) -> float:
+    """Clamp a ULP-level remainder to exactly 0 (bot_bookgap: 1.5e-12 leftovers refired exits every 2 min)."""
+    try:
+        if left <= DUST_REL * max(abs(ref), 1e-18):
+            return 0.0
+    except (TypeError, ValueError):
+        pass
+    return max(0.0, left)
 
 
 def t36(ts) -> str:
@@ -275,6 +311,8 @@ def desired(plan: dict, now, equity: float, ledger: dict, budget: float = BUDGET
             if piece is None:
                 continue
             pc = ledger[piece]
+            if _market_inflight(pc, now):
+                continue  # a market exit of this piece is in flight: no TP/stop/add/reduce until it fills (bot_bookgap double-spend)
             pos = sub.get("position")
             if not pos and pc.get("sl") and pc.get("tp"):  # filled before the plan saw it: protect with the entry's attached levels
                 pos = {"sl": pc["sl"], "tp": pc["tp"]}
@@ -297,8 +335,9 @@ def desired(plan: dict, now, equity: float, ledger: dict, budget: float = BUDGET
                         out[tag] = Order(tag, sym, pc_side, q, "reduce", price=float(o["price"]), reduce_only=True,
                                          position_idx=_pidx(pc["side"]), piece=piece)
         # dip pieces already open: take-profit + native backstop (the 5m-close stop and the time exit are bot actions, see exits())
+        # A piece with a market exit in flight carries no other resting order (same double-spend rule as book pieces).
         for pid, pc in ledger.items():
-            if pc["kind"] == "dip" and pc["symbol"] == sym and pc["qty"] > 0:
+            if pc["kind"] == "dip" and pc["symbol"] == sym and pc["qty"] > 0 and not _market_inflight(pc, now):
                 out[pid + "T"] = Order(pid + "T", sym, "Sell", pc["qty"], "tp", price=pc["tp"], reduce_only=True, position_idx=1, piece=pid)
                 if pc.get("backstop"):
                     out[pid + "S"] = Order(pid + "S", sym, "Sell", pc["qty"], "stop", trigger=pc["backstop"], reduce_only=True,
@@ -371,6 +410,8 @@ def desired(plan: dict, now, equity: float, ledger: dict, budget: float = BUDGET
             rem = 0.0
         if pc.get("kind") != "dip" or rem <= 1e-12 or float(pc.get("qty", 0.0)) <= 0:
             continue
+        if _market_inflight(pc, now):
+            continue  # closing in flight: do not re-place the remainder until it fills (bot_bookgap double-spend)
         if pid + "E" in out:
             continue
         if pid not in active_pids:
@@ -626,7 +667,8 @@ def apply_fill(ledger: dict, order: Order, qty: float, price: float, t) -> None:
         if "entry_px" not in pc and order.price is not None:
             pc["entry_px"] = order.price
         try:
-            pc["entry_remaining"] = max(0.0, float(pc.get("planned_qty", tot)) - tot)
+            pc["entry_remaining"] = _zero_dust(max(0.0, float(pc.get("planned_qty", tot)) - tot),
+                                              float(pc.get("planned_qty", tot)))
         except (TypeError, ValueError):
             pc["entry_remaining"] = 0.0
         if pc["entry_remaining"] <= 1e-12:
@@ -637,4 +679,9 @@ def apply_fill(ledger: dict, order: Order, qty: float, price: float, t) -> None:
         pc["entry"] = (pc["entry"] * pc["qty"] + price * qty) / tot
         pc["qty"] = tot
     elif pid in ledger:
-        ledger[pid]["qty"] = max(0.0, ledger[pid]["qty"] - qty)
+        pc = ledger[pid]
+        try:
+            left = float(pc.get("qty", 0.0)) - float(qty)
+            pc["qty"] = _zero_dust(left, max(float(pc.get("qty", 0.0)), float(qty)))
+        except (TypeError, ValueError):
+            ledger[pid]["qty"] = max(0.0, ledger[pid]["qty"] - qty)

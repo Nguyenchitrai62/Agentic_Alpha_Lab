@@ -31,6 +31,16 @@ State: `artifacts/bot/<mode>/state.json`; every action: `artifacts/bot/<mode>/ac
 Known caveats: plan levels come from Binance prices (Bybit within ~2 bps, BNB ~10 bps cheaper on Bybit); the backend must run
 for fresh plans; a new fill has no exit orders until the next cycle (<= 20 s) places its stop and TP.
 
+## CHANGES (bot_bookgap: dust + in-flight double-spend, mirror-only, default behaviour)
+- `mirror.apply_fill` clamps ULP-level remainders (<= 1e-9 of the piece size) to exactly 0, so a closed piece never
+  refires market exits every 2 minutes (parity window: one 1.5e-12 XRP leftover alone caused 3,781 futile placements).
+- `mirror.desired` emits no other order (TP/stop/reduce/add/entry-remainder) for a piece with a market exit in flight
+  (`exit_sent` < 2 min old): the market exit and a resting TP could otherwise both fill for the full piece qty out of
+  the shared (symbol, positionIdx) net, spending other pieces' balances and stranding victims in an exit-retry loop
+  (parity window: 25,435 exit placements for 143 fills). Stale markers restore protection, so a failed exit never
+  disarms a piece. NOTE: `tests/test_bot_resilience.py::test_1` and `::test_6` still assert the old behaviour
+  (protection rests alongside a fresh market exit) and need updating to the fixed behaviour.
+
 ## CHANGES (v399/R2B1_130: correlation-aware dip sizing + risk multiplier, default off)
 - `mirror.corr_mult(dips_of_phase, last_close, a) = 1/(1+n)`: n = other majors in the same phase whose last closed 1m
   close <= open_b*(1-2.5*sigma_b), with open/sigma from any rung row (`sigma=(1-stop/buy_limit)/4`,

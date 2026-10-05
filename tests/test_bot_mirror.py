@@ -646,3 +646,75 @@ def test_dip_gross_cap_never_touches_book_or_protection():
     assert mirror.diff(wcut, have) == []  # default: entry qty changes never amend
     acts = mirror.diff(wcut, have, amend_entry_qty=True)
     assert acts == [dict(op="amend", link=klink, symbol="BTCUSDT", qty=wcut[klink].qty)]
+
+
+# ---- bot_bookgap: dust remainders + in-flight double-spend (window 2026-09-01..09-23) ----
+
+def _open_dip_piece(qty=0.7574794472048797):
+    o = next(iter(mirror.desired(plan(dips=[dip(2.5)]), T0 + pd.Timedelta(minutes=20), 10000, {}).values()))
+    led = {}
+    mirror.apply_fill(led, o, qty, 78000.0, T0 + pd.Timedelta(minutes=21))
+    (pid,) = led
+    return led, pid
+
+
+def test_bookgap_dust_remainder_clears_and_stops_exits():
+    # parity case b0XRPhr8lc: entry 99.62821364020849, market exit filled 99.62821364020702
+    o = next(iter(mirror.desired(plan([pending()]), T0 + pd.Timedelta(minutes=6), 10000, {}).values()))
+    led = {}
+    mirror.apply_fill(led, o, 99.62821364020849, 80000.0, T0 + pd.Timedelta(minutes=30))
+    (pid,) = led
+    mkt = mirror.Order(pid + "X", o.symbol, "Sell", 99.62821364020849, "reduce",
+                       reduce_only=True, position_idx=1, piece=pid)
+    mirror.apply_fill(led, mkt, 99.62821364020702, 79900.0, T0 + pd.Timedelta(minutes=31))
+    assert led[pid]["qty"] == 0.0  # 1.5e-12 dust clamped: no more exits for this piece
+    assert mirror.exits(plan(), T0 + pd.Timedelta(hours=5), led, {}) == []
+
+
+def test_bookgap_real_partial_remainder_kept():
+    # a genuine partial take (0.176 of 0.8146) keeps the exact remainder: no money is hidden
+    o = next(iter(mirror.desired(plan([pending()]), T0 + pd.Timedelta(minutes=6), 10000, {}).values()))
+    led = {}
+    mirror.apply_fill(led, o, 0.8145962055350299, 80000.0, T0 + pd.Timedelta(minutes=30))
+    (pid,) = led
+    pos = {"phase": 0, "state": "position", "position": {"side": "LONG", "sl": 70000.0, "tp": 95000.0}}
+    tp = next(x for x in mirror.desired(plan([pos]), T0 + pd.Timedelta(hours=1), 10000, led).values() if x.kind == "tp")
+    mirror.apply_fill(led, tp, 0.17618897168112468, 81000.0, T0 + pd.Timedelta(hours=2))
+    assert abs(led[pid]["qty"] - (0.8145962055350299 - 0.17618897168112468)) < 1e-12
+    assert led[pid]["qty"] > 0
+
+
+def test_bookgap_dust_entry_remaining_clears():
+    o = next(iter(mirror.desired(plan(dips=[dip(2.5)]), T0 + pd.Timedelta(minutes=20), 10000, {}).values()))
+    led = {}
+    mirror.apply_fill(led, o, o.qty, 78000.0, T0 + pd.Timedelta(minutes=21))
+    (pid,) = led
+    assert led[pid].get("entry_remaining", 0.0) == 0.0  # full fill leaves no remainder
+    # a ULP-level shortfall of the remainder never re-places a dust bid
+    led[pid]["entry_remaining"] = 1e-12
+    w = mirror.desired(plan(dips=[dip(2.5)]), T0 + pd.Timedelta(minutes=30), 10000, led)
+    assert not [x for x in w.values() if x.kind == "entry" and x.piece == pid]
+
+
+def test_bookgap_inflight_suppresses_dip_protection_and_restores():
+    led, pid = _open_dip_piece()
+    now = T0 + pd.Timedelta(minutes=30)
+    guard = {x.kind for x in mirror.desired(plan(), now, 10000, led).values()}
+    assert guard == {"tp", "stop"}
+    led[pid]["exit_sent"] = str(now)  # market exit just placed: in flight
+    assert mirror.desired(plan(), now + pd.Timedelta(minutes=1), 10000, led) == {}
+    # stale marker (failed exit): protection is emitted again, the piece is never disarmed
+    assert {x.kind for x in mirror.desired(plan(), now + pd.Timedelta(minutes=3), 10000, led).values()} == {"tp", "stop"}
+
+
+def test_bookgap_inflight_suppresses_book_exits_and_restores():
+    o = next(iter(mirror.desired(plan([pending()]), T0 + pd.Timedelta(minutes=6), 10000, {}).values()))
+    led = {}
+    mirror.apply_fill(led, o, 0.025, 80000.0, T0 + pd.Timedelta(minutes=30))
+    pos = {"phase": 0, "state": "position", "position": {"side": "LONG", "sl": 70000.0, "tp": 95000.0}}
+    now = T0 + pd.Timedelta(hours=1)
+    assert {x.kind for x in mirror.desired(plan([pos]), now, 10000, led).values()} == {"stop", "tp"}
+    (pid,) = led
+    led[pid]["exit_sent"] = str(now)  # divergence market exit in flight
+    assert mirror.desired(plan([pos]), now + pd.Timedelta(minutes=1), 10000, led) == {}
+    assert {x.kind for x in mirror.desired(plan([pos]), now + pd.Timedelta(minutes=3), 10000, led).values()} == {"stop", "tp"}
