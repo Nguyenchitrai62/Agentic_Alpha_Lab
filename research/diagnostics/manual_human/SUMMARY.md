@@ -16,3 +16,5 @@ Reading: a sleeping, 15-minute-late human loses ~0.6 %/month on every MANUAL pip
 with single-clock DD 22-24 % (one phase reaches 32-34 % in 2022 through the second 4-sigma dip rung). No MANUAL pipeline meets the floor
 (5 %/month, DD < 20) honestly. M3/M4/M5 are equivalent within noise; M2 has the best worst year. To hold DD < 20 a human should run a
 MANUAL pipeline on ~80 % of the capital (expect ~2.8 %/month). Nothing was selected on this table.
+
+Audit 2026-10-05 (OpenCode blind, research/diagnostics/diag_20261005_audit/COMPARISON.md): PASS, 0 mismatches, look-ahead PASS.

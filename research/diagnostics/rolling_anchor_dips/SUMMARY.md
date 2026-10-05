@@ -15,3 +15,5 @@ Reading: a clock-free anchor fills during sustained declines (a 4h drop is not a
 with bids from minute 16 and the bar-end time exit is a real part of the edge, not only an artefact. Phase 0 is again best in dev
 (2021 0.98 vs 0.16-0.42) and worst pre-research (2.91 vs 2.67-5.00) -> phase luck confirmed; the dip-only edge in 2021-2023 is modest
 (4-phase Sharpe 1.0-1.5 per year at equal notional; 2024 and the pre period are much stronger).
+
+Audit 2026-10-05 (OpenCode blind, research/diagnostics/diag_20261005_audit/COMPARISON.md): PASS, 0 mismatches, look-ahead PASS.
