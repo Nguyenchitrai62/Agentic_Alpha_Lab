@@ -7,15 +7,19 @@ into exchange orders. Logic: `bot/mirror.py` (pure, tests in `tests/test_bot_mir
 - `python -m bot.run --once --equity 2000` - DRY RUN: prints the orders that should rest now (public market data only, sends nothing).
 - `python -m bot.run --mode testnet` - Bybit TESTNET, every 20 s. Put `BYBIT_TESTNET_API_KEY` / `BYBIT_TESTNET_API_SECRET` in `.env`
   (testnet keys from testnet.bybit.com; never commit them).
+- `python -m bot.run --mode paper --equity 5000` - PAPER: the same bot against a simulated account filled from LIVE Bybit 1m klines
+  (`bot/paper.py`: trade-through limits, stop-first, taker market / stops, adverse long funding); prospective evidence for the whole bot
+  stack without keys. Running since 2026-10-05 04:46 UTC (state `artifacts/bot/paper/exchange.json`, log `runner.log`; one runner per mode,
+  OS lock `runner.lock`).
 - `--mode live` is LOCKED: it needs `BYBIT_API_KEY` / `BYBIT_API_SECRET` in `.env` AND `BOT_ALLOW_LIVE=yes-real-money` set by the
   account owner. Start live only after a clean testnet run and with a small account.
 
 ## Rules implemented (same as the research engine)
 - Hedge mode: longs positionIdx 1, shorts 2 (a sub-book short never nets against a long dip rung).
-- Book entries: PostOnly limits from minute 5 after the plan's issue time until `valid_until`; unfilled -> cancelled, never chased.
+- Book entries: GTC limits (a crossing limit fills at once as taker) from minute 5 after the plan's issue time until `valid_until`; unfilled -> cancelled, never chased.
 - Every filled piece gets its own reduce-only exits: book = conditional market stop at the plan SL + limit TP (amended when the plan moves
   SL/TP, e.g. break-even / tighten); plan add / reduce / close = limit orders.
-- Dip rungs: PostOnly bids from minute 16 to the bar end, admitted shallow-first inside each sub-book's risk budget (0.26 x sub capital,
+- Dip rungs: limit bids from minute 16 to the bar end, admitted shallow-first inside each sub-book's risk budget (0.26 x sub capital,
   stop distance + 2 %), TP limit + 8-sigma native backstop on the exchange, 4-sigma stop on a CLOSED 5m bar close (bot market exit), time
   exit at the bar end (market).
 - The exchange is the truth for open pieces: when the paper plan has exited a book position that is still open on the exchange, the bot

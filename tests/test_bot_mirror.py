@@ -96,7 +96,7 @@ def test_diff_cancels_and_places():
 def test_rounding_and_payloads():
     assert round_step(0.0129, "0.001") == "0.012" and round_step(1.2345, "0.01", up=True) == "1.24"
     buy = to_exchange(mirror.Order("e", "BTCUSDT", "Buy", 0.0129, "entry", price=80000.06), INST)
-    assert buy["qty"] == "0.012" and buy["price"] == "80000" and buy["timeInForce"] == "PostOnly"
+    assert buy["qty"] == "0.012" and buy["price"] == "80000" and buy["timeInForce"] == "GTC"
     assert to_exchange(mirror.Order("e", "BTCUSDT", "Buy", 0.0004, "entry", price=80000.0), INST) is None   # below the lot minimum
     st = to_exchange(mirror.Order("s", "SOLUSDT", "Sell", 1.25, "stop", trigger=100.006, reduce_only=True), INST)
     assert st["orderType"] == "Market" and st["triggerPrice"] == "100" and st["triggerDirection"] == 2 and st["reduceOnly"]
@@ -107,3 +107,40 @@ def test_rounding_and_payloads():
 def test_sign_matches_hmac():
     want = hmac.new(b"sec", b"1700000000000keyX10000a=1", hashlib.sha256).hexdigest()
     assert sign("sec", "1700000000000", "keyX", "10000", "a=1") == want
+
+
+class FakePublic:
+    """Bybit public client stand-in: 1m klines from a dict symbol -> list of (start_ms, o, h, l, c)."""
+    def __init__(self, bars):
+        self.bars = bars
+
+    def public(self, path, **kw):
+        rows = [b for b in self.bars[kw["symbol"]] if kw["start"] <= b[0] <= kw["end"]]
+        return {"list": [[str(b[0])] + [str(x) for x in b[1:]] + ["0", "0"] for b in reversed(rows)]}
+
+
+def test_paper_exchange_fills(tmp_path):
+    from bot.paper import PaperExchange
+    m0 = int(pd.Timestamp("2026-10-05 05:00", tz="UTC").timestamp() * 1000)
+    bars = {"BTCUSDT": [(m0 + 60_000 * k, *b) for k, b in enumerate([(100, 101, 99.5, 100), (100, 100, 98.9, 99), (99, 99.5, 97, 97.5),
+                                                                       (97.5, 102, 97.5, 101)])]}
+    ex = PaperExchange(FakePublic(bars), tmp_path / "x.json", 1000.0, ["BTCUSDT"])
+    ex.s["last_ms"]["BTCUSDT"] = m0
+    ex.s["last_close"]["BTCUSDT"] = 100.0
+    ex.place(dict(symbol="BTCUSDT", side="Buy", qty="1", orderLinkId="e", positionIdx=1, orderType="Limit", price="99", timeInForce="GTC"))
+    ex.s["orders"]["e"]["t_ms"] = m0 - 1
+    ex.step(pd.Timestamp(m0 + 2 * 60_000, unit="ms", tz="UTC"))               # minute 1 low 98.9 < 99 -> filled at 99 (maker)
+    assert ex.s["pos"]["BTCUSDT|1"]["qty"] == 1.0 and ex.s["pos"]["BTCUSDT|1"]["avg"] == 99.0
+    ex.place(dict(symbol="BTCUSDT", side="Sell", qty="1", orderLinkId="s", positionIdx=1, orderType="Market", triggerPrice="98",
+                  triggerDirection=2, reduceOnly=True))
+    ex.place(dict(symbol="BTCUSDT", side="Sell", qty="1", orderLinkId="t", positionIdx=1, orderType="Limit", price="99.4", reduceOnly=True))
+    for k in ("s", "t"):
+        ex.s["orders"][k]["t_ms"] = m0 + 60_000
+    ex.step(pd.Timestamp(m0 + 3 * 60_000, unit="ms", tz="UTC"))               # minute 2: high 99.5 > TP and low 97 <= stop -> stop first
+    assert ex.s["pos"]["BTCUSDT|1"]["qty"] == 0.0
+    fills = {e["orderLinkId"]: float(e["execPrice"]) for e in ex.s["execs"]}
+    assert fills == {"e": 99.0, "s": 98.0}
+    exp_cash = 1000 - 0.0002 * 99 + (98 - 99) - 0.00055 * 98
+    assert abs(ex.s["cash"] - exp_cash) < 1e-9
+    ex.step(pd.Timestamp(m0 + 4 * 60_000, unit="ms", tz="UTC"))               # reduce-only TP with a flat position is dropped
+    assert "t" not in ex.s["orders"]

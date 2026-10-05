@@ -1,6 +1,7 @@
 """Order-mirror bot runner: follow a merged paper trade plan on Bybit USDT perps (hedge mode).
 
   .venv/Scripts/python.exe -m bot.run --once                       dry run: prints what would be placed / cancelled now (no keys needed)
+  .venv/Scripts/python.exe -m bot.run --mode paper --equity 2000   simulated account filled from LIVE Bybit 1m klines (prospective bot log)
   .venv/Scripts/python.exe -m bot.run --mode testnet               loop every 20 s on Bybit TESTNET (BYBIT_TESTNET_API_KEY / _SECRET in .env)
   .venv/Scripts/python.exe -m bot.run --mode live                  REAL MONEY: refused unless BOT_ALLOW_LIVE=yes-real-money is set by the owner
 
@@ -14,13 +15,14 @@ import json
 import os
 import sys
 import time
-from dataclasses import asdict
+from dataclasses import asdict, replace
 from pathlib import Path
 
 import pandas as pd
 
 from bot import mirror
 from bot.bybit_v5 import MAINNET, TESTNET, Bybit, BybitError, round_step
+from bot.paper import PaperExchange
 
 ROOT = Path(__file__).resolve().parents[1]
 PLAN = ROOT / "artifacts/research/advisor_shadow/trade_plan_v376.json"
@@ -55,7 +57,7 @@ def to_exchange(o: mirror.Order, inst: dict) -> dict | None:
     price = round_step(o.price, it["tick"], up=up)
     if not o.reduce_only and float(qty) * float(price) < float(it["min_notional"]):
         return None
-    p.update(orderType="Limit", price=price, timeInForce="PostOnly" if o.kind in ("entry", "add") else "GTC")
+    p.update(orderType="Limit", price=price, timeInForce="GTC")  # a crossing limit fills at once (taker, better price) instead of being lost
     if o.reduce_only:
         p["reduceOnly"] = True
     return p
@@ -70,6 +72,8 @@ class Runner:
         self.state = json.loads(self.state_f.read_text()) if self.state_f.exists() else dict(ledger={}, links={}, last_exec_ms=None)
         if mode == "dry":
             self.ex = Bybit(base=MAINNET)  # public data only
+        elif mode == "paper":  # simulated account filled from live Bybit 1m klines (no keys)
+            self.ex = PaperExchange(Bybit(base=MAINNET), self.dir / "exchange.json", equity or 1000.0, SYMS)
         else:
             key, sec = (env("BYBIT_TESTNET_API_KEY"), env("BYBIT_TESTNET_API_SECRET")) if mode == "testnet" else (env("BYBIT_API_KEY"), env("BYBIT_API_SECRET"))
             if not (key and sec):
@@ -141,6 +145,8 @@ class Runner:
         now = pd.Timestamp.now(tz="UTC")
         plan = json.loads(self.plan_path.read_text())
         stale = now - pd.Timestamp(plan["generated_at"]) > STALE_PLAN
+        if self.mode == "paper":
+            self.ex.step(now)
         equity = self.equity_arg if self.mode == "dry" else self.ex.equity_usdt()
         self.sync_fills()
         led = self.state["ledger"]
@@ -176,6 +182,8 @@ class Runner:
             if p is None:
                 skipped.append(k)
             else:
+                o = replace(o, qty=float(p["qty"]), price=float(p["price"]) if "price" in p else None,
+                            trigger=float(p["triggerPrice"]) if "triggerPrice" in p else None)  # compare / amend in exchange units
                 rounded[k] = (o, p)
         acts = mirror.diff({k: o for k, (o, _) in rounded.items()}, self.have())
         for a in acts:
@@ -200,19 +208,38 @@ class Runner:
         if skipped:
             self.log(dict(op="skipped_below_minimum", links=skipped, equity=equity))
         self.state_f.write_text(json.dumps(self.state, indent=1, default=str))
+        if self.mode == "paper":
+            self.ex.save()
         return acts
+
+
+def single_instance(lock_path: Path):
+    """Hold an exclusive OS lock on lock_path for the process lifetime; exit if another runner of this mode holds it."""
+    f = open(lock_path, "a+")
+    try:
+        if os.name == "nt":
+            import msvcrt
+            msvcrt.locking(f.fileno(), msvcrt.LK_NBLCK, 1)
+        else:
+            import fcntl
+            fcntl.flock(f, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except OSError:
+        sys.exit(f"another bot runner holds {lock_path}")
+    return f
 
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--mode", choices=("dry", "testnet", "live"), default="dry")
+    ap.add_argument("--mode", choices=("dry", "paper", "testnet", "live"), default="dry")
     ap.add_argument("--plan", default=str(PLAN))
-    ap.add_argument("--equity", type=float, default=1000.0, help="dry run only: account equity in USDT")
+    ap.add_argument("--equity", type=float, default=1000.0, help="dry run / paper start: account equity in USDT")
     ap.add_argument("--once", action="store_true")
     ap.add_argument("--interval", type=float, default=20.0)
     a = ap.parse_args()
     if a.mode == "live" and os.environ.get("BOT_ALLOW_LIVE") != "yes-real-money":
         sys.exit("live trading is locked: the account owner must set BOT_ALLOW_LIVE=yes-real-money")
+    (ROOT / "artifacts/bot" / a.mode).mkdir(parents=True, exist_ok=True)
+    _lock = single_instance(ROOT / "artifacts/bot" / a.mode / "runner.lock") if not a.once else None
     r = Runner(a.mode, Path(a.plan), a.equity)
     while True:
         try:
