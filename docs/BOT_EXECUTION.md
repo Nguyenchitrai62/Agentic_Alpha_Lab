@@ -1,0 +1,28 @@
+# BOT execution: order mirror for R2-4P (Bybit USDT perps)
+
+`bot/` turns the merged multi-phase paper plan (`artifacts/research/advisor_shadow/trade_plan_v376.json`, refreshed hourly by the backend)
+into exchange orders. Logic: `bot/mirror.py` (pure, tests in `tests/test_bot_mirror.py`); exchange client: `bot/bybit_v5.py`; loop: `bot/run.py`.
+
+## Modes
+- `python -m bot.run --once --equity 2000` - DRY RUN: prints the orders that should rest now (public market data only, sends nothing).
+- `python -m bot.run --mode testnet` - Bybit TESTNET, every 20 s. Put `BYBIT_TESTNET_API_KEY` / `BYBIT_TESTNET_API_SECRET` in `.env`
+  (testnet keys from testnet.bybit.com; never commit them).
+- `--mode live` is LOCKED: it needs `BYBIT_API_KEY` / `BYBIT_API_SECRET` in `.env` AND `BOT_ALLOW_LIVE=yes-real-money` set by the
+  account owner. Start live only after a clean testnet run and with a small account.
+
+## Rules implemented (same as the research engine)
+- Hedge mode: longs positionIdx 1, shorts 2 (a sub-book short never nets against a long dip rung).
+- Book entries: PostOnly limits from minute 5 after the plan's issue time until `valid_until`; unfilled -> cancelled, never chased.
+- Every filled piece gets its own reduce-only exits: book = conditional market stop at the plan SL + limit TP (amended when the plan moves
+  SL/TP, e.g. break-even / tighten); plan add / reduce / close = limit orders.
+- Dip rungs: PostOnly bids from minute 16 to the bar end, admitted shallow-first inside each sub-book's risk budget (0.26 x sub capital,
+  stop distance + 2 %), TP limit + 8-sigma native backstop on the exchange, 4-sigma stop on a CLOSED 5m bar close (bot market exit), time
+  exit at the bar end (market).
+- The exchange is the truth for open pieces: when the paper plan has exited a book position that is still open on the exchange, the bot
+  closes it at market after 3 minutes (logged `plan_closed_divergence`).
+- Safety: a plan older than 2 h blocks new entries (exits keep running); orders below Bybit lot / notional minimums are skipped and logged
+  (at ~2000 USDT some BTC rungs are below 0.001 BTC; see the small-account study).
+
+State: `artifacts/bot/<mode>/state.json`; every action: `artifacts/bot/<mode>/actions.jsonl`.
+Known caveats: plan levels come from Binance prices (Bybit within ~2 bps, BNB ~10 bps cheaper on Bybit); the backend must run
+for fresh plans; the 20-s loop means a dip fill is protected by its native backstop until the next cycle places the TP.
