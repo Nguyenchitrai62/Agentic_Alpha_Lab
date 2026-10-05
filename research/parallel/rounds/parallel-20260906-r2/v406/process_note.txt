@@ -1,0 +1,1 @@
+2026-10-05: first run crashed with NameError (kd undefined) before any result; fixed the closure and re-ran (no results were seen).
