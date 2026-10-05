@@ -222,9 +222,18 @@ class Runner:
                 if self.mode == "dry":
                     pc["qty"] = 0.0
         bear = self.bear_now(now)
+        lc = self.last_close_1m() if (self.corr or self.bear_book) else None
         want = mirror.desired(plan, now, equity, led, risk_mult=self.risk_mult, corr=self.corr,
-                              last_close=self.last_close_1m() if self.corr else None, dip_mult=self.dip_mult,
+                              last_close=lc, dip_mult=self.dip_mult,
                               bear_book=self.bear_book, bear=bear)
+        if self.bear_book:
+            if bear:
+                for o in want.values():
+                    if o.kind == "reduce" and o.meta.get("bear_trim") and o.piece in led:
+                        led[o.piece]["trimmed_bear"] = True
+            else:
+                for pc in led.values():
+                    pc.pop("trimmed_bear", None)
         if stale:
             want = {k: o for k, o in want.items() if o.kind in ("tp", "stop", "reduce")}
             self.log(dict(op="stale_plan", generated_at=plan["generated_at"]))

@@ -224,6 +224,84 @@ def desired(plan: dict, now, equity: float, ledger: dict, budget: float = BUDGET
         out[pid + "E"] = Order(pid + "E", sym, "Buy", frac * equity / lv * rk * mult * float(dip_mult), "entry", price=lv, position_idx=1, piece=pid,
                                meta=dict(kind="dip", phase=ph, tp=float(d["tp"]), stop=float(d["stop"]), backstop=d.get("backstop"),
                                          t_exit=str(bar + pd.Timedelta(hours=4)), frac=frac * mult, dist=dist))
+    if bear_book and bear:
+        # Bear-regime trim of open book longs (closes the BOT_EXECUTION.md known gap): the research engine (v410)
+        # halves the book LONG target in bear, so existing longs are trimmed toward the halved target. For every open
+        # BOOK long whose qty exceeds 0.5 x the plan-implied qty (weight x equity / price x risk_mult), place ONE
+        # reduce-only limit sell for the excess (never below half), valid until the end of the current 4h bar; at most
+        # one trim per piece per bear episode (ledger flag trimmed_bear, set by the runner, reset on bull).
+        try:
+            bar_start = pd.Timestamp(now).floor("4h")
+        except (TypeError, ValueError):
+            bar_start = pd.Timestamp(now)
+        bar_end = bar_start + pd.Timedelta(hours=4)
+        sub_by_ph_sym = {}
+        for sym2, c2 in (plan.get("coins") or {}).items():
+            for sub2 in c2.get("subs", []):
+                sub_by_ph_sym[(sub2.get("phase"), sym2)] = sub2
+        coin_px: dict = {}
+        for sym2, c2 in (plan.get("coins") or {}).items():
+            try:
+                px = float(c2.get("price")) if c2.get("price") is not None else None
+            except (TypeError, ValueError):
+                px = None
+            if px:
+                coin_px[sym2] = px
+        for pid, pc in list(ledger.items()):
+            if pc.get("kind") != "book" or pc.get("side", 0) <= 0 or float(pc.get("qty", 0.0)) <= 0:
+                continue
+            if pc.get("trimmed_bear"):
+                continue
+            sub = sub_by_ph_sym.get((pc.get("phase"), pc.get("symbol")))
+            if not sub:
+                continue
+            pos = sub.get("position")
+            if not pos or pos.get("weight") is None:
+                continue
+            try:
+                w = float(pos["weight"])
+            except (TypeError, ValueError):
+                continue
+            if not w > 0:
+                continue
+            ref_px = coin_px.get(pc["symbol"])
+            if not ref_px and last_close and pc["symbol"] in last_close:
+                try:
+                    ref_px = float(last_close[pc["symbol"]])
+                except (TypeError, ValueError):
+                    ref_px = None
+            if not ref_px:
+                continue
+            implied = w * float(equity) / ref_px * rk
+            half = 0.5 * implied
+            qty = float(pc["qty"])
+            if not qty > half + 1e-12:
+                continue
+            trim_qty = qty - half
+            trim_px = None
+            o = sub.get("order")
+            if o and o.get("kind") in ("reduce", "close") and o.get("price") is not None:
+                try:
+                    trim_px = float(o["price"])
+                except (TypeError, ValueError):
+                    trim_px = None
+            if trim_px is None:
+                lc = None
+                if last_close and pc["symbol"] in last_close:
+                    try:
+                        lc = float(last_close[pc["symbol"]])
+                    except (TypeError, ValueError):
+                        lc = None
+                if lc is None:
+                    lc = ref_px
+                if not lc:
+                    continue
+                trim_px = lc * 1.001
+            link = f"{pid}B{t36(bar_start)}"
+            if link in out:
+                continue
+            out[link] = Order(link, pc["symbol"], "Sell", trim_qty, "reduce", price=trim_px, reduce_only=True,
+                              position_idx=1, piece=pid, meta=dict(bear_trim=True, valid_until=str(bar_end)))
     return out
 
 

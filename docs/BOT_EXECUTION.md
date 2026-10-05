@@ -47,5 +47,5 @@ for fresh plans; a new fill has no exit orders until the next cycle (<= 20 s) pl
   dips unchanged). `bybit_v5.Bybit.klines_4h_opens(symbol, n=1200)` pages the public kline endpoint (interval 240,
   limit 1000, `end` cursor) oldest-first; `run.py --bear-book` recomputes bear from BTCUSDT every 10 minutes (cached)
   and logs `op='bear_state'` on change.
-- Known gap (2026-10-05): `--bear-book` halves NEW book long entries / adds in the bear regime; the research engine (v410) halves the book
-  long TARGET, so existing longs are also trimmed by the grid trader when the regime turns - the bot does not trim open longs yet.
+- Closed gap (2026-10-05, bot_beartrim): `--bear-book` halves NEW book long entries / adds in the bear regime; the research engine (v410) halves the book
+  long TARGET; the bot now also trims each open book long once per bear episode to half its plan size with one reduce-only limit.

@@ -330,3 +330,88 @@ def test_klines_4h_opens_pages_oldest_first():
     opens = b.klines_4h_opens("BTCUSDT")
     assert opens == [100.0 + i for i in range(n_all)]
     assert len(calls) == 2 and calls[0].get("end") is None and calls[1]["limit"] == 200
+
+
+def _pos_sub(weight, reduce_price=None, phase=0):
+    sub = {"phase": phase, "state": "position",
+           "position": {"side": "LONG", "sl": 70000.0, "tp": 95000.0, "weight": weight}}
+    if reduce_price is not None:
+        sub["order"] = {"kind": "reduce", "amount": 0.5, "price": reduce_price,
+                        "valid_until": str(T0 + pd.Timedelta(hours=4))}
+    return sub
+
+
+def _trims(w):
+    return {k: o for k, o in w.items() if o.kind == "reduce" and o.meta.get("bear_trim")}
+
+
+def test_bear_trim_long_once_in_bear():
+    now = T0 + pd.Timedelta(hours=1)
+    p = plan([_pos_sub(0.2)])
+    led = {"pL": dict(kind="book", phase=0, symbol="BTCUSDT", side=1, qty=0.05, sl=70000.0, tp=95000.0)}
+    lc = {"BTCUSDT": 80000.0}
+    w = mirror.desired(p, now, 10000, led, bear_book=True, bear=True, last_close=lc)
+    tr = _trims(w)
+    assert len(tr) == 1
+    (link, o), = tr.items()
+    bar_start = pd.Timestamp(now).floor("4h")
+    assert link == "pLB" + mirror.t36(bar_start)
+    assert o.side == "Sell" and o.reduce_only and o.position_idx == 1 and o.piece == "pL"
+    assert abs(o.qty - (0.05 - 0.5 * 0.2 * 10000 / 80000)) < 1e-12
+    assert abs(o.price - 80000.0 * 1.001) < 1e-9
+    assert o.meta.get("valid_until") == str(bar_start + pd.Timedelta(hours=4))
+    # runner records the trim: no second trim in the same or the next 4h bar of the same bear episode
+    led["pL"]["trimmed_bear"] = True
+    assert _trims(mirror.desired(p, now, 10000, led, bear_book=True, bear=True, last_close=lc)) == {}
+    nxt = T0 + pd.Timedelta(hours=5)
+    assert _trims(mirror.desired(p, nxt, 10000, led, bear_book=True, bear=True, last_close=lc)) == {}
+
+
+def test_bear_trim_not_in_bull():
+    now = T0 + pd.Timedelta(hours=1)
+    p = plan([_pos_sub(0.2)])
+    led = {"pL": dict(kind="book", phase=0, symbol="BTCUSDT", side=1, qty=0.05, sl=70000.0, tp=95000.0)}
+    lc = {"BTCUSDT": 80000.0}
+    assert _trims(mirror.desired(p, now, 10000, dict(led), bear_book=True, bear=False, last_close=lc)) == {}
+    assert _trims(mirror.desired(p, now, 10000, dict(led), bear_book=False, bear=True, last_close=lc)) == {}
+    assert _trims(mirror.desired(p, now, 10000, dict(led))) == {}
+
+
+def test_bear_trim_never_below_half_and_shorts_untouched():
+    now = T0 + pd.Timedelta(hours=1)
+    lc = {"BTCUSDT": 80000.0}
+    half = 0.5 * 0.2 * 10000 / 80000
+    p = plan([_pos_sub(0.2)])
+    small = {"pL": dict(kind="book", phase=0, symbol="BTCUSDT", side=1, qty=half * 0.9, sl=70000.0, tp=95000.0)}
+    assert _trims(mirror.desired(p, now, 10000, small, bear_book=True, bear=True, last_close=lc)) == {}
+    exact = {"pL": dict(kind="book", phase=0, symbol="BTCUSDT", side=1, qty=half, sl=70000.0, tp=95000.0)}
+    assert _trims(mirror.desired(p, now, 10000, exact, bear_book=True, bear=True, last_close=lc)) == {}
+    big = {"pL": dict(kind="book", phase=0, symbol="BTCUSDT", side=1, qty=0.10, sl=70000.0, tp=95000.0)}
+    (o,) = _trims(mirror.desired(p, now, 10000, big, bear_book=True, bear=True, last_close=lc)).values()
+    assert abs((0.10 - o.qty) - half) < 1e-12  # never trims below half
+    short = {"pS": dict(kind="book", phase=0, symbol="BTCUSDT", side=-1, qty=0.10, sl=70000.0, tp=95000.0)}
+    ps = plan([{"phase": 0, "state": "position",
+                "position": {"side": "SHORT", "sl": 90000.0, "tp": 70000.0, "weight": 0.2}}])
+    assert _trims(mirror.desired(ps, now, 10000, short, bear_book=True, bear=True, last_close=lc)) == {}
+
+
+def test_bear_trim_uses_plan_reduce_price():
+    now = T0 + pd.Timedelta(hours=1)
+    p = plan([_pos_sub(0.2, reduce_price=81000.0)])
+    led = {"pL": dict(kind="book", phase=0, symbol="BTCUSDT", side=1, qty=0.05, sl=70000.0, tp=95000.0)}
+    (o,) = _trims(mirror.desired(p, now, 10000, led, bear_book=True, bear=True,
+                                 last_close={"BTCUSDT": 80000.0})).values()
+    assert o.price == 81000.0
+
+
+def test_bear_trim_default_off_identity():
+    now = T0 + pd.Timedelta(hours=1)
+    p = plan([_pos_sub(0.2)])
+    led = {"pL": dict(kind="book", phase=0, symbol="BTCUSDT", side=1, qty=0.05, sl=70000.0, tp=95000.0)}
+    old = mirror.desired(p, now, 10000, {k: dict(v) for k, v in led.items()})
+    assert old  # guard: stop + tp present
+    for kw in (dict(bear_book=False, bear=False), dict(bear_book=False, bear=True),
+               dict(bear_book=True, bear=False), dict(),
+               dict(bear_book=False, bear=True, last_close={"BTCUSDT": 80000.0})):
+        same = mirror.desired(p, now, 10000, {k: dict(v) for k, v in led.items()}, **kw)
+        assert set(same) == set(old) and all(abs(same[k].qty - old[k].qty) < 1e-12 for k in old)
