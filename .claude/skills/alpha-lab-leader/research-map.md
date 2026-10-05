@@ -2,6 +2,8 @@
 
 Last update: 2026-10-04 (after v389): honest 4-phase harness is the standard; BOT = R2-4P (v376); MANUAL = M5. v377-v389 rejected on the honest harness (dip budget, bear filter, governor, phase-augmented agents, book family, Bitfinex agents, one-shot depth sizing, crash breaker, 8 clocks, wider dip stops, phase-specific books). Closed quick checks: per-coin dip weights, weekend dips, funding-settlement trades. Next: paper evidence + live liquidation data (backend/liquidations.py).
 
+2026-10-05: rolling (clock-free) dip anchors closed (lose 2021-22, research/diagnostics/rolling_anchor_dips); MANUAL human schedule (15-min, night skipped) honest 3.0-3.6 %/month, DD 22-24 (research/diagnostics/manual_human).
+
 ## Honest status
 
 EXECUTABLE TRADE MODE (user rules 2026-09-28: one resting limit order, no fill in the first 5 minutes after the 4h close, in a
