@@ -94,6 +94,7 @@ class Runner:
         self.dip_sl_coin = dict(dip_sl_coin or {})
         self._bear_at = None
         self._bear = False
+        self._last_plan = None
         self.dir = ROOT / "artifacts/bot" / (mode if not self.tag else f"{mode}_{self.tag}")
         self.dir.mkdir(parents=True, exist_ok=True)
         self.state_f = self.dir / "state.json"
@@ -133,7 +134,8 @@ class Runner:
         """Exchange executions of bot links -> piece ledger (testnet / live only)."""
         if self.mode == "dry":
             return
-        start = self.state.get("last_exec_ms") or int((time.time() - 3600) * 1000)
+        last = self.state.get("last_exec_ms")
+        start = int(last) if last is not None else int((time.time() - 3600) * 1000)
         try:
             ex = self.ex.executions(start)
         except BybitError as e:
@@ -224,9 +226,129 @@ class Runner:
         self._bear, self._bear_at = b, now
         return b
 
+    def _protection_only(self, led) -> dict:
+        """Protection orders from the ledger alone (plan file missing and no cached plan)."""
+        out = {}
+        for pid, pc in led.items():
+            try:
+                qty = float(pc.get("qty", 0.0))
+            except (TypeError, ValueError):
+                continue
+            if qty <= 0:
+                continue
+            sym = pc.get("symbol")
+            if not sym or sym not in self.inst:
+                continue
+            side = pc.get("side", 1)
+            pidx = 1 if side > 0 else 2
+            if pc.get("kind") == "dip":
+                if pc.get("tp"):
+                    out[pid + "T"] = mirror.Order(pid + "T", sym, "Sell", qty, "tp", price=pc["tp"],
+                                                 reduce_only=True, position_idx=1, piece=pid)
+                if pc.get("backstop"):
+                    out[pid + "S"] = mirror.Order(pid + "S", sym, "Sell", qty, "stop", trigger=pc["backstop"],
+                                                 reduce_only=True, position_idx=1, piece=pid)
+            elif pc.get("kind") == "book" and pc.get("sl") and pc.get("tp"):
+                sell = side > 0
+                out[pid + "S"] = mirror.Order(pid + "S", sym, "Sell" if sell else "Buy", qty, "stop",
+                                             trigger=float(pc["sl"]), reduce_only=True, position_idx=pidx, piece=pid)
+                out[pid + "T"] = mirror.Order(pid + "T", sym, "Sell" if sell else "Buy", qty, "tp",
+                                             price=float(pc["tp"]), reduce_only=True, position_idx=pidx, piece=pid)
+        return out
+
     def cycle(self):
         now = pd.Timestamp.now(tz="UTC")
-        plan = json.loads(self.plan_path.read_text())
+        if getattr(self, "_last_plan", None) is None:
+            self._last_plan = None
+        plan_ok = True
+        try:
+            plan = json.loads(self.plan_path.read_text())
+            self._last_plan = plan
+        except (OSError, json.JSONDecodeError, ValueError) as e:
+            self.log(dict(op="plan_error", note=f"{type(e).__name__}: {e}"))
+            if isinstance(self._last_plan, dict):
+                plan = self._last_plan
+                plan_ok = False
+            else:
+                # No cached plan: keep protection from the ledger only, place nothing new.
+                if self.mode == "paper":
+                    try:
+                        self.ex.step(now)
+                    except Exception:
+                        pass
+                try:
+                    equity = self.equity_arg if self.mode == "dry" else self.ex.equity_usdt()
+                except Exception:
+                    equity = self.equity_arg or 0.0
+                try:
+                    self.sync_fills()
+                except Exception:
+                    pass
+                led = self.state["ledger"]
+                try:
+                    last5 = self.last5()
+                except Exception:
+                    last5 = {}
+                for pid, why in mirror.exits({"phases": [], "coins": {}}, now, led, last5):
+                    if why == "plan_closed_divergence":
+                        continue
+                    pc = led[pid]
+                    if pc.get("exit_sent") and now - pd.Timestamp(pc["exit_sent"]) < pd.Timedelta(minutes=2):
+                        continue
+                    pc["exit_sent"] = str(now)
+                    link = f"{pid}X{mirror.t36(now)}"
+                    qty = round_step(pc["qty"], self.inst[pc["symbol"]]["qty_step"])
+                    payload = dict(symbol=pc["symbol"], side="Sell" if pc["side"] > 0 else "Buy", orderType="Market",
+                                   qty=qty, reduceOnly=True, orderLinkId=link, positionIdx=1 if pc["side"] > 0 else 2)
+                    self.log(dict(op="market_exit", piece=pid, reason=why, payload=payload))
+                    if self.send(self.ex.place, payload) is not None or self.mode == "dry":
+                        self.state["links"][link] = dict(order=asdict(mirror.Order(link, pc["symbol"], payload["side"], float(qty), "reduce",
+                                                                                  reduce_only=True, position_idx=payload["positionIdx"], piece=pid)))
+                        if self.mode == "dry":
+                            pc["qty"] = 0.0
+                want = self._protection_only(led)
+                rounded, skipped = {}, []
+                for k, o in want.items():
+                    p = to_exchange(o, self.inst)
+                    if p is None:
+                        skipped.append(k)
+                    else:
+                        o = replace(o, qty=float(p["qty"]), price=float(p["price"]) if "price" in p else None,
+                                    trigger=float(p["triggerPrice"]) if "triggerPrice" in p else None)
+                        rounded[k] = (o, p)
+                try:
+                    have = self.have()
+                except Exception:
+                    have = {}
+                acts = mirror.diff({k: o for k, (o, _) in rounded.items()}, have)
+                for a in acts:
+                    if a["op"] == "place":
+                        o = a["order"]
+                        p = rounded[o.link][1]
+                        self.log(dict(op="place", payload=p))
+                        if self.send(self.ex.place, p) is not None or self.mode == "dry":
+                            self.state["links"][o.link] = dict(order=asdict(o), rest=dict(symbol=o.symbol, price=o.price, trigger=o.trigger, qty=o.qty))
+                    elif a["op"] == "cancel":
+                        self.log(dict(op="cancel", link=a["link"]))
+                        if self.send(self.ex.cancel, a["symbol"], a["link"]) is not None or self.mode == "dry":
+                            self.state["links"].get(a["link"], {}).pop("rest", None)
+                    else:
+                        kw = {k2: str(v) for k2, v in a.items() if k2 in ("price", "qty")}
+                        if "trigger" in a:
+                            kw["triggerPrice"] = str(a["trigger"])
+                        self.log(dict(op="amend", link=a["link"], **kw))
+                        if self.send(self.ex.amend, a["symbol"], a["link"], **kw) is not None or self.mode == "dry":
+                            rest = self.state["links"][a["link"]].setdefault("rest", {})
+                            rest.update({k2: a[k2] for k2 in ("price", "trigger", "qty") if k2 in a})
+                if skipped:
+                    self.log(dict(op="skipped_below_minimum", links=skipped, equity=equity))
+                self.state_f.write_text(json.dumps(self.state, indent=1, default=str))
+                if self.mode == "paper":
+                    try:
+                        self.ex.save()
+                    except Exception:
+                        pass
+                return acts
         stale = now - pd.Timestamp(plan["generated_at"]) > STALE_PLAN
         if self.mode == "paper":
             self.ex.step(now)
@@ -274,9 +396,13 @@ class Runner:
             else:
                 for pc in led.values():
                     pc.pop("trimmed_bear", None)
+        if not plan_ok:
+            # Cached plan after a plan_error: keep protection, place no new entries.
+            want = {k: o for k, o in want.items() if o.kind in ("tp", "stop")}
         if stale:
             want = {k: o for k, o in want.items() if o.kind in ("tp", "stop", "reduce")}
             self.log(dict(op="stale_plan", generated_at=plan["generated_at"]))
+        have_before = self.have()
         rounded, skipped = {}, []
         for k, o in want.items():
             p = to_exchange(o, self.inst)
@@ -286,8 +412,9 @@ class Runner:
                 o = replace(o, qty=float(p["qty"]), price=float(p["price"]) if "price" in p else None,
                             trigger=float(p["triggerPrice"]) if "triggerPrice" in p else None)  # compare / amend in exchange units
                 rounded[k] = (o, p)
-        acts = mirror.diff({k: o for k, (o, _) in rounded.items()}, self.have(),
+        acts = mirror.diff({k: o for k, (o, _) in rounded.items()}, have_before,
                            amend_entry_qty=(self.corr or self.risk_mult != 1.0 or self.dip_mult != 1.0))
+        failed_stop_pieces, placed_stop_links = set(), set()
         for a in acts:
             if a["op"] == "place":
                 o = a["order"]
@@ -295,6 +422,10 @@ class Runner:
                 self.log(dict(op="place", payload=p))
                 if self.send(self.ex.place, p) is not None or self.mode == "dry":
                     self.state["links"][o.link] = dict(order=asdict(o), rest=dict(symbol=o.symbol, price=o.price, trigger=o.trigger, qty=o.qty))
+                    if o.kind == "stop":
+                        placed_stop_links.add(o.link)
+                elif o.kind == "stop":
+                    failed_stop_pieces.add(o.piece)
             elif a["op"] == "cancel":
                 self.log(dict(op="cancel", link=a["link"]))
                 if self.send(self.ex.cancel, a["symbol"], a["link"]) is not None or self.mode == "dry":
@@ -309,6 +440,49 @@ class Runner:
                     rest.update({k2: a[k2] for k2 in ("price", "trigger", "qty") if k2 in a})
         if skipped:
             self.log(dict(op="skipped_below_minimum", links=skipped, equity=equity))
+        # Unprotected positions: an open piece whose stop is wanted but rests nowhere and
+        # whose placement just failed. Retry is automatic next cycle (want still has the
+        # stop); after > 2 such cycles flatten at market (reduce-only) and log op=unprotected_close.
+        if self.mode != "dry":
+            for pid, pc in list(led.items()):
+                try:
+                    qty = float(pc.get("qty", 0.0))
+                except (TypeError, ValueError):
+                    continue
+                if qty <= 0:
+                    pc.pop("unprotected_cycles", None)
+                    continue
+                stop_links = [k for k, o in want.items() if o.piece == pid and o.kind == "stop"]
+                if not stop_links:
+                    pc.pop("unprotected_cycles", None)
+                    continue
+                rests = any(k in have_before or k in placed_stop_links for k in stop_links)
+                if rests:
+                    pc.pop("unprotected_cycles", None)
+                    continue
+                if pid in failed_stop_pieces or any(k not in have_before for k in stop_links):
+                    # No resting stop and none placed successfully this cycle.
+                    # Only count cycles where a placement was actually attempted and failed;
+                    # a pure have-miss without a place act means the link was skipped below
+                    # minimum (already logged) and must not trigger a market close.
+                    if pid not in failed_stop_pieces:
+                        continue
+                    n = int(pc.get("unprotected_cycles", 0) or 0) + 1
+                    pc["unprotected_cycles"] = n
+                    if n > 2:
+                        if pc.get("exit_sent") and now - pd.Timestamp(pc["exit_sent"]) < pd.Timedelta(minutes=2):
+                            continue
+                        pc["exit_sent"] = str(now)
+                        link = f"{pid}U{mirror.t36(now)}"
+                        q = round_step(qty, self.inst[pc["symbol"]]["qty_step"])
+                        payload = dict(symbol=pc["symbol"], side="Sell" if pc["side"] > 0 else "Buy",
+                                       orderType="Market", qty=q, reduceOnly=True, orderLinkId=link,
+                                       positionIdx=1 if pc["side"] > 0 else 2)
+                        self.log(dict(op="unprotected_close", piece=pid, payload=payload, cycles=n))
+                        if self.send(self.ex.place, payload) is not None:
+                            self.state["links"][link] = dict(order=asdict(mirror.Order(link, pc["symbol"], payload["side"], float(q), "reduce",
+                                                                                      reduce_only=True, position_idx=payload["positionIdx"], piece=pid)))
+                            pc.pop("unprotected_cycles", None)
         self.state_f.write_text(json.dumps(self.state, indent=1, default=str))
         if self.mode == "paper":
             self.ex.save()

@@ -55,3 +55,12 @@ for fresh plans; a new fill has no exit orders until the next cycle (<= 20 s) pl
   satisfies s < B <= s+H (open pieces keep TP/backstop; same-bar B <= s unaffected). `--dip-sl-coin SYM=M` (repeatable)
   replaces the 4-sigma dip close-stop for that coin (`mirror.dip_stop_price`, budget `frac*(M*sigma+GAP)`; backstop 8 sigma
   unchanged). Defaults reproduce every old order bit-for-bit.
+
+## Failure modes (tests/test_bot_resilience.py, fake exchange, no network)
+- Restart mid-position: new Runner adopts state.json + exchange stops/TPs, no duplicate entries, filled rungs never re-placed.
+- Partial dip fill: TP/stop size to the filled qty, remainder stays resting (same link), budget counts only the filled part.
+- Stop placement errors: retried next cycle; unprotected > 2 cycles -> market reduce-only close, logged `op=unprotected_close`.
+- Rejected orders (lot/min-notional): `to_exchange` returns None, logged `skipped_below_minimum`, at most one attempt per cycle per link.
+- Late cycle (20 min): time exits fire on `now >= t_exit`, stale-plan still blocks entries, entries never wanted inside the first 5 min.
+- Missing/corrupt plan: logged `op=plan_error`, no crash, cached plan keeps protection with no new entries (no cache: ledger-only TP/stop).
+- Duplicate fills: `sync_fills` applies each execId once (`seen_exec`); fixed `last_exec_ms=0` falsy-start bug.

@@ -303,11 +303,20 @@ def desired(plan: dict, now, equity: float, ledger: dict, budget: float = BUDGET
                 if pc.get("backstop"):
                     out[pid + "S"] = Order(pid + "S", sym, "Sell", pc["qty"], "stop", trigger=pc["backstop"], reduce_only=True,
                                            position_idx=1, piece=pid)
-    # dip bids: admitted shallow-first inside each sub-book's risk budget (open rungs count first)
+    # dip bids: admitted shallow-first inside each sub-book's risk budget (open rungs count first).
+    # Partially filled rungs count only the filled part (frac scaled by filled/planned).
     used = {ph: 0.0 for ph in caps}
     for pc in ledger.values():
         if pc["kind"] == "dip" and pc["qty"] > 0:
-            used[pc["phase"]] = used.get(pc["phase"], 0.0) + pc["frac"] * (pc["dist"] + GAP)
+            frac = float(pc["frac"])
+            try:
+                planned = float(pc.get("planned_qty", pc["qty"]))
+            except (TypeError, ValueError):
+                planned = float(pc["qty"])
+            scale = float(pc["qty"]) / planned if planned > 0 else 1.0
+            if scale > 1.0:
+                scale = 1.0
+            used[pc["phase"]] = used.get(pc["phase"], 0.0) + frac * scale * (pc["dist"] + GAP)
     bids = []
     for sym, c in (plan.get("coins") or {}).items():
         for d in c.get("dips", []):
@@ -336,6 +345,55 @@ def desired(plan: dict, now, equity: float, ledger: dict, budget: float = BUDGET
         out[pid + "E"] = Order(pid + "E", sym, "Buy", frac * equity / lv * rk * mult * float(dip_mult), "entry", price=lv, position_idx=1, piece=pid,
                                meta=dict(kind="dip", phase=ph, tp=float(d["tp"]), stop=stop_px, backstop=d.get("backstop"),
                                          t_exit=str(bar + pd.Timedelta(hours=4)), frac=frac * mult, dist=dist))
+    # Partially filled dip entries: the remainder stays resting (same piece/link).
+    # Protection (tp/stop above) is already sized to the filled qty; the budget above
+    # counts only the filled part, so the remainder does not consume extra budget here.
+    # The remainder is re-emitted only while its rung is still active in the current plan
+    # (otherwise the plan no longer wants it and the exchange order should cancel).
+    active_pids = set()
+    for sym2, c2 in (plan.get("coins") or {}).items():
+        for d2 in c2.get("dips", []):
+            try:
+                a0b, a1b = _ts(d2["active_from"]), _ts(d2["active_until"])
+            except (KeyError, TypeError, ValueError):
+                continue
+            if not (a0b <= now < a1b + pd.Timedelta(minutes=1)):
+                continue
+            try:
+                bar2 = a0b - pd.Timedelta(minutes=16)
+                active_pids.add(dip_pid(d2.get("phase"), sym2, d2.get("rung"), bar2))
+            except (KeyError, TypeError, ValueError):
+                continue
+    for pid, pc in ledger.items():
+        try:
+            rem = float(pc.get("entry_remaining", 0.0) or 0.0)
+        except (TypeError, ValueError):
+            rem = 0.0
+        if pc.get("kind") != "dip" or rem <= 1e-12 or float(pc.get("qty", 0.0)) <= 0:
+            continue
+        if pid + "E" in out:
+            continue
+        if pid not in active_pids:
+            continue  # rung gone from the plan: do not re-place, let it cancel
+        try:
+            t_exit = pd.Timestamp(pc.get("t_exit"))
+        except (TypeError, ValueError):
+            continue
+        bar = t_exit - pd.Timedelta(hours=4)
+        a0, a1 = bar + pd.Timedelta(minutes=16), bar + pd.Timedelta(minutes=239)
+        if not (a0 <= now < a1 + pd.Timedelta(minutes=1)):
+            continue  # expired: let the exchange cancel, do not re-place
+        px = pc.get("entry_px")
+        try:
+            px = float(px)
+        except (TypeError, ValueError):
+            continue
+        if not px > 0:
+            continue
+        out[pid + "E"] = Order(pid + "E", pc["symbol"], "Buy", rem, "entry", price=px, position_idx=1, piece=pid,
+                               meta=dict(kind="dip", phase=pc.get("phase", 0), tp=pc.get("tp"), stop=pc.get("stop5"),
+                                         backstop=pc.get("backstop"), t_exit=str(t_exit),
+                                         frac=float(pc.get("frac", 0.0)), dist=float(pc.get("dist", 0.0))))
     if bear_book and bear:
         # Bear-regime trim of open book longs (closes the BOT_EXECUTION.md known gap): the research engine (v410)
         # halves the book LONG target in bear, so existing longs are trimmed toward the halved target. For every open
@@ -468,7 +526,13 @@ def diff(want: dict[str, Order], have: dict[str, dict], rel_tol: float = 1e-6, a
 
 
 def apply_fill(ledger: dict, order: Order, qty: float, price: float, t) -> None:
-    """Book a fill of a bot order into the piece ledger (entry / add extend a piece; reduce / tp / stop shrink it)."""
+    """Book a fill of a bot order into the piece ledger (entry / add extend a piece; reduce / tp / stop shrink it).
+
+    Partial entry fills leave the remainder resting: the first entry fill records
+    planned_qty (the full order size) and entry_px; entry_remaining = planned - filled.
+    desired() re-emits the remainder as an entry order for the same piece, while the
+    risk budget counts only the filled part.
+    """
     pid = order.piece
     if order.kind == "entry":
         m = order.meta
@@ -481,6 +545,19 @@ def apply_fill(ledger: dict, order: Order, qty: float, price: float, t) -> None:
             pc.update(sl=m.get("sl"), tp=m.get("tp"))
         if m["kind"] == "dip":
             pc.update(tp=m["tp"], stop5=m["stop"], backstop=m.get("backstop"), t_exit=m["t_exit"], frac=m["frac"], dist=m["dist"])
+        if "planned_qty" not in pc:
+            try:
+                pc["planned_qty"] = float(order.qty)
+            except (TypeError, ValueError):
+                pc["planned_qty"] = tot
+        if "entry_px" not in pc and order.price is not None:
+            pc["entry_px"] = order.price
+        try:
+            pc["entry_remaining"] = max(0.0, float(pc.get("planned_qty", tot)) - tot)
+        except (TypeError, ValueError):
+            pc["entry_remaining"] = 0.0
+        if pc["entry_remaining"] <= 1e-12:
+            pc["entry_remaining"] = 0.0
     elif order.kind == "add" and pid in ledger:
         pc = ledger[pid]
         tot = pc["qty"] + qty
