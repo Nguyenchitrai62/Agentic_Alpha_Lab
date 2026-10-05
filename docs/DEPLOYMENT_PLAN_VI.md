@@ -67,3 +67,10 @@ Lịch sử 5 năm: G2 5,41 %/tháng, DD năm 16,9 / toàn giai đoạn 16,8 (D1
 
 Robustness G2 (v421 audit, OpenCode): dưới mọi ma sát DD thấp hơn D17BF - chi phí x2: 4,57 %/tháng DD 17,45; trễ 15 phút 5,21 / 16,91;
 trễ 30 phút 4,58 / 17,32; trượt stop 50 %: 4,90 / 17,31 (D17BF 19,97); giá Bybit: 4,88 / 18,11 (D17BF 19,85). => D17BF + trần 2x là bản triển khai.
+
+## Chọn phiên bản có tổng quát không? (oc_wfselect) và bối cảnh hiện tại (oc_regimeexp)
+
+Chọn walk-forward (mỗi năm chọn trong 31 biến thể chỉ bằng các năm trước) KHÔNG thắng việc luôn giữ R2B1D17BF (6,03 vs 6,08 %/tháng
+trên 4 năm kiểm, LOO không ổn định) -> giữ cố định D17BF (+ trần 2x), không đổi cấu hình theo kết quả gần đây.
+Bối cảnh 2026-09 (dữ liệu cuối): trên MA200, biến động thấp, xu hướng 90 ngày +35 %. Lịch sử nhóm này: 21 tháng, trung bình +8,1 %,
+trung vị +5,0 %, 29 % tháng âm, tệ nhất -7,5 % (2024-01). Chỉ là bối cảnh, không phải dự báo.
