@@ -64,3 +64,6 @@ Sụt -10 %: trung vị lỗ 0,85 % vốn, p99 13 %, nhưng phút tệ nhất (m
 Với trần notional dip 2x vốn (v421 G2, `--dip-gross-cap 2.0`): phút tệ nhất còn 33,5 % (3x: 39 %); trung vị và p99 không đổi.
 Lịch sử 5 năm: G2 5,41 %/tháng, DD năm 16,9 / toàn giai đoạn 16,8 (D17BF 5,43 / 18,3 / 16,9). Khuyến nghị: chạy thật nên bật
 `--dip-gross-cap 2.0` (đang có bot paper d17bfg2 song song d17bf và g2k20 để so sánh tiến cứu).
+
+Robustness G2 (v421 audit, OpenCode): dưới mọi ma sát DD thấp hơn D17BF - chi phí x2: 4,57 %/tháng DD 17,45; trễ 15 phút 5,21 / 16,91;
+trễ 30 phút 4,58 / 17,32; trượt stop 50 %: 4,90 / 17,31 (D17BF 19,97); giá Bybit: 4,88 / 18,11 (D17BF 19,85). => D17BF + trần 2x là bản triển khai.
