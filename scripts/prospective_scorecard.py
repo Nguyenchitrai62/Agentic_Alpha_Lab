@@ -21,7 +21,7 @@ ROOT = Path(__file__).resolve().parents[1]
 PLANS = ROOT / "artifacts/research/advisor_shadow"
 DB = ROOT / "artifacts/web/app.db"
 DEV0, DEV1 = pd.Timestamp("2021-09-24", tz="UTC"), pd.Timestamp("2025-09-24", tz="UTC")
-NAMES = {"v367": "M5 (MANUAL)", "v362": "M4 (MANUAL)", "v342": "M3 (MANUAL)", "v340": "M2 (MANUAL)", "v315": "M1 (MANUAL)", "v321": "R2 (BOT)", "v301": "G2 (BOT)", "v295": "CS (BOT)", "v285": "D2", "v269": "M1-old",
+NAMES = {"bot_paper": "R2-4P bot on Bybit (paper)", "v367": "M5 (MANUAL)", "v362": "M4 (MANUAL)", "v342": "M3 (MANUAL)", "v340": "M2 (MANUAL)", "v315": "M1 (MANUAL)", "v321": "R2 (BOT)", "v301": "G2 (BOT)", "v295": "CS (BOT)", "v285": "D2", "v269": "M1-old",
          "v266": "C5"}
 
 
@@ -50,16 +50,17 @@ def bootstrap(daily, days, draws=4000, block=10, seed=0):
 def main():
     con = sqlite3.connect(DB)
     table = []
-    for p in sorted(PLANS.glob("trade_plan_v*.json")):
-        v = p.stem.replace("trade_plan_", "")
-        plan = json.loads(p.read_text())
-        curve = plan.get("equity_curve") or []
+    sources = [(p.stem.replace("trade_plan_", ""), json.loads(p.read_text()).get("equity_curve") or []) for p in sorted(PLANS.glob("trade_plan_v*.json"))]
+    bot = ROOT / "artifacts/bot/paper/exchange.json"  # the order-mirror bot on a paper account filled from live Bybit 1m klines (bot/paper.py)
+    if bot.exists():
+        sources.append(("bot_paper", json.loads(bot.read_text()).get("equity_curve") or []))
+    for v, curve in sources:
         if len(curve) < 2:
             continue
         t0, t1 = pd.Timestamp(curve[0][0]), pd.Timestamp(curve[-1][0])
         days = (t1 - t0).total_seconds() / 86400
         live = float(curve[-1][1]) / float(curve[0][1]) - 1
-        daily = research_daily(con, v)
+        daily = research_daily(con, "v376" if v == "bot_paper" else v)  # the bot mirrors the R2-4P plan
         row = dict(pipeline=v, name=NAMES.get(v, v), start=str(t0), last=str(t1), days=round(days, 2), live_pct=round(100 * live, 3))
         if daily is not None and len(daily) > 100 and days >= 0.5:
             b = bootstrap(daily, days)
