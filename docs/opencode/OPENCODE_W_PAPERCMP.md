@@ -1,0 +1,7 @@
+# OpenCode task oc_papercmp: paper evidence comparison tool
+Read AGENTS.md, docs/opencode/OPENCODE_VF_COMMON.md and research/tournament/RULES.md. Write ONLY under the folder named below (+ tests/test_<folder>.py); no commits; no edits of leader files or other folders; market data up to 2026-09-24 00:00 UTC may be read (all years are research data; findings need prospective validation). Load 1m data one coin at a time in float32; RAM < 1.5 GB; one process. Write PLAN.md (hypothesis, exact definitions, decision rule) BEFORE computing outcomes; then scripts, results.json, REPORT.md with tables and a one-line verdict. Folder: research/tournament/oc_papercmp/ (tool code may also go to scripts/paper_compare.py - create it, do not edit other scripts).
+Inputs: artifacts/bot/paper/exchange.json and artifacts/bot/paper_d18/exchange.json (equity_curve hourly, execs, positions), their runner.log
+(actions), artifacts/research/advisor_shadow/trade_plan_v376.json (paper plan equity_curve). Write scripts/paper_compare.py that prints and
+saves artifacts/research/paper_compare.json: for each source the hourly equity curve since start, return %, max DD, number of fills by kind
+(book entry / dip / tp / stop / market exit), win rate of closed pieces (from execs matched by link prefix), and the divergence between the
+R2-4P bot and the plan (difference of returns, fills present in one but not the other). Add a test with synthetic inputs. Run it once.
