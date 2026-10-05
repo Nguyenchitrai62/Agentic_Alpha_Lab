@@ -25,7 +25,7 @@ Cập nhật 2026-10-05: thước đo cũ (mix 4 pha liên tục) phóng đại 
    - (b) DD bot giấy <= 15 %;
    - (c) sai lệch bot giấy so với kế hoạch paper <= 1.5 điểm %/tháng (đo chất lượng thực thi);
    - (d) không có lỗi `cycle_error` kéo dài > 1 giờ, không có vị thế nào thiếu stop.
-   Vốn tối thiểu ~3000-5000 USDT (dưới mức này các bậc dip BTC nhỏ hơn 0.001 BTC bị bỏ do 4 khung chia vốn làm 4).
+   Vốn tối thiểu ~5000 USDT (dưới mức này các bậc dip BTC nhỏ hơn 0.001 BTC bị bỏ do 4 khung chia vốn làm 4). Kiểm chứng khối lượng tối thiểu Bybit cho R2B1D17BF (research/diagnostics/oc_lots): 10.000 USDT đặt được 100 % lệnh book / 98 % bậc dip (giữ ~100 % lãi/lỗ); 5.000 USDT: 96 % / 94 % (~99.5 %); 2.000 USDT: 80 % / 81 % (mất ~5-20 %, chủ yếu BTC); khuyến nghị >= 5.000 USDT, tốt nhất ~10.000.
 4. Tăng vốn: sau 3 tháng tiền thật nếu (a)-(c) vẫn đúng trên tiền thật.
 
 ## 3. MANUAL: cách theo

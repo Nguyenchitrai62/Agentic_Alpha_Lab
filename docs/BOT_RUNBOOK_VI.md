@@ -28,7 +28,7 @@
 4. **Vốn:** tối thiểu **~3000–5000 USDT** (`docs/DEPLOYMENT_PLAN_VI.md`).
    Dưới mức này các bậc dip BTC < 0.001 BTC bị bỏ qua do 4 khung giờ chia vốn làm 4
    (log `skipped_below_minimum`). Nghiên cứu chi tiết `research/diagnostics/oc_lots`:
-   tại thời điểm viết sổ tay này **chưa tồn tại** — khi có, lấy cỡ tài khoản từ đó.
+   đã có: Kiểm chứng khối lượng tối thiểu Bybit cho R2B1D17BF (research/diagnostics/oc_lots): 10.000 USDT đặt được 100 % lệnh book / 98 % bậc dip (giữ ~100 % lãi/lỗ); 5.000 USDT: 96 % / 94 % (~99.5 %); 2.000 USDT: 80 % / 81 % (mất ~5-20 %, chủ yếu BTC); khuyến nghị >= 5.000 USDT, tốt nhất ~10.000.
 5. **Máy chạy 24/7, một runner cho mỗi mode** (khóa OS `artifacts/bot/<mode>/runner.lock`).
    Không mở 2 tiến trình cùng thư mục state.
 
