@@ -1,0 +1,4 @@
+# OpenCode task ops_fullsuite2
+Read AGENTS.md and docs/opencode/OPENCODE_VF_COMMON.md (GIT IS READ-ONLY FOR WORKERS: never stash/reset/checkout/clean/commit; scratch only under research/tournament/ops_fullsuite2/tmp/; do not inspect /proc). Read docs/opencode/FULLSUITE_20261006.md (previous run: 1939 pass / 2 fail).
+Run the TRACKED test suite once: `.venv/Scripts/python.exe -m pytest -q -p no:cacheprovider $(git ls-files 'tests/test_*.py')` through scripts/heavy_slot.py (--min-free-gb 3.0), timeout 80 min. Never start/stop bot or backend processes; tests must not touch artifacts/bot/*.
+Write ONLY docs/opencode/FULLSUITE2_20261006.md (<= 40 lines): pass/fail/skip counts and duration, every failure with its error line and a one-line cause (stale local artifact / CRLF / real bug / flaky), and the exact list of tests that fail only because a gitignored local result file is missing (candidates for a skip guard). Do not edit any test.
