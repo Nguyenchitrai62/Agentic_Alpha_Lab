@@ -139,19 +139,56 @@ hồi phục trả tiền cho crash-fill, budget lại nhận THÊM rung nhỏ (
 ĐÓNG, cần edge entry trước [oc_manualcap]. Đặt trước nến đêm (stale mức bar trước): R 2.92/DD 25.25,
 tệ hơn M5_human → không đặt đêm [oc_manualnight results.json].
 
-## 6. Việc mở
+Bổ sung đóng đợt 2026-10-06 sau cập nhật trước (mỗi hướng một dòng, số y nguyên báo cáo):
+- Quy tắc thang dip: oc_btclead — BTC-lead làm sâu giá bid alt theo beta BTC: tổng năm thua cả 5/5 (FULL 10.33 so với
+BASE 15.14; mean 17.5 so với 27.4 bps, win .678 so với .705), DD chỉ tốt hơn 1/5 — fills mất 9% (4998 so với 5498)
+toàn trúng winner mà không có đuôi bù → đóng, giữ B1 size-only [oc_btclead]. oc_rungcap — trần 3 fills/coin/bar
+(cắt rung sâu 4-5 cùng nến crash): giữ ≥97% tổng 0/5 năm (tốt nhất 91% năm 2023; raw FULL 7.45 so với 9.67),
+DD tốt hơn chỉ 3/5 — rung bị cắt win 72-83%, mean +15..+83 bps toàn winner đáy crash → đóng [oc_rungcap].
+- Quy tắc book: oc_bookcorr — co giãn book theo tương quan (s=clip(1.5−rho,0.5,1.0), ý tưởng #43): DD tốt 5/5
+nhưng giữ ≥90% P&L chỉ 1/5 (retention 0.73/0.88/0.92/0.83/0.74, bám sát mức co 0.70-0.85x vì rho 0.65-0.80 quanh
+năm) — deleverage gần như thường trực, không phải edge DD → đóng [oc_bookcorr]. oc_coinbear — bear-book mở rộng
+theo từng coin (long x0.5 khi BTC bear HOẶC chính coin dưới mean-1200, ý tưởng #44): DD không tệ hơn 3/5,
+P&L ≥95% 3/5, cửa grind 2023-04-17..06-15 gần như không đổi (−0.0504→−0.0506) — không chạm đúng episode cần cắt
+→ không đăng ký engine [oc_coinbear]. oc_longcap — trần tổng long book 0.6 (ý tưởng #46): giữ ≥95% P&L 0/5 năm
+(0.848-0.948), DD không tệ hơn 1/5 strict, cửa grind còn tệ hơn (−0.0499→−0.0511) — bleed nằm ở bar không binding
+(chỉ bind 9.1% bar), trần chỉ cắt winner nơi khác → đóng [oc_longcap]. oc_cadence — book cadence chậm 8h
+(ý tưởng #47): P&L hơn base 2/5, DD không tệ hơn 1/5 (12h: 2/5 và 3/5) — tiết kiệm phí (~0.011/5 năm) nhỏ hơn
+một bậc so với độ trễ stale-gross → đóng [oc_cadence].
+- MANUAL: oc_manualtsmom — M5_human + sleeve TSMOM-30d: overlay 0.25x lên 3.90%/tháng (+0.17pp, excess +5/5)
+nhưng DD cũng tệ hơn 5/5 (19.33), đòn cao hơn vỡ DD<20 mà vẫn xa 5%, split thì return rơi (2.53 ở 0.50) —
+add-on tương quan, không phải edge còn thiếu → đóng [oc_manualtsmom].
+- Chẩn đoán (ghi nhận, không phải hướng đóng): oc_ddanat_g2 — DD gate G2 16.91 là grind chậm đồng bộ
+2023-04-17→06-15 (~59 ngày, book long −9..−11 + dip stop/timeout −7..−10 mỗi phase, BNB dẫn đầu, short bù +6.8
+gộp) — muốn <15 phải cắt ~11% thiệt hại cửa sổ; cascade một-bar 2024-01-03 (15.81) đã nhỏ hơn BF ~2.5pp nhờ
+trần G=2.0 [oc_ddanat_g2]. oc_grindsignal — không có tín hiệu fear/crowding/washout báo trước; cực trị lặp lại
+duy nhất là breadth=1.0 (E0/E2/E3 max, E1 0.8) — DD bắt đầu từ đỉnh mở rộng toàn diện, gate tương lai phải điều
+kiện trên over-extension chứ không phải stress [oc_grindsignal].
 
-Paper triển vọng là bằng chứng sạch: 4 bot R2-4P / d17bf / d17bfg2 / g2k20 + `bot_health.py`,
-`paper_report.py`, `paper_compare.py`, `prospective_scorecard.py` [research-map; DEPLOYMENT_PLAN_VI].
-Sửa parity bot-vs-engine cho trần dip (bot_capfix; bot chặt hơn engine, xem CẢNH BÁO mục 2) rồi mới quay
-lại lệnh 4-flag [BOT_RUNBOOK_VI; RUNBOOK_VALIDATION_20261006 ISSUE-01].
-Làm tươi mô hình book C1/C2 trên Kaggle (GPU/cloud; local chỉ inference/replay/backtest; GTX1650, import
-torch trước pandas) [AGENTS.md Development; research-map open queue]. Dữ liệu liquidation/top-of-book:
-`backend/liquidations.py` (Bybit liq + Binance forceOrder + top-book) thu từ 2026-10-04, cần 4–12 tuần mới
-có feature; stream oc_liq còn quá ngắn, oc_topbook/oc_venuegap chờ [research-map].
-Screen còn chạy: oc_dvolshort (chỉ chân short, 5/5 hứa hẹn) [research-map].
-Chọn cấu hình giữ cố định D17BF (+trần 2x), không đổi theo kết quả gần đây (chọn walk-forward 31 biến thể
-thua giữ cố định: 6.03 so với 6.08) [DEPLOYMENT_PLAN_VI].
+## 6. Việc còn mở (tươi 2026-10-06)
+
+Trần dip của bot (bot_capfix): FIXED và tốn ~không — bản engine-faithful (room = G×vốn − notional OPEN đã fill,
+bound cứng 2×G): C_on 3.20%/261 fills so với A không trần 3.58%/271 (trần cũ 1.12%/209, lệch −5.98pp → −3.90pp);
+code bot/mirror.py đã sửa cục bộ (chưa commit), tests đã cập nhật — còn lại: merge, chạy lại paper có trần, rồi
+mới quay lại lệnh 4-flag [bot_capfix; BOT_RUNBOOK_VI; RUNBOOK_VALIDATION_20261006 ISSUE-01].
+Mô hình book C1/C2: audit mù FAIL ở F1 (C2 dùng chính label rank42 làm feature — common_impl.py:251-256; kèm W1
+split calibration random, W2 allowlist mong manh, N1 vòng lặp chết) → fix đã dispatch
+[docs/opencode/OPENCODE_W_oc_bookmodel_fix.md], code đang sửa (chưa commit) → re-audit → Kaggle C1 ~3-6h CPU /
+C2 ~0.5-1h → chọn trên 2021-2024 [oc_bookmodel_audit COMPARISON/AUDIT; oc_bookmodel_impl].
+Bằng chứng paper: 5 thư mục bot đang chạy trên đĩa (paper/R2-4P, paper_d17bf, paper_d17bfg2, paper_g2k20 từ
+2026-10-05, paper_d13bf từ 2026-10-06); assignment ghi 6 bot — leader xác nhận roster bot thứ 6; divergence
+paper-vs-plan (ngưỡng go-live 1.5pp/tháng, ≥14 ngày mới kết luận) theo ops_divergence
+[docs/opencode/OPENCODE_W_ops_divergence.md]; go-live vẫn cần ≥8 tuần + đủ 4 điều kiện [DEPLOYMENT_PLAN_VI].
+Dữ liệu liquidation/top-of-book: collectors KHỎE từ restart 2026-10-05 17:40 UTC (9.06h sạch, 0 gap>60s,
+326.813 topbook rows, 802 liq, ~27MB/ngày) — tích 4-12 tuần mới có feature; oc_liq còn ngắn,
+oc_topbook/oc_venuegap chờ [oc_collectors; research-map].
+Margin study: XONG [oc_margin] — Bybit cross margin Hedge Mode, leverage tối thiểu không bao giờ kẹt lệnh là 5x
+(3x kẹt 22 phút-mix; 10x/20x không an toàn hơn trong cross), G2 max ~3.4x vốn (không trần ~7.1x), phút tệ nhất cần
+−29% mới cháy, gap −10%/−20% không phút nào cháy trong 5 năm → runbook: cross + 5x cả 5 coin, không Isolated.
+Lead mở duy nhất sau đợt này: brake DD theo từng coin PROMISING (DD 4/5, P&L 4/5, cắt ~30% book loss cửa grind
+−0.0504→−0.0354) [oc_bookcoinbrake] → đăng ký engine version + paper; giả thuyết breadth-1.0 [oc_grindsignal]
+cho rule sau; v425 (trần trên hàng conservative) đã pre-register; giữ D17BF+G2 cố định, không đổi theo kết quả
+gần đây (walk-forward 31 biến thể thua giữ cố định: 6.03 so với 6.08) [oc_wfselect; DEPLOYMENT_PLAN_VI].
 
 ## 7. Caveat trung thực
 
