@@ -31,7 +31,7 @@ import sys
 from pathlib import Path
 
 HERE = Path(__file__).parent
-ROOT = HERE.parents[3]
+ROOT = HERE.parents[2]  # research/diagnostics/oc_jitter -> repo root
 DEFAULT_SEARCH = ROOT / "artifacts" / "kaggle" / "engine_jitter_v2"
 DEFAULT_JOB = ROOT / "artifacts" / "kaggle_stage" / "engine_kernel" / "jobs" / "jitter_g2.json"
 

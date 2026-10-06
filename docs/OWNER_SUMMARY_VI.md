@@ -92,3 +92,7 @@ Hiện chỉ có 6 cú flush 2,5σ / 30 ngày trên 5 coin (lịch sử p25 = 7,
 Không ma sát 5,63; trễ 15 phút (S2) 5,44; trượt stop 50 % (S4) 5,13; giá Bybit (S5) 5,11 — đều >= 5 %/tháng, không năm lỗ. Chỉ dưới 5 ở
 phí gấp đôi (S1, maker 0,04 % / taker 0,12 %: 4,78) và trễ 30 phút (S3: 4,81). Với BOT, S3 ít liên quan (bot chạy mỗi ~25 giây) và S1 bi quan hơn
 phí Bybit VIP0 thật (0,02 % / 0,055 %); nhưng đó vẫn là rủi ro thật nếu phí tăng hoặc bot/máy chủ trễ lâu — đừng coi 5 %/tháng là chắc chắn.
+
+## Độ bền tham số (jitter đồng thời ±10 %, 12 bộ, chạy trên Kaggle) [oc_jitter]
+Đổi đồng thời kd / trần G / ngưỡng flush ±10 % quanh G2: cả 12 bộ đều >= 5 %/tháng (5,09–5,95, trung vị 5,54), DD năm 16,3–18,2, không năm nào lỗ;
+bản gốc tái lập đúng v421 (5,41 / 16,91 / 16,82). G2 nằm trên một vùng ổn định, không phải điểm tối ưu mong manh.
