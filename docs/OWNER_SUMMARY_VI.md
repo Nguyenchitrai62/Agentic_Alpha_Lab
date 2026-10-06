@@ -82,3 +82,8 @@ lãi 0/5 năm (lệnh muộn toàn lệnh thắng 59-69%) → ĐÓNG [oc_bidttl]
 Hiện chỉ có 6 cú flush 2,5σ / 30 ngày trên 5 coin (lịch sử p25 = 7, trung vị 15) [regime_now]. Trong 12 tháng yên tĩnh lịch sử, G2 có trung vị chỉ +0,7 %/tháng
 (trung bình +4,9; p10 −4,5; p90 +22,4; 4/12 tháng lỗ) — ít cơ hội dip chứ không phải edge hỏng; mẫu nhỏ (n = 12) nên khởi đầu yên tĩnh không phải tín hiệu xấu
 đáng tin [oc_quietmonth]. Đừng đổi cấu hình vì vài tuần yên; chỉ điều tra khi chạm ngưỡng cảnh báo sớm trong daily_status.
+
+## Bằng chứng ngoài mẫu đầu tiên (dữ liệu sau 2026-09-23, chưa từng dùng khi nghiên cứu)
+- G2 đầy đủ (book + dip, 4 pha) 2026-09-30 .. 10-06 (6 ngày): **+2,0 %**, phân vị 72,7 so với các cửa sổ 6 ngày lịch sử (p5 −3,3 / p50 +0,5 / p95 +7,5), DD 0,77 %, 9/10 lệnh đóng thắng [oc_bookoos].
+- Dip sleeve riêng 2026-09-24 .. 10-06 (12 ngày): +0,19 %, phân vị 37,8 [oc_oos12d]. Mẫu rất nhỏ — chỉ để xác nhận "trong biên", không phải kết luận mục tiêu.
+- Chạy lại hằng tuần: `.venv/Scripts/python.exe research/diagnostics/oc_bookoos/score_oos.py --fetch --run`
