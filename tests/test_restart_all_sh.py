@@ -48,15 +48,15 @@ def test_sh_delegates_real_starts_to_ps1_static():
     assert "nohup" not in non_comment, "sh must not launch via nohup (incident fix)"
 
 
-def test_ps1_uses_wmi_and_no_start_process_for_bots():
+def test_ps1_starts_bots_with_start_process_not_wmi():
+    # 2026-10-06: WMI-created bots died ~30 min after start (WMI host); the owner's
+    # console path is a hidden Start-Process, agents use nohup from a foreground shell.
     body = _read(PS1)
-    assert "Win32_Process" in body, "ps1 must launch via WMI Win32_Process"
-    assert "Invoke-CimMethod" in body
     code_lines = [
         ln for ln in body.splitlines() if not ln.lstrip().startswith("#")
     ]
-    assert not any("Start-Process" in ln for ln in code_lines), \
-        "ps1 must not use Start-Process for bots (WMI path only)"
+    assert not any("Invoke-CimMethod" in ln for ln in code_lines)
+    assert any("Start-Process cmd.exe" in ln for ln in code_lines)
 
 
 def test_dry_run_default_maps_to_ps1_dryrun_without_only():

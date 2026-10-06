@@ -77,10 +77,9 @@ function Start-Detached([string]$exe, [string[]]$argv, [string]$logRel) {
   New-Item -ItemType Directory -Force (Split-Path $logAbs) | Out-Null
   # append stdout+stderr to the log, detached (no new window, no waiting)
   $cmd = '"{0}" {1} >> "{2}" 2>&1' -f $exe, ($argv -join ' '), $logAbs
-  # WMI create: parented to the WMI host, so the bot survives the console/task that ran this script
-  # (Start-Process children died with the launching shell on 2026-10-06)
-  $r = Invoke-CimMethod -ClassName Win32_Process -MethodName Create -Arguments @{ CommandLine = "cmd.exe /c `"$cmd`""; CurrentDirectory = $root }
-  if ($r.ReturnValue -ne 0) { Log "WARNING: Win32_Process.Create returned $($r.ReturnValue) for $logRel" }
+  # Start-Process from the OWNER's console: independent hidden process. (2026-10-06: WMI-created bots died ~30 min
+  # later with the WMI host; agent tool shells kill their children - agents start runners with nohup instead.)
+  Start-Process cmd.exe -WindowStyle Hidden -ArgumentList '/c', $cmd | Out-Null
 }
 
 $doBackend = ($Only -eq "all" -or $Only -eq "backend")
@@ -138,10 +137,7 @@ if ($doCarry) {
     Log "starting hourly carry ledger loop (once)"
     New-Item -ItemType Directory -Force (Join-Path $root "artifacts\bot\paper_carry") | Out-Null
     $loopBody = "while (1) { & `"$py`" scripts/carry_paper.py --once --equity 5000 --f 0.5 --tag carry; Start-Sleep -Seconds 3600 }"
-    $carryLog = Join-Path $root "artifacts\bot\paper_carry\stdout.log"
-    $enc = [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($loopBody))
-    $r = Invoke-CimMethod -ClassName Win32_Process -MethodName Create -Arguments @{ CommandLine = "cmd.exe /c `"powershell.exe -NoProfile -WindowStyle Hidden -EncodedCommand $enc >> `"$carryLog`" 2>&1`""; CurrentDirectory = $root }
-    if ($r.ReturnValue -ne 0) { Log "WARNING: Win32_Process.Create returned $($r.ReturnValue) for the carry loop" }
+    Start-Process powershell.exe -WindowStyle Hidden -ArgumentList @("-NoProfile", "-Command", $loopBody) -RedirectStandardOutput (Join-Path $root "artifacts\bot\paper_carry\stdout.log") | Out-Null
   }
 }
 
