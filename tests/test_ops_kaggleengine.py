@@ -1,7 +1,7 @@
 """Smoke tests for the generic 4-phase engine Kaggle bundle (ops_kaggleengine).
 
 Covers, without uploads or heavy full runs:
-  1. bundle closure resolves (39 files, all exist) and kaggle_entry.py
+  1. bundle closure resolves (40 files, all exist) and kaggle_entry.py
      extracts back to the same tree (extractor round-trip);
   2. every kernel INPUTS path and MANIFEST file exists locally with the
      listed byte size;
@@ -11,6 +11,10 @@ Covers, without uploads or heavy full runs:
      kernel_run.main (KAGGLE_INPUT_BASE/KAGGLE_WORKING_BASE wiring) writes
      results.json + runs.pkl byte-identical to the direct harness call on
      the same subset.
+  5. outside-repo bundle check: the built kaggle_entry.py BUNDLE extracts
+     to a temp dir outside the repo, every closure module loads there with
+     a clean sys.path (no repo root), plus a 60-bar ENGINE_SMOKE run from
+     the extracted dir (KAGGLE_INPUT_BASE -> artifacts/kaggle_stage).
 
 Run: .venv/Scripts/python.exe -m pytest tests/test_ops_kaggleengine.py -q
 """
@@ -21,11 +25,13 @@ import importlib.util
 import io
 import json
 import os
+import subprocess
 import sys
 import zipfile
 from pathlib import Path
 
 import pandas as pd
+import pytest
 
 ROOT = Path(__file__).resolve().parents[1]
 KERN = ROOT / "artifacts/kaggle_stage/engine_kernel"
@@ -42,7 +48,8 @@ def _load(name, path):
 def test_closure_and_inputs_exist():
     import build_bundle as B
     files = B.closure(ROOT)
-    assert len(files) == 39, f"closure drift: {len(files)} files"
+    assert len(files) == 40, f"closure drift: {len(files)} files"
+    assert "research/parallel/rounds/parallel-20260906-r2/rl/trader_rl.py" in files  # sys.path import (v214/v215)
     for f in files:
         assert (ROOT / f).exists(), f
     inputs = json.loads((KERN / "INPUTS.json").read_text())["inputs"]
@@ -70,6 +77,7 @@ def test_entry_roundtrip(tmp_path):
     assert (tmp_path / "engine_harness.py").exists()
     for rel in ("research/parallel/rounds/parallel-20260906-r2/engine_user/engine_user.py",
                 "research/parallel/rounds/parallel-20260906-r2/v388/v388_bot_stop_distance.py",
+                "research/parallel/rounds/parallel-20260906-r2/rl/trader_rl.py",
                 "backend/history_tm.py", "scripts/forward_v205.py"):
         assert (tmp_path / rel).read_bytes() == (ROOT / rel).read_bytes(), rel
 
@@ -144,3 +152,65 @@ def test_smoke_kernel_matches_direct(tmp_path, monkeypatch):
     assert a == b  # kernel path reproduces the direct harness call exactly
     assert (out / "runs.pkl").read_bytes() == (direct / "runs.pkl").read_bytes()
     assert os.environ.get("ENGINE_SMOKE_BARS") == "60"
+
+
+def test_bundle_outside_repo_imports_and_smoke(tmp_path):
+    """Kaggle-fidelity check: the built BUNDLE must work with cwd outside the repo.
+
+    Extracts kaggle_entry.py's BUNDLE to tmp_path (outside the repo), loads
+    every closure module there via spec_from_file_location with a clean
+    sys.path (no repo root) and fails on any ImportError/ModuleNotFoundError
+    (regression: v214/v215's `sys.path.insert + import trader_rl` failed on
+    Kaggle while the in-repo smoke test passed); then runs the 60-bar
+    ENGINE_SMOKE from the extracted dir (KAGGLE_INPUT_BASE ->
+    artifacts/kaggle_stage; skipped if engine_data is absent).
+    """
+    import build_bundle as B
+    files = B.closure(ROOT)
+    src = (KERN / "kaggle_entry.py").read_text()
+    b64 = src.split('BUNDLE = "', 1)[1].split('"', 1)[0]
+    ext = tmp_path / "ext"
+    ext.mkdir()
+    zipfile.ZipFile(io.BytesIO(base64.b64decode(b64))).extractall(ext)
+    assert ext.resolve() != ROOT.resolve()
+    for rel in files:
+        assert (ext / rel).exists(), f"bundle miss: {rel}"
+    (ext / "_closure.json").write_text(json.dumps([f for f in files if f.endswith(".py")]))
+    script = (
+        "import importlib.util, json, pathlib\n"
+        "lst = json.loads(pathlib.Path('_closure.json').read_text())\n"
+        "bad = []\n"
+        "for i, rel in enumerate(lst):\n"
+        "    try:\n"
+        "        spec = importlib.util.spec_from_file_location(f'bx{i}', str(pathlib.Path(rel)))\n"
+        "        m = importlib.util.module_from_spec(spec)\n"
+        "        spec.loader.exec_module(m)\n"
+        "    except (ImportError, ModuleNotFoundError) as e:\n"
+        "        bad.append(f'{rel}: {e}')\n"
+        "    except Exception as e:\n"
+        "        print(f'warn {rel}: {type(e).__name__}: {e}')\n"
+        "if bad:\n"
+        "    print('BUNDLE IMPORT FAIL')\n"
+        "    [print(' ' + b) for b in bad]\n"
+        "    raise SystemExit(1)\n"
+        "print(f'bundle imports ok: {len(lst)} modules')\n"
+    )
+    clean = {k: v for k, v in os.environ.items() if k not in ("PYTHONPATH", "PYTHONHOME", "REPO_ROOT")}
+    r = subprocess.run([sys.executable, "-c", script], cwd=ext, env=clean,
+                       capture_output=True, text=True, timeout=1200)
+    assert r.returncode == 0, (r.stdout + r.stderr)[-4000:]
+    assert "bundle imports ok" in r.stdout
+    if not (ROOT / "artifacts/kaggle_stage/engine_data").exists():
+        pytest.skip("engine_data absent")
+    job = {"name": "smoke", "rows": [{"name": "BASE",
+                                      "book_hook": "bear",
+                                      "sleeve": {"rule": "inv", "k": 1.0, "kd": 1.7, "bear": True, "G": 2.0}}]}
+    (ext / "job_smoke.json").write_text(json.dumps(job))
+    env = dict(clean, REPO_ROOT=str(ext), KAGGLE_INPUT_BASE=str(ROOT / "artifacts/kaggle_stage"),
+               KAGGLE_WORKING_BASE=str(ext / "kwork2"), ENGINE_SHIFTS="0",
+               ENGINE_SMOKE_START="2024-03-01", ENGINE_SMOKE_BARS="60", ENGINE_NO_SCORE="1")
+    s = subprocess.run([sys.executable, "kernel_run.py", "--job", "job_smoke.json"],
+                       cwd=ext, env=env, capture_output=True, text=True, timeout=1800)
+    assert s.returncode == 0, (s.stdout + s.stderr)[-4000:]
+    res = json.loads((ext / "kwork2" / "out_eng" / "results.json").read_text())
+    assert res["rows"]["BASE"]["bars"] == {"0": 60}
