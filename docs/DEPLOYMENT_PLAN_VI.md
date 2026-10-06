@@ -20,7 +20,7 @@ Cập nhật 2026-10-05: thước đo cũ (mix 4 pha liên tục) phóng đại 
 1. Paper (đang chạy từ 2026-10-05): kế hoạch paper `trade_plan_v376.json` (backend) + bot giấy khớp theo giá Bybit thật
    (`python -m bot.run --mode paper --equity 5000 --corr-size --dip-mult 1.7 --dip-gross-cap 2.0 --bear-book --adopt-fresh --carry-f 0.25 --interval 25 --tag d17bfg2c`, `artifacts/bot/paper/exchange.json`).
    Kiểm tra hằng ngày bắt đầu bằng `python scripts/daily_status.py` (một trang: backend, tuổi plan, các bot, collector), rồi mới dùng `scripts/bot_health.py` soi chi tiết.
-2. Testnet (tùy chọn): `--mode testnet` với khóa testnet trong `.env` để kiểm tra API thật (không ảnh hưởng tiền).
+2. Testnet (GO sau preflight PASS): `--mode testnet` với khóa testnet trong `.env` để kiểm tra API thật (không ảnh hưởng tiền). Code-review F1-F7 + N1-N4 ĐÃ SỬA (commit 359004f, bot_reviewfix) nên testnet có carry (`--carry-f 0.25`) được phép sau preflight PASS; live chỉ sau testnet sạch 7 ngày [docs/opencode/CODEREVIEW_BOT_20261006.md; docs/BOT_EXECUTION.md; docs/TESTNET_PLAN_VI.md].
 3. Tiền thật nhỏ: chỉ khi ĐỦ cả 4 điều kiện sau, đo trên bot giấy, sau tối thiểu 8 tuần:
    - (a) lợi nhuận bot giấy nằm ở phân vị >= 20 của phân phối bootstrap trung thực cho cùng số ngày (`scripts/prospective_scorecard.py`);
    - (b) DD bot giấy <= 15 %;
@@ -81,6 +81,7 @@ Chọn walk-forward (mỗi năm chọn trong 31 biến thể chỉ bằng các n
 trên 4 năm kiểm, LOO không ổn định) -> giữ cố định D17BF (+ trần 2x), không đổi cấu hình theo kết quả gần đây.
 Bối cảnh 2026-09 (dữ liệu cuối): trên MA200, biến động thấp, xu hướng 90 ngày +35 %. Lịch sử nhóm này: 21 tháng, trung bình +8,1 %,
 trung vị +5,0 %, 29 % tháng âm, tệ nhất -7,5 % (2024-01). Chỉ là bối cảnh, không phải dự báo.
+Tháng yên tĩnh khởi đầu (6 flush/30d = nhóm thấp): 12 tháng thấp lịch sử sau đó trung bình +4,87%/tháng, trung vị +0,67% (p10 -4,46/p90 +22,44; 3/12 đạt >=5%, 4/12 lỗ) so với bình thường (n=34) 7,55/4,82 và cao (n=14) 3,64/4,17; chênh lệch trong một SE (n=12) — khởi đầu yên tĩnh KHÔNG phải tín hiệu xấu đáng tin, chỉ ít cơ hội dip hơn, giữ kỳ vọng chung [oc_quietmonth].
 
 ## Tuần xấu trông thế nào (OpenCode oc_stresshist, D17BF + trần 2x)
 
@@ -148,6 +149,7 @@ none. Stale-plan đúng: 14:03–18:13 không fill nào giữa backend outage 12
 sau ~18:13 bám lại; `skipped_below_minimum` 596–701 dòng/bot (vài rung BTC sâu dưới minimum ở 5000 — ồn erwart); không double-spend
 (market_exit 0). Chưa kết luận go-live/divergence nào trước 14 ngày. Trước testnet: tách quota kline, báo động stale-plan sớm hơn,
 gộp log skipped, dán nhãn "closest plan v376 R2-4P" cho bot khác cấu hình [PAPER_DAY1_20261006].
+OOS sạch trên dữ liệu mới (research kết thúc 2026-09-23, mẫu nhỏ, không gate claim, trong biên lịch sử): full G2 book+dip 2026-09-30..10-06 (6 ngày) +1,995% (1,004602->1,019945), DD gate 0,766%, 10 rung exits 9 thắng 90,0%, phân vị 72,7 (biên p5 -3,309/p50 +0,466/p95 +7,477) [oc_bookoos]; dip riêng 2026-09-24..10-06 (12 ngày) +0,187%, DD 0,149%, 14 exits 12 thắng 85,7%, phân vị 37,8 (biên p5 -4,173/p50 +1,028/p95 +13,634) [oc_oos12d]. Chạy lại hằng tuần: `.venv/Scripts/python.exe research/diagnostics/oc_bookoos/score_oos.py --fetch --run` [oc_bookoos].
 
 ## Screens mới đóng đợt 2026-10-06 (mỗi hướng một dòng)
 
@@ -284,9 +286,9 @@ recent-only/proxy/OI — không feature liq lịch sử cho 2021-2026 [oc_liqhis
 
 KHUYẾN NGHỊ: BOT G2 (R2B1D17BF + `--dip-gross-cap 2.0`, v421/v422 twin numbers, v422 audited: 5,41 %/tháng, worst 2,588, maxDD 16,91, full 16,82) + sleeve cash-and-carry quý f=0,25 trên
 CÙNG MỘT Bybit UTA (cross, hedge, 5x cả 5 coin) [oc_carrycombo; oc_utamargin].
-Số base hai quy ước (ghi cả hai cho trung thực): roll-only = cận dưới (lãi carry không tái đầu tư vào BOT; ước lượng chính là oc_carryfric 5,533) G2+carry f=0,25: 5,413 / 2,647 / 16,78 / full marked 16,34
-(close 15,60); f=0,50: 5,418 / 2,705 / 16,65 / 15,86 [oc_carrycombo]; year-start rebalance G2+carry f=0,25: 5,533 / 2,736 / 16,78; f=0,50: 5,654 /
-2,881 / 16,64 (lift cao hơn, KHÔNG dùng làm kỳ vọng) [oc_carryfric]. Caveat: overlay cần tới 2f cash EXTRA (f=0,25 -> 1,5x funded), R tính trên base
+Số base (ước lượng chính là oc_carrycompound, account-realistic: lãi carry tái đầu tư, BOT đặt lệnh theo tổng equity): G2+carry f=0,25: 5,634 / 2,778 / 16,75 / full 16,66 (G2 đơn 5,410/2,588/16,91/16,82; +0,224pp; từng năm 2,778/10,86 — 3,353/16,75 — 6,590/15,69 — 10,956/8,20 — 4,698/12,66) [oc_carrycompound]. Bảo thủ: year-start rebalance oc_carryfric G2+carry f=0,25: 5,533 / 2,736 / 16,78; f=0,50: 5,654 /
+2,881 / 16,64 [oc_carryfric]. Cận dưới: roll-only oc_carrycombo (lãi carry không tái đầu tư vào BOT) G2+carry f=0,25: 5,413 / 2,647 / 16,78 / full marked 16,34
+(close 15,60); f=0,50: 5,418 / 2,705 / 16,65 / 15,86 [oc_carrycombo]. Caveat: overlay cần tới 2f cash EXTRA (f=0,25 -> 1,5x funded), R tính trên base
 equity [oc_carrycombo].
 Dưới ma sát (`oc_carryfric`): G2+carry f=0,25: base 5,533; S1 4,696; S2 5,339; S3 4,717; S4 5,033; S5 5,016 (f=0,50: 5,654 / 4,820 / 5,463 / 4,853 /
 5,166 / 5,147) — giữ >=5,0 ở base/S2/S4/S5, RỚT S1 và S3 kể cả f=0,50 (4,820 / 4,853); sleeve chỉ +0,12–0,15pp (f=0,25), bớt DD 0,1–0,3pp, không năm lỗ

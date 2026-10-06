@@ -58,11 +58,13 @@ full-path official 16.82 (chained 16.91) [oc_frontier; oc_kpi_g2; oc_frontiercar
 G2 KPI [oc_kpi_g2]: gấp 26.4x sau 5 năm, win all 65.3-65.5% (book 51.5%, rung dip 68.6-68.7%, n G2=5064/21513/26577; BF=4955/21389/26344),
 không năm lỗ; 41% tháng >= +5%, ~70.5-72% tháng không lỗ, chuỗi lỗ dài nhất 2 tháng D17BF (G2 4 tháng 2024-04..07).
 Gross đỉnh đo được: BF không trần peak 6.40x vốn (oc_kpi results.json combined 6.4007); G2 có trần 2x mix max 3.41x (oc_margin results.json G_max 3.4113, các phase <=3.78); "~7.1x không trần" chỉ là ước tính trong văn bản oc_margin/REPORT.md:95, không phải giá trị results.json [oc_kpi; oc_margin].
-- G2+carry f=0.25 một UTA: quy ước roll-only = CẬN DƯỚI (oc_carrycombo: lãi carry không tái đầu tư vào BOT; ước lượng chính là oc_carryfric 5.533): G2 đơn 5.410/2.588/16.91/16.82
-(close 16.05) -> +carry 5.413/2.647/16.78/full-marked 16.34 (close 15.60); f=0.50: 5.418/2.705/16.65/15.86
-[oc_carrycombo]. Quy ước year-start rebalance (oc_carryfric, lift cao hơn, KHÔNG dùng làm kỳ vọng):
-G2+carry f=0.25: 5.533/2.736/16.78; f=0.50: 5.654/2.881/16.64 [oc_carryfric; OWNER_SUMMARY_VI].
-Từng năm G2+carry f=0.25 roll-only (R/DD): 2021 2.647/10.79; 2022 3.283/16.78; 2023 6.168/15.72;
+- G2+carry f=0.25 một UTA: ước lượng chính là oc_carrycompound (+0.224: G2 đơn 5.410/2.588/16.91/16.82
+(close 16.05) -> +carry 5.634/2.778/16.75/full 16.66; lãi carry tái đầu tư, BOT đặt lệnh theo tổng equity)
+[oc_carrycompound]; oc_carryfric (+0.123: 5.533/2.736/16.78, year-start sizing, chained-reset) là bảo thủ;
+roll-only oc_carrycombo (5.413/2.647/16.78/full-marked 16.34 (close 15.60); f=0.50: 5.418/2.705/16.65/15.86)
+là CẬN DƯỚI (lãi carry không tái đầu tư vào BOT) [oc_carryfric; oc_carrycombo]. Từng năm G2+carry f=0.25
+compound (R/DD): 2021 2.778/10.86; 2022 3.353/16.75; 2023 6.590/15.69; 2024 10.956/8.20; 2025 4.698/12.66
+[oc_carrycompound]; roll-only từng năm (R/DD): 2021 2.647/10.79; 2022 3.283/16.78; 2023 6.168/15.72;
 2024 10.559/8.08; 2025 4.593/12.57 [oc_carrycombo]. Overlay cần tới 2f cash EXTRA khi cả hai coin cùng mở
 (f=0.25 -> tới 1.5x funded); R tính trên base equity [oc_carrycombo].
 - Carry sleeve độc lập (oc_cashcarry, BTC/ETH quarterlies, ENTER iff basis năm hóa >= 4%/yr, giữ tới delivery,
@@ -212,6 +214,7 @@ không double-spend; divergence toàn "too early" (<14d) [docs/opencode/PAPER_DA
 Carry paper 2026-10-06 06:05Z f=0.5: BTC entered basis +5.42%, ETH skip (<4%), MtM -0.15% quá sớm [PROSPECTIVE_20261006].
 Parity carry 143/144 đồng ý với rule đóng băng trên mids của ledger (vi phạm genuine duy nhất ETH retry vào ở 3.80% <4% đã fix re-check trong bot/carry.py); khớp chính xác basis trong 0.2pp/yr chỉ 56/144 (88 breaches là mid-vs-last do quarterly kém thanh khoản, không phải bug rule)
 [oc_carryparity].
+OOS sạch trên dữ liệu mới (research kết thúc 2026-09-23, không gate claim vì mẫu nhỏ): full G2 book+dip 2026-09-30..10-06 (6 ngày, rule-based, 4 pha, gate costs) +1.995% (equity 1.004602->1.019945), DD gate 0.766% (close 0.128/marked 0.766), 10 rung exits 9 thắng (90.0%), 0 book episode hoàn tất, phân vị 72.7 trong biên 6 ngày (p5 -3.309/p50 +0.466/p95 +7.477) [oc_bookoos]; dip sleeve riêng 2026-09-24..10-06 (12 ngày) +0.187%, DD 0.149%, 14 exits 12 thắng (85.7%), phân vị 37.8 trong biên 12 ngày (p5 -4.173/p50 +1.028/p95 +13.634) [oc_oos12d]. Cả hai trong biên lịch sử, không kết luận gate. Chạy lại hằng tuần: `.venv/Scripts/python.exe research/diagnostics/oc_bookoos/score_oos.py --fetch --run` [oc_bookoos].
 Caveat: trần dip bot cũ CHẶT HƠN engine (09/2026 có trần chỉ +1.1% vs +3.6% không trần); fix engine-faithful đã xong
 trên paper (C_on 3.20%/261 fills vs A 3.58%/271, trần cũ 1.12%/209) nhưng tới khi merge xong thì chạy KHÔNG trần hoặc
 chấp nhận thấp hơn [bot_capfix]. Carry orders trong paper bị generic diff hủy ngày 2026-10-06, fix đang làm [docs/opencode/OPENCODE_W_bot_carryfix.md:3-4; bot/run.py].
@@ -221,7 +224,7 @@ Go-live chỉ sau >=8 tuần paper + testnet bắt buộc, khi ĐỦ cả 4: (a)
 Dừng: DD >20% dừng mở mới; lỗ tháng >10% halve vốn tháng sau; phân vị <5 sau >=8 tuần thì dừng [DEPLOYMENT_PLAN_VI].
 Kiểm hằng ngày: `daily_status.py` (+ mục 6 edge monitor) + `bot_health.py` + `paper_report.py` + `prospective_scorecard.py`;
 runbook đã xác minh độc lập 2026-10-06 (core đúng, 11 issue văn bản, chưa đủ điều kiện live vì paper <1 ngày)
-[RUNBOOK_VALIDATION_20261006]. Testnet 7 ngày G2+carry theo `docs/TESTNET_PLAN_VI.md` (9 tiêu chí PASS, P&L không kết luận).
+[RUNBOOK_VALIDATION_20261006]. Testnet 7 ngày G2+carry theo `docs/TESTNET_PLAN_VI.md` (9 tiêu chí PASS, P&L không kết luận): code-review F1-F7 + N1-N4 ĐÃ SỬA (commit 359004f, bot_reviewfix) nên testnet có carry GO sau preflight PASS; live chỉ sau testnet sạch 7 ngày [docs/opencode/CODEREVIEW_BOT_20261006.md; docs/BOT_EXECUTION.md].
 Carry làm tay theo rule đóng băng (oc_cashcarry: 33 entered / 25 in-window trong 5 năm, ≈5 quyết định vào/năm); vào khi front còn <=7d và basis >=4%/yr; mỗi chân f x vốn; giữ tới delivery;
 bán spot đúng 08:00 UTC delivery [oc_carrycombo; research/tournament/carry_audit/COMPARISON.md (audit độc lập verdict FAIL về dung sai số — 20/25 basis >0.1pp, 25/25 returns >0.02pp, 4/5 năm, thêm 1 BTC 2026-12-25, 1 sign-flip BTC 2026-03-27 — nhưng PASS leakage/fee/overlay/IM-MM; leader 2026-10-06 chấp nhận kèm modelling note settlement đúng kinh tế, thêm rule bán spot đúng giờ delivery); QUICKSTART_VI].
 
@@ -229,8 +232,8 @@ bán spot đúng 08:00 UTC delivery [oc_carrycombo; research/tournament/carry_au
 
 - Paper triển vọng là bằng chứng sạch duy nhất: nuôi đủ >=8 tuần + đủ 4 gate; divergence >=14 ngày mới kết luận;
 hiện mọi bot/paper mới ~0.2-1.1 ngày ("quá sớm", trong biên) [PROSPECTIVE_20261006; DEPLOYMENT_PLAN_VI].
-- Testnet bắt buộc trước live (cơ chế GTC entries — PostOnly mới chỉ ghi trong docstring bot/mirror.py:10, live gửi GTC nên có thể cross thành taker — /risk guard/Hedge/5x Cross-5x do code không tự set/kiểm tra, checklist V1-V9), rồi live vốn nhỏ, tăng vốn sau
-3 tháng nếu gate vẫn đúng [DEPLOYMENT_PLAN_VI; docs/opencode/TESTNET_REVIEW_20261006.md (F1 PostOnly-chưa-gửi, V1 Cross/5x-phải-set-tay)].
+- Testnet bắt buộc trước live (GO sau preflight PASS; code-review F1-F7 + N1-N4 đã sửa ở commit 359004f nên testnet có carry được phép; live chỉ sau testnet sạch 7 ngày), rồi live vốn nhỏ, tăng vốn sau
+3 tháng nếu gate vẫn đúng [DEPLOYMENT_PLAN_VI; docs/TESTNET_PLAN_VI.md; docs/BOT_EXECUTION.md; docs/opencode/CODEREVIEW_BOT_20261006.md].
 - Một UTA G2+carry f=0.25 cố định (không đổi theo kết quả gần đây; WF-select 31 biến thể thua giữ cố định)
 [oc_wfselect]. Không vượt f=0.25 chung UTA; FAR/top-up/calendar/weekly carry đã đóng [oc_carryfar; oc_carrytopup; oc_calendar].
 - Dữ liệu liquidation/top-of-book: collectors KHỎE từ restart 2026-10-05 17:40 UTC (9.06h sạch, 0 gap>60s, 326.813
@@ -238,6 +241,7 @@ topbook rows, 802 liq) nhưng còn non (3.230 rows tới 2026-10-06, 2 gap đã 
 2027-01-04, tới lúc đó chỉ monitoring [oc_collectors; oc_liqcheck].
 - Edge monitor đã vào `daily_status.py` mục 6: TB 6 tháng <1.61%/tháng hoặc TP rate dip nửa năm <0.434 thì ĐIỀU TRA,
 không tự đổi cấu hình [oc_edgedecay]. Vốn phải chịu DD 25% [oc_mcdd].
+- Tháng yên tĩnh khởi đầu (6 flush/30d = nhóm thấp): lịch sử 12 tháng thấp sau đó trung bình +4.87%/tháng nhưng trung vị chỉ +0.67% (p10 -4.46/p90 +22.44; 3/12 đạt >=5%, 4/12 lỗ), so với nhóm bình thường (n=34) 7.55/4.82 và nhóm cao (n=14) 3.64/4.17; chênh lệch trong một SE mẫu nhỏ (n=12), hai tháng lãi lớn nhất (+23%) cũng từ khởi đầu yên tĩnh — khởi đầu yên tĩnh KHÔNG phải tín hiệu xấu đáng tin, chỉ nghĩa là ít cơ hội dip hơn, giữ kỳ vọng chung và ngưỡng edgedecay [oc_quietmonth].
 - Giả thuyết mở duy nhất (chưa rule): breadth=1.0 làm gate over-extension tương lai [oc_grindsignal].
 Lead book-coin brake PROMISING (cắt ~30% book loss cửa grind -0.0504->-0.0354) chờ đăng ký engine version + paper
 [oc_bookcoinbrake]; v425 (trần trên hàng conservative) đã pre-register [docs/opencode/RESEARCH_MAP_DRAFT_20261006b.md:33].
