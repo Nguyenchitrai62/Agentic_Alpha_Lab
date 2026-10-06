@@ -199,7 +199,7 @@
     H.candles = []; H.times = []; H.orders = []; H.pos = []; H.fills = []; H.posAt = [];
     H.series = null; H.wSeries = null; H.prim = null;
     for (const key of Object.keys(lineCharts)) { lineCharts[key].remove(); delete lineCharts[key]; }
-    for (const id of ["pipeEvid", "pipeBar", "board", "todoCards", "planPanel", "watchlist", "hPipe", "ordersTbl", "oStats", "perfKpis", "yearTbl", "coinTbl", "fwSummary", "pPipe", "pipelineSettingsTbl", "pipelineMode", "pipelineSaveStatus", "usersTbl", "jobsTbl", "pipeSelectedNote"]) {
+    for (const id of ["pipeEvid", "pipeBar", "board", "todoCards", "planPanel", "watchlist", "hPipe", "ordersTbl", "oStats", "perfKpis", "yearTbl", "coinTbl", "fwSummary", "pPipe", "pipelineSettingsTbl", "pipelineMode", "pipelineSaveStatus", "usersTbl", "jobsTbl", "pipeSelectedNote", "carryBody", "carryMeta"]) {
       const el = $(id); if (el) el.innerHTML = "";
     }
     if (tickerWs) { tickerWs.close(); tickerWs = null; }
@@ -430,7 +430,7 @@
       await loadEvidence();
       if (pipeOf(planPipe())?.product !== product()) await ensureProductPipe();
       await loadPlans();
-      renderProduct(); renderGoals(); renderPipeBar(); renderBoard(); renderCards(); renderProductPanels(); updateTitle();
+      renderProduct(); renderGoals(); renderPipeBar(); renderBoard(); renderCards(); renderProductPanels(); renderCarry(); updateTitle();
     } catch (e) { toast(e.message); }
   }
 
@@ -529,6 +529,41 @@
     bn.hidden = !(product() === "bot" && cur?.product === "bot");
     if (!bn.hidden) bn.innerHTML = `<b>Vận hành bot · ${esc(cur.nm)}</b><span>Mỗi nến 4h đặt lại toàn bộ lệnh bắt đáy (từ phút 16 đến hết nến).</span>
       <span>SL bắt đáy kích hoạt khi nến 5m đóng dưới mức SL; luôn có SL sàn 8σ phòng mất kết nối.</span><span>Lệnh bắt đáy còn mở cuối nến: đóng ở giá mở nến sau.</span>`;
+  }
+  // ---- carry quý (paper): sổ cash-and-carry (chỉ đọc)
+  async function renderCarry() {
+    const body = $("carryBody"); if (!body) return;
+    const meta = $("carryMeta");
+    try {
+      const v = await api("/api/carry");
+      const open = Array.isArray(v.open_pairs) ? v.open_pairs : [];
+      const done = Array.isArray(v.settled_pairs) ? v.settled_pairs : [];
+      const t = v.totals || {};
+      const upd = v.updated_at ? dt(Date.parse(v.updated_at)) : "—";
+      if (meta) meta.innerHTML = `Cập nhật sổ: <b>${esc(upd)}</b>${v.stale ? ' · <span class="down">sổ đã cũ (hơn 2 giờ chưa chạy)</span>' : ""}`;
+      const rule = v.rule || {};
+      const ruleLine = (rule.basis_threshold != null || v.rule_sha256)
+        ? `<p class="muted small">Quy tắc đông lạnh: vào lệnh khi basis ≥ ${(((rule.basis_threshold ?? 0.04) * 100)).toFixed(0)}%/năm · giữ tới đáo hạn · sha <span class="mono">${esc((v.rule_sha256 || "").slice(0, 12))}</span></p>`
+        : "";
+      const openTbl = open.length
+        ? `<div class="table-wrap" tabindex="0"><table class="tbl compact"><thead><tr><th>Coin</th><th>Hợp đồng</th><th>Vào lúc</th><th>Basis %/năm</th><th>Còn lại</th><th>MtM % vốn phân bổ</th><th>Phí vào</th></tr></thead><tbody>${open.map((p) =>
+          `<tr><td>${esc(p.coin ?? "")}</td><td>${esc(p.contract ?? "")}</td><td>${p.entry_time ? esc(dt(Date.parse(p.entry_time))) : "—"}</td>` +
+          `<td class="${(p.entry_basis ?? 0) >= 0 ? "up" : "down"}">${p.entry_basis_pct_yr != null ? Number(p.entry_basis_pct_yr).toFixed(2) + "%" : "—"}</td>` +
+          `<td>${p.days_to_delivery != null ? Number(p.days_to_delivery).toFixed(0) + " ngày" : "—"}</td>` +
+          `<td class="${(p.mtm_alloc ?? 0) >= 0 ? "up" : "down"}">${p.mtm_pct_alloc != null ? (Number(p.mtm_pct_alloc) >= 0 ? "+" : "") + Number(p.mtm_pct_alloc).toFixed(2) + "%" : "—"}</td>` +
+          `<td>${p.entry_fees_usdt != null ? Number(p.entry_fees_usdt).toFixed(2) + " USDT" : "—"}</td></tr>`).join("")}</tbody></table></div>`
+        : `<p class="muted">Không có cặp nào đang mở.</p>`;
+      const doneTbl = done.length
+        ? `<div class="panel-h sub"><span>Đã tất toán (${done.length})</span></div><div class="table-wrap" tabindex="0"><table class="tbl compact"><thead><tr><th>Coin</th><th>Hợp đồng</th><th>Tất toán</th><th>Lãi/lỗ thực hiện</th></tr></thead><tbody>${done.slice(-10).reverse().map((p) =>
+          `<tr><td>${esc(p.coin ?? "")}</td><td>${esc(p.contract ?? "")}</td><td>${p.settled_at ? esc(dt(Date.parse(p.settled_at))) : "—"}</td>` +
+          `<td class="${(p.realised_pnl_usdt ?? 0) >= 0 ? "up" : "down"}">${p.realised_pnl_usdt != null ? (Number(p.realised_pnl_usdt) >= 0 ? "+" : "") + Number(p.realised_pnl_usdt).toFixed(2) + " USDT" : "—"}</td></tr>`).join("")}</tbody></table></div>`
+        : "";
+      const pnl = t.realised_pnl_usdt != null ? Number(t.realised_pnl_usdt) : null;
+      body.innerHTML = `${ruleLine}${openTbl}${doneTbl}`
+        + `<p class="fine">Tổng lãi/lỗ thực hiện: <b class="${pnl != null && pnl < 0 ? "down" : "up"}">${pnl != null ? (pnl >= 0 ? "+" : "") + pnl.toFixed(2) + " USDT" : "—"}</b>`
+        + ` · phí đã trả ${t.fees_paid_usdt != null ? Number(t.fees_paid_usdt).toFixed(2) + " USDT" : "—"}`
+        + `. Sổ paper chỉ theo dõi, hệ thống không đặt lệnh thật.</p>`;
+    } catch (e) { body.innerHTML = `<p class="muted">Không tải được sổ carry: ${esc(e.message)}</p>`; }
   }
   const PIPE_LABEL = Object.fromEntries(PIPES.map((p) => [p.v, p.nm]));
   function visiblePipes() {

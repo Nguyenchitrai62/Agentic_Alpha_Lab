@@ -19,7 +19,7 @@ from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import JSONResponse, ORJSONResponse, Response
 import orjson
 
-from . import auth, catalog, db, pipeline
+from . import auth, carry_view, catalog, db, pipeline
 from .config import ROOT, SETTINGS, log
 from .security import BodyLimitMiddleware
 
@@ -286,6 +286,13 @@ def trade_plan(request: Request, pipeline: str | None = None, user: dict = Depen
         raise HTTPException(400, "Unknown pipeline.")
     key = {"v233": "trade_plan_v233", "v236": "trade_plan_v236", "v240": "trade_plan_v240", "v266": "trade_plan_v266", "v269": "trade_plan_v269", "v285": "trade_plan_v285", "v295": "trade_plan_v295", "v301": "trade_plan_v301", "v321": "trade_plan_v321", "v315": "trade_plan_v315", "v340": "trade_plan_v340", "v342": "trade_plan_v342", "v362": "trade_plan_v362", "v367": "trade_plan_v367", "v376": "trade_plan_v376"}.get(pipeline, "trade_plan")
     return cached(request, key, 20, lambda: db.kv_get(key, {}))
+
+
+@app.get("/api/carry")
+def carry(request: Request, user: dict = Depends(auth.require_viewer)):
+    """Frozen cash-and-carry paper ledger (scripts/carry_paper.py): rule params + sha, open pairs, settled pairs and
+    realised P&L, last ledger run time and a stale flag (> 2 h). Read-only; the ledger file is never written here."""
+    return cached(request, "carry", 60, lambda: carry_view.get_carry_view())
 
 
 @app.get("/api/signals/latest")
