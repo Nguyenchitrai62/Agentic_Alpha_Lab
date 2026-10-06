@@ -164,3 +164,10 @@ Mục tiêu 5%/tháng DD<=20% với MANUAL CHƯA đạt trung thực (~3.7 ở D
 để DD<20 chỉ còn ~2.8%/tháng) [DEPLOYMENT_PLAN_VI; research-map].
 Kỳ vọng BOT hợp lý là 4–6%/tháng với DD 12–18%, nhưng ~1/9 năm có thể chạm DD>20%; vốn phải chịu được DD
 25% [DEPLOYMENT_PLAN_VI; oc_mcdd].
+
+## Bổ sung: KPI cấu hình triển khai G2 (OpenCode oc_kpi_g2)
+
+R2B1D17BFG2 (D17BF + trần notional dip 2x): 5,41 %/tháng, DD năm tối đa 16,91, toàn đường (gate) 16,82, gấp 26,4 lần sau 5 năm,
+win tất cả lệnh 65,3 % (book 51,5 %, rung dip 68,6 %), không năm lỗ; 41 % số tháng >= +5 %, 70,5 % số tháng không lỗ, chuỗi tháng lỗ
+dài nhất 4 tháng (2024-04..07; D17BF: 2 tháng). Gross tổng tệ nhất 3,0x vốn (D17BF 6,4x). => BOT đạt base cả 3 chỉ số.
+Lưu ý: cách bot hiện cài `--dip-gross-cap` chặt hơn engine (đang sửa: bot_capfix); số trên là engine.
