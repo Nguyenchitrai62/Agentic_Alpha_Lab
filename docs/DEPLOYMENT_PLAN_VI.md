@@ -83,3 +83,6 @@ LUNA 2022-05 -3,0 % (DD 9,7 %). Hãy chuẩn bị tâm lý: vài lần mỗi nă
 
 Dòng phụ funding thực (OpenCode oc_signedfunding; SỐ CHÍNH THỨC vẫn là mô hình gate: long trả 0,01 %/8h, short không nhận):
 R2B1D17BF với funding thực có dấu 5,55 %/tháng, DD năm 18,32 (gate 5,43 / 18,33) -> mô hình gate bảo thủ hơn thực tế khoảng 0,1 %/tháng.
+
+Chênh lệch sàn Bybit vs Binance (~0,5 %/tháng, oc_venuegap + oc_bookvenue): nằm ở thang dip (ít TP hơn trên băng giá Bybit), không ở book
+(khớp/stop/TP gần như giống hệt). Không có lỗi thực thi để sửa; kỳ vọng triển khai trên Bybit dùng hàng "giá Bybit" (~4,9 %/tháng, DD < 20).
