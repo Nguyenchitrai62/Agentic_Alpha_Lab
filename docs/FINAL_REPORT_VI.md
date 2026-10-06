@@ -219,7 +219,7 @@ thước đo chính thức. Bot paper D13BF (`--dip-mult 1.3 --bear-book`, tag d
 
 Bảng agent R2 đang triển khai là seed TỐT NHẤT trong 5 seed ở 2022 và năm gần nhất (2025), hạng 2 năm 2023, hạng chót năm 2024; độ phân
 tán giữa các seed đáng kể. Bỏ phiếu 5 seed không tốt hơn (năm tệ nhất kém hơn). Hàm ý: các con số backtest của R2 có thể hơi lạc quan vì
-may mắn của seed - một lý do nữa để coi bằng chứng paper/tiến cứu là kiểm định chính, và kỳ vọng thận trọng (~4,5-5 %/tháng thay vì 5,4).
+may mắn của seed ở cấp rung. NHƯNG chạy engine đầy đủ G2 với 5 seed (OpenCode oc_seedengine): 5y 5,34-5,43 %/tháng (trung bình 5,39, seed triển khai 5,41, hạng 2/5), DD toàn đường 16,5-17,0, không năm lỗ ở seed nào -> may mắn seed gần như triệt tiêu ở cấp danh mục (~0,02 %/tháng). Kỳ vọng G2 ~5,4 %/tháng trên giá Binance, ~4,9 trên giá Bybit.
 
 ## Bổ sung: hồ sơ thận trọng D13BF dưới ma sát (OpenCode oc_d13robust, oc_kpi_d13)
 

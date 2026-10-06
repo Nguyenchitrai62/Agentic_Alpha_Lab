@@ -1,0 +1,3 @@
+# OpenCode task ops_stalealert
+Read scripts/daily_status.py, scripts/bot_health.py, backend/multiphase.py (phase plans are produced hourly: phase s after its shifted 4h close). Write ONLY scripts/daily_status.py, scripts/bot_health.py (minimal) and their tests. No commits, no network beyond the existing local /health call, no credentials.
+Earlier stale-plan warning: WARNING when trade_plan_v376.json generated_at is older than 1h15m (a phase plan should arrive every hour), CRITICAL at 4h30m (bots stop entering) - in both daily_status and bot_health; also flag CRITICAL if the backend /health is down even when the plan is still fresh. Update tests. Report in at most 6 lines.
