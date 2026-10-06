@@ -7,6 +7,12 @@ Fill rules (as the research engine, stated conservatively):
 - conditional market stop: long (triggerDirection 2) when low <= trigger at min(trigger, minute open); short (1) when high >= trigger at
   max(trigger, minute open); taker 0.00055; a stop and a take-profit of the same position in the same minute -> the stop first;
 - market orders fill at the open of the first minute after placement, taker 0.00055;
+- IOC limits (bot_carry entry legs, categories spot / dated-future): fill
+  immediately at the limit price (maker 0.0002) when the limit crosses the
+  current price - Buy px >= ask, Sell px <= bid - where ask/bid is the paper
+  ticker when the public client has one, else the last closed 1m close +- one
+  tick (dated futures use their own symbol's close); a non-crossing IOC is
+  cancelled by the exchange at placement (no resting order, no fill);
 - reduce-only orders are capped at the position size (cancelled when the position is flat);
 - funding (gate rule, adverse): longs pay 0.0001 x notional at 00 / 08 / 16 UTC, shorts receive nothing.
 Hedge mode: positions keyed (symbol, positionIdx), idx 1 = long, idx 2 = short.
@@ -80,6 +86,82 @@ class PaperExchange:
     def executions(self, start_ms):
         return [e for e in self.s["execs"] if int(e["execTime"]) >= int(start_ms)]
 
+    def _tick_size(self, sym):
+        """Tick size for the IOC ask/bid proxy (cached; None when unknown)."""
+        try:
+            cache = self.__dict__.setdefault("_tick_cache", {})
+        except Exception:
+            cache = {}
+        try:
+            if sym in cache:
+                return cache[sym]
+        except TypeError:
+            pass
+        tick = None
+        try:
+            inst = self.pub.instruments([sym])
+            tick = float((inst.get(sym) or {}).get("tick") or 0) or None
+        except Exception:
+            tick = None
+        try:
+            cache[sym] = tick
+        except Exception:
+            pass
+        return tick
+
+    def _ioc_book(self, sym, category):
+        """Current (ask, bid): paper ticker when available, else last 1m close +- tick."""
+        try:
+            res = self.pub.public("/v5/market/tickers",
+                                  category="spot" if category == "spot" else "linear",
+                                  symbol=sym)
+            row = (res.get("list") or [{}])[0]
+            ask = float(row.get("ask1Price") or 0) or None
+            bid = float(row.get("bid1Price") or 0) or None
+            if ask and bid:
+                return ask, bid
+        except Exception:
+            pass
+        try:
+            ref = self.s.get("last_close", {}).get(sym)
+            ref = float(ref) if ref is not None else None
+        except (TypeError, ValueError):
+            ref = None
+        if ref is None or not ref > 0:
+            return None, None
+        try:
+            tick = float(self._tick_size(sym) or 0.0)
+        except (TypeError, ValueError):
+            tick = 0.0
+        return ref + tick, ref - tick
+
+    def _ioc_try_fill(self, o) -> bool | None:
+        """Immediate IOC outcome: True = filled now, False = cancelled, None = leave resting.
+
+        Applies to spot and dated-future IOC limits only. A Buy crosses when
+        px >= ask, a Sell when px <= bid; fills book at the limit price (maker).
+        """
+        try:
+            px = float(o.get("price"))
+            qty = float(o.get("qty"))
+        except (TypeError, ValueError):
+            return False
+        if not (px > 0 and qty > 0):
+            return False
+        try:
+            link = o.get("orderLinkId")
+            t_ms = int(o.get("t_ms") or 0)
+        except (TypeError, ValueError):
+            return False
+        ask, bid = self._ioc_book(o.get("symbol"), o.get("category", "linear"))
+        if ask is None or bid is None:
+            return None
+        side = o.get("side")
+        if (side == "Buy" and px >= ask) or (side == "Sell" and px <= bid):
+            self._fill(link, o, qty, px, MAKER, t_ms)
+            return True
+        return False
+
     def place(self, p: dict):
         o = dict(p, t_ms=int(pd.Timestamp.now(tz="UTC").timestamp() * 1000))
         last = self.s["last_close"].get(p["symbol"])
@@ -87,6 +169,19 @@ class PaperExchange:
             px = float(p["price"])
             if (p["side"] == "Buy" and px >= last) or (p["side"] == "Sell" and px <= last):
                 return None  # rejected (PostOnly would cross)
+        if o.get("timeInForce") == "IOC" and o.get("orderType") == "Limit":
+            cat = o.get("category", "linear")
+            sym = o.get("symbol")
+            try:
+                in_syms = sym in (self.symbols or [])
+            except TypeError:
+                in_syms = False
+            if cat == "spot" or not in_syms or cat not in ("linear", "inverse"):
+                hit = self._ioc_try_fill(o)
+                if hit is True:
+                    return dict(orderLinkId=o["orderLinkId"])  # filled at placement, nothing rests
+                if hit is False:
+                    return None  # cancelled by the exchange (IOC, no cross)
         self.s["orders"][p["orderLinkId"]] = o
         return dict(orderLinkId=p["orderLinkId"])
 

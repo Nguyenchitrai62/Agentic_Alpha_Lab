@@ -127,6 +127,36 @@ def _is_postonly_reject_msg(msg: str) -> bool:
     return False
 
 
+def _is_carry_link(link) -> bool:
+    """True for bot-owned carry links (prefix ``c``): owned by bot/carry.py only."""
+    try:
+        return str(link or "").startswith(carry_mod.LINK_PREFIX)
+    except Exception:
+        return str(link or "").startswith("c")
+
+
+def _have_without_carry(have):
+    """Resting set minus carry links (generic diff must never see them)."""
+    try:
+        items = list((have or {}).items())
+    except (AttributeError, TypeError):
+        return have
+    return {k: v for k, v in items if not _is_carry_link(k)}
+
+
+def _acts_without_carry_cancel(acts):
+    """Drop generic cancel/amend acts targeting carry links (defense in depth)."""
+    out = []
+    for a in acts or []:
+        try:
+            if str(a.get("op")) in ("cancel", "amend") and _is_carry_link(a.get("link")):
+                continue
+        except (AttributeError, TypeError):
+            pass
+        out.append(a)
+    return out
+
+
 class Runner:
     def __init__(self, mode: str, plan_path: Path, equity: float | None, risk_mult: float = 1.0, corr: bool = False,
                  tag: str | None = None, dip_mult: float = 1.0, bear_book: bool = False,
@@ -762,7 +792,8 @@ class Runner:
                     have = {}
                 _stages["sync_ms"] += (_cycle_now() - _t) * 1000.0
                 _t = _cycle_now()
-                acts = mirror.diff({k: o for k, (o, _) in rounded.items()}, have)
+                acts = mirror.diff({k: o for k, (o, _) in rounded.items()}, _have_without_carry(have))
+                acts = _acts_without_carry_cancel(acts)
                 _stages["decide_ms"] += (_cycle_now() - _t) * 1000.0
                 _t = _cycle_now()
                 for a in acts:
@@ -895,8 +926,9 @@ class Runner:
                 o = replace(o, qty=float(p["qty"]), price=float(p["price"]) if "price" in p else None,
                             trigger=float(p["triggerPrice"]) if "triggerPrice" in p else None)  # compare / amend in exchange units
                 rounded[k] = (o, p)
-        acts = mirror.diff({k: o for k, (o, _) in rounded.items()}, have_before,
+        acts = mirror.diff({k: o for k, (o, _) in rounded.items()}, _have_without_carry(have_before),
                            amend_entry_qty=(self.corr or self.risk_mult != 1.0 or self.dip_mult != 1.0 or bool(getattr(self, "dip_gross_cap", 0.0))))
+        acts = _acts_without_carry_cancel(acts)
         _stages["decide_ms"] += (_cycle_now() - _t) * 1000.0
         failed_stop_pieces, placed_stop_links = set(), set()
         _t = _cycle_now()

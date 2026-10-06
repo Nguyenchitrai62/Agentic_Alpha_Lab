@@ -37,6 +37,8 @@ from bot import risk_guard  # noqa: E402
 
 LINK_PREFIX = "c"
 MAX_UNHEDGED_CYCLES = 2
+MAX_ENTRY_ATTEMPTS = 3  # a pending pair with NEITHER leg filled is retried at
+# fresh prices up to 3 attempts per roll, then carry_abandon (re-evaluated next cycle)
 CARRY_SHORT_CAP = 0.30  # carry short notional <= 0.30 x equity per coin
 
 
@@ -80,6 +82,45 @@ def has_history(cstate: dict, coin: str) -> bool:
                 return True
     except (AttributeError, TypeError):
         pass
+    return False
+
+
+def _skip_hour_key(coin: str, now) -> str:
+    """Dedupe key for carry_skip: one log per coin per UTC hour."""
+    import pandas as pd
+
+    try:
+        ts = pd.Timestamp(now)
+    except (TypeError, ValueError):
+        return f"{coin}:{now}"
+    try:
+        if ts.tzinfo is not None:
+            ts = ts.tz_convert("UTC")
+        h = ts.floor("h")
+    except (TypeError, ValueError, AttributeError):
+        h = ts
+    return f"{coin}:{h}"
+
+
+def _skip_already(cstate: dict, key: str) -> bool:
+    """True when this (coin, hour) skip was already logged; else record it."""
+    try:
+        seen = cstate.setdefault("skip_logged", {})
+    except (AttributeError, TypeError):
+        return False
+    if not isinstance(seen, dict):
+        return False
+    if key in seen:
+        return True
+    seen[key] = True
+    if len(seen) > 240:  # bound memory: keep the current hour's keys
+        cur_h = key.split(":", 1)[-1] if ":" in key else ""
+        for k in list(seen):
+            if cur_h and k.endswith(cur_h):
+                continue
+            del seen[k]
+            if len(seen) <= 48:
+                break
     return False
 
 
@@ -304,6 +345,52 @@ def decide(now, equity: float, f: float, cstate: dict, expiries_by_coin: dict,
                     logs.append(dict(op="carry_unhedged", coin=coin, symbol=pos.get("symbol"),
                                      missing="spot", cycles=n))
                 continue
+            # NEITHER leg filled (both IOCs missed/cancelled): retry the pair at
+            # fresh prices, max MAX_ENTRY_ATTEMPTS per roll, then carry_abandon
+            # (position cleared, re-evaluated at the next roll). One-leg-filled
+            # keeps the unhedged recovery above.
+            try:
+                natt = int(pos.get("attempts", 1) or 1)
+            except (TypeError, ValueError):
+                natt = 1
+            if natt >= MAX_ENTRY_ATTEMPTS:
+                logs.append(dict(op="carry_abandon", coin=coin, symbol=pos.get("symbol"),
+                                 attempts=natt))
+                try:
+                    positions.pop(coin, None)
+                except (AttributeError, TypeError):
+                    pass
+                continue
+            rq = (quotes_by_coin or {}).get(coin) or {}
+            try:
+                r_fut_q = (rq.get("fut_by_sym") or {}).get(pos.get("symbol")) or {}
+                r_s_ask = float(rq.get("spot_ask") or rq.get("spot_mid") or 0)
+                r_f_bid = float(r_fut_q.get("bid") or r_fut_q.get("mid") or 0)
+                r_s_mid = float(rq.get("spot_mid") or r_s_ask)
+                r_f_mid = float(r_fut_q.get("mid") or r_f_bid)
+            except (TypeError, ValueError, AttributeError, KeyError):
+                continue
+            if not (r_s_mid > 0 and r_f_mid > 0 and r_s_ask > 0 and r_f_bid > 0):
+                continue
+            r_qty = qty_for(f, equity, r_s_ask)
+            if not (r_qty > 0):
+                continue
+            if not carry_cap_ok(r_qty, r_f_bid, equity):
+                logs.append(dict(op="carry_cap", coin=coin, symbol=pos.get("symbol"),
+                                 reason="carry_cap"))
+                continue
+            r_cand = dict(symbol=pos.get("symbol"), category=pos.get("category", "linear"))
+            r_spot, r_fut = entry_payloads(coin, r_cand, r_s_ask, r_f_bid, r_qty, now)
+            want.extend([r_spot, r_fut])
+            pos.update(qty=float(r_qty), S_entry=float(r_s_mid), F_entry=float(r_f_mid),
+                       S_ask=float(r_s_ask), F_bid=float(r_f_bid),
+                       spot_link=r_spot["orderLinkId"], fut_link=r_fut["orderLinkId"],
+                       spot_filled=False, fut_filled=False, S_fill=None, F_fill=None,
+                       unhedged_cycles=0, attempts=natt + 1, entry_time=str(now))
+            logs.append(dict(op="carry_entry", coin=coin, symbol=pos.get("symbol"),
+                             category=pos.get("category", "linear"),
+                             S_entry=float(r_s_mid), F_entry=float(r_f_mid),
+                             qty=float(r_qty), attempt=natt + 1, retry=True))
             continue
         expiries = list((expiries_by_coin or {}).get(coin, []) or [])
         cand = roll_candidate(expiries, now_ms, has_history(cstate, coin))
@@ -326,8 +413,9 @@ def decide(now, equity: float, f: float, cstate: dict, expiries_by_coin: dict,
         except (TypeError, ValueError):
             continue
         if basis < float(RULE_PARAMS.get("basis_threshold", 0.04)):
-            logs.append(dict(op="carry_skip", coin=coin, symbol=cand["symbol"],
-                             ann_basis=round(float(basis), 6)))
+            if not _skip_already(cstate, _skip_hour_key(coin, now)):
+                logs.append(dict(op="carry_skip", coin=coin, symbol=cand["symbol"],
+                                 ann_basis=round(float(basis), 6)))
             continue
         qty = qty_for(f, equity, s_ask)
         if not (qty > 0):
@@ -348,9 +436,9 @@ def decide(now, equity: float, f: float, cstate: dict, expiries_by_coin: dict,
                                entry_time=str(now),
                                spot_filled=False, fut_filled=False,
                                S_fill=None, F_fill=None,
-                               spot_link=spot_p["orderLinkId"], fut_link=fut_p["orderLinkId"],
-                               unhedged_cycles=0, ann_basis=round(float(basis), 6),
-                               dte_days=round(float(dte), 2))
+                                spot_link=spot_p["orderLinkId"], fut_link=fut_p["orderLinkId"],
+                                unhedged_cycles=0, attempts=1, ann_basis=round(float(basis), 6),
+                                dte_days=round(float(dte), 2))
         logs.append(dict(op="carry_entry", coin=coin, symbol=cand["symbol"],
                          category=cand.get("category", "linear"),
                          S_entry=float(s_mid), F_entry=float(f_mid),

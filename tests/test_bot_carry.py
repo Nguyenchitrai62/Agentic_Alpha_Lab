@@ -192,6 +192,126 @@ def test_flag_off_no_change(monkeypatch, tmp_path):
     assert acts is not None
 
 
+def test_generic_cancel_ignores_carry_links():
+    import bot.run as runmod
+    have = {"cBTChrvw7S": dict(symbol="BTCUSDT", price=85363.1, qty=0.014),
+            "cBTChrvw7F": dict(symbol="BTCUSDT-25DEC26", price=86274.4, qty=0.014),
+            "b0BTCxyzE": dict(symbol="BTCUSDT", price=80000.0, qty=0.01)}
+    raw = mirror.diff({}, have)
+    assert any(a.get("op") == "cancel" and a.get("link") == "cBTChrvw7S" for a in raw)
+    filt = runmod._have_without_carry(have)
+    assert "cBTChrvw7S" not in filt and "cBTChrvw7F" not in filt
+    assert "b0BTCxyzE" in filt
+    kept = runmod._acts_without_carry_cancel(
+        raw + [dict(op="amend", link="cBTChrvw7S", symbol="BTCUSDT", price=1.0)])
+    assert not [a for a in kept if str(a.get("link", "")).startswith("c")]
+    assert any(a.get("link") == "b0BTCxyzE" for a in kept)
+
+
+def test_ioc_paper_fill_both_legs():
+    from bot.paper import PaperExchange
+
+    class Pub:
+        def instruments(self, syms):
+            return {s: INST["BTCUSDT"] for s in syms}
+
+        def public(self, *a, **k):
+            return {"list": []}
+
+    import tempfile
+    from pathlib import Path
+    d = Path(tempfile.mkdtemp())
+    ex = PaperExchange(Pub(), d / "ex.json", 10000.0, ["BTCUSDT"])
+    t0 = int(_ms(_now()) // 60000 * 60000)
+    ex.s["last_ms"] = {"BTCUSDT": t0, "BTCQ": t0}
+    ex.s["last_close"] = {"BTCUSDT": 79999.0, "BTCQ": 82001.0}
+    r1 = ex.place(dict(symbol="BTCUSDT", side="Buy", qty="0.01", orderType="Limit",
+                       price="80000", orderLinkId="cBTCiS", category="spot",
+                       timeInForce="IOC"))
+    r2 = ex.place(dict(symbol="BTCQ", side="Sell", qty="0.01", orderType="Limit",
+                       price="82000", orderLinkId="cBTCiF", category="linear",
+                       positionIdx=2, timeInForce="IOC"))
+    assert r1 and r2  # crossing IOCs fill at placement
+    assert not [k for k in ex.s["orders"] if str(k).startswith("cBTCi")]
+    assert abs(ex.s["spot"]["BTCUSDT"]["qty"] - 0.01) < 1e-9
+    assert abs(ex.s["pos"]["BTCQ|2"]["qty"] - 0.01) < 1e-9
+    assert {"cBTCiS", "cBTCiF"} <= {e["orderLinkId"] for e in ex.s["execs"]}
+
+
+def test_ioc_paper_cancel_when_no_cross():
+    from bot.paper import PaperExchange
+
+    class Pub:
+        def instruments(self, syms):
+            return {s: INST["BTCUSDT"] for s in syms}
+
+        def public(self, *a, **k):
+            return {"list": []}
+
+    import tempfile
+    from pathlib import Path
+    d = Path(tempfile.mkdtemp())
+    ex = PaperExchange(Pub(), d / "ex.json", 10000.0, ["BTCUSDT"])
+    t0 = int(_ms(_now()) // 60000 * 60000)
+    ex.s["last_ms"] = {"BTCUSDT": t0, "BTCQ": t0}
+    ex.s["last_close"] = {"BTCUSDT": 79999.0, "BTCQ": 82001.0}
+    assert ex.place(dict(symbol="BTCUSDT", side="Buy", qty="0.01", orderType="Limit",
+                         price="79000", orderLinkId="cBTCnS", category="spot",
+                         timeInForce="IOC")) is None
+    assert ex.place(dict(symbol="BTCQ", side="Sell", qty="0.01", orderType="Limit",
+                         price="83000", orderLinkId="cBTCnF", category="linear",
+                         positionIdx=2, timeInForce="IOC")) is None
+    assert not [k for k in ex.s["orders"] if str(k).startswith("cBTCn")]
+    assert {e["orderLinkId"] for e in ex.s["execs"]}.isdisjoint({"cBTCnS", "cBTCnF"})
+
+
+def test_neither_filled_retry_then_abandon():
+    now = _now()
+    cstate = {"positions": {}, "entered": [], "history": []}
+    exp, quo = _expiries(now), _quotes()
+    want, _ = carry.decide(now, 10000.0, 0.25, cstate, exp, quo)
+    assert len(want) == 2
+    first_links = {p["orderLinkId"] for p in want}
+    # cycle 2: neither leg filled -> fresh pair, attempt 2
+    want2, logs2 = carry.decide(now + pd.Timedelta(minutes=1), 10000.0, 0.25,
+                                cstate, exp, quo)
+    assert len(want2) == 2
+    assert {p["orderLinkId"] for p in want2} != first_links
+    assert any(r.get("op") == "carry_entry" and r.get("retry") for r in logs2)
+    assert cstate["positions"]["BTC"]["attempts"] == 2
+    # cycle 3: still nothing filled -> attempt 3
+    want3, _ = carry.decide(now + pd.Timedelta(minutes=2), 10000.0, 0.25,
+                            cstate, exp, quo)
+    assert len(want3) == 2
+    assert cstate["positions"]["BTC"]["attempts"] == 3
+    # cycle 4: 3 attempts used -> carry_abandon, position cleared for next roll
+    want4, logs4 = carry.decide(now + pd.Timedelta(minutes=3), 10000.0, 0.25,
+                                cstate, exp, quo)
+    assert want4 == []
+    assert any(r.get("op") == "carry_abandon" for r in logs4)
+    assert "BTC" not in cstate["positions"]
+    # next roll: re-evaluated, a fresh entry is possible
+    want5, logs5 = carry.decide(now + pd.Timedelta(minutes=4), 10000.0, 0.25,
+                                cstate, exp, quo)
+    assert len(want5) == 2
+    assert any(r.get("op") == "carry_entry" for r in logs5)
+
+
+def test_skip_dedupe_per_coin_hour():
+    now = _now().floor("h")
+    cstate = {"positions": {}, "entered": [], "history": []}
+    exp = _expiries(now)
+    quo = _quotes(spot=80000.0, fut=80100.0)
+    _, logs1 = carry.decide(now, 10000.0, 0.25, cstate, exp, quo)
+    _, logs2 = carry.decide(now + pd.Timedelta(minutes=5), 10000.0, 0.25,
+                            cstate, exp, quo)
+    skips = [r for r in logs1 + logs2 if r.get("op") == "carry_skip"]
+    assert len(skips) == 1
+    _, logs3 = carry.decide(now + pd.Timedelta(hours=1, minutes=1), 10000.0, 0.25,
+                            cstate, _expiries(now), quo)
+    assert any(r.get("op") == "carry_skip" for r in logs3)
+
+
 def test_paper_spot_and_dated_trade_through():
     from bot.paper import PaperExchange
 
