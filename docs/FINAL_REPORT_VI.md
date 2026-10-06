@@ -171,3 +171,9 @@ R2B1D17BFG2 (D17BF + trần notional dip 2x): 5,41 %/tháng, DD năm tối đa 1
 win tất cả lệnh 65,3 % (book 51,5 %, rung dip 68,6 %), không năm lỗ; 41 % số tháng >= +5 %, 70,5 % số tháng không lỗ, chuỗi tháng lỗ
 dài nhất 4 tháng (2024-04..07; D17BF: 2 tháng). Gross tổng tệ nhất 3,0x vốn (D17BF 6,4x). => BOT đạt base cả 3 chỉ số.
 Lưu ý: cách bot hiện cài `--dip-gross-cap` chặt hơn engine (đang sửa: bot_capfix); số trên là engine.
+
+## Bổ sung: stretch DD < 15 (OpenCode oc_tsmom_official, thước đo chính thức)
+
+Hồ sơ thận trọng R2B1D13BF (dip x1,3 + bear-book): 4,97 %/tháng, DD năm 14,98, toàn đường 14,86 (đạt DD < 15, thiếu 0,03 %/tháng).
+Thêm sleeve TSMOM 0,10: 5,03 %/tháng nhưng DD năm 15,42 (vượt 0,42 pp). Không tổ hợp nào đạt đồng thời >= 5 %/tháng và DD < 15 trên
+thước đo chính thức. Bot paper D13BF (`--dip-mult 1.3 --bear-book`, tag d13bf) chạy từ 2026-10-06 để thu bằng chứng tiến cứu.
