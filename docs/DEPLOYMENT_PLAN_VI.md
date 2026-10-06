@@ -8,7 +8,7 @@ Không sửa các ngưỡng sau khi đã thấy dữ liệu paper (nếu sửa p
 | Sản phẩm | Pipeline | %/tháng kỳ vọng | DD kỳ vọng | Ghi chú |
 |---|---|---|---|---|
 | BOT | R2-4P (v376) | 4.8 (thước đo cân lại mỗi năm, 5 năm; từng năm 2.0 / 3.8 / 4.0 / 10.6 / 3.9); thực tế trên Bybit + ma sát ~3.5-4.4 | 25 (năm xấu nhất), tới ~28 khi trượt stop / giá Bybit | cần bot chạy 24/7, 4 khung giờ lệch 1h; không năm lỗ trong mọi kịch bản ma sát (research/diagnostics/r2_4p_robust5) |
-| **BOT khuyến nghị (paper từ 2026-10-05)** | **R2B1D17BF (v411)** | **5.43** (giá Bybit + ma sát: 4.97; trễ 15': 5.24) | năm xấu nhất 18.3, toàn đường cong 16.9; mọi kịch bản ma sát <= 20 | size dip theo tương quan + dip x1.7 + bộ lọc gấu cho book; thắng 65.5 %, không năm lỗ; bot: `--corr-size --dip-mult 1.7 --bear-book` |
+| **BOT khuyến nghị (paper từ 2026-10-05)** | **R2B1D17BF (v411)** | **5.43** (giá Bybit + ma sát: 4.97; trễ 15': 5.24) — docs_update6 hiệu chỉnh may mắn đồng hồ dip: kỳ vọng đồng hồ ngẫu nhiên ~5.24 thay vì 5.41 G2 (`oc_clockluck`; giữ số cũ 5.41 kèm giải thích ~0.17pp luck, biên mỏng, method proxy) | năm xấu nhất 18.3, toàn đường cong 16.9; mọi kịch bản ma sát <= 20 | size dip theo tương quan + dip x1.7 + bộ lọc gấu cho book; thắng 65.5 %, không năm lỗ; bot: `--corr-size --dip-mult 1.7 --bear-book` |
 | BOT (các điểm khác) | R2B1D18 (v408) / R2B1D16 (v406) | 5.45 / 5.14 (5 năm 2021-2026; ma sát thực tế D16: 4.8-5.1) | năm xấu nhất 19.1 / 17.3; toàn đường cong 17.6 / 16.4 | size dip theo tương quan (cần bot chỉnh lệnh theo phút), tỉ lệ thắng 65 %, không năm lỗ; cổng nền PASS (audit OpenCode); bot: `--corr-size --dip-mult 1.8` |
 | MANUAL | M4 / M5 | ~3.5 với người thật (trễ 15', bỏ nến đêm) | 22-24 % (pha xấu 32-34 %) | dùng ~80 % vốn -> ~2.8 %/tháng, DD < 20 % |
 
@@ -26,7 +26,7 @@ Cập nhật 2026-10-05: thước đo cũ (mix 4 pha liên tục) phóng đại 
    - (b) DD bot giấy <= 15 %;
    - (c) sai lệch bot giấy so với kế hoạch paper <= 1.5 điểm %/tháng (đo chất lượng thực thi) — kiểm tra bằng `python scripts/paper_divergence.py <thư-mục-bot>` (trước 14 ngày báo `too early` là bình thường, đủ 14 ngày mới PASS/FAIL);
    - (d) không có lỗi `cycle_error` kéo dài > 1 giờ, không có vị thế nào thiếu stop.
-   Vốn tối thiểu ~5000 USDT (dưới mức này các bậc dip BTC nhỏ hơn 0.001 BTC bị bỏ do 4 khung chia vốn làm 4). Kiểm chứng khối lượng tối thiểu Bybit cho R2B1D17BF (research/diagnostics/oc_lots): 10.000 USDT đặt được 100 % lệnh book / 98 % bậc dip (giữ ~100 % lãi/lỗ); 5.000 USDT: 96 % / 94 % (~99.5 %); 2.000 USDT: 80 % / 81 % (mất ~5-20 %, chủ yếu BTC); khuyến nghị >= 5.000 USDT, tốt nhất ~10.000.
+   Vốn tối thiểu ~5000 USDT (dưới mức này các bậc dip BTC nhỏ hơn 0.001 BTC bị bỏ do 4 khung chia vốn làm 4). Kiểm chứng khối lượng tối thiểu Bybit cho R2B1D17BF (research/diagnostics/oc_lots): 10.000 USDT đặt được 100 % lệnh book / 98 % bậc dip (giữ ~100 % lãi/lỗ); 5.000 USDT: 96 % / 94 % (~99.5 %); 2.000 USDT: 80 % / 81 % (mất ~5-20 %, chủ yếu BTC); khuyến nghị >= 5.000 USDT, tốt nhất ~10.000. Cập nhật docs_update6 (`oc_capscale`, G2 v421, minima 5 USDT + qty steps): >=5.000 USDT đặt được gần như mọi lệnh (book 0,9990 count / 0,9995 weight; dip 0,9780 / 0,9985 net / 0,9967 gross); 10.000 USDT book 100%, dip gross 99,92%; 2.000 USDT chỉ ~93–96% count (book 0,9585/0,9704; dip 0,9269/0,9950/0,9804; bottleneck BTC rồi ETH) — giữ khuyến nghị >=5.000 (1250/sub-book), thoải mái 10.000; R5/DD y hệt mọi size là UPPER bound (engine chưa enforce qty step in-path).
 4. Tăng vốn: sau 3 tháng tiền thật nếu (a)-(c) vẫn đúng trên tiền thật.
 
 ## 3. MANUAL: cách theo
@@ -313,3 +313,36 @@ Restart sau reboot: `bash scripts/restart_all.sh` (`--dry-run`, `--only bots|bac
 loop.sh RETIRED 2026-09-30, 5 runner paper theo runner.lock + state.json backup, vòng carry mỗi 3600s, KHÔNG live/testnet [restart_all.sh].
 Screens đóng: oc_expirydip NOT PROMISING (dSum +0,0164 vs gate +0,273, 24 fills) [oc_expirydip]; oc_usdtdip NOT PROMISING (+0,047, 3/5 sums, 3/5
 control) [oc_usdtdip].
+
+## Bổ sung docs_update6 (2026-10-06)
+
+- Hiệu chỉnh may mắn đồng hồ (`oc_clockluck`) — cập nhật kỳ vọng, giữ số cũ kèm giải thích: bốn đồng hồ giờ triển khai may ở sleeve dip
+(replica 24 START offset S: min 4,55 / max 9,67 offset 0 / mean 7,12 / median 7,13 / std 1,54; triển khai 0=9,67 pct 100% max / 60=7,54 58% /
+120=8,76 88% / 180=4,90 8%; mean deployed 7,72 vs mean all 7,12, gap −0,59; gap theo năm 2021 +0,00 / 2022 −0,03 / 2023 −0,42 / 2024 +0,01 /
+2025 −0,15; ratios 1,002/0,958/0,798/1,004/0,779, 5y 0,923; adjusted yearly R 2,593/3,233/5,453/10,691/4,401) → kỳ vọng đồng hồ ngẫu nhiên
+~5,24 %/tháng thay vì 5,41 deployed [oc_clockluck]. Hệ quả vận hành: kỳ vọng trung thực BOT G2 đọc là ~5,24 (proxy) thay vì 5,41, vẫn trên 5% nhưng biên
+mỏng; phạm vi 4–6%/tháng và trung vị ~5%/tháng giữ nguyên kèm caveat này; nửa giờ KÉM CẤU TRÚC (dip-2023 0,090 vs 0,706, book+dip cùng thua 2022–2023) nên
+KHÔNG đổi sang 8-phase [oc_clockluck; oc_phase8].
+- Carry (`oc_utamargin2`; `oc_carryfar` Leader decision NOT adopted): chân short quarterly để 10x (hedge bằng spot): f=0,25 free min 22,49%→32,67%
+(IM/bal 77,51%→67,33%), 0 blocked/0 MM breach/gap −10% −28,85% không liq; bắt buộc Cross [oc_utamargin2]. Trần một UTA cộng gộp f=0,25 (5x, không đổi;
+spot cost max 95,8%, không vay); f=0,375 @10x chỉ là ngoại lệ bound nếu chấp nhận borrow (spot peak 139%, headroom −39%; free 27,47%/hc10 21,42%/hc20 5,67%,
+0 blocked; 20x cũng qua nhưng mỏng hơn) [oc_utamargin2]. f=0,50 KHÔNG clear mọi đòn bẩy (base 1,85% free/1 blocked; hc10 −9,41%/3 blocked; hc20 −41,98%/132
+blocked ngay cả 20x vẫn 1 blocked hc20) [oc_utamargin2]. FAR thắng 4/5 năm cả hai venue (Binance 1,07064 vs 0,523436; inverse 0,931737 vs 0,497293;
++0,43/+0,37 hình học vs +0,21/+0,20) nhưng là exposure không phải rate (basis 2023 12,9% vs 13,0%/năm; overlap 2 cặp/coin, spot 1,04–1,12x Eq phải vay) —
+giữ rule base next-quarterly f=0,25; hướng carry ĐÓNG 2/2 variants [oc_carryfar].
+- Vốn (`oc_capscale`): xem mục 2 đã cập nhật (>=5.000 gần như mọi lệnh; 2.000 ~93–96% count) [oc_capscale].
+- Paper runner `paper_d17bfg2c` (G2 + carry 0,25) started 2026-10-06 07:19 UTC (bear_state 07:19:09Z; carry BTCUSDT-25DEC26 f=0,25 ann_basis ~5,31%,
+equity 5000, `--carry-f 0.25` trên cùng flags G2): bằng chứng triển vọng cho combo một UTA; caveat: carry orders trong paper bị generic diff hủy ngày
+2026-10-06, fix đang làm (`docs/BOT_EXECUTION.md` bot_carry) — số paper carry tới khi fix xong có nhiễu thực thi [artifacts/bot/paper_d17bfg2c].
+- Đóng hôm nay mỗi hướng một dòng: oc_linvinv — 0 vào (12 skip <3pp, max 2,55pp BTC Jun25), net 0,0000 — NOT USEFUL [oc_linvinv]. oc_marktrig — sum 4/5
+(trừ 2022 −0,227) nhưng DD 2/5 + worst 2/5 (delta 5y +0,057/base 7,72) — NOT PROMISING [oc_marktrig]. oc_discsniper — S_bar>0 0/5 (5y −0,5291, placebo
+13,3, corr +0,045) — NOT PROMISING [oc_discsniper]. oc_manual2coin — M5_human 3,73 vs 2coin x1,0 3,24 vs x2,5 3,39/24,3 FAIL DD — cả ba NO vs floor;
+load 51/d→21/d được nhưng không ra return [oc_manual2coin]. oc_phase8 — 8-phase 4,960/17,98/17,32 vs 4-phase 5,410/16,91/16,82 (−0,45pp return, +0,5pp DD;
+47–60% BTC dưới minimum ở 1250/clock) — NO [oc_phase8].
+
+## Cảnh báo sớm edge (oc_edgedecay, 2026-10-06)
+
+Không có suy giảm edge có ý nghĩa thống kê trong 5 năm (độ dốc +0,067 điểm %/tháng, CI [-0,158; +0,160]; 30 tháng sau 6,61 > 30 tháng đầu 5,59;
+6 tháng gần nhất 7,38) [oc_edgedecay]. Theo dõi trên paper/live: (1) trung bình 6 tháng gần nhất < 1,61 %/tháng; (2) tỉ lệ chốt lời (TP) của dip
+trong nửa năm gần nhất < 0,434. Vượt ngưỡng = ĐIỀU TRA (so với cơ hội thị trường: số cú flush, biến động), không phải tự động đổi cấu hình.
+`scripts/edge_monitor.py` (đang viết) sẽ đưa hai chỉ số này vào `daily_status.py` [oc_edgedecay].

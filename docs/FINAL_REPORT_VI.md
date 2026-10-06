@@ -620,3 +620,44 @@ cuối in bot_health 5 runner + daily_status; KHÔNG set BOT_ALLOW_LIVE, KHÔNG 
 21/24 wins nhưng mẫu tí hon): sum 5/5 + DD 5/5 pass trivially nhưng dSum5y +0,0164 chỉ 6% gate placebo p95 +0,273 — NOT PROMISING, đóng không
 full-engine [oc_expirydip]. oc_usdtdip (tilt size x1,2 khi z>1 / x0,8 khi z<−1 theo USDT premium, 22312 fills): sum 3/5 + DD 4/5 + dSum +0,047 (17% gate) +
 control 3/5 (2021 −0,133 sum/+0,074 DD, 2024 edge thuần exposure) — NOT PROMISING, edge book-long USDT không chuyển sang dip [oc_usdtdip].
+
+## Bổ sung docs_update6 (2026-10-06)
+
+- Kỳ vọng trung thực sau hiệu chỉnh may mắn đồng hồ (`oc_clockluck`): bốn đồng hồ giờ triển khai MAY ở sleeve dip — replica dip 24 START offset
+(S=sum(w*y), B1 sizes, R2 depths, D0 exits): min 4,55 / max 9,67 (offset 0) / mean 7,12 / median 7,13 / std 1,54; bốn offset triển khai
+0=9,67 (percentile 100%, max) / 60=7,54 (58%) / 120=8,76 (88%) / 180=4,90 (8%); mean triển khai 7,72 so với mean 24 offset 7,12 (luck gap −0,59,
+−8% deployed); may mắn tập trung 2023 (offset 0 tốt nhất 24, gap −0,42) + 2025 (gap −0,15), 2021/2022/2024 trung tính (gap +0,00/−0,03/+0,01)
+[oc_clockluck]. Kỳ vọng đồng hồ ngẫu nhiên (approx: book giữ mix4 + dip(mix4) x ratio mean_all/mean_deployed theo năm; ratios 2021 1,002 / 2022 0,958 /
+2023 0,798 / 2024 1,004 / 2025 0,779 / 5y 0,923; mix4 yearly R 2,588/3,282/6,093/10,677/4,648 = 5,42 ≈ deployed 5,41; adjusted 2,593/3,233/5,453/10,691/4,401):
+5,24 %/tháng thay vì 5,41 — giữ SỐ CŨ 5,41 kèm giải thích ~0,17pp là luck dip-clock; kỳ vọng vẫn trên 5% theo approx này nhưng biên mỏng và method chỉ là
+proxy (equal-bar replica, không gross cap/governor/compounding, book giả định clock-neutral) [oc_clockluck]. Đồng thời đồng hồ nửa giờ KÉM CẤU TRÚC
+(book VÀ dip cùng thua 2022–2023, dip-2023 0,090 so với 0,706) — verdict BOTH [oc_clockluck].
+- Carry (`oc_utamargin2`, `oc_carryfar` + Leader decision): chân short quarterly để 10x (đã hedge bằng spot) — margin trống thấp nhất 22,5% → 32,7%
+ở f=0,25 (IM/bal max 77,51% → 67,33%, 0 blocked, 0 MM breach, gap −10% −28,85% không liq); bắt buộc Cross margin (isolated short cháy ngay khi squeeze
++30% ở mọi mức 5x/10x/20x) [oc_utamargin2]. Trần f=0,25 cho một UTA cộng gộp (5x, không đổi; spot cost max 95,8% Eq, headroom +4,2%, không vay)
+[oc_utamargin2; oc_utamargin]. f=0,375 @10x là ngoại lệ có bound DUY NHẤT nếu chấp nhận auto-borrow USDT mua spot (27,47% free / 21,42% dưới hc10 /
+5,67% dưới hc20, 0 blocked; 20x cũng qua về cơ học nhưng mỏng hơn nên ưu tiên 10x; spot cost peak 139% Eq, headroom −39%) [oc_utamargin2].
+f=0,50 KHÔNG clear ở mọi đòn bẩy (ngay 20x vẫn 1 giờ blocked dưới hc20; 5x: 1,85% free / 1 blocked base, hc10 −9,41%/3 blocked, hc20 −41,98%/132 blocked)
+[oc_utamargin2]. Tenor FAR KHÔNG adopt: FAR thắng 4/5 năm cả hai venue (Binance pooled 1,07064 so với base 0,523436; Bybit-inverse 0,931737 so với
+0,497293; add f=0,25 +0,43%/tháng hình học Binance / +0,37% live so với base +0,21/+0,20) NHƯNG gain là exposure chứ không phải rate tốt hơn
+(entry basis gần bằng nhau, vd 2023 12,9% so với 13,0%/năm; FAR giữ ~6 tháng nên 2 cặp/coin overlap, spot cost 1,04–1,12x Eq phải vay — cùng constraint
+đã loại base f=0,50) — Leader decision 2026-10-06: giữ rule base (next quarterly, f=0,25); hướng carry ĐÓNG (2/2 variants đã dùng) [oc_carryfar].
+- Vốn (`oc_capscale`, G2 v421, Bybit minima 5 USDT + qty steps BTC 0,001/ETH 0,01/SOL 0,1/BNB 0,01/XRP 0,1): R5/DD y hệt mọi size (5,41/2,588/16,91/16,82 —
+UPPER bound vì engine chưa enforce qty step in-path) [oc_capscale]. Placeability (pooled 4 phases; 9051 book sizings, 21513 rungs): >=5.000 USDT đặt được
+gần như mọi lệnh (book 0,9990 count / 0,9995 weight; dip 0,9780 count / 0,9985 net / 0,9967 gross); 10.000 USDT book 100%, dip gross 99,92%; 2.000 USDT chỉ
+~93–96% count (book 0,9585/0,9704; dip 0,9269/0,9950/0,9804; BTC book 0,844/dip 0,799, ETH 0,954/0,895 — bottleneck BTC rồi ETH) [oc_capscale].
+Khuyến nghị: TỐI THIỂU 5.000 USDT (1250/sub-book), THOẢI MÁI 10.000 USDT; dưới 5.000 (đặc biệt 2.000) KHÔNG chạy cấu hình này như mô phỏng
+(~16% book BTC và ~20% rung dip BTC không đạt lot Bybit, chủ yếu do qty step) [oc_capscale].
+- Paper runner `paper_d17bfg2c` (G2 + carry 0,25) started 2026-10-06 07:19 UTC (first action `bear_state` 07:19:09Z; state `carry.positions.BTC`
+f=0,25 BTCUSDT-25DEC26 ann_basis ~5,31%, equity_entry 5000; equity paper 5000, flags G2 `--corr-size --dip-mult 1.7 --bear-book --dip-gross-cap 2.0`
++ `--carry-f 0.25`): thu bằng chứng triển vọng cho combo triển khai một UTA; caveat 2026-10-06: carry orders trong paper bị generic diff hủy (fix đang làm,
+xem `docs/BOT_EXECUTION.md` bot_carry) — tới khi fix xong thì số paper carry là tiến cứu có nhiễu thực thi, không phải engine-faithful [artifacts/bot/paper_d17bfg2c].
+- Đóng hôm nay mỗi hướng một dòng (số y nguyên báo cáo): oc_linvinv — 0 lệnh vào (12 skip <3pp, max diff 2,55pp BTC Jun25 lin 7,50 so với inv 4,94;
+16 cặp cùng expiry, net 0,0000) — NOT USEFUL, dislocation cần chưa từng in trong history [oc_linvinv]. oc_marktrig — sum>=BASE 4/5 (trừ 2022 −0,227)
+NHƯNG maxDD chỉ 2/5 + worst-day 2/5 (5y delta +0,057 trên base 7,72; mark âm premium nên fire sớm hơn trong crash, cascade 2024-01-03 −0,405) —
+NOT PROMISING, giữ last-price triggers [oc_marktrig]. oc_discsniper — S_bar>0 0/5 năm (5y −0,5291, win 42,5%, mean −13,7 bps/trade; placebo pct 13,3
+dưới cả random-timing mean −0,452; corr dip +0,045) — NOT PROMISING [oc_discsniper]. oc_manual2coin — M5_human 3,73/17,9/17,8 so với 2coin x1,0
+3,24/15,8/17,1 (dip win .701→.740 nhưng rung 6417→2495, P&L BTC/ETH/BNB bị loại không bù được) và 2coin x2,5 3,39/20,2/24,3 FAIL DD (gom 2,5x vào 2 coin
+gom đuôi crash thay vì đa dạng) — cả ba NO vs MANUAL floor; load 51/d→21/d được nhưng không ra return; còn 1 shot MANUAL cuối phải thêm entry edge
+[oc_manual2coin]. oc_phase8 — 8-phase mix 4,960/worst 2,709/maxDD 17,98/full 17,32 so với 4-phase 5,410/2,588/16,91/16,82 (pha loãng −0,45pp return mà
+fullDD +0,5pp; half-hour đơn lẻ fullDD 21–37% crash cùng năm 2022–2023; 1250/clock thì 47–60% lệnh BTC dưới minimum) — NO, giữ mix 4 pha [oc_phase8].

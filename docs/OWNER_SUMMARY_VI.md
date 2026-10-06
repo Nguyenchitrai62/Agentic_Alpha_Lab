@@ -6,8 +6,8 @@
 - Carry nghĩa là: khi hợp đồng quý kế tiếp còn chênh giá (basis — chênh giá futures so với giá hiện tại) >= 4%/năm và hợp đồng gần còn <= 7 ngày thì mua coin thật + bán khống futures quý bằng nhau, mỗi chân = 0,25 x vốn, giữ tới đáo hạn (~4 quyết định/năm) [DEPLOYMENT_PLAN_VI]. G2+carry f=0,25 trong một UTA (carry cộng thêm, spot làm tài sản ký quỹ): 5,533 %/tháng, năm tệ nhất 2,736, DD năm 16,78 [oc_carryfric]; nếu tách vốn riêng cho carry thì lợi nhuận gần như không đổi (5,413) nhưng DD toàn đường giảm còn 16,34 [oc_carrycombo].
 - Vì sao: G2 giữ gần nguyên lợi nhuận (5,41 so với 5,43 không trần) mà DD thấp hơn ~1,4 điểm và phút sập -10% cả 5 coin chỉ mất 33,5% thay vì 58% vốn [QUICKSTART_VI]. Carry f=0,25 cho thêm ~+0,12 điểm %/tháng cho cả tài khoản (riêng phần vốn carry ~+0,21%/tháng) và giữ được ở mọi kịch bản ma sát [oc_carryfric], mà kiểm tra margin đạt (tiền trống thấp nhất còn 22,49%, 0 giờ bị chặn, gap -10% mất -28,85% không cháy tài khoản); f=0,50 bị chặn 1 giờ nên không dùng [DEPLOYMENT_PLAN_VI]. Vốn >= 5000 USDT, tốt nhất ~10000 [BOT_RUNBOOK_VI].
 
-## 2. Kỳ vọng trung thực (khoảng, không phải một số) [BOT_RUNBOOK_VI; DEPLOYMENT_PLAN_VI]
-- Tháng thường: trung vị ~5 %/tháng; 49 cửa sổ 12 tháng: thấp nhất 2,73 / p10 3,25 / giữa 4,89 / p90 8,88 / cao nhất 11,71 [DEPLOYMENT_PLAN_VI]. Giả lập 10.000 năm: giữa ~5,1 (thấp 1,5 / cao 10,3) %/tháng [DEPLOYMENT_PLAN_VI]. Nói gọn: 4–6 %/tháng [FINAL_REPORT_VI].
+## 2. Kỳ vọng trung thực (khoảng, không phải một số) [BOT_RUNBOOK_VI; DEPLOYMENT_PLAN_VI; docs_update6 `oc_clockluck`]
+- Tháng thường: trung vị ~5 %/tháng (docs_update6: đồng hồ ngẫu nhiên ~5,24 thay vì 5,41 deployed — giữ số cũ 5,41 kèm giải thích ~0,17pp luck dip-clock, biên mỏng, method proxy); 49 cửa sổ 12 tháng: thấp nhất 2,73 / p10 3,25 / giữa 4,89 / p90 8,88 / cao nhất 11,71 [DEPLOYMENT_PLAN_VI]. Giả lập 10.000 năm: giữa ~5,1 (thấp 1,5 / cao 10,3) %/tháng [DEPLOYMENT_PLAN_VI]. Nói gọn: 4–6 %/tháng [FINAL_REPORT_VI].
 - Năm xấu: chỉ ~3 %/tháng; năm tệ nhất lịch sử BOT là 2,83 (G2 là 2,588) %/tháng [FINAL_REPORT_VI]. Chỉ ~52% năm đạt >= 5 %/tháng [DEPLOYMENT_PLAN_VI].
 - Sụt vốn DD (mức giảm từ đỉnh): DD cửa sổ thấp nhất 8,3 / giữa 13,5 / p90 18,3 / cao nhất 18,7; DD giả lập giữa 14,5%, p95 22,6% [DEPLOYMENT_PLAN_VI]. Chuẩn bị chịu DD tới ~18%, vốn phải chịu được DD 25% [BOT_RUNBOOK_VI].
 - Xác suất: P(DD > 20%) ~11%, P(năm lỗ) ~0,7%; 5 năm thật không năm nào lỗ, 49/49 cửa sổ không lỗ, 100% DD < 20 [DEPLOYMENT_PLAN_VI]. Tháng: 41% tháng >= +5%, 72% tháng không lỗ [DEPLOYMENT_PLAN_VI]. Tuần xấu mất 8–12% vài lần/năm, mất 1–4 tháng mới về đỉnh cũ là bình thường [QUICKSTART_VI].
@@ -26,3 +26,21 @@
 ## 5. Mỗi ngày xem 5 thứ + 1 lệnh cứu sau reboot [BOT_RUNBOOK_VI]
 - 1) Backend sống và plan tươi < 4h30m; 2) vòng bot sống (vài chục giây); 3) không vị thế thiếu stop (unprotected) và sổ khớp sàn (qty_mismatch); 4) không cycle_error > 1 giờ; 5) equity/DD/fills và điểm prospective [BOT_RUNBOOK_VI]. Lệnh chạy: `daily_status.py` rồi `bot_health.py`, `paper_report.py`, `prospective_scorecard.py` [BOT_RUNBOOK_VI].
 - Sau reboot/mất điện chỉ cần MỘT lệnh: `bash scripts/restart_all.sh` (xem trước bằng `--dry-run`; backend local rồi 5 bot paper rồi vòng carry) [BOT_RUNBOOK_VI].
+
+## 6. Bổ sung docs_update6 (2026-10-06)
+
+- May mắn đồng hồ (`oc_clockluck`): bốn đồng hồ giờ triển khai may ở sleeve dip (24 offset S min 4,55/max 9,67 offset 0/mean 7,12/median 7,13/std 1,54;
+triển khai 0=9,67 pct 100% max, 60=7,54, 120=8,76, 180=4,90; mean deployed 7,72 vs all 7,12 gap −0,59; gap năm 2023 −0,42 + 2025 −0,15, còn lại ~0)
+→ kỳ vọng đồng hồ ngẫu nhiên ~5,24 %/tháng thay vì 5,41 (adjusted yearly 2,593/3,233/5,453/10,691/4,401; ratios 1,002/0,958/0,798/1,004/0,779) —
+giữ số cũ 5,41 kèm giải thích này; nửa giờ kém cấu trúc (dip-2023 0,090 vs 0,706) nên giữ mix 4 pha [oc_clockluck].
+- Carry: short quarterly 10x (hedge bằng spot; f=0,25 free 22,49%→32,67%, bắt buộc Cross), trần một UTA f=0,25 (5x không đổi); f=0,375 @10x chỉ là ngoại lệ
+bound nếu chấp nhận borrow USDT (spot peak 139%); f=0,50 không clear mọi đòn bẩy [oc_utamargin2]. Tenor FAR thắng 4/5 năm (Binance 1,07064 vs 0,523436;
+inverse 0,931737 vs 0,497293) nhưng là exposure không phải rate (basis 2023 12,9% vs 13,0%/năm; spot 1,04–1,12x Eq phải vay) — KHÔNG adopt, giữ base
+next-quarterly f=0,25; hướng carry ĐÓNG 2/2 [oc_carryfar Leader decision].
+- Vốn (`oc_capscale`): >=5.000 USDT đặt gần như mọi lệnh (book 0,9990/0,9995; dip 0,9780/0,9985/0,9967); 2.000 USDT chỉ ~93–96% count
+(book 0,9585/0,9704; dip 0,9269/0,9950/0,9804; bottleneck BTC/ETH); tối thiểu 5.000, thoải mái 10.000 [oc_capscale].
+- Paper `paper_d17bfg2c` (G2 + carry 0,25) started 2026-10-06 07:19 UTC (BTCUSDT-25DEC26 f=0,25 basis ~5,31%, equity 5000, `--carry-f 0.25`);
+caveat: carry orders trong paper bị generic diff hủy ngày 2026-10-06, fix đang làm [artifacts/bot/paper_d17bfg2c; docs/BOT_EXECUTION.md].
+- Đóng hôm nay: oc_linvinv 0 vào (max diff 2,55pp) NOT USEFUL [oc_linvinv]; oc_marktrig sum 4/5 nhưng DD 2/5 + worst 2/5 NOT PROMISING [oc_marktrig];
+oc_discsniper 0/5 năm (5y −0,5291, placebo 13,3) NOT PROMISING [oc_discsniper]; oc_manual2coin 3,73 vs 3,24 vs 3,39/24,3 FAIL — cả ba NO [oc_manual2coin];
+oc_phase8 8-phase 4,960 vs 4-phase 5,410 (−0,45pp, +0,5pp DD) NO [oc_phase8].

@@ -57,3 +57,20 @@ quarterly bằng nhau giữ tới delivery (≈15 vé/năm); sổ paper `scripts
 MANUAL+carry tốt nhất 3,993 vẫn <5 — NO [oc_manualcarry]; plateau G2 giữ deploy [oc_plateau2]; 8-phase NO [oc_phase8]; screens expirydip/usdtdip
 đóng (NO) [oc_expirydip; oc_usdtdip].
 - Sau reboot: `bash scripts/restart_all.sh` (loop.sh retired), idempotent, backend local + 5 paper runner + vòng carry [restart_all.sh].
+
+## 6. Bổ sung docs_update6 (2026-10-06)
+
+- May mắn đồng hồ (`oc_clockluck`): bốn đồng hồ giờ triển khai may ở sleeve dip — kỳ vọng đồng hồ ngẫu nhiên ~5,24 %/tháng thay vì 5,41 deployed
+(24 offset S min 4,55/max 9,67/mean 7,12; deployed 0=9,67 pct 100%/60=7,54/120=8,76/180=4,90; mean 7,72 vs 7,12 gap −0,59; gap 2023 −0,42 + 2025 −0,15;
+adjusted yearly 2,593/3,233/5,453/10,691/4,401) — giữ số cũ 5,41 kèm giải thích ~0,17pp luck, biên mỏng, proxy; nửa giờ kém cấu trúc nên giữ mix 4 pha
+[oc_clockluck]. Kỳ vọng mục 1 đọc là ~5,24 (proxy) thay vì 5,41, phạm vi 4–6% giữ nguyên kèm caveat này.
+- Carry: short quarterly 10x (hedge bằng spot; f=0,25 free 22,49%→32,67%, bắt buộc Cross), trần một UTA f=0,25; f=0,375 @10x chỉ nếu chấp nhận borrow
+(spot peak 139%); f=0,50 không clear mọi đòn bẩy [oc_utamargin2]. FAR thắng 4/5 năm nhưng là exposure không phải rate — KHÔNG adopt, giữ base
+next-quarterly f=0,25; hướng carry ĐÓNG 2/2 [oc_carryfar Leader decision].
+- Vốn (`oc_capscale`): >=5.000 USDT đặt gần như mọi lệnh (book 0,9990/0,9995; dip 0,9780/0,9985/0,9967); 2.000 USDT ~93–96% count (book 0,9585/0,9704;
+dip 0,9269/0,9950/0,9804; bottleneck BTC/ETH) [oc_capscale].
+- Paper `paper_d17bfg2c` (G2 + carry 0,25) started 2026-10-06 07:19 UTC (BTCUSDT-25DEC26 f=0,25 basis ~5,31%, `--carry-f 0.25`); caveat: carry orders
+trong paper bị generic diff hủy ngày 2026-10-06, fix đang làm [artifacts/bot/paper_d17bfg2c; docs/BOT_EXECUTION.md].
+- Đóng hôm nay: oc_linvinv 0 vào NOT USEFUL [oc_linvinv]; oc_marktrig sum 4/5 nhưng DD/worst 2/5 NOT PROMISING [oc_marktrig]; oc_discsniper 0/5 năm
+(5y −0,5291, placebo 13,3) NOT PROMISING [oc_discsniper]; oc_manual2coin 3,73 vs 3,24 vs 3,39/24,3 FAIL — cả ba NO [oc_manual2coin]; oc_phase8 8-phase
+4,960 vs 4-phase 5,410 NO [oc_phase8].
