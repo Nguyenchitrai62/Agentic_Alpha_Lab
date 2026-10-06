@@ -156,3 +156,49 @@ gộp log skipped, dán nhãn "closest plan v376 R2-4P" cho bot khác cấu hìn
 - oc_bookfunding (x0,75 long khi funding 7d > p80): P&L>=97% 3/5, DD 3/5 (5y −8,8%) — NOT PROMISING [oc_bookfunding].
 - oc_tpdecay (TP decay 1,0sg→0,5sg): sum 3/5, DD 1/5 (timeout 41%→31% nhưng full chỉ +1%) — NOT PROMISING [oc_tpdecay].
 - oc_trendladder (depth x0,85 up / x1,15 down theo trend BTC r30): sum 3/5, DD 2/5 (2025 1,13→1,74) — NOT PROMISING [oc_trendladder].
+
+## Vì sao chạy bốn đồng hồ (OpenCode oc_phasedisp) — quy tắc vận hành
+
+R2B1D17BFG2 đơn lẻ phân tán 5 năm 3,102–6,923 %/tháng, DD toàn đường 16,91–43,55 % (phase0 6,923/16,91; phase1 4,834/22,46; phase2 5,592/20,07;
+phase3 3,102/43,55; mix 5,410/16,82; năm tệ nhất đơn lẻ −2,431 %/tháng ở phase3 2023 trong khi mix vẫn +2,588 %/tháng và không năm nào lỗ;
+DD năm tối đa đơn lẻ 16,91/22,46/20,07/43,23 so với mix 16,91) [oc_phasedisp]. Không đồng hồ nào thắng mọi năm nên mix 4 pha (mỗi pha 1/4 vốn
+mỗi anchor, reproduce `v421_result.json` 5,41 / worst 2,588 / DD 16,91 / full 16,82) là cách khóa chênh lệch giờ [oc_phasedisp].
+Quy tắc: không bao giờ chạy một pha đơn lẻ; backend + cả 4 runner phải sống (plan `trade_plan_v376.json` tươi < 4h30m, kiểm bằng
+`daily_status.py` → `bot_health.py`); pha nào restart/thiếu phải khôi phục xong mới được tin các số mix [oc_phasedisp; BOT_RUNBOOK_VI].
+
+## Độ nhạy blend 0,8/0,2 (OpenCode oc_blendsens) — giữ nguyên, không đổi
+
+Screen vectorised open-to-open (`w(alpha)=alpha*o1+(1-alpha)*dmean`, bear v410 FIRST, cost 0,0005/unit, 10955 bars x 5 coin) [oc_blendsens]:
+NOT a clean plateau (sensitivity, no selection) — bước cục bộ qua 0,8/0,2 trái dấu theo năm (E1/E2 same-sign 3/5, LOYO 2/5, không đạt 4/5+4/5)
+và trung bình 0,0134 mỗi 0,1 alpha (>= ngưỡng 0,01 nên KHÔNG nhỏ); 2024 kéo về O1, 2025 kéo về D; deployed luôn interior không nhất/cuối năm nào;
+worst week phẳng (<= 0,7pp mọi năm) [oc_blendsens]. Triển khai giữ nguyên 0,8/0,2, không tinh chỉnh theo năm gần nhất [oc_blendsens].
+
+## PostOnly entries + risk guard (OpenCode bot_testnetfix, docs/BOT_EXECUTION.md CHANGES bot_testnetfix)
+
+Triển khai testnet/live: book entries/adds + dip bids là PostOnly maker-only (đúng giả định fill research/`bot/paper.py`); chạm giá thì
+`postonly_reject` và thử lại cycle sau cùng giá, không đuổi thành taker; TP/reduce GTC reduce-only, stops/market exits không đổi
+[docs/BOT_EXECUTION.md CHANGES bot_testnetfix]. `risk_guard.check()` ON mặc định ở testnet/live (tắt bằng `--no-risk-guard`), OFF ở paper/dry
+trừ khi `--risk-guard`; hạn per-coin 2,5x / dip 2,0x / total 4x / single 1x, từ chối log `risk_reject`, protection không bao giờ bị chặn
+[docs/BOT_EXECUTION.md CHANGES bot_testnetfix]. QUICKSTART_VI bước 9: xác nhận Hedge/5x, lệnh vào PostOnly, guard bật, rate_limit ~ 0 trước live
+[QUICKSTART_VI]. Paper giữ engine-faithful (không bật guard mặc định) để số paper so được với plan [BOT_EXECUTION.md CHANGES bot_testnetfix].
+
+## Screens mới đóng đợt này (mỗi hướng một dòng, số y nguyên báo cáo)
+
+- oc_expirybook (halving book x0,5 trong 48h trước expiry Deribit, ~6,6% bars): PROMISING 4/5 DD + 4/5 P&L>=98% (2021 fail cả hai; full P&L
+2,061253→2,077167, DD 0,100471→0,090484) — hiệu ứng nhỏ parameter-free, chưa deploy, cần prospective [oc_expirybook].
+- oc_expirycb (BOTH = expiry sau premium tilt, post-hoc): NOT PROMISING — P&L>base 4/5 nhưng DD<=base chỉ 1/5 (chỉ 2022 đỗ cả hai; full both 2,114578
+cao nhất nhưng DD 0,089602 mất lợi expiry) — không deploy [oc_expirycb].
+- oc_cbpremium (tilt long x1,15/x0,85 theo premium z ±1): NOT PROMISING — P&L 5/5 nhưng DD chỉ 2/5 (full 2,061253→2,102446, DD 0,100471→0,102295) —
+return-only, không deploy [oc_cbpremium].
+- oc_skewbook2 (gate long x0,75 khi skew_z90>q80 walk-forward 0,61–0,67): NOT PROMISING — P&L>=97% chỉ 1/5 (2025 0,976), DD 4/5 (full 2,061253→1,960521,
+DD gần phẳng) — đóng [oc_skewbook2].
+- oc_basisbook (long x0,5 khi basis impulse 7d<p20 walk-forward): NOT PROMISING — P&L 4/5 và DD 3/5 (2023 gãy cả hai: 96,7%, +0,07pp; full
+2,061253→2,072244, DD 0,100471→0,098859) — đóng [oc_basisbook].
+- oc_breadthbook (long x0,75 khi breadth==1,0, on 23,2%): NOT PROMISING — DD 5/5 nhưng P&L>=95% chỉ 2/5 (2024 bleed −13,6% khi on 42%; full
+2,061253→1,923118) — đóng [oc_breadthbook].
+- oc_breadthdip (dip x0,8 khi breadth==1,0, on-bars 2538/10956=23,2%): NOT PROMISING — DD 5/5 nhưng sum>=95% chỉ 1/5 (2025 99,6%; full 9,671→8,729,
+90,3%) — giữ B1 full-size [oc_breadthdip].
+- oc_bookholdcap (flat 1 bar sau 42 bars cùng dấu, 1,2–1,7% cells): NOT PROMISING — P&L>=97% 2/5, DD 2/5 (chỉ 2024 đỗ cả hai; full 1,970907→1,883804,
+DD 0,104644→0,113519, cost +45%) — đóng [oc_bookholdcap].
+- oc_fomcbook (halving x0,5 quanh FOMC [R−24h,R+4h], 280/10955=2,56% bars): NOT PROMISING — DD 4/5 nhưng retention>=98% chỉ 2/5 (window lãi 3/5 năm nên
+halving tốn 4–5% P&L; full 1,970907→1,928287, DD 0,104644→0,103597) — đóng [oc_fomcbook].

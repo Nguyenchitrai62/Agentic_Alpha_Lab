@@ -296,3 +296,82 @@ timeout 41%→31%, win +1..+4pp mọi năm nhưng full sum chỉ +1%, worst tệ
 - oc_trendladder (depth theo trend BTC r30: mult 0,85 up / 1,15 down): sum 3/5 (2021–2023 đỗ, 2024 −0,39, 2025 −0,46), DD 2/5
 (2023 0,41→0,77, 2024 0,33→0,52, 2025 1,13→1,74 với worst −1,66 so với −0,90; full 15,14→16,97 chỉ nhờ 3 năm tốt) — NOT PROMISING,
 giữ depth R2 cố định [oc_trendladder].
+
+## Bổ sung: vì sao bot chạy bốn đồng hồ (OpenCode oc_phasedisp)
+
+R2B1D17BFG2 theo từng đồng hồ đơn (reset mỗi anchor, R %/tháng, DD % trong năm) so với mix 4 pha (mỗi pha 1/4 vốn mỗi anchor) [oc_phasedisp]:
+
+| năm (anchor→+365d) | phase0 (0h) | phase1 (1h) | phase2 (2h) | phase3 (3h) | mix 4 pha |
+|---|---|---|---|---|---|
+| 2021-09-24 | 4,567 / 13,41 | 2,919 / 22,46 | 2,153 / 13,70 | 0,188 / 15,94 | 2,588 / 10,86 |
+| 2022-09-24 | 3,571 / 16,91 | 3,942 / 15,67 | 3,226 / 17,39 | 2,312 / 17,99 | 3,282 / 16,91 |
+| 2023-09-24 | 11,249 / 14,56 | 4,226 / 18,91 | 6,412 / 20,07 | −2,431 / 43,23 | 6,045 / 15,81 |
+| 2024-09-24 | 10,023 / 10,75 | 9,645 / 15,22 | 11,849 / 10,14 | 11,040 / 10,90 | 10,677 / 8,27 |
+| 2025-09-24 | 5,427 / 11,88 | 3,577 / 21,21 | 4,590 / 13,69 | 4,905 / 14,21 | 4,648 / 12,90 |
+| TB 5 năm | 6,923 | 4,834 | 5,592 | 3,102 | 5,410 |
+| năm tệ nhất | 3,571 | 2,919 | 2,153 | −2,431 (lỗ) | 2,588 |
+| DD năm tối đa | 16,91 | 22,46 | 20,07 | 43,23 | 16,91 |
+| DD toàn đường | 16,91 | 22,46 | 20,07 | 43,55 | 16,82 |
+
+Đọc: chỉ lệch 1–3 giờ cắt 4h mà đơn lẻ phân tán 5 năm 3,102–6,923 %/tháng, DD toàn đường 16,91–43,55 %, năm tệ nhất đơn lẻ xuống −2,431 %/tháng
+(phase3, 2023) trong khi mix vẫn +2,588 %/tháng và không năm nào lỗ; không đồng hồ đơn nào thắng mọi năm (nhất năm xoay 2021→p0, 2022→p1,
+2023→p0, 2024→p2, 2025→p0), mix không thắng năm đơn nào nhưng cũng không thua năm nào [oc_phasedisp].
+Quy tắc vận hành theo đó: không bao giờ chạy một pha đơn lẻ; pha bị restart/thiếu phải khôi phục xong mới được tin các số mix (mix là cách khóa
+chênh lệch giờ, không phải để cộng thêm lợi nhuận) [oc_phasedisp].
+
+## Bổ sung: độ nhạy blend 0,8/0,2 của book BOT (OpenCode oc_blendsens — sensitivity, no selection, không đổi)
+
+Book legs dựng đúng `oc_dvolshort` (`o1` + `dmean=(D+Dq)/2`, blend `w(alpha)=alpha*o1+(1-alpha)*dmean`, alpha {1,0 O1-only; 0,9; 0,8 triển khai;
+0,7; 0,0 D-only}), bear v410 FIRST, screen open-to-open 4h net `wb*R1−0,0005*|wb−wprev|` trên 10955 bars x 5 coin = 54775 rows [oc_blendsens].
+Verdict y nguyên: NOT a clean plateau (sensitivity, no selection): bước cục bộ qua 0,8/0,2 trái dấu theo năm (E1/E2 same-sign 3/5, LOYO 2/5 —
+không đạt ngưỡng mặc định 4/5 + 4/5) và KHÔNG nhỏ (mean adjacent step 0,0134 >= ngưỡng đăng ký trước 0,01); 2024 kéo về O1 (+0,033/step)
+trong khi 2025 kéo về D (−0,019/step) [oc_blendsens]. Deployed 0,8/0,2 luôn interior (không năm nào nhất/cuối: 2021/2022/2024 phe O1 thắng,
+2023/2025 phe D thắng); worst week phẳng mọi blend (chênh <= 0,7pp mọi năm); full 5y interior DD thấp nhất (O1 0,106606 / 0,9 0,105548 /
+0,8 0,104644 / 0,7 0,104086 / D 0,130199), D-only vọt DD 2021 (0,130) và 2024 (0,123) [oc_blendsens]. Độ dốc nhỏ nhưng đổi dấu theo regime —
+không plateau sạch, không chọn lại, giữ nguyên 0,8/0,2 [oc_blendsens].
+
+## Bổ sung: PostOnly entries + risk guard (OpenCode bot_testnetfix, docs/BOT_EXECUTION.md CHANGES bot_testnetfix)
+
+F1: book entries/adds và dip rung bids gửi `timeInForce:"PostOnly"` (maker-only, đúng giả định fill của research và `bot/paper.py`); TP/reduce
+limit giữ GTC reduce-only; stops/market exits không đổi; PostOnly bị chạm bị từ chối (paper trả None, live lỗi PostOnly 110079/170146) thì
+log `op=postonly_reject` và thử lại cycle sau cùng giá, không bao giờ đuổi thành market/taker [BOT_EXECUTION.md CHANGES bot_testnetfix].
+V4: `bot/risk_guard.check()` lọc `want` sau cắt stale/plan_error và trước rounding/`diff` ở cả hai nhánh `Runner.cycle` (normal + ledger-only),
+với equity sàn + ledger positions + giá đóng 1m mới nhất (rơi về 5m closes / plan marks), hạn mặc định per-coin 2,5x / dip 2,0x / total 4x /
+single 1x; từ chối log `op=risk_reject` và không gửi, protection/reduce-only không bao giờ bị chặn [BOT_EXECUTION.md CHANGES bot_testnetfix].
+Mặc định: ON ở testnet/live (`--no-risk-guard` mới tắt), OFF ở paper/dry trừ khi `--risk-guard` (paper giữ engine-faithful, vd R2-4P không trần
+dip gross có thể vượt 2,0x) [BOT_EXECUTION.md CHANGES bot_testnetfix]; test ở `tests/test_bot_testnetfix.py` (`test_bot_mirror` entry payload
+đã cập nhật PostOnly) [BOT_EXECUTION.md CHANGES bot_testnetfix]. QUICKSTART_VI bước 9 đã ghi: lệnh vào là PostOnly, risk guard bật mặc định,
+`postonly_reject` = thử lại không đuổi giá, `risk_reject` trong log [QUICKSTART_VI].
+
+## Bổ sung: screens mới đóng đợt này (mỗi hướng một dòng, số y nguyên báo cáo)
+
+- oc_expirybook (idea #62, halving book x0,5 cả hai phía trong 48h trước expiry Deribit hàng tháng, 68 expiries, ~6,6% bars): PROMISING (as assigned) —
+DD không tệ hơn 4/5 và P&L >= 98% base 4/5 (2021 fail cả hai: retention 0,932, DD 0,086514→0,090484; 2022–2025 window base lỗ −0,006..−0,031 nên halving
+thành lãi nhỏ +0,003..+0,015; full 5y P&L 2,061253→2,077167 (+0,0159), maxDD 0,100471→0,090484; worst week y hệt mọi năm) — hiệu ứng nhỏ, parameter-free,
+cần prospective [oc_expirybook].
+- oc_expirycb (COMBINATION post-hoc oc_expirybook + oc_cbpremium, BOTH = expiry halving SAU premium tilt): NOT PROMISING (as assigned) — P&L cao hơn
+base 4/5 (pass) NHƯNG DD không tệ hơn chỉ 1/5 (fail: chỉ 2022 đỗ cả hai, DD 0,0715→0,0667, P&L 0,2520→0,2748); full 5y both cao nhất 2,114578
+(base 2,061253 / exp 2,077167 / prem 2,102446), maxDD both 0,089602 (base 0,100471 / exp 0,090484 / prem 0,102295) — tilt premium nuốt mất lợi DD
+của expiry, cộng return mà không giữ DD [oc_expirycb].
+- oc_cbpremium (idea #60, tilt long book x1,15 khi z>1 / x0,85 khi z<−1, tín hiệu premium BTC-only cho cả 5 coin trên base v410): NOT PROMISING
+(as assigned) — P&L cao hơn 5/5 (pass) NHƯNG DD không tệ hơn chỉ 2/5 (2021 −0,30pp, 2022 −0,36pp đỗ; 2023 +0,01pp, 2024 +0,75pp, 2025 +0,39pp fail);
+full 5y P&L 2,061253→2,102446 (+0,0412 toàn qua long leg), maxDD 0,100471→0,102295 (+0,18pp) — tilt chỉ cộng return bằng variance [oc_cbpremium].
+- oc_skewbook2 (idea #59, gate long x0,75 khi BTC skew_z90 > walk-forward p80, q80 ổn định 0,61–0,67, coverage z 100%): NOT PROMISING (as assigned) —
+P&L gated >= 97% base chỉ 1/5 (2025 0,976 đỗ duy nhất; ratios 0,89–0,98) và DD không tệ hơn 4/5; full 5y P&L 2,061253→1,960521 (−0,101), maxDD
+0,087278→0,086447 gần như phẳng — đánh thuế long có lãi mà không hạ DD [oc_skewbook2].
+- oc_basisbook (idea #61, gate long x0,5 khi basis impulse 7d < walk-forward p20, p20 −0,053367..−0,017200, coverage 1,0): NOT PROMISING (as assigned) —
+P&L kept (>=97%) 4/5 VÀ DD không tệ hơn chỉ 3/5 (cần 4/5 cả hai); full 5y P&L 2,061253→2,072244 (+0,0110), maxDD 0,100471→0,098859 (−0,16pp);
+2023 gãy cả hai (flag 16,8% bars nhiều nhất, P&L 96,7%, DD +0,07pp) — impulse chỉ mua DD khi collapse là stress thật, năm grind-up chỉ thuế long [oc_basisbook].
+- oc_breadthbook (idea #63, brake long x0,75 khi breadth==1,0 — cả 5 majors trên mean 200d daily, on-share toàn cục 23,2%): NOT PROMISING (as assigned) —
+DD không tệ hơn 5/5 NHƯNG P&L >= 95% base chỉ 2/5 (2021 91,3%, 2024 86,4%, 2025 94,2% fail; 2023 95,8% pass; 2022 103,4% pass duy nhất lãi);
+full 5y P&L 2,061253→1,923118 (−0,1381, −6,7%), maxDD 0,100471→0,100471 (bằng) — 2024 on 42% bars bleed −13,6%, đỉnh mở rộng cứ lên tiếp [oc_breadthbook].
+- oc_breadthdip (idea #64, dip size x0,8 khi breadth==1,0 tại open, bars on 2538/10956=23,2%): VERDICT NOT PROMISING — DD không tệ hơn 5/5 (bằng 2021/2023,
+cắt 2022/2024/2025) NHƯNG sum >= 95% base chỉ 1/5 (chỉ 2025 99,6%; còn lại 83–94%: 2021 94,3% / 2022 83,0% / 2023 89,4% / 2024 85,7%); FULL BASE sum
+9,671→RULE 8,729 (90,3%), fills breadth-on 1570/5498=28,6% (30,3% weight) toàn winner bị cắt — giữ B1 full-size [oc_breadthdip].
+- oc_bookholdcap (idea #65, cap giữ tối đa 42 bars cùng dấu → flat 1 bar rồi resume, n_forced 129–184/năm ~1,2–1,7% cells): NOT PROMISING (as assigned) —
+P&L RULE >= 97% BASE chỉ 2/5 và DD không tệ hơn chỉ 2/5 (chỉ 2024 đỗ cả hai: P&L 97,5%, DD 0,0653→0,0612); full 5y P&L 1,970907→1,883804 (−0,0871),
+maxDD 0,104644→0,113519 (tệ hơn) — mỗi forced close phải mở lại nên cost +0,006..+0,017/năm (+45% tổng cost) [oc_bookholdcap].
+- oc_fomcbook (idea #66, halving book x0,5 cả hai phía trên RULEBARs [R−24h,R+4h] quanh 56 FOMC scheduled, 40 cái trong span x 7 bars = 280/10955 bars
+= 2,56%): NOT PROMISING (as assigned) — DD không tệ hơn 4/5 NHƯNG retention >= 98% chỉ 2/5 (chỉ 2022 1,0427 và 2024 1,0020 đỗ; 2021 0,9515 / 2023 0,9583 /
+2025 0,9557 fail vì window P&L dương +0,026/+0,043/+0,033 nên halving tốn 4–5% P&L năm); full 5y P&L 1,970907→1,928287 (−0,0426), maxDD 0,104644→0,103597;
+worst week y hệt cả 5 năm — đóng hướng [oc_fomcbook].
