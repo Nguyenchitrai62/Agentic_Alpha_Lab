@@ -63,3 +63,10 @@ Hai đèn vàng đã vào báo cáo hằng ngày `daily_status.py`: (1) trung b�
 - Ba thử nghiệm đóng mỗi cái một dòng: carry top-up tuần đáo hạn lỗ cả 5/5 năm hai sàn + phải vay tiền → ĐÓNG [oc_carrytopup]; rút ngắn lệnh dip còn 2 giờ mất
 lãi 0/5 năm (lệnh muộn toàn lệnh thắng 59-69%) → ĐÓNG [oc_bidttl]; đổi stop theo giá mark thắng lãi 4/5 năm nhưng sụt vốn tệ 3/5 năm → ĐÓNG, giữ stop giá khớp
 [oc_marktrig].
+
+## 8. Bổ sung docs_update8 (2026-10-06, nói ngắn gọn)
+
+- Thực đơn để chọn (có/không phần carry thêm f=0,25) [`oc_frontiercarry`]: thận trọng D13 4,96→5,09%/tháng (sụt vốn ~15,0→14,9); bản đang chạy G2 5,41→5,53 (sụt ~16,9→16,8); bản lợi nhuận cao nhất đạt chuẩn G2K20 5,87→5,99 (sụt ~17,8→17,7). Carry chỉ cộng thêm ~0,13 điểm và bớt sụt vốn một chút, ma sát thật bào ~0,2–0,8 điểm nên đừng xem nó là cứu cánh — vẫn giữ G2 chờ paper.
+- Carry đứng riêng khi BOT sập: tương quan ngày với BOT gần bằng 0 (−0,09); 10 tuần BOT tệ nhất nó vẫn lãi nhẹ, ngày sập mạnh chỉ lệch vài phần vạn [`oc_carrycorr`]. Đối chiếu lệnh giấy với quy tắc: đúng hợp đồng 144/144, chỉ 1 lệnh vào sai đã biết (ETH dưới ngưỡng 4%) và đã sửa code [`oc_carryparity`].
+- Dữ liệu thanh lý mới thu từ 2026-10-04 còn quá non (3.230 dòng, 2 lần mất sóng đã rào lại) — sớm nhất 2027-01-04 mới đủ 3 tháng để thử [`oc_liqcheck`]. Muốn chạy thử cơ chế trước tiền thật thì theo `docs/TESTNET_PLAN_VI.md` (7 ngày, đủ 9 điều kiện mới xét live).
+- Ba hướng đóng mỗi cái một dòng: spread quarterly gần-xa 0/5 năm cả hai sàn (bên Binance không vào được, bên Bybit chênh cao nhất 1,2% chưa tới ngưỡng 2%) → ĐÓNG [`oc_calendar`]; dồn vốn vào bậc dip sâu thua tổng 3/5 năm dù lãi/đơn vị cao hơn → ĐÓNG [`oc_depthtilt`]; gắn chốt lời ngay phút khớp lệnh không đổi một đồng nào (22.312 bậc đối chiếu chênh đúng 0) → chỉ là kiểm thực tế, KHÔNG hiệu ứng [`oc_tpfill`].
