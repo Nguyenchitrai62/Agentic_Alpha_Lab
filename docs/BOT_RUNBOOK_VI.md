@@ -5,6 +5,10 @@
 > (đăng ký trước 2026-10-05, không sửa sau khi thấy dữ liệu paper).
 > Chi tiết kỹ thuật: `docs/BOT_EXECUTION.md`, code `bot/run.py`.
 
+> **CẢNH BÁO 2026-10-06:** phép đối chiếu bot-vs-engine (research/diagnostics/bot_parity_adopt) cho thấy cách bot cài
+> `--dip-gross-cap` hiện CHẶT HƠN engine (tính cả lệnh dip đang chờ, chia phòng tích lũy) -> tháng 9/2026 bot có trần chỉ +1,1 % so với
+> +3,6 % không trần. Đang sửa cho khớp engine (bot_capfix). Cho tới khi sửa xong: chạy KHÔNG có `--dip-gross-cap` hoặc chấp nhận lợi nhuận thấp hơn.
+
 ## 1. Lệnh khuyến nghị (R2B1D17BF + trần an toàn)
 
 Mọi lệnh chạy từ thư mục repo root. Windows dùng `.venv\Scripts\python.exe`.
