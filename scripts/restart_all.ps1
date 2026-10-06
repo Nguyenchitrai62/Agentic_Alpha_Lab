@@ -78,7 +78,7 @@ function Start-Detached([string]$exe, [string[]]$argv, [string]$logRel) {
   # append stdout+stderr to the log, detached (no new window, no waiting)
   $cmd = '"{0}" {1} >> "{2}" 2>&1' -f $exe, ($argv -join ' '), $logAbs
   # Start-Process from the OWNER's console: independent hidden process. (2026-10-06: WMI-created bots died ~30 min
-  # later with the WMI host; agent tool shells kill their children - agents start runners with nohup instead.)
+  # later with the WMI host; agent tool shells take their children down with them - agents start runners with nohup instead.)
   Start-Process cmd.exe -WindowStyle Hidden -ArgumentList '/c', $cmd | Out-Null
 }
 
