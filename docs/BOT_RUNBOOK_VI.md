@@ -68,13 +68,19 @@ REM Dừng: .\run_backend.ps1 -Stop
 
 ## 3. Kiểm tra hằng ngày (5 phút)
 
+Bắt đầu bằng một trang tổng quan, rồi mới soi chi tiết từng bot:
+
 ```bat
+.venv\Scripts\python.exe scripts/daily_status.py
 .venv\Scripts\python.exe scripts/bot_health.py artifacts/bot/paper_d17bfg2
 .venv\Scripts\python.exe scripts/paper_report.py artifacts/bot/paper_d17bfg2 artifacts/bot/paper_d17bf artifacts/bot/paper_g2k20
 .venv\Scripts\python.exe scripts/prospective_scorecard.py
 ```
 
 Tìm hàng `bot_paper_d17bfg2` (cột `percentile`, `config`, `go_live`, `stop`); mới chạy < 8 tuần thì `percentile` NaN là bình thường.
+
+- `scripts/daily_status.py` là điểm bắt đầu: một trang gồm (1) backend + tuổi plan, (2) mọi thư mục `artifacts/bot/paper*` (tóm tắt bot_health + equity/return/DD/fills), (3) collector (liquidations/topbook theo venue + gap > 5 phút/24h), (4) một dòng kết luận OK/WARNING/CRITICAL. Chỉ đọc file, không chạm `.env`, không start/stop process.
+- `scripts/bot_health.py` soi chi tiết từng bot khi daily_status báo WARNING/CRITICAL.
 
 Ý nghĩa từng dòng `bot_health.py` (exit 0 ok / 1 warning / 2 critical):
 
@@ -97,10 +103,14 @@ Bot và backend **không tự chạy lại**. Thứ tự:
 3. Đối chiếu `actions.jsonl` với vị thế sàn (paper: `exchange.json`; live/testnet: Bybit thật): stop/TP thiếu được đặt lại trong <= 20s; mảnh plan đã thoát mà sàn còn mở bị đóng market sau ~3 phút (`plan_closed_divergence`).
 4. Mất mạng dài: stop market + TP limit reduce-only đã nằm trên sàn vẫn bảo vệ vị thế; phần hở duy nhất là mảnh vừa khớp chưa kịp đặt exit (cửa sổ <= 20s) — kiểm tra tay khi mạng trở lại.
 
-## 5. Vốn, margin, đòn bẩy
+## 5. Vốn, margin, đòn bẩy (cài đặt tài khoản Bybit từ oc_margin, 2026-10-06)
 
 - Tối thiểu **5000 USDT, tốt nhất ~10000 USDT** (`docs/DEPLOYMENT_PLAN_VI.md`). Dưới mức này bậc dip BTC < 0,001 BTC bị bỏ (`skipped_below_minimum`): 10.000 đặt được 100% book / 98% dip; 5.000: 96% / 94%; 2.000: 80% / 81% (mất ~5–20%).
-- Sàn Bybit, **cross margin**. Đặt mức đòn bẩy tài khoản đủ cao cho notional dip: không trần có lúc tới **~6,4x vốn**, có trần 2x còn tối đa **~2x vốn** — đòn bẩy cài thấp sẽ thiếu margin đặt đủ rungs.
+- Sàn Bybit, **Cross margin + Hedge Mode** (không dùng Isolated cho bot). Chỉnh đòn bẩy tài khoản **5x trên cả 5 coin** BTC/ETH/SOL/BNB/XRP (Bybit chỉnh theo từng coin).
+- Vì sao 5x (G2 `--dip-gross-cap 2.0`, `research/tournament/oc_margin/REPORT.md`): **mức tối thiểu không bao giờ chặn lệnh** (IM = G/đòn bẩy <= 95% vốn mọi phút mở trong 5 năm; 3x đã chặn 22 phút mix / 31–45 phút mỗi phase). 10x/20x cũng không chặn nhưng không an toàn hơn trong cross (thanh lý không phụ thuộc IM) mà chỉ làm lệnh nhầm tay to hơn — **giữ 5x**.
+- Dư địa ở 5x: gross tối đa **~3,4x vốn** (không trần ~7,1x); IM tối đa **68% vốn** (từng phase 71–76%), thường chỉ ~7% (free trung vị 93%); phút chật nhất vẫn còn >= 32% free.
+- Khoảng cách thanh lý (cross, all-long): phút thường cần sập **~300%** mới cháy, 99% số phút cần sập > 73–76%; phút tệ nhất lịch sử (2025-09-25 17:57, G 3,41) vẫn cần **sập tức thì -29% cả 5 coin** mới cháy (từng phase 26–28%).
+- Gap tức thì cả 5 coin: **-10% không phút nào cháy** (0/65,1k phút; trung vị mất 0,83%, p99 ~13%, tệ nhất ~34%); **-20% cũng không phút nào cháy** (tệ nhất mất ~68%, cần ~98,5% mới cháy). Lệnh vẫn sống — nhưng sau gap kiểm tra tay trước khi cho bot chạy tiếp. Nếu Bybit báo thiếu margin / `skipped_below_minimum` nhiều: kiểm tra leverage có bị reset về thấp không — **không tự hạ đòn bẩy khi đang có vị thế**.
 - Máy chạy 24/7 (BOT cần bot trực; bản MANUAL theo tay không cần).
 
 ## 6. Kỳ vọng thực tế + go-live / dừng (từ DEPLOYMENT_PLAN_VI.md)
@@ -109,5 +119,5 @@ Bot và backend **không tự chạy lại**. Thứ tự:
 - Cửa sổ 12 tháng trượt (49 cửa sổ): %/tháng min 2,73 / p10 3,25 / trung vị 4,89 / p90 8,88 / max 11,71; DD min 8,3 / trung vị 13,5 / p90 18,3 / max 18,7; không cửa sổ nào lỗ; 49% đạt >= 5 %/tháng, 61% DD < 15, 100% DD < 20.
 - Bootstrap 10.000 năm: trung vị ~5,1 %/tháng (p5 1,5 / p95 10,3), chỉ ~52% năm đạt >= 5 %/tháng; DD trung vị 14,5%, p95 22,6%; P(DD > 20%) ~11%; P(năm lỗ) ~0,7%. Vốn phải chịu được DD 25%.
 - KPI: 41% tháng >= +5%, 72% tháng không lỗ, chuỗi lỗ dài nhất 2 tháng; thắng book 51,5%, dip 68,7%, toàn bộ 65,5%.
-- Go-live tiền thật nhỏ (sau tối thiểu 8 tuần paper, ĐỦ cả 4): (a) lợi nhuận paper ở phân vị >= 20 của bootstrap (`prospective_scorecard.py`); (b) DD paper <= 15%; (c) lệch bot so với plan <= 1,5 điểm %/tháng; (d) không `cycle_error` > 1 giờ, không vị thế thiếu stop. Tăng vốn sau 3 tháng live nếu (a)–(c) vẫn đúng.
+- Go-live tiền thật nhỏ (sau tối thiểu 8 tuần paper, ĐỦ cả 4): (a) lợi nhuận paper ở phân vị >= 20 của bootstrap (`prospective_scorecard.py`); (b) DD paper <= 15%; (c) lệch bot so với plan <= 1,5 điểm %/tháng — kiểm tra bằng `python scripts/paper_divergence.py artifacts/bot/paper_d17bfg2` (trước 14 ngày báo `too early` là bình thường); (d) không `cycle_error` > 1 giờ, không vị thế thiếu stop. Tăng vốn sau 3 tháng live nếu (a)–(c) vẫn đúng.
 - Dừng: DD tài khoản > 20% → dừng mở mới, chỉ giữ SL/TP; lỗ một tháng > 10% → halve vốn tháng sau; phân vị lợi nhuận < 5 sau >= 8 tuần → dừng.

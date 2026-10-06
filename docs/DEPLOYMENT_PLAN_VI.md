@@ -19,11 +19,12 @@ Cập nhật 2026-10-05: thước đo cũ (mix 4 pha liên tục) phóng đại 
 
 1. Paper (đang chạy từ 2026-10-05): kế hoạch paper `trade_plan_v376.json` (backend) + bot giấy khớp theo giá Bybit thật
    (`python -m bot.run --mode paper --equity 5000`, `artifacts/bot/paper/exchange.json`).
+   Kiểm tra hằng ngày bắt đầu bằng `python scripts/daily_status.py` (một trang: backend, tuổi plan, các bot, collector), rồi mới dùng `scripts/bot_health.py` soi chi tiết.
 2. Testnet (tùy chọn): `--mode testnet` với khóa testnet trong `.env` để kiểm tra API thật (không ảnh hưởng tiền).
 3. Tiền thật nhỏ: chỉ khi ĐỦ cả 4 điều kiện sau, đo trên bot giấy, sau tối thiểu 8 tuần:
    - (a) lợi nhuận bot giấy nằm ở phân vị >= 20 của phân phối bootstrap trung thực cho cùng số ngày (`scripts/prospective_scorecard.py`);
    - (b) DD bot giấy <= 15 %;
-   - (c) sai lệch bot giấy so với kế hoạch paper <= 1.5 điểm %/tháng (đo chất lượng thực thi);
+   - (c) sai lệch bot giấy so với kế hoạch paper <= 1.5 điểm %/tháng (đo chất lượng thực thi) — kiểm tra bằng `python scripts/paper_divergence.py <thư-mục-bot>` (trước 14 ngày báo `too early` là bình thường, đủ 14 ngày mới PASS/FAIL);
    - (d) không có lỗi `cycle_error` kéo dài > 1 giờ, không có vị thế nào thiếu stop.
    Vốn tối thiểu ~5000 USDT (dưới mức này các bậc dip BTC nhỏ hơn 0.001 BTC bị bỏ do 4 khung chia vốn làm 4). Kiểm chứng khối lượng tối thiểu Bybit cho R2B1D17BF (research/diagnostics/oc_lots): 10.000 USDT đặt được 100 % lệnh book / 98 % bậc dip (giữ ~100 % lãi/lỗ); 5.000 USDT: 96 % / 94 % (~99.5 %); 2.000 USDT: 80 % / 81 % (mất ~5-20 %, chủ yếu BTC); khuyến nghị >= 5.000 USDT, tốt nhất ~10.000.
 4. Tăng vốn: sau 3 tháng tiền thật nếu (a)-(c) vẫn đúng trên tiền thật.
@@ -39,6 +40,12 @@ Cập nhật 2026-10-05: thước đo cũ (mix 4 pha liên tục) phóng đại 
 - DD tài khoản > 20 %: dừng mở lệnh mới, chỉ giữ SL/TP; xem xét lại trước khi chạy tiếp.
 - Lỗ một tháng > 10 %: giảm vốn dùng một nửa trong tháng kế tiếp.
 - Phân vị lợi nhuận thực < 5 sau >= 8 tuần: dừng (mô hình không còn khớp với nghiên cứu).
+
+## 5. Cài đặt tài khoản Bybit (oc_margin, 2026-10-06; chi tiết runbook ở `docs/BOT_RUNBOOK_VI.md` mục 5)
+
+- **Cross margin + Hedge Mode**, không dùng Isolated. Chỉnh đòn bẩy **5x trên cả 5 coin** BTC/ETH/SOL/BNB/XRP (Bybit chỉnh theo từng coin).
+- Vì sao 5x (G2 `--dip-gross-cap 2.0`): **mức tối thiểu không bao giờ chặn lệnh** (IM = G/đòn bẩy <= 95% vốn mọi phút mở trong 5 năm; 3x đã chặn 22 phút mix / 31–45 phút mỗi phase). 10x/20x cũng không chặn nhưng không an toàn hơn trong cross mà chỉ làm lệnh nhầm tay to hơn — **giữ 5x**.
+- Ở 5x: gross tối đa **~3,4x vốn** (không trần ~7,1x); IM tối đa **68% vốn**, thường chỉ ~7%; phút chật nhất vẫn còn >= 32% free. Thanh lý cần **sập tức thì -29% cả 5 coin** ở phút tệ nhất (thường ~300%, 99% số phút > 73–76%). Gap **-10% và -20% không phút nào cháy** trong 5 năm (0/65,1k phút; tệ nhất -10% mất ~34%, -20% mất ~68%). Sau gap kiểm tra tay; leverage bị reset thì dừng bot kiểm tra, **không tự hạ đòn bẩy khi đang có vị thế**.
 
 ## Rủi ro thống kê của R2B1D17BF (bootstrap, OpenCode oc_mcdd, 2026-10-05)
 
