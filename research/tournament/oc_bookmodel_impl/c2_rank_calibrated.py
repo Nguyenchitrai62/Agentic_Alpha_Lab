@@ -100,6 +100,21 @@ def apply_calibrator(cal, pred: np.ndarray) -> np.ndarray:
     return m.predict(pred)
 
 
+def split_fit_cal(tr_sorted: pd.DataFrame, frac: float = 0.8):
+    """Time-ordered fit/calibration split (W1 fix): first frac by time = fit,
+    last (1-frac) by time = calibration fold. Input must already be sorted by
+    t; no shuffling, no sampling, so the calibration rows are the latest
+    pre-cutoff timestamps."""
+    tr_sorted = tr_sorted.sort_values("t")
+    n = len(tr_sorted)
+    k = max(100, int(frac * n))
+    tr_fit, tr_cal = tr_sorted.iloc[:k], tr_sorted.iloc[k:]
+    assert len(tr_fit) and len(tr_cal), "empty fit/calibration split"
+    assert tr_fit["t"].max() <= tr_cal["t"].min(), \
+        "calibration fold is not the time-last rows"
+    return tr_fit, tr_cal
+
+
 def build_panel_full(log=print):
     stack = C.load_stack()
     v92, v94, v103, v142, tvm, flo, flo_o = stack
@@ -140,11 +155,14 @@ def fit_anchor(panel, stack, anchor, feats_A, feats_B, max_rows=None, seed=0, qu
         for feats, store in ((feats_A, out_A), (feats_B, out_B)):
             tr = panel[base].sort_values("t")
             if max_rows and len(tr) > max_rows:
-                tr = tr.sample(n=max_rows, random_state=seed)
-            # time-split calibration: last 20% of train = calibration fold (still before cutoff)
-            n = len(tr)
-            k = max(100, int(0.8 * n))
-            tr_fit, tr_cal = tr.iloc[:k], tr.iloc[k:]
+                # deterministic time-last cap (no .sample()): keeps the latest
+                # pre-cutoff rows in time order so the calibration fold below
+                # stays the time-last 20%. `seed` is kept in the signature for
+                # caller compatibility but no longer used (no randomness).
+                tr = tr.iloc[-max_rows:]
+            # time-split calibration: last 20% by time = calibration fold
+            # (still before cutoff); see split_fit_cal.
+            tr_fit, tr_cal = split_fit_cal(tr)
             m = HistGradientBoostingRegressor(**C.HGB)
             m.fit(tr_fit[feats].to_numpy(float), tr_fit["rank42"].to_numpy(float))
             cal = fit_calibrator(m.predict(tr_cal[feats].to_numpy(float)),

@@ -91,6 +91,67 @@ def test_truncation_causality_on_rank_target_inputs():
     pd.testing.assert_frame_equal(m.iloc[: len(m2)], m2)
 
 
+def test_feature_list_excludes_label_rank_pred_columns():
+    """F1/W2 regression: a panel carrying label/target/rank/pred columns must
+    not expose them as features. FAILS on the old y*-prefix filter (rank42 and
+    pred leaked through); passes with the explicit allowlist + denylist."""
+    panel = pd.DataFrame({
+        "ret42": [0.1, 0.2], "tv_st_dir": [1.0, -1.0],
+        "fl_big_imb6": [0.3, -0.3], "xs_ret42": [0.0, 0.1],
+        "tbr_6": [0.01, -0.01], "asset": [0, 1],
+        "y": [0.1, 0.2], "y3": [0.1, 0.2], "y18": [0.1, 0.2],
+        "y42": [0.1, 0.2], "rank42": [0.5, -0.5], "pred": [0.3, -0.3],
+        "future_leak": [9.0, 9.0], "t": pd.date_range("2021-01-01", periods=2, tz="UTC"),
+        "open": [1.0, 1.0], "sym": ["BTCUSDT"] * 2, "bar": [0, 1],
+    })
+    feats = C.feature_list(panel)
+    for leaked in ("y", "y3", "y18", "y42", "rank42", "pred", "future_leak",
+                   "t", "open", "sym", "bar"):
+        assert leaked not in feats, leaked
+    for kept in ("ret42", "tv_st_dir", "fl_big_imb6", "xs_ret42", "tbr_6", "asset"):
+        assert kept in feats, kept
+    # B-members still drop order-flow features
+    feats_b = C.feature_list(panel, exclude_flow_for_B=True)
+    assert "fl_big_imb6" not in feats_b
+    assert "ret42" in feats_b
+
+
+def test_feature_allowlist_matches_builder_outputs():
+    """The allowlist is built from the feature-builder outputs: every builder
+    feature family must be present, and no denied label may be a member."""
+    stack = C.load_stack()
+    _v92, _v94, v103, v142, tvm, flo, _flo_o = stack
+    for c in list(v103.FLOW) + list(tvm.TV) + list(flo.FL):
+        assert c in C.FEATURE_ALLOWLIST, c
+    for c in list(v142.BASE) + list(v142.FLOWX):
+        assert f"xs_{c}" in C.FEATURE_ALLOWLIST and f"xr_{c}" in C.FEATURE_ALLOWLIST, c
+    for denied in ("y", "y42", "rank42", "pred"):
+        assert denied not in C.FEATURE_ALLOWLIST, denied
+
+
+def test_c2_calibration_split_is_time_last_no_sampling():
+    """W1 regression: C2 calibration fold = time-last 20% of train, no random
+    sampling. FAILS on the old code (no split_fit_cal helper; .sample() before
+    the iloc split made the 'last 20%' random)."""
+    c2 = _load("ocbm_c2_fix_t", IMPL / "c2_rank_calibrated.py")
+    assert hasattr(c2, "split_fit_cal"), "missing time-ordered split helper"
+    src = (IMPL / "c2_rank_calibrated.py").read_text()
+    code = "\n".join(l for l in src.splitlines() if not l.strip().startswith("#"))
+    assert ".sample(n=" not in code and "tr.sample(" not in code, \
+        "random sampling still present in C2"
+    t = pd.date_range("2020-01-01", periods=500, freq="4h", tz="UTC")
+    rng = np.random.RandomState(0)
+    order = rng.permutation(len(t))
+    tr = pd.DataFrame({"t": t[order], "v": rng.randn(len(t))})
+    fit, cal = c2.split_fit_cal(tr)
+    assert len(fit) == 400 and len(cal) == 100
+    assert fit["t"].max() <= cal["t"].min(), "calibration fold is not the latest timestamps"
+    assert set(cal["t"]) == set(sorted(t)[-100:])
+    fit2, cal2 = c2.split_fit_cal(tr)  # deterministic: no sampling
+    pd.testing.assert_frame_equal(fit.reset_index(drop=True), fit2.reset_index(drop=True))
+    pd.testing.assert_frame_equal(cal.reset_index(drop=True), cal2.reset_index(drop=True))
+
+
 def test_c1_smoke_cli(tmp_path=None):
     out = Path("artifacts/research/engine_real")  # smoke without --out writes nothing
     r = subprocess.run([sys.executable, str(IMPL / "c1_pooled_tvflow.py"), "--smoke"],

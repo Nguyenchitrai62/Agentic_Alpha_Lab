@@ -144,8 +144,6 @@ def run(smoke=False, out=None, max_alts=None, max_rows=None):
     _, v94, _, _, _, _, _ = stack
     out = Path(out) if out else (HERE / "kaggle_out_C1")
     out.mkdir(parents=True, exist_ok=True)
-    for anchor in list(C.DEV_ANCHORS) + [C.FINAL_ANCHOR]:
-        pass  # full loop below writes per-anchor caches; final anchor only for frozen finalist
     for anchor in C.DEV_ANCHORS:
         oos_A, oos_B = fit_anchor(panel, stack, anchor, feats_A, feats_B, max_rows=max_rows)
         C.format_member(C.weights_frame(oos_A, v94, True)).to_parquet(out / f"member_C1_A_{anchor[:4]}.parquet")

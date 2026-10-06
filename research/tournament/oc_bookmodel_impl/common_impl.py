@@ -248,11 +248,69 @@ def add_xs(stack, panel: pd.DataFrame) -> pd.DataFrame:
     return panel
 
 
+# Explicit feature ALLOWLIST built from the feature-builder outputs (F1 fix).
+# No new formulas: every name below comes from one of the audited builders.
+# - v92 base (research/parallel/rounds/parallel-20260906-r2/v92/v92_pooled_hgb_vt.py:53-84)
+_V92_BASE = ("ret6", "snr6", "ret42", "snr42", "ret90", "snr90", "ret180",
+             "snr180", "ret540", "snr540", "vol42", "vol180", "vol_ratio",
+             "ema20", "ema200", "d50", "d200", "rib", "f7", "f30", "volz",
+             "asset")
+# - BTC cross columns added in build_majors_panel from v92 base cols (common_impl.py:149-150)
+_BTC_CROSS = ("btc_ret42", "btc_ret180", "btc_rib", "btc_snr42")
+# - v103 kline flow (research/parallel/rounds/parallel-20260906-r2/v103/v103_flow_short_horizon.py:46 FLOW)
+_V103_FLOW = ("tbr_1", "tbr_6", "tbr_42", "flow_6", "flow_42", "tbr_z",
+              "tsize_z", "ntr_z", "rng6", "clv6")
+# - v231 TV(17) (research/parallel/rounds/parallel-20260906-r2/v231/tv_indicators.py:23-24 TV)
+_TV = ("tv_st_dir", "tv_st_dist", "tv_sqz_on", "tv_sqz_mom", "tv_sqz_slope",
+       "tv_wt1", "tv_wt_diff", "tv_wvf_z", "tv_ich_cloud", "tv_ich_tk",
+       "tv_vwap_w", "tv_vwap_m", "tv_poc", "tv_ms_trend", "tv_ms_hi",
+       "tv_ms_lo", "tv_fisher")
+# - v236 order-level whale flow(6) (research/parallel/rounds/parallel-20260906-r2/v236/flow_features.py:22 FL)
+_FL = ("fl_big_imb6", "fl_big_imb42", "fl_ret_imb6", "fl_div6",
+       "fl_big_share_z", "fl_whale_n_z")
+# - v142 xs/xr over BASE+FLOWX
+#   (research/parallel/rounds/parallel-20260906-r2/v142/v142_cross_sectional_features.py:29-30)
+_V142_BASE = ("ret42", "ret180", "snr42", "snr180", "d50", "d200",
+              "vol_ratio", "volz", "f7")
+_V142_FLOWX = ("tbr_6", "flow_42", "tbr_z")
+_XS = tuple([f"xs_{c}" for c in _V142_BASE + _V142_FLOWX]
+            + [f"xr_{c}" for c in _V142_BASE + _V142_FLOWX])
+
+FEATURE_ALLOWLIST = frozenset(
+    list(_V92_BASE) + list(_BTC_CROSS) + list(_V103_FLOW) + list(_TV)
+    + list(_FL) + list(_XS))
+
+# Explicit denylist (W2): any label/target/rank/pred column must never be a feature.
+LABEL_DENY_EXACT = frozenset({"y", "y3", "y6", "y18", "y42", "y84",
+                              "rank42", "pred"})
+LABEL_DENY_PREFIXES = ("y", "rank", "pred", "label", "target")
+
+assert not [c for c in FEATURE_ALLOWLIST
+            if c in LABEL_DENY_EXACT or c.lower().startswith(LABEL_DENY_PREFIXES)], \
+    "allowlist contains a denied label column"
+
+
+def _is_denied(col: str) -> bool:
+    cl = col.lower()
+    return cl in LABEL_DENY_EXACT or cl.startswith(LABEL_DENY_PREFIXES)
+
+
 def feature_list(panel: pd.DataFrame, exclude_flow_for_B=False) -> list:
-    feats = [c for c in panel.columns
-             if c not in ("y", "t", "open", "sym", "bar") and not c.startswith("y")]
+    """Explicit-allowlist features (F1): only builder-output columns, never labels.
+
+    Membership in FEATURE_ALLOWLIST (built from the v92/v103/v231/v236/v142
+    builder outputs above) decides; the old y*-prefix filter is gone. An
+    explicit denylist assert (W2) guarantees no label/target/rank/pred column
+    (y, y{h}, rank42, pred, ...) can ever appear in X, even if a future panel
+    adds such a column.
+    """
+    feats = [c for c in panel.columns if c in FEATURE_ALLOWLIST]
     if exclude_flow_for_B:
         feats = [c for c in feats if not c.startswith("fl_")]
+    bad = [c for c in feats if _is_denied(c)]
+    assert not bad, f"denied label/target/rank/pred column in features: {bad}"
+    leaked = [c for c in ("rank42", "pred") if c in feats]
+    assert not leaked, f"label leakage in features: {leaked}"
     return feats
 
 
