@@ -1000,34 +1000,146 @@ class Runner:
             pass
         return b
 
-    def _protection_only(self, led) -> dict:
-        """Protection orders from the ledger alone (plan file missing and no cached plan)."""
+    def _protection_only(self, led, now=None) -> dict:
+        """Protection orders from the ledger alone (plan file missing and no cached plan).
+
+        bot_reviewfix2 #3: respects in-flight exits like the main path and
+        validates prices (finite_pos), so a plan-outage cycle never re-places
+        S/T alongside an in-flight market (double-spend) and a corrupt ledger
+        never raises out of the cycle. Dip pieces get TP + native stop
+        (backstop else plan stop), never TP-only (#1).
+        """
         out = {}
-        for pid, pc in led.items():
+        for pid, pc in (led or {}).items():
             try:
-                qty = float(pc.get("qty", 0.0))
-            except (TypeError, ValueError):
-                continue
-            if qty <= 0:
-                continue
-            sym = pc.get("symbol")
-            if not sym or sym not in self.inst:
-                continue
-            side = pc.get("side", 1)
-            pidx = 1 if side > 0 else 2
-            if pc.get("kind") == "dip":
-                if pc.get("tp"):
-                    out[pid + "T"] = mirror.Order(pid + "T", sym, "Sell", qty, "tp", price=pc["tp"],
+                if not isinstance(pc, dict):
+                    continue
+                try:
+                    qty = float(pc.get("qty", 0.0))
+                except (TypeError, ValueError):
+                    continue
+                if not qty > 0:
+                    continue
+                sym = pc.get("symbol")
+                if not sym or sym not in self.inst:
+                    continue
+                if now is not None:
+                    try:
+                        if mirror._market_inflight(pc, now):
+                            continue
+                    except Exception:
+                        pass
+                side = pc.get("side", 1)
+                pidx = 1 if side > 0 else 2
+                if pc.get("kind") == "dip":
+                    try:
+                        _tp = float(pc.get("tp"))
+                    except (TypeError, ValueError):
+                        continue
+                    if not mirror._finite_pos(_tp):
+                        continue
+                    out[pid + "T"] = mirror.Order(pid + "T", sym, "Sell", qty, "tp", price=_tp,
                                                  reduce_only=True, position_idx=1, piece=pid)
-                if pc.get("backstop"):
-                    out[pid + "S"] = mirror.Order(pid + "S", sym, "Sell", qty, "stop", trigger=pc["backstop"],
-                                                 reduce_only=True, position_idx=1, piece=pid)
-            elif pc.get("kind") == "book" and pc.get("sl") and pc.get("tp"):
-                sell = side > 0
-                out[pid + "S"] = mirror.Order(pid + "S", sym, "Sell" if sell else "Buy", qty, "stop",
-                                             trigger=float(pc["sl"]), reduce_only=True, position_idx=pidx, piece=pid)
-                out[pid + "T"] = mirror.Order(pid + "T", sym, "Sell" if sell else "Buy", qty, "tp",
-                                             price=float(pc["tp"]), reduce_only=True, position_idx=pidx, piece=pid)
+                    _bs = mirror._dip_native_stop(pc)
+                    if _bs is not None:
+                        out[pid + "S"] = mirror.Order(pid + "S", sym, "Sell", qty, "stop", trigger=_bs,
+                                                     reduce_only=True, position_idx=1, piece=pid)
+                elif pc.get("kind") == "book":
+                    try:
+                        _sl = float(pc.get("sl"))
+                        _tp = float(pc.get("tp"))
+                    except (TypeError, ValueError):
+                        continue
+                    if not (mirror._finite_pos(_sl) and mirror._finite_pos(_tp)):
+                        continue
+                    sell = side > 0
+                    out[pid + "S"] = mirror.Order(pid + "S", sym, "Sell" if sell else "Buy", qty, "stop",
+                                                 trigger=_sl, reduce_only=True, position_idx=pidx, piece=pid)
+                    out[pid + "T"] = mirror.Order(pid + "T", sym, "Sell" if sell else "Buy", qty, "tp",
+                                                 price=_tp, reduce_only=True, position_idx=pidx, piece=pid)
+            except Exception:
+                continue
+        return out
+
+    def _guard_phantom_cancels(self, acts, led, have, now):
+        """Drop cancels that would strip resting S/T for a phantom exit.
+
+        bot_reviewfix2 #2: a persisted ``exit_sent`` with no confirmed
+        ``exit_link`` (logged but never placed, send-failed) must NOT cancel
+        still-resting protection. True in-flight pieces (confirmed exit_link)
+        still cancel S/T to avoid the shared-net double-spend. Returns the
+        filtered acts; dropped cancels log op=exit_revalidate once per piece.
+        """
+        try:
+            acts = list(acts or [])
+        except TypeError:
+            return acts
+        if not acts:
+            return acts
+        try:
+            ledger = led or {}
+        except (AttributeError, TypeError):
+            return acts
+        out, seen = [], set()
+        for a in acts:
+            try:
+                if not isinstance(a, dict) or a.get("op") != "cancel":
+                    out.append(a)
+                    continue
+                link = a.get("link")
+                # Carry links never reach here (filtered), but stay safe.
+                try:
+                    if _is_carry_link(link):
+                        out.append(a)
+                        continue
+                except Exception:
+                    pass
+                # Find the piece for this resting link (state metadata, else pid prefix).
+                pid = None
+                try:
+                    o = ((self.state or {}).get("links") or {}).get(link) or {}
+                    oo = (o.get("order") or {})
+                    pid = oo.get("piece")
+                except (AttributeError, TypeError):
+                    pid = None
+                if not pid and isinstance(link, str) and len(link) > 1:
+                    pid = link[:-1]
+                pc = ledger.get(pid) if isinstance(ledger, dict) else None
+                if not isinstance(pc, dict):
+                    out.append(a)
+                    continue
+                try:
+                    sent = pc.get("exit_sent")
+                    has_link = bool(pc.get("exit_link"))
+                except (AttributeError, TypeError):
+                    out.append(a)
+                    continue
+                if sent is None or has_link:
+                    out.append(a)
+                    continue
+                try:
+                    age_min = (pd.Timestamp(now) - pd.Timestamp(sent)).total_seconds() / 60.0
+                except (TypeError, ValueError, AttributeError):
+                    out.append(a)
+                    continue
+                if not (0.0 <= age_min < mirror.EXIT_INFLIGHT_MIN):
+                    out.append(a)
+                    continue
+                # Phantom fresh exit with no live market order: keep resting S/T.
+                if link not in seen:
+                    seen.add(link)
+                    try:
+                        self.log(dict(op="exit_revalidate", piece=pid, link=link,
+                                      reason="persisted_exit_without_live_order"))
+                    except Exception:
+                        pass
+                continue
+            except Exception:
+                try:
+                    out.append(a)
+                except Exception:
+                    pass
+                continue
         return out
 
     def _cycle_timing_start(self):
@@ -1162,20 +1274,26 @@ class Runner:
                     if why == "plan_closed_divergence":
                         continue
                     pc = led[pid]
-                    if pc.get("exit_sent") and now - pd.Timestamp(pc["exit_sent"]) < pd.Timedelta(minutes=2):
-                        continue
-                    pc["exit_sent"] = str(now)
+                    try:
+                        if mirror._market_inflight(pc, now):
+                            continue  # confirmed market exit in flight; wait for its fill
+                    except Exception:
+                        pass
                     link = f"{pid}X{mirror.t36(now)}"
                     qty = round_step(pc["qty"], self.inst[pc["symbol"]]["qty_step"])
                     payload = dict(symbol=pc["symbol"], side="Sell" if pc["side"] > 0 else "Buy", orderType="Market",
                                    qty=qty, reduceOnly=True, orderLinkId=link, positionIdx=1 if pc["side"] > 0 else 2)
                     self.log(dict(op="market_exit", piece=pid, reason=why, payload=payload))
                     if self.send(self.ex.place, payload) is not None or self.mode == "dry":
+                        # bot_reviewfix2 #2: confirm only after the exchange accepts
+                        # (a logged-but-unfilled exit must not strip protection on restart).
+                        pc["exit_sent"] = str(now)
+                        pc["exit_link"] = link
                         self.state["links"][link] = dict(order=asdict(mirror.Order(link, pc["symbol"], payload["side"], float(qty), "reduce",
                                                                                   reduce_only=True, position_idx=payload["positionIdx"], piece=pid)))
                         if self.mode == "dry":
                             pc["qty"] = 0.0
-                want = self._protection_only(led)
+                want = self._protection_only(led, now)
                 # PRE-TRADE GUARD (testnet review 2026-10-06 V4): filter `want`
                 # before anything is rounded/sent. Protection is reduce-only so
                 # check() never blocks it; this insert is a no-op there.
@@ -1204,6 +1322,10 @@ class Runner:
                 _t = _cycle_now()
                 acts = mirror.diff({k: o for k, (o, _) in rounded.items()}, _have_without_carry(have))
                 acts = _acts_without_carry_cancel(acts)
+                try:
+                    acts = self._guard_phantom_cancels(acts, led, have, now)
+                except Exception:
+                    pass
                 _stages["decide_ms"] += (_cycle_now() - _t) * 1000.0
                 _t = _cycle_now()
                 for a in acts:
@@ -1283,9 +1405,11 @@ class Runner:
         _t = _cycle_now()
         for pid, why in mirror.exits(plan, now, led, _last5_for_cycle):
             pc = led[pid]
-            if pc.get("exit_sent") and now - pd.Timestamp(pc["exit_sent"]) < pd.Timedelta(minutes=2):
-                continue  # a market exit is in flight; wait for its fill before sending another
-            pc["exit_sent"] = str(now)
+            try:
+                if mirror._market_inflight(pc, now):
+                    continue  # a confirmed market exit is in flight; wait for its fill before sending another
+            except Exception:
+                pass
             if why == "close5_stop" and pc.get("kind") == "dip":
                 # bot close-stop stop-out (time exits and TP fills never trigger the cooldown)
                 mirror.note_dip_stop(led, pid, now)
@@ -1297,6 +1421,8 @@ class Runner:
                            orderLinkId=link, positionIdx=1 if pc["side"] > 0 else 2)
             self.log(dict(op="market_exit", piece=pid, reason=why, payload=payload))
             if self.send(self.ex.place, payload) is not None or self.mode == "dry":
+                pc["exit_sent"] = str(now)
+                pc["exit_link"] = link
                 self.state["links"][link] = dict(order=asdict(mirror.Order(link, pc["symbol"], payload["side"], float(qty), "reduce",
                                                                           reduce_only=True, position_idx=payload["positionIdx"], piece=pid)))
                 if self.mode == "dry":
@@ -1335,7 +1461,7 @@ class Runner:
             except Exception:
                 pass
             try:
-                want = self._protection_only(led)
+                want = self._protection_only(led, now)
             except Exception:
                 want = {}
         # bot_soakfix B2a (pre-entry dust guard): never place a book / dip entry
@@ -1455,8 +1581,12 @@ class Runner:
         acts = mirror.diff({k: o for k, (o, _) in rounded.items()}, _have_without_carry(have_before),
                            amend_entry_qty=(self.corr or self.risk_mult != 1.0 or self.dip_mult != 1.0 or bool(getattr(self, "dip_gross_cap", 0.0))))
         acts = _acts_without_carry_cancel(acts)
+        try:
+            acts = self._guard_phantom_cancels(acts, led, have_before, now)
+        except Exception:
+            pass
         _stages["decide_ms"] += (_cycle_now() - _t) * 1000.0
-        failed_stop_pieces, placed_stop_links = set(), set()
+        failed_protect_pieces, placed_protect_links = set(), set()
         _t = _cycle_now()
         for a in acts:
             if a["op"] == "place":
@@ -1465,10 +1595,11 @@ class Runner:
                 self.log(dict(op="place", payload=p))
                 if self.send(self.ex.place, p) is not None or self.mode == "dry":
                     self.state["links"][o.link] = dict(order=asdict(o), rest=dict(symbol=o.symbol, price=o.price, trigger=o.trigger, qty=o.qty))
-                    if o.kind == "stop":
-                        placed_stop_links.add(o.link)
-                elif o.kind == "stop":
-                    failed_stop_pieces.add(o.piece)
+                    if o.kind in ("stop", "tp"):
+                        placed_protect_links.add(o.link)
+                elif o.kind in ("stop", "tp"):
+                    # bot_reviewfix2 #5: TP place-failures count like stops.
+                    failed_protect_pieces.add(o.piece)
             elif a["op"] == "cancel":
                 self.log(dict(op="cancel", link=a["link"]))
                 if self.send(self.ex.cancel, a["symbol"], a["link"]) is not None or self.mode == "dry":
@@ -1508,12 +1639,6 @@ class Runner:
                             continue
                     except Exception:
                         pass
-                    try:
-                        _es = pc.get("exit_sent")
-                        if _es is not None and now - pd.Timestamp(_es) < pd.Timedelta(minutes=2):
-                            continue
-                    except (TypeError, ValueError, AttributeError):
-                        pass
                     _tp_px = _sp_px = None
                     try:
                         for _k, _o in want.items():
@@ -1550,13 +1675,13 @@ class Runner:
                         continue
                     if not _is_dust:
                         continue
-                    pc["exit_sent"] = str(now)
                     try:
                         _qq = round_step(_q, self.inst[_sym]["qty_step"])
                     except (TypeError, ValueError, KeyError):
                         continue
+                    _dlink = f"{pid}D{mirror.t36(now)}"
                     _payload = dict(symbol=_sym, side="Sell" if pc.get("side", 1) > 0 else "Buy",
-                                    orderType="Market", qty=_qq, reduceOnly=True, orderLinkId=f"{pid}D{mirror.t36(now)}",
+                                    orderType="Market", qty=_qq, reduceOnly=True, orderLinkId=_dlink,
                                     positionIdx=1 if pc.get("side", 1) > 0 else 2)
                     try:
                         self.log(dict(op="dust_close", piece=pid, payload=_payload, reason="protection_below_minimum"))
@@ -1564,6 +1689,8 @@ class Runner:
                         pass
                     try:
                         if self.send(self.ex.place, _payload) is not None:
+                            pc["exit_sent"] = str(now)
+                            pc["exit_link"] = _dlink
                             self.state["links"][_payload["orderLinkId"]] = dict(order=asdict(
                                 mirror.Order(_payload["orderLinkId"], _sym, _payload["side"], float(_qq), "reduce",
                                              reduce_only=True, position_idx=_payload["positionIdx"], piece=pid)))
@@ -1571,9 +1698,12 @@ class Runner:
                         continue
                 except Exception:
                     continue
-        # Unprotected positions: an open piece whose stop is wanted but rests nowhere and
-        # whose placement just failed. Retry is automatic next cycle (want still has the
-        # stop); after > 2 such cycles flatten at market (reduce-only) and log op=unprotected_close.
+        # Unprotected positions: an open piece whose stop or TP is wanted but rests
+        # nowhere and whose placement just failed. Retry is automatic next cycle
+        # (want still has the order); after > 2 such cycles flatten at market
+        # (reduce-only) and log op=unprotected_close. bot_reviewfix2 #5 counts
+        # TP failures like stops (a piece with only one leg resting is still
+        # unprotected: every position carries native SL+TP).
         if self.mode != "dry":
             for pid, pc in list(led.items()):
                 try:
@@ -1583,27 +1713,34 @@ class Runner:
                 if qty <= 0:
                     pc.pop("unprotected_cycles", None)
                     continue
-                stop_links = [k for k, o in want.items() if o.piece == pid and o.kind == "stop"]
-                if not stop_links:
+                try:
+                    if mirror._market_inflight(pc, now):
+                        continue
+                except Exception:
+                    pass
+                protect_links = [k for k, o in want.items() if o.piece == pid and o.kind in ("stop", "tp")]
+                if not protect_links:
                     pc.pop("unprotected_cycles", None)
                     continue
-                rests = any(k in have_before or k in placed_stop_links for k in stop_links)
+                rests = all(k in have_before or k in placed_protect_links for k in protect_links)
                 if rests:
                     pc.pop("unprotected_cycles", None)
                     continue
-                if pid in failed_stop_pieces or any(k not in have_before for k in stop_links):
-                    # No resting stop and none placed successfully this cycle.
+                if pid in failed_protect_pieces or any(k not in have_before for k in protect_links):
+                    # No resting protection and none placed successfully this cycle.
                     # Only count cycles where a placement was actually attempted and failed;
                     # a pure have-miss without a place act means the link was skipped below
                     # minimum (already logged) and must not trigger a market close.
-                    if pid not in failed_stop_pieces:
+                    if pid not in failed_protect_pieces:
                         continue
                     n = int(pc.get("unprotected_cycles", 0) or 0) + 1
                     pc["unprotected_cycles"] = n
                     if n > 2:
-                        if pc.get("exit_sent") and now - pd.Timestamp(pc["exit_sent"]) < pd.Timedelta(minutes=2):
-                            continue
-                        pc["exit_sent"] = str(now)
+                        try:
+                            if mirror._market_inflight(pc, now):
+                                continue
+                        except Exception:
+                            pass
                         link = f"{pid}U{mirror.t36(now)}"
                         q = round_step(qty, self.inst[pc["symbol"]]["qty_step"])
                         payload = dict(symbol=pc["symbol"], side="Sell" if pc["side"] > 0 else "Buy",
@@ -1611,6 +1748,8 @@ class Runner:
                                        positionIdx=1 if pc["side"] > 0 else 2)
                         self.log(dict(op="unprotected_close", piece=pid, payload=payload, cycles=n))
                         if self.send(self.ex.place, payload) is not None:
+                            pc["exit_sent"] = str(now)
+                            pc["exit_link"] = link
                             self.state["links"][link] = dict(order=asdict(mirror.Order(link, pc["symbol"], payload["side"], float(q), "reduce",
                                                                                       reduce_only=True, position_idx=payload["positionIdx"], piece=pid)))
                             pc.pop("unprotected_cycles", None)

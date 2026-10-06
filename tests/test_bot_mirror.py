@@ -730,6 +730,7 @@ def test_bookgap_inflight_suppresses_dip_protection_and_restores():
     guard = {x.kind for x in mirror.desired(plan(), now, 10000, led).values()}
     assert guard == {"tp", "stop"}
     led[pid]["exit_sent"] = str(now)  # market exit just placed: in flight
+    led[pid]["exit_link"] = pid + "X"  # accepted by the exchange (bot_reviewfix2: inflight needs exit_link)
     assert mirror.desired(plan(), now + pd.Timedelta(minutes=1), 10000, led) == {}
     # stale marker (failed exit): protection is emitted again, the piece is never disarmed
     assert {x.kind for x in mirror.desired(plan(), now + pd.Timedelta(minutes=3), 10000, led).values()} == {"tp", "stop"}
@@ -744,6 +745,7 @@ def test_bookgap_inflight_suppresses_book_exits_and_restores():
     assert {x.kind for x in mirror.desired(plan([pos]), now, 10000, led).values()} == {"stop", "tp"}
     (pid,) = led
     led[pid]["exit_sent"] = str(now)  # divergence market exit in flight
+    led[pid]["exit_link"] = pid + "X"  # accepted by the exchange (bot_reviewfix2: inflight needs exit_link)
     assert mirror.desired(plan([pos]), now + pd.Timedelta(minutes=1), 10000, led) == {}
     assert {x.kind for x in mirror.desired(plan([pos]), now + pd.Timedelta(minutes=3), 10000, led).values()} == {"stop", "tp"}
 

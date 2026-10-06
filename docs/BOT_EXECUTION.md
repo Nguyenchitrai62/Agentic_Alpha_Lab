@@ -213,6 +213,16 @@ for fresh plans; a new fill has no exit orders until the next cycle (<= 20 s) pl
   Helpers `mirror.entry_is_dust / protection_is_dust`; tests in `tests/test_bot_soakfix.py` (8 tests).
   Full `tests/test_bot_*.py` (181 tests) green; 2h smoke `tests/test_bot_soak_smoke.py` passes with 0 violations.
 
+## CHANGES (bot_reviewfix2 2026-10-07: review findings 1-6 + carry-slice weakness, defaults unchanged for valid plans)
+- #1 dip native stop: `mirror._dip_native_stop` (backstop else stop5/stop/sl); `desired` + `Runner._protection_only` emit TP+stop for every dip piece, never TP-only (`mirror.py`, `run.py:_protection_only`).
+- #2 restart-safe exits: `mirror._market_inflight` needs confirmed `exit_link` (set only after the exchange accepts); phantom `exit_sent` never suppresses protection; `Runner` sets `exit_sent/link` post-send, `_guard_phantom_cancels` keeps resting S/T (`op=exit_revalidate`).
+- #3 `_protection_only(led, now)` respects in-flight + `finite_pos` (no raise on corrupt ledgers; dip native stop like the main path).
+- #4 per-leg TP=0 fallback: a valid tightened plan SL survives a `tp=0` glitch (and vice versa); only invalid legs fall back to entry levels.
+- #5 TP failures count in the unprotected counter like stops (both legs must rest; >2 failed cycles -> `op=unprotected_close`).
+- #6 wrong-side guard: plan SL/TP on the wrong side of the mark (long `SL<px<TP`, short mirrored; mark = `last_close` else plan coin price) logs `op=plan_reject/book_protect_wrong_side` and falls back to entry levels.
+- Carry slices: buckets go done only in `carry.note_exec` on the slice fill (`slice_link_bucket` map); unfilled buckets re-emit while active (same-bucket retry); dust/zero still done at decide; remainder fallback unchanged.
+- Sizing/entry logic untouched. Tests: `tests/test_review_soakfix.py` (12: 3 demos now pass + 9 for #3-#6/carry); 3 pre-fix assertions superseded (2 exit_sent-only inflight, 1 no-retry slice) and fail as intended.
+
 ## Failure modes (tests/test_bot_resilience.py, fake exchange, no network)
 - Restart mid-position: new Runner adopts state.json + exchange stops/TPs, no duplicate entries, filled rungs never re-placed.
 - Partial dip fill: TP/stop size to the filled qty, remainder stays resting (same link), budget counts only the filled part.

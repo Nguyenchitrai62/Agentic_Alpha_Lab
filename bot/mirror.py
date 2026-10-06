@@ -36,23 +36,48 @@ EXIT_INFLIGHT_MIN = 2.0  # runner market-exit throttle: a piece with exit_sent t
 
 
 def _market_inflight(pc: dict, now) -> bool:
-    """True while a market exit of this piece may still be in flight (exit_sent < 2 min old).
+    """True while a market exit of this piece may still be in flight.
 
-    While in flight the piece must carry no other resting order (no TP/stop/reduce/add,
-    no entry remainder): otherwise the market exit and the resting order can both fill
-    for the full piece qty (market sorts before limits in the same minute), spending the
-    shared (symbol, positionIdx) net twice and stranding the victim piece whose exchange
-    balance was consumed (bot_bookgap: 25,435 exit placements for 143 fills). Once the
-    marker is stale the protection is emitted again, so a failed exit never disarms a piece.
+    Restart-safe (bot_reviewfix2 #2): a fresh ``exit_sent`` alone does NOT
+    suppress protection. Suppression needs a confirmed exit placement
+    (``exit_link`` set by the runner only AFTER the exchange accepts the
+    market order). A persisted ``exit_sent`` with no ``exit_link`` (logged
+    but never placed, send-failed, or pre-fix state) restores protection
+    immediately instead of stripping resting S/T for up to 2 min. Once the
+    marker is stale the protection is emitted again, so a failed exit never
+    disarms a piece.
     """
     try:
         sent = pc.get("exit_sent")
         if sent is None:
             return False
+        if not pc.get("exit_link"):
+            return False
         age_min = (pd.Timestamp(now) - pd.Timestamp(sent)).total_seconds() / 60.0
         return 0.0 <= age_min < EXIT_INFLIGHT_MIN
     except (TypeError, ValueError, AttributeError):
         return False
+
+
+def _dip_native_stop(pc: dict):
+    """Native stop trigger for a dip piece (bot_reviewfix2 #1).
+
+    Prefers the 8-sigma backstop; falls back to the 4-sigma plan stop
+    (stop5, else legacy stop/sl) so a piece without a backstop still ends
+    every cycle with stop+TP, never TP-only. Returns None when no usable
+    stop price exists.
+    """
+    for k in ("backstop", "stop5", "stop", "sl"):
+        try:
+            v = pc.get(k)
+        except (AttributeError, TypeError):
+            continue
+        if _finite_pos(v):
+            try:
+                return float(v)
+            except (TypeError, ValueError):
+                continue
+    return None
 
 
 def _zero_dust(left: float, ref: float) -> float:
@@ -467,6 +492,7 @@ def desired(plan: dict, now, equity: float, ledger: dict, budget: float = BUDGET
                         continue
                     # bot_soakfix B3: non-positive / non-finite plan SL/TP never raises. An open piece is
                     # never left bare: fall back to the levels attached at entry (leader fix, soakfix residual).
+                    # bot_reviewfix2 #4: per-leg fallback (a valid tightened plan SL survives a tp=0 glitch).
                     try:
                         _sl = float(pos["sl"])
                         _tp = float(pos["tp"])
@@ -476,16 +502,61 @@ def desired(plan: dict, now, equity: float, ledger: dict, budget: float = BUDGET
                     _pside = str(pos.get("side", "")).upper()
                     if (_pside == "LONG" and pc["side"] < 0) or (_pside == "SHORT" and pc["side"] > 0):
                         _sl = _tp = float("nan")
-                    if not (_finite_pos(_sl) and _finite_pos(_tp)):
+                    _sl_ok, _tp_ok = _finite_pos(_sl), _finite_pos(_tp)
+                    if not (_sl_ok and _tp_ok):
                         _emit_reject(on_reject, op="plan_reject", reason="book_protect_nonpositive_sl_tp",
                                      symbol=sym, phase=ph, piece=piece, sl=pos.get("sl"), tp=pos.get("tp"))
-                        try:
-                            _sl = float(pc.get("sl"))
-                            _tp = float(pc.get("tp"))
-                        except (TypeError, ValueError):
-                            continue
+                        if not _sl_ok:
+                            try:
+                                _fsl = float(pc.get("sl"))
+                            except (TypeError, ValueError):
+                                _fsl = float("nan")
+                            if _finite_pos(_fsl):
+                                _sl = _fsl
+                        if not _tp_ok:
+                            try:
+                                _ftp = float(pc.get("tp"))
+                            except (TypeError, ValueError):
+                                _ftp = float("nan")
+                            if _finite_pos(_ftp):
+                                _tp = _ftp
                         if not (_finite_pos(_sl) and _finite_pos(_tp)):
                             continue
+                    # bot_reviewfix2 #6: SL/TP on the wrong side of the current mark
+                    # (long: SL < px < TP; short mirrored) is rejected and falls
+                    # back to the piece's entry levels. Mark = last closed 1m
+                    # close when given, else the plan coin mark; no mark = no check.
+                    try:
+                        _mark = None
+                        if isinstance(last_close, dict) and last_close.get(sym) is not None:
+                            _lc = float(last_close.get(sym))
+                            if _finite_pos(_lc):
+                                _mark = _lc
+                        if _mark is None:
+                            try:
+                                _cp = float((c or {}).get("price"))
+                            except (TypeError, ValueError, AttributeError):
+                                _cp = None
+                            if _finite_pos(_cp):
+                                _mark = float(_cp)
+                    except (TypeError, ValueError):
+                        _mark = None
+                    if _mark is not None:
+                        try:
+                            _long = pc["side"] > 0
+                        except (TypeError, KeyError):
+                            _long = True
+                        _wrong = (_sl >= _mark or _tp <= _mark) if _long else (_tp >= _mark or _sl <= _mark)
+                        if _wrong:
+                            _emit_reject(on_reject, op="plan_reject", reason="book_protect_wrong_side",
+                                         symbol=sym, phase=ph, piece=piece, sl=_sl, tp=_tp, mark=_mark)
+                            try:
+                                _esl, _etp = float(pc.get("sl")), float(pc.get("tp"))
+                            except (TypeError, ValueError):
+                                continue
+                            if not (_finite_pos(_esl) and _finite_pos(_etp)):
+                                continue
+                            _sl, _tp = _esl, _etp
                     pc_side = "Sell" if pc["side"] > 0 else "Buy"
                     out[piece + "S"] = Order(piece + "S", sym, pc_side, pc["qty"], "stop", trigger=_sl, reduce_only=True,
                                              position_idx=_pidx(pc["side"]), piece=piece)
@@ -536,14 +607,12 @@ def desired(plan: dict, now, equity: float, ledger: dict, budget: float = BUDGET
                 if not _finite_pos(_tp):
                     continue
                 out[pid + "T"] = Order(pid + "T", sym, "Sell", _q, "tp", price=_tp, reduce_only=True, position_idx=1, piece=pid)
-                if pc.get("backstop"):
-                    try:
-                        _bs = float(pc.get("backstop"))
-                    except (TypeError, ValueError):
-                        _bs = 0.0
-                    if _finite_pos(_bs):
-                        out[pid + "S"] = Order(pid + "S", sym, "Sell", _q, "stop", trigger=_bs, reduce_only=True,
-                                               position_idx=1, piece=pid)
+                # bot_reviewfix2 #1: every dip piece gets a native stop (backstop,
+                # else the plan stop), never TP-only.
+                _bs = _dip_native_stop(pc)
+                if _bs is not None:
+                    out[pid + "S"] = Order(pid + "S", sym, "Sell", _q, "stop", trigger=_bs, reduce_only=True,
+                                           position_idx=1, piece=pid)
             except Exception as e:
                 _emit_reject(on_reject, op="plan_reject", reason=f"dip_protect_error:{type(e).__name__}",
                              symbol=sym, piece=str(pid), note=str(e)[:160])
