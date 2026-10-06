@@ -23,3 +23,6 @@ NEXT_AGENT.md, ../Kronos, or git state.
 - Outputs: CSV + SUMMARY.md (<= 15 lines) in your artifacts folder; state how
   many rows are stable_significant, effect sizes vs ~4-8 bps round-trip cost.
 - Run your tests with `.venv/Scripts/python.exe -m pytest <file> -q`. Stop when done.
+- HEAVY jobs (any 4-phase engine / harness run, any process expected > 0.4 GB): run them through the shared semaphore,
+  `.venv/Scripts/python.exe scripts/heavy_slot.py run --tag <your tag> --min-free-gb 2.0 -- <cmd...>` (or
+  `with heavy_slot("<tag>", max_slots=2, min_free_gb=2.0):` from scripts/heavy_slot.py); never `--leader`. Waiting for a slot is normal.
