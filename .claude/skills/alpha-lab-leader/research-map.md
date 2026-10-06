@@ -343,3 +343,19 @@ Pooled majors HGB (v92), 2017 spot prefix, causal vol targets, long/short horizo
 - Book vectorised tilts: two PROMISING tilts (expiry, CME gap) failed the full engine; oc_placebo: require legs + placebo P&L pct >= 95 AND DD pct <= 5 (joint FPR 0.2 %);
   exposure tilts must also beat an exposure-matched control + timing placebo (oc_premexpo: USDT premium passed, CB premium did not).
 - Carry: cash-and-carry with quarterlies (oc_cashcarry) = useful add-on +0.21/+0.42 %/mo at f 0.25/0.5, near zero DD; combo pending.
+
+## 2026-10-06 addendum 3 (afternoon): carry, book-model C2, methodology
+- DEPLOYMENT now: G2 (R2B1D17BF + --dip-gross-cap 2.0) + quarterly cash-and-carry f = 0.25 in ONE Bybit UTA (additive overlay;
+  +~0.12 pp/mo, DD -0.1..-0.2 under every friction - oc_carryfric; margin-safe only at f = 0.25 - oc_utamargin; Bybit inverse
+  quarterlies give the same yield - data_bybitq). Prospective: scripts/carry_paper.py hourly ledger (quarterly-cycle filter fixed).
+- Return saturates ~5.9 %/mo on the frontier even at DD 21-24 (oc_frontier) -> 8 %/mo not reachable with these sources; oc_saturation running.
+- Stretch DD < 15: D13BF + carry meets it at base (5.10 / 14.85) but not under frictions (oc_carryfric). MANUAL capped ~3.7-4.0 (+carry,
+  2-coin both fail).
+- Book model: v427 C2 rejected (first run had a Platt base-rate bug -> all members short; ALWAYS check member sign balance before
+  evaluating); v428 C1 on Kaggle. Eval harness research/tournament/oc_bookmodel_evalprep reproduces v421 bit-exactly.
+- Methodology: vectorised book screens failed the engine 3/3 (expiry, CME, USDT premium) -> test book ideas in the engine only;
+  dip screens need the placebo gate (+0.273). Clocks: 8 phases worse (oc_phase8); single clocks swing DD 17-44 % (oc_phasedisp);
+  G2 on a plateau for TP/stop/G (oc_plateau2). Closed today: rearm, fillttl, stoptf, seasondepth, usdtdip, expirydip, discsniper,
+  fomcbook, bookholdcap, cmegap, expiry, usdt book tilt, breadth x2, cbpremium, skew2, basis book.
+- Ops: scripts/heavy_slot.py (2 worker heavy slots + leader slot), scripts/restart_all.sh (loop.sh retired), bot cycle timing,
+  bot_preflight (read-only), PostOnly + risk guard (ON testnet/live), Kaggle engine bundle artifacts/kaggle_stage/engine_kernel.
