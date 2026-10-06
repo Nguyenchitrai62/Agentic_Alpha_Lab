@@ -28,6 +28,10 @@
 - Carry (cash-and-carry quý) = mua coin thật + bán khống futures quý bằng nhau, ăn chênh giá khi đáo hạn [QUICKSTART_VI]. Ví dụ: mua 1 BTC spot + short 1 BTC quý Dec.
 - f = tỉ lệ vốn cho mỗi chân carry [QUICKSTART_VI]. Ví dụ: f=0,25 nghĩa là mỗi chân 0,25x vốn (mua spot mỗi coin = 0,25x vốn; khi BTC và ETH cùng mở và các cặp chồng nhau lúc roll, tiền mặt dùng cho spot lên tới ~96% vốn — vì vậy không vượt f=0,25 [oc_utamargin]).
 - Basis = chênh giá futures so với giá hiện tại, tính %/năm [QUICKSTART_VI]. Ví dụ: basis >= 4%/năm mới vào, ETH 3,7% thì bỏ qua.
+- Basis threshold = ngưỡng basis năm hóa `ln(F/S)*365/DTE >= 4%` mới được mở cặp carry [carry_calendar.py]. Ví dụ: basis 5,2% thì vào, 3,7% thì SKIP.
+- Delivery / settlement index = giá thanh toán futures quý là INDEX (trung bình giá spot trong cửa sổ), không phải một giá in lúc 08:00 [oc_deliverytrack]. Ví dụ: short futures chốt theo index nên spot cũng phải bán rải theo index mới khớp.
+- Roll window = cửa sổ mở cặp kế tiếp khi hợp đồng front còn <= 7 ngày tới đáo hạn (và chỉ khi basis đạt ngưỡng) [carry_calendar.py]. Ví dụ: front còn 6 ngày thì được xét mở cặp quý kế tiếp.
+- Slice sale (bán rải 6 lát) = bán chân spot chia 6 phần đều lúc 07:34/07:39/07:44/07:49/07:54/07:59 để bám index, lệch tối đa ~20bp thay vì ~90bp khi bán một lệnh [oc_deliverytrack]. Ví dụ: không bán một cục lúc 08:00 sau đêm biến động.
 
 ## Tài khoản và lệnh sàn
 - UTA = tài khoản hợp nhất Bybit: một vốn dùng chung cho mọi lệnh [BOT_RUNBOOK_VI]. Ví dụ: BOT + carry chung một UTA.
@@ -38,6 +42,9 @@
 - TP / SL / backstop = chốt lời / cắt lỗ / lưới an toàn cuối trên sàn [BOT_RUNBOOK_VI]. Ví dụ: TP limit +8σ, SL market, backstop chạm 8σ.
 - Close5 stop = cắt lỗ khi nến 5 phút ĐÓNG vượt 4σ (thoát ở phút mở tiếp theo), khác backstop là cắt ngay khi giá chạm [BOT_RUNBOOK_VI]. Ví dụ: giá chạm nhẹ rồi hồi thì close5 không cắt oan.
 - Time exit = tới giờ mà lệnh chưa lời thì thoát, không ôm mãi [FINAL_REPORT_VI]. Ví dụ: rung dip quá ~4h không về thì đóng.
+- UTA margin / IM = ký quỹ giữ lệnh trong ví Bybit UTA chung: IM perp = giá trị gộp G2 / 5, IM carry short / 10, spot không cần IM [oc_carrymargin]. Ví dụ: G2 + carry f=0,25 dùng tối đa ~67% vốn, vượt 95% là bị chặn.
+- Haircut = phần trừ khi tính giá trị spot làm tài sản đảm bảo: BTC/ETH trừ 5% (stress 10%), tiền mặt mua spot tối đa ~95,8% vốn ở f=0,25 [oc_carrymargin]. Ví dụ: spot 1000 USDT chỉ tính ~950 USDT đảm bảo.
+- Dust (lượng lẻ dưới min notional) = mảnh dip khớp quá nhỏ khiến TP/stop dưới sàn 5$ nên không đặt được bảo vệ, bot log `skipped_below_minimum` [BOT_SOAK_20261006]. Ví dụ: rung SOL sâu còn 0,1 SOL thì TP/stop bị sàn từ chối.
 
 ## Đo lợi nhuận và rủi ro
 - DD (drawdown) = mức sụt vốn từ đỉnh; DD năm = sụt tệ nhất trong từng năm, DD toàn đường = sụt tệ nhất trên cả đường 5 năm liên tục [FINAL_REPORT_VI]. Ví dụ: DD 16,9 nghĩa là từ đỉnh mất tối đa 16,9%.
@@ -53,3 +60,10 @@
 - Stop rules = quy tắc dừng: DD > 20% dừng mở mới, lỗ tháng > 10% giảm nửa vốn, phân vị < 5 sau 8 tuần thì dừng [BOT_RUNBOOK_VI].
 - Edge monitor = 2 đèn vàng trong báo cáo hằng ngày: lãi 6 tháng < 1,61%/tháng hoặc tỉ lệ chốt lời dip < 0,434 thì điều tra [QUICKSTART_VI].
 - OOS (ngoài mẫu) = dữ liệu sau 2026-09-23, chưa từng dùng khi nghiên cứu, là bằng chứng sạch [OWNER_SUMMARY_VI]. Ví dụ: 6 ngày đầu OOS G2 +2,0% là trong biên.
+
+## Vận hành và kiểm thử
+- Cycle = một vòng bot (đồng bộ, quyết lệnh, guard, đặt/hủy), mặc định ~20–25 giây [BOT_RUNBOOK_VI]. Ví dụ: cycle > 60 giây log `slow_cycle`, quá 5 phút không cycle mới là runner chết.
+- Stale plan = plan backend quá 4h30m chưa tươi, bot chặn lệnh mới chỉ giữ stop/TP cũ [BOT_RUNBOOK_VI]. Ví dụ: thấy `stale_plan` thì dựng lại backend, không ép vào lệnh.
+- Soak test = chạy replay tăng tốc (24h giá thật qua sàn giả) để soi invariant, không phải đo lợi nhuận [BOT_SOAK_20261006]. Ví dụ: soak2 chạy 4320 cycle, phát hiện lỗi dust không bảo vệ.
+- Alert_watch --once = kiểm tra sức khỏe một lần không toast [BOT_RUNBOOK_VI]. Ví dụ: sau reboot chạy `--once --no-toast`, còn canh liên tục dùng `--every 300`.
+- WMI detached start = cách dựng backend/runner tách khỏi terminal qua `Win32_Process.Create` nên không chết theo cửa sổ console [BOT_RUNBOOK_VI]. Ví dụ: từ 2026-10-06 chỉ dựng bằng `restart_all.ps1`, cấm chạy foreground rồi đóng cửa sổ.
