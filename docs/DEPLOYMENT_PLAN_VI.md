@@ -80,3 +80,6 @@ trung vị +5,0 %, 29 % tháng âm, tệ nhất -7,5 % (2024-01). Chỉ là bố
 Tuần tệ nhất lịch sử: 2023-12-27..2024-01-03 -12,3 % (DD 13,9 %, hồi lại sau ~54 ngày; không trần: -14,7 % / DD 16,3 %).
 Các tuần xấu khác: 2025-10-10 -9,7 % (hồi ~134 ngày), 2024-07 -9,6 %, 2023-06 -8,6 %, 2024-06 -8,9 %; FTX 2022-11 -2,2 % (DD 9,2 %),
 LUNA 2022-05 -3,0 % (DD 9,7 %). Hãy chuẩn bị tâm lý: vài lần mỗi năm mất 8-12 % trong một tuần và mất 1-4 tháng để về đỉnh cũ.
+
+Dòng phụ funding thực (OpenCode oc_signedfunding; SỐ CHÍNH THỨC vẫn là mô hình gate: long trả 0,01 %/8h, short không nhận):
+R2B1D17BF với funding thực có dấu 5,55 %/tháng, DD năm 18,32 (gate 5,43 / 18,33) -> mô hình gate bảo thủ hơn thực tế khoảng 0,1 %/tháng.
