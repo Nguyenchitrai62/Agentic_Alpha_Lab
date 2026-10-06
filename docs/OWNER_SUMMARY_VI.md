@@ -108,3 +108,15 @@ Bộ ma sát thực tế để xét BOT từ nay là S1 (phí) / S4 (trượt st
 Đã rớt fold năm gần nhất (v422 fold 4: 4,716 so với 5,06 của G2, transfer=False) nên G2 vẫn là bản triển khai chính;
 runner paper `paper_g2k20c` (G2K20 + carry 0,25) chạy từ 2026-10-06 ~14:15 UTC thu bằng chứng triển vọng — chưa kết luận gì trước đủ 14/56 ngày.
 - Tăng trọng book (bookscale) NO [oc_bookscale]: book x1,1/x1,2 vẫn rớt S1/S3 kể cả +carry (cao nhất 4,892 / 4,854) — không adopt, giữ nguyên size G2.
+
+## 11. Bổ sung docs_owner12 (2026-10-06, nói ngắn gọn)
+
+- Tăng carry lên f=0,5 có vay USDT THUA f=0,25 nên giữ 0,25 [oc_carryborrow]: base 5,569 (@10%/năm) và 5,424 (@15%) so với 5,634,
+tức −0,065 và −0,21 điểm %/tháng, DD còn nhích lên (16,93/17,10 so với 16,75); hàng ma sát S1 cũng thua tương tự (−0,084/−0,23).
+- Carry thêm BNB/SOL/XRP gác lại [oc_carrymore]: cùng quy tắc cho thêm +0,145 điểm %/tháng trên BTC/ETH (tổng +0,361 thành 5,77),
+không năm lỗ, không thêm DD, nhưng phải chạy trên Binance COIN-M (Bybit chỉ kiểm kê được BTC/ETH) và peak spot 2,0x vốn phải vay — chưa triển khai.
+- Tuần OOS sạch đầu tiên xem mục 'Bằng chứng ngoài mẫu' ngay trên (6 ngày +2,0 %, phân vị 72,7, mẫu nhỏ, chỉ để xác nhận trong biên)
+[oc_bookoos; docs/opencode/WEEKLY_20261006.md] — không nhắc lại số ở đây.
+- Sự cố 2026-10-06: backend + tunnel chết ~10:32–14:16 UTC do cửa sổ console foreground bị đóng (plan kẹt ở bar 08:00, mất cycle 12:00),
+và 6 runner paper dừng ~11:55–14:37 UTC do khởi động trong shell có giới hạn thời gian. Đã sửa restart_all.ps1 chạy độc lập qua WMI
+và chạy lại toàn bộ lúc ~14:37 UTC; từ nay luôn khởi động lại bằng `.\scripts\restart_all.ps1` [docs/opencode/BACKEND_INCIDENT_20261006.md; docs/PLAN_NEXT_20261006.md].

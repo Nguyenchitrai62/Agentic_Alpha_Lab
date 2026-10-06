@@ -30,7 +30,7 @@ HỦY bid dip đang chờ từ trước giờ bắt đầu 30 phút tới hết 
 Carry = mua coin thật + short futures quý bằng nhau, vào khi basis >= 4%/năm và hợp đồng gần còn <= 7 ngày, mỗi chân 0,25x vốn, giữ tới đáo hạn (~4 quyết định/năm) [OWNER_SUMMARY_VI §1]. Cộng thêm chỉ ~+0,12–0,22 điểm %/tháng, không cứu được ma sát [OWNER_SUMMARY_VI §1]. Ngày đáo hạn: BÁN spot đúng 08:00 UTC (tốt nhất rải quanh cửa sổ tính giá index) [QUICKSTART_VI §4]. Đọc: `QUICKSTART_VI §4`, `GLOSSARY_VI §Carry`.
 
 ## 10. Có tăng carry lên f=0,5 được không?
-Không, trên cùng UTA. f=0,25 tiền trống thấp nhất còn 22,49%, 0 giờ bị chặn; f=0,50 chỉ còn 1,85% và bị chặn 1 giờ nên cấm [OWNER_SUMMARY_VI §1]. Gap -10% cả 5 coin ở f=0,25 mất -28,85%, không cháy [OWNER_SUMMARY_VI §1]. Đọc: `DEPLOYMENT_PLAN_VI §Triển khai`, `BOT_RUNBOOK_VI §1`.
+Không, trên cùng UTA. f=0,25 tiền trống thấp nhất còn 22,49%, 0 giờ bị chặn; f=0,50 chỉ còn 1,85% và bị chặn 1 giờ nên cấm [OWNER_SUMMARY_VI §1]. Có vay USDT thêm cũng vẫn thua: base 5,569 (@10%/năm) và 5,424 (@15%) so với 5,634 f=0,25, tức −0,065/−0,21 điểm %/tháng, DD còn cao hơn [oc_carryborrow; OWNER_SUMMARY_VI §11]. Gap -10% cả 5 coin ở f=0,25 mất -28,85%, không cháy [OWNER_SUMMARY_VI §1]. Đọc: `DEPLOYMENT_PLAN_VI §Triển khai`, `BOT_RUNBOOK_VI §1`.
 
 ## 11. Sao không đặt mục tiêu 8%/tháng?
 Điểm cao nhất trên đường đánh đổi cũng chỉ ~5,9 %/tháng ở DD trên 17,5 [OWNER_SUMMARY_VI §3]. Tăng size chỉ tăng lãi tuyến tính mà DD tăng nhanh hơn (edge/đơn vị bất biến) [OWNER_SUMMARY_VI §docs_update7]. Nên giữ cấu hình, không bơm size. Đọc: `OWNER_SUMMARY_VI §3 + §docs_update7`.
@@ -55,3 +55,9 @@ Chỉ trong `.env` local, không commit, không dán chat [QUICKSTART_VI §3]. L
 
 ## 18. Backend khi nào cần khởi động lại?
 Mỗi ngày kiểm tra `.\run_backend.ps1 -Status`; plan `trade_plan_v376.json` quá 4h30m là cũ (bot chỉ giữ exits) thì dựng lại backend [BOT_RUNBOOK_VI §1]. Sau MỌI lần cập nhật code thêm route API mới (ví dụ `/api/carry`) phải restart tay một lần thì route mới có hiệu lực [BOT_RUNBOOK_VI §1]. Đọc: `BOT_RUNBOOK_VI §1`.
+
+## 19. Sao chưa carry BNB/SOL/XRP?
+Cùng quy tắc cho thêm +0,145 điểm %/tháng trên BTC/ETH (tổng +0,361 thành 5,77), không thêm DD, nhưng phải chạy trên Binance COIN-M (Bybit chỉ kiểm kê được BTC/ETH) và peak spot 2,0x vốn phải vay nên gác lại [OWNER_SUMMARY_VI §11]. Đọc: `research/tournament/oc_carrymore/REPORT.md`.
+
+## 20. Bot/backend chết thì kiểm tra thế nào?
+Ngày 2026-10-06 backend + tunnel chết ~10:32–14:16 UTC (plan kẹt bar 08:00, mất cycle 12:00) và 6 runner dừng ~11:55–14:37 UTC, đều đã chạy lại sau khi sửa restart_all.ps1 [OWNER_SUMMARY_VI §11]. Kiểm tra theo thứ tự: `.\run_backend.ps1 -Status`, plan tươi < 4h30m, `bot_health.py` hết CRITICAL; khởi động lại luôn bằng `.\scripts\restart_all.ps1`, không dùng terminal tạm [docs/opencode/BACKEND_INCIDENT_20261006.md]. Đọc: `docs/opencode/BACKEND_INCIDENT_20261006.md`.
