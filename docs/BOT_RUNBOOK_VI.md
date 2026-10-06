@@ -276,3 +276,27 @@ REM Liệt kê nội dung một bản (không ghi gì):
 
 - Kiểm thử: `tests/test_snapshot_untracked.py` (repo git tạm, không chạm cây thật). Chạy tay định kỳ
   trước các đợt dọn git (stash/clean/reset) và sau mỗi tuần paper.
+
+## 13. Watcher cảnh báo CRITICAL (`scripts/alert_watch.py`, 2026-10-06)
+
+- Chủ tự chạy tay (không tự khởi động, không network, không credentials — chỉ đọc file local):
+
+```bat
+REM Chạy nền mỗi 300s (toast Windows + log artifacts/alerts/alerts.log):
+.venv\Scripts\python.exe scripts/alert_watch.py --every 300
+
+REM Kiểm tra một lần, không toast:
+.venv\Scripts\python.exe scripts/alert_watch.py --once --no-toast
+```
+
+- Mỗi vòng đọc health nhanh/local của 2 runner triển khai (`paper_d17bfg2`, `paper_d17bfg2c`)
+  bằng đúng hàm `bot_health.check_dir` + `daily_status.check_plan` + `stop_rules.summarize_runner`
+  (không đọc parquet collector, không chạm `.env`, không start/stop process).
+  6 mục CRITICAL: vị thế thiếu stop/TP, lệch số liệu với sàn, chu kỳ cuối > 5 phút,
+  plan > 4h30m, stop rule STOP (DD > 20% / lỗ tháng > 10% / phân vị < 5 sau >= 8 tuần),
+  carry lệch hedge > 2 cycle.
+- Toast Windows dùng `[Windows.UI.Notifications]` có sẵn (BurntToast không cài sẵn);
+  lỗi thì fallback `msg` / beep console. Mỗi incident mới toast ĐÚNG 1 lần
+  (de-dup trong bộ nhớ tiến trình); hết thì ghi `RESOLVED` vào `alerts.log`.
+  Khi toast nổ: chạy `daily_status.py` + `bot_health.py` như mục 3 rồi xử lý theo mục 4/6.
+- Kiểm thử: `tests/test_alert_watch.py` (health giả + notifier giả, không toast thật).
