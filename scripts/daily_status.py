@@ -63,6 +63,14 @@ try:
 except Exception:  # pragma: no cover - thieu file thi van chay
     edge_monitor = None
 try:
+    stop_rules = _load("daily_status_stop_rules", "scripts/stop_rules.py")
+except Exception:  # pragma: no cover - thieu file thi van chay
+    stop_rules = None
+try:
+    regime_now = _load("daily_status_regime_now", "scripts/regime_now.py")
+except Exception:  # pragma: no cover - thieu file thi van chay
+    regime_now = None
+try:
     liq_mod = _load("daily_status_load_liq", "research/tournament/oc_liqlive/load_liq.py")
 except Exception:  # pragma: no cover - pandas/pyarrow thieu thi van chay
     liq_mod = None
@@ -473,6 +481,45 @@ def check_edge(root: Path) -> list[dict]:
     return out
 
 
+def check_stops(root: Path) -> list[dict]:
+    """Nguong dung + go-live (chi doc) cho cac runner trien khai."""
+    out = []
+    if stop_rules is None:
+        return out
+    for name in getattr(stop_rules, "RUNNERS", EDGE_RUNNERS):
+        if not (root / BOT_REL / name).is_dir():
+            continue
+        try:
+            rep = stop_rules.summarize_runner(root, name)
+        except Exception as e:  # pragma: no cover - phong thu
+            out.append({"runner": name, "severity": "warning",
+                        "lines": [f"{name}: khong doc duoc stop rules ({e})"]})
+            continue
+        out.append({"runner": name, "severity": rep.get("severity", "ok"),
+                    "lines": list(rep.get("lines", []))})
+    return out
+
+
+def check_regime(root: Path) -> dict:
+    """Thi truong hien tai (scripts/regime_now.py, offline local only).
+
+    Chi doc file local, khong network (daily_status chi duoc cham localhost).
+    Luon severity ok (thong tin, khong anh huong verdict/exit).
+    """
+    if regime_now is None:
+        return {"severity": "ok", "line": "regime: n/a (thieu scripts/regime_now.py)",
+                "lines": []}
+    try:
+        sm = regime_now.summarize(root, live=False)
+        txt = regime_now.format_vi(sm)
+        lines = [x for x in txt.splitlines() if x.strip()]
+        head = lines[1] if len(lines) > 1 else "regime: n/a"
+        return {"severity": "ok", "line": head, "lines": lines}
+    except Exception as e:  # pragma: no cover - phong thu
+        return {"severity": "ok", "line": f"regime: n/a ({type(e).__name__})",
+                "lines": []}
+
+
 def build_status(root: Path = ROOT, now: datetime | None = None,
                  health_url: str = HEALTH_URL) -> dict:
     now = now or utcnow()
@@ -483,13 +530,16 @@ def build_status(root: Path = ROOT, now: datetime | None = None,
     carry = check_carry(root, now)
     cycles = check_cycles(root, now)
     edge = check_edge(root)
+    stops = check_stops(root)
+    regime = check_regime(root)
     verdict = worst(be["severity"], plan["severity"], carry["severity"],
                     *(b["severity"] for b in bots), *(c["severity"] for c in cols),
                     *(r["severity"] for r in cycles),
-                    *(e["severity"] for e in edge))
+                    *(e["severity"] for e in edge),
+                    *(s["severity"] for s in stops))
     return {"now": now, "backend": be, "plan": plan, "bots": bots,
             "collectors": cols, "carry": carry, "cycles": cycles,
-            "edge": edge, "verdict": verdict,
+            "edge": edge, "stops": stops, "regime": regime, "verdict": verdict,
             "exit": {"ok": 0, "warning": 1, "critical": 2}[verdict]}
 
 
@@ -512,6 +562,17 @@ def format_text(st: dict) -> str:
             L += [f"     . {x}" for x in e.get("lines", [])]
     else:
         L.append("   - chua co runner trien khai (paper_d17bfg2/c)")
+    L.append("7) Nguong dung + go-live (DD>20% dung; thang <-10% giam von; phan vi<5 sau 8 tuan dung):")
+    if st.get("stops"):
+        for s in st["stops"]:
+            L.append(f"   - {s['runner']} [{s['severity'].upper()}]:")
+            L += [f"     . {x}" for x in s.get("lines", [])]
+    else:
+        L.append("   - chua co runner trien khai (paper_d17bfg2/c)")
+    L.append("8) Thi truong hien tai (regime_now, offline local):")
+    rg = st.get("regime") or {}
+    for x in rg.get("lines", []) or [rg.get("line", "regime: n/a")]:
+        L.append(f"   - {x}")
     L.append(f"KET LUAN: {st['verdict'].upper()} "
              f"(0=OK 1=canh bao 2=nguy hiem) -> exit {st['exit']}")
     return "\n".join(L)
@@ -546,6 +607,20 @@ def format_markdown(st: dict) -> str:
                 L.append(f"  - {x}")
     else:
         L.append("- chua co runner trien khai (paper_d17bfg2/c)")
+    L += ["", "## Nguong dung + go-live (DEPLOYMENT_PLAN_VI muc 2+4)",
+          "Nguong: DD > 20% dung mo lenh moi; lo thang > 10% giam mot nua von; "
+          "phan vi < 5 sau >= 8 tuan dung.", ""]
+    if st.get("stops"):
+        for s in st["stops"]:
+            L.append(f"- {s['runner']} ({s['severity'].upper()})")
+            for x in s.get("lines", []):
+                L.append(f"  - {x}")
+    else:
+        L.append("- chua co runner trien khai (paper_d17bfg2/c)")
+    L += ["", "## Thi truong hien tai (regime_now, offline local)", ""]
+    rg = st.get("regime") or {}
+    for x in rg.get("lines", []) or [rg.get("line", "regime: n/a")]:
+        L.append(f"- {x}")
     L += ["", f"**KET LUAN: {st['verdict'].upper()}** (exit {st['exit']})", ""]
     return "\n".join(L)
 
