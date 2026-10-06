@@ -2,7 +2,8 @@
 #
 # Order: (1) backend uvicorn on 127.0.0.1:8724 (local only, NEVER the public
 # tunnel/cloudflared), wait for /health + fresh plan (<1h15m); (2) advisor
-# shadow loop.sh exactly once (skip if running); (3) the five paper runners,
+# shadow loop.sh exactly once (skip if running); (3) the six paper runners
+# (paper, d17bf, d13bf, d17bfg2, g2k20, d17bfg2c),
 # each only if its runner.lock is free (live process check); state.json is
 # backed up first and validated as JSON; (4) the hourly carry ledger loop once;
 # (5) bot_health for every runner + daily_status summary.
@@ -104,7 +105,7 @@ if ($doBackend) {
   Log "advisor loop.sh retired (backend runs shadow) -> not started"
 }
 
-# ---------- (3) five paper runners ----------
+# ---------- (3) six paper runners (paper, d17bf, d13bf, d17bfg2, g2k20, d17bfg2c) ----------
 if ($doBots) {
   foreach ($b in $bots) {
     $procs = if ($b.tag -eq "paper") {
@@ -139,7 +140,7 @@ if ($doCarry) {
 
 # ---------- (5) health summary ----------
 if ($DryRun) {
-  Plan "print health: scripts/bot_health.py for all five runners + scripts/daily_status.py summary"
+  Plan "print health: scripts/bot_health.py for all six runners (paper, d17bf, d13bf, d17bfg2, g2k20, d17bfg2c) + scripts/daily_status.py summary"
   Log "dry-run: plan only, started nothing"
   exit 0
 }

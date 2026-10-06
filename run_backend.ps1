@@ -1,4 +1,4 @@
-# Web backend (127.0.0.1:8724) + Cloudflare tunnel connector (api-crypto.nguyenchitrai.id.vn).
+﻿# Web backend (127.0.0.1:8724) + Cloudflare tunnel connector (api-crypto.nguyenchitrai.id.vn).
 #
 #   .\run_backend.ps1              run in THIS terminal: logs stream here (VS Code terminal works), Ctrl+C stops the backend
 #                                  and the tunnel. The scheduler inside the backend runs the pipeline after every 4h close
@@ -9,6 +9,9 @@
 #   .\run_backend.ps1 -Stop        stop the backend (foreground or background) and the tunnel connector
 # The tunnel token is read from CLOUDFLARE_TUNNEL_TOKEN in the local .env (gitignored; never commit it).
 param([switch]$Background, [switch]$Stop, [switch]$Status, [switch]$AccessLog, [switch]$Ensure)
+# WinPS 5.1 output fix (encoding only): UTF-8 output so Vietnamese diacritics print correctly.
+[Console]::OutputEncoding = [System.Text.Encoding]::UTF8
+$OutputEncoding = [System.Text.Encoding]::UTF8
 
 $root = $PSScriptRoot
 $py = Join-Path $root ".venv\Scripts\python.exe"
