@@ -13,37 +13,54 @@
 
 Mọi lệnh chạy từ thư mục repo root. Windows dùng `.venv\Scripts\python.exe`.
 
+- (A) KHUYẾN NGHỊ cho tới khi bản bot_capfix được merge và `docs/BOT_EXECUTION.md` xác nhận cap khớp engine: BỎ `--dip-gross-cap` (xem CẢNH BÁO đầu sổ tay).
+- (B) Chỉ dùng khi cap đã khớp engine: THÊM `--dip-gross-cap 2.0` vào cùng lệnh.
+- Paper bot `d17bfg2` hiện đang chạy (B) — runner so sánh có trần, không dùng để kết luận lợi nhuận.
+
 ```bat
-REM Xem thử, không gửi lệnh:
+REM (A) Xem thử KHUYẾN NGHỊ, không gửi lệnh:
+.venv\Scripts\python.exe -m bot.run --once --equity 5000 --corr-size --dip-mult 1.7 --bear-book
+
+REM (B) Xem thử so sánh có trần (khi cap đã khớp engine):
 .venv\Scripts\python.exe -m bot.run --once --equity 5000 --corr-size --dip-mult 1.7 --bear-book --dip-gross-cap 2.0
 
-REM Paper khuyến nghị (bằng chứng triển vọng):
+REM (A) Paper KHUYẾN NGHỊ (bằng chứng triển vọng):
+.venv\Scripts\python.exe -m bot.run --mode paper --equity 5000 --corr-size --dip-mult 1.7 --bear-book --tag d17bf
+
+REM (B) Paper so sánh có trần (= runner d17bfg2 hiện tại):
 .venv\Scripts\python.exe -m bot.run --mode paper --equity 5000 --corr-size --dip-mult 1.7 --bear-book --dip-gross-cap 2.0 --tag d17bfg2
 
 REM Kiểm tra sức khỏe hằng ngày:
 .venv\Scripts\python.exe scripts/bot_health.py artifacts/bot/paper_d17bfg2
 
-REM Testnet (bắt buộc trước live, khóa testnet trong .env):
-.venv\Scripts\python.exe -m bot.run --mode testnet --corr-size --dip-mult 1.7 --bear-book --dip-gross-cap 2.0 --tag d17bfg2
+REM (A) Testnet KHUYẾN NGHỊ (bắt buộc trước live, khóa testnet trong .env):
+.venv\Scripts\python.exe -m bot.run --mode testnet --corr-size --dip-mult 1.7 --bear-book --tag d17bf
+
+REM (B) Testnet so sánh có trần: thêm --dip-gross-cap 2.0 vào lệnh trên.
 
 REM Live (KHÓA — chỉ chủ tài khoản mở, sau testnet sạch + đủ điều kiện mục 6):
-set BOT_ALLOW_LIVE=yes-real-money
-.venv\Scripts\python.exe -m bot.run --mode live --corr-size --dip-mult 1.7 --bear-book --dip-gross-cap 2.0 --tag d17bfg2
+REM cmd: set BOT_ALLOW_LIVE=yes-real-money
+REM PowerShell: $env:BOT_ALLOW_LIVE="yes-real-money"
+REM (A) Live KHUYẾN NGHỊ: .venv\Scripts\python.exe -m bot.run --mode live --corr-size --dip-mult 1.7 --bear-book --tag d17bf
+REM (B) Live có trần (khi cap đã khớp engine): thêm --dip-gross-cap 2.0 vào lệnh trên.
 ```
 
-- Đủ 4 flag mới đúng pipeline khuyến nghị: `--corr-size --dip-mult 1.7 --bear-book --dip-gross-cap 2.0`. Thiếu một flag là thành pipeline khác, mọi kỳ vọng dưới đây vô hiệu.
-- Vì sao `--dip-gross-cap 2.0`: kiểm tra gap-stress (`docs/DEPLOYMENT_PLAN_VI.md`) giả lập cả 5 coin sập tức thì nhảy qua mọi stop — phút tệ nhất không trần lỗ 58% vốn, có trần 2x còn 33,5% (3x: 39%), trung vị/p99 không đổi; lợi nhuận giữ nguyên (~5,41 so với 5,43 %/tháng, DD 16,9 so với 18,3).
+- Đủ flag mới đúng pipeline khuyến nghị: `--corr-size --dip-mult 1.7 --bear-book` (+ `--dip-gross-cap 2.0` chỉ khi cap đã khớp engine). Thiếu một flag là thành pipeline khác, mọi kỳ vọng dưới đây vô hiệu. Không chạy (A) và (B) cùng `--tag` cùng lúc (một runner/một thư mục state).
+- Vì sao `--dip-gross-cap 2.0` (kết quả engine/backtest trong `docs/DEPLOYMENT_PLAN_VI.md`): giả lập cả 5 coin sập tức thì nhảy qua mọi stop — phút tệ nhất không trần lỗ 58% vốn, có trần 2x còn 33,5% (3x: 39%), trung vị/p99 không đổi; lợi nhuận giữ nguyên (~5,41 so với 5,43 %/tháng, DD 16,9 so với 18,3). Lưu ý bot hiện tại cài cap CHẶT HƠN engine nên con số “giữ nguyên” chưa đúng cho bot (xem CẢNH BÁO).
+- `--adopt-fresh` mặc định TẮT, không thuộc pipeline khuyến nghị. Chỉ bật khi được yêu cầu bằng văn bản để nhận lại vị thế book còn tươi mà bot đã bỏ lỡ (cửa sổ 5–65 phút sau entry, lệnh limit đúng giá engine, có stop/TP). Mặc định không thêm flag này.
+- `--equity` chỉ dùng cho dry/paper; live/testnet lấy vốn thật trên sàn. Dry `--once` mặc định `--mode dry`, không giữ `runner.lock`. Testnet cần `BYBIT_TESTNET_API_KEY` + `BYBIT_TESTNET_API_SECRET` trong `.env` (không commit, không dán vào chat).
 - Live bị khóa cứng: thiếu `BOT_ALLOW_LIVE=yes-real-money` do chính chủ đặt thì bot từ chối. Testnet trước, live bắt đầu vốn nhỏ.
 - Một runner cho mỗi thư mục state (khóa OS `runner.lock`). Không mở 2 tiến trình cùng `artifacts/bot/<mode>_<tag>`.
 
 ## 2. Nguồn plan: backend phải chạy
 
 - Bot chỉ gương theo `artifacts/research/advisor_shadow/trade_plan_v376.json`, backend làm tươi mỗi giờ qua scheduler trong backend.
-- Dựng backend trước bot:
+- Dựng backend trước bot. Backend đang chạy thì CHỈ dùng `-Status` để kiểm. Muốn chạy nền: `-Background` (log `artifacts\web\backend.log`); dừng: `-Stop`. KHÔNG gõ `.\run_backend.ps1` foreground khi backend đang chạy vì nó thay thế instance cũ.
 
 ```bat
-.\run_backend.ps1
 .\run_backend.ps1 -Status
+REM Chỉ khi backend chưa chạy: .\run_backend.ps1 -Background
+REM Dừng: .\run_backend.ps1 -Stop
 ```
 
 - Plan quá **4h30m** là cũ: bot chặn lệnh mới, chỉ giữ bảo vệ (stop/TP, thoát lệnh vẫn chạy), log `stale_plan`. Việc đầu tiên là dựng lại backend, không ép bot vào lệnh.
@@ -53,16 +70,20 @@ set BOT_ALLOW_LIVE=yes-real-money
 
 ```bat
 .venv\Scripts\python.exe scripts/bot_health.py artifacts/bot/paper_d17bfg2
+.venv\Scripts\python.exe scripts/paper_report.py artifacts/bot/paper_d17bfg2 artifacts/bot/paper_d17bf artifacts/bot/paper_g2k20
 .venv\Scripts\python.exe scripts/prospective_scorecard.py
 ```
+
+Tìm hàng `bot_paper_d17bfg2` (cột `percentile`, `config`, `go_live`, `stop`); mới chạy < 8 tuần thì `percentile` NaN là bình thường.
 
 Ý nghĩa từng dòng `bot_health.py` (exit 0 ok / 1 warning / 2 critical):
 
 - `last_cycle ... age`: CRITICAL nếu > 3 lần interval (> 60s với vòng 20s) hoặc > 5 phút = runner đã chết → khởi động lại lệnh mục 1, kiểm tra `runner.log`, Task Manager xem tiến trình cũ còn giữ `runner.lock` không.
 - `plan age ... (>4h30m)`: warning = plan cũ → dựng lại backend (mục 2). Bot lúc này chỉ giữ thoát lệnh là đúng.
-- `24h ops place/amend/cancel/fill/market_exit/stale_plan/errors`: `errors` > 0 = warning (xem 5 dòng lỗi kèm theo; `rate_limit`/10006 là chạm giới hạn Bybit → đợi, giảm tần suất); `cycle_error` kéo dài > 1 giờ = mất điều kiện go-live, dừng và sửa.
-- `unprotected=[...]`: CRITICAL = vị thế mở thiếu stop hoặc TP → kiểm tra ngay `actions.jsonl` + vị thế thật trên Bybit; bot tự đặt lại trong <= 20s, quá 2 vòng không stop sẽ đóng market (`unprotected_close`).
-- `qty_mismatch=[...]`: CRITICAL = sổ bot lệch vị thế sàn → sàn là sự thật; kiểm tra tay, xem `sync_fills`/`seen_exec`, không sửa tay `state.json`.
+- `24h ops place/amend/cancel/fill/market_exit/stale_plan/errors`: `errors` > 0 = warning (xem 5 dòng lỗi kèm theo; `rate_limit`/10006 là chạm giới hạn Bybit → đợi, giảm tần suất). Để kiểm `cycle_error` kéo dài > 1 giờ (mất điều kiện go-live, dừng và sửa), chạy: `Select-String -Path artifacts/bot/paper_d17bfg2/actions.jsonl -Pattern cycle_error | Select-Object -Last 20` (bash: `grep cycle_error ...`), xem timestamp `t`; cùng lỗi lặp > 1 giờ mới tính.
+- `unprotected=[...]`: CRITICAL = vị thế mở thiếu stop hoặc TP → kiểm tra ngay `actions.jsonl` + vị thế thật; bot tự đặt lại trong <= 20s, quá 2 vòng không stop sẽ đóng market (`unprotected_close`).
+- `qty_mismatch=[...]`: CRITICAL = sổ bot lệch vị thế sàn → sàn là sự thật; kiểm tra tay, không sửa tay `state.json`.
+- Với paper, “sàn” là `artifacts/bot/<dir>/exchange.json`; với live/testnet mới là Bybit thật. Xem tên nội bộ (`unprotected_close`, `plan_closed_divergence`, `skipped_below_minimum`, `stale_plan`, `sync_fills`): `Select-String -Path artifacts/bot/paper_d17bfg2/actions.jsonl -Pattern 'unprotected_close|plan_closed_divergence|skipped_below_minimum|stale_plan' | Select-Object -Last 20`.
 - `equity ... maxDD`: lãi/lỗ và DD từ đầu paper; so với ngưỡng dừng mục 6.
 - `fills24h / closed W/L`: số khớp dip/book 24h và thắng/thua mảnh đã đóng (chỉ tham khảo ngắn hạn).
 - `missing actions.jsonl / state.json`: runner chưa từng chạy đúng thư mục/tag → kiểm tra lại `--tag`.
@@ -71,9 +92,9 @@ set BOT_ALLOW_LIVE=yes-real-money
 
 Bot và backend **không tự chạy lại**. Thứ tự:
 
-1. `.\run_backend.ps1`, chờ `.\run_backend.ps1 -Status` báo local OK, xác nhận `trade_plan_v376.json` có `generated_at` mới (< 4h30m).
-2. Chạy lại đúng một runner cho mỗi mode bằng lệnh mục 1 (đúng `--tag d17bfg2`). Nếu báo `another bot runner holds .../runner.lock` là còn tiến trình cũ — đừng chạy đè.
-3. Đối chiếu `actions.jsonl` với vị thế thật trên Bybit: stop/TP thiếu được đặt lại trong <= 20s; mảnh nào plan đã thoát mà sàn còn mở sẽ bị đóng market sau ~3 phút (`plan_closed_divergence`).
+1. Nếu backend chưa chạy: `.\run_backend.ps1 -Background`, chờ `.\run_backend.ps1 -Status` báo local OK, xác nhận `trade_plan_v376.json` có `generated_at` mới (< 4h30m). Backend đang chạy thì không gõ foreground.
+2. Chạy lại đúng một runner cho mỗi mode bằng lệnh mục 1 (đúng `--tag d17bfg2` ↔ `artifacts/bot/paper_d17bfg2`). Nếu báo `another bot runner holds .../runner.lock` là còn tiến trình cũ — tìm bằng `Get-Process python` + xem `state.json` (mtime) và `stdout.log`, đừng chạy đè.
+3. Đối chiếu `actions.jsonl` với vị thế sàn (paper: `exchange.json`; live/testnet: Bybit thật): stop/TP thiếu được đặt lại trong <= 20s; mảnh plan đã thoát mà sàn còn mở bị đóng market sau ~3 phút (`plan_closed_divergence`).
 4. Mất mạng dài: stop market + TP limit reduce-only đã nằm trên sàn vẫn bảo vệ vị thế; phần hở duy nhất là mảnh vừa khớp chưa kịp đặt exit (cửa sổ <= 20s) — kiểm tra tay khi mạng trở lại.
 
 ## 5. Vốn, margin, đòn bẩy

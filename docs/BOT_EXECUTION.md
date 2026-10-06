@@ -24,7 +24,7 @@ into exchange orders. Logic: `bot/mirror.py` (pure, tests in `tests/test_bot_mir
   exit at the bar end (market).
 - The exchange is the truth for open pieces: when the paper plan has exited a book position that is still open on the exchange, the bot
   closes it at market after 3 minutes (logged `plan_closed_divergence`).
-- Safety: a plan older than 2 h blocks new entries (exits keep running); orders below Bybit lot / notional minimums are skipped and logged
+- Safety: a plan older than 4h30m blocks new entries (exits keep running); orders below Bybit lot / notional minimums are skipped and logged
   (at ~2000 USDT some BTC rungs are below 0.001 BTC; see the small-account study).
 
 State: `artifacts/bot/<mode>/state.json`; every action: `artifacts/bot/<mode>/actions.jsonl`.
