@@ -52,6 +52,9 @@ class PaperExchange:
     def _pos(self, sym, idx):
         return self.s["pos"].setdefault(f"{sym}|{idx}", dict(qty=0.0, avg=0.0))
 
+    def _spot(self, sym):
+        return self.s.setdefault("spot", {}).setdefault(sym, dict(qty=0.0, avg=0.0))
+
     def equity_usdt(self) -> float:
         eq = self.s["cash"]
         for k, p in self.s["pos"].items():
@@ -59,6 +62,15 @@ class PaperExchange:
             px = self.s["last_close"].get(sym)
             if px and p["qty"]:
                 eq += (px - p["avg"]) * p["qty"] * (1 if idx == "1" else -1)
+        for sym, sp in (self.s.get("spot") or {}).items():
+            try:
+                q = float(sp.get("qty", 0.0) or 0.0)
+            except (TypeError, ValueError):
+                continue
+            if q:
+                px = self.s["last_close"].get(sym)
+                if px:
+                    eq += q * float(px)
         return eq
 
     def open_orders(self):
@@ -91,6 +103,26 @@ class PaperExchange:
 
     # ---- matching ------------------------------------------------------------------------------------------------------------
     def _fill(self, link, o, qty, px, fee_rate, t_ms):
+        # Spot legs (bot_carry): physical coin against USDT cash.
+        if o.get("category") == "spot":
+            sym = o["symbol"]
+            sp = self._spot(sym)
+            if o["side"] == "Buy":
+                tot = sp["qty"] + qty
+                sp["avg"] = (sp["avg"] * sp["qty"] + px * qty) / tot if tot > 0 else px
+                sp["qty"] = tot
+                self.s["cash"] -= qty * px
+            else:
+                qty = min(qty, sp["qty"])
+                if qty <= 0:
+                    return
+                sp["qty"] -= qty
+                self.s["cash"] += qty * px
+            fee = fee_rate * qty * px
+            self.s["cash"] -= fee
+            self.s["fees"] += fee
+            self.s["execs"].append(dict(execId=uuid.uuid4().hex, orderLinkId=link, execQty=str(qty), execPrice=str(px), execTime=str(t_ms)))
+            return
         sym, idx = o["symbol"], int(o.get("positionIdx", 1))
         p = self._pos(sym, idx)
         sgn = 1 if idx == 1 else -1
@@ -120,11 +152,15 @@ class PaperExchange:
             idx = int(o.get("positionIdx", 1))
             qty = float(o["qty"])
             if o.get("reduceOnly"):
+                if o.get("category") == "spot":
+                    continue  # spot sale at delivery is not reduce-only-gated; capped in _fill
                 have = self._pos(sym, idx)["qty"]
                 if have <= 0:
                     self.s["orders"].pop(k)
                     continue
                 qty = min(qty, have)
+            if o.get("category") == "spot" and o["side"] == "Sell" and o["orderType"] == "Market":
+                qty = min(qty, self._spot(sym)["qty"]) if self._spot(sym)["qty"] > 0 else qty
             if o.get("triggerPrice"):
                 tr = float(o["triggerPrice"])
                 if int(o.get("triggerDirection", 2)) == 2 and l <= tr:
@@ -155,8 +191,13 @@ class PaperExchange:
         """Process every CLOSED 1m bar since the last call (live Bybit klines,
         shared across runners via the on-disk kline cache, TTL 20 s)."""
         now_ms = int(pd.Timestamp(now or pd.Timestamp.now(tz="UTC")).floor("min").timestamp() * 1000)
-        for sym in self.symbols:
-            start = int(self.s["last_ms"][sym])
+        # bot_carry: dated quarterly symbols ride along (same 1m trade-through
+        # fills as every other paper order).
+        extra = sorted({o["symbol"] for o in self.s["orders"].values()
+                        if o.get("symbol") not in self.symbols})
+        for sym in list(self.symbols) + extra:
+            start = int(self.s.setdefault("last_ms", {}).setdefault(
+                sym, min(int(self.s["last_ms"].get(s, now_ms)) for s in self.symbols) if self.s.get("last_ms") else now_ms))
             if start >= now_ms:
                 continue
             cache_dir = getattr(self, "cache_dir", None)

@@ -21,6 +21,7 @@ from pathlib import Path
 import pandas as pd
 
 from bot import mirror
+from bot import carry as carry_mod
 from bot import risk_guard
 from bot.bybit_v5 import (
     KLINE_CACHE_LOCK_WARN_S,
@@ -130,12 +131,16 @@ class Runner:
     def __init__(self, mode: str, plan_path: Path, equity: float | None, risk_mult: float = 1.0, corr: bool = False,
                  tag: str | None = None, dip_mult: float = 1.0, bear_book: bool = False,
                  dip_cooldown_h: float = 0.0, dip_sl_coin: dict | None = None, dip_gross_cap: float | None = None,
-                 adopt_fresh: bool = False, no_risk_guard: bool = False):
+                 adopt_fresh: bool = False, no_risk_guard: bool = False, carry_f: float = 0.0):
         self.mode, self.plan_path = mode, plan_path
         self.risk_mult, self.corr, self.tag, self.dip_mult = float(risk_mult), bool(corr), tag or None, float(dip_mult)
         self.bear_book = bool(bear_book)
         self.adopt_fresh = bool(adopt_fresh)
         self.no_risk_guard = bool(no_risk_guard)
+        try:
+            self.carry_f = float(carry_f or 0.0)
+        except (TypeError, ValueError):
+            self.carry_f = 0.0
         self.dip_cooldown_h = float(dip_cooldown_h or 0.0)
         self.dip_sl_coin = dict(dip_sl_coin or {})
         try:
@@ -255,6 +260,175 @@ class Runner:
             keep = set()
         return {k: o for k, o in want.items() if id(o) in keep}
 
+    # ---- bot_carry sleeve (opt-in --carry-f; off by default, zero behaviour change) ----
+    def _carry_sync(self):
+        """Apply exchange executions of carry links (prefix ``c``) to carry state."""
+        try:
+            f = float(getattr(self, "carry_f", 0.0) or 0.0)
+        except (TypeError, ValueError):
+            return
+        if not f > 0 or self.mode == "dry":
+            return
+        try:
+            cstate = carry_mod.carry_state(self.state)
+        except Exception:
+            return
+        last = self.state.get("last_exec_ms")
+        try:
+            start = int(last) if last is not None else int((time.time() - 3600) * 1000)
+            ex = self.ex.executions(start)
+        except Exception:
+            return
+        seen = set(self.state.setdefault("seen_exec", [])[-500:])
+        for e in sorted(ex, key=lambda r: int(r.get("execTime", 0) or 0)):
+            try:
+                link = e.get("orderLinkId") or ""
+            except AttributeError:
+                continue
+            if not link.startswith(carry_mod.LINK_PREFIX):
+                continue
+            try:
+                if e["execId"] in seen:
+                    continue
+            except KeyError:
+                continue
+            try:
+                rec = carry_mod.note_exec(cstate, link, float(e.get("execQty", 0)), float(e.get("execPrice", 0)))
+            except Exception:
+                continue
+            seen.add(e["execId"])
+            if rec is not None:
+                self.log(rec)
+            try:
+                self.state["last_exec_ms"] = max(int(self.state.get("last_exec_ms") or 0), int(e["execTime"]))
+            except (TypeError, ValueError):
+                pass
+        self.state["seen_exec"] = list(seen)
+
+    def _carry_round(self, p: dict):
+        """Rounded carry payload or None when below lot / notional minimums."""
+        try:
+            sym = p.get("symbol")
+            qty = float(p.get("qty", 0))
+            if not qty > 0:
+                return None
+        except (TypeError, ValueError, AttributeError):
+            return None
+        it = self.inst.get(sym)
+        if it is None and sym:
+            # Dated quarterly (e.g. BTCUSD_...): fall back to the coin's perp lot.
+            try:
+                pre = str(sym).upper()
+            except Exception:
+                pre = ""
+            for cs in SYMS:
+                if pre.startswith(cs[:-4]):
+                    it = self.inst.get(cs)
+                    break
+        if it is None:
+            return dict(p, qty=str(qty))
+        out = dict(p)
+        try:
+            out["qty"] = round_step(qty, it["qty_step"])
+            if float(out["qty"]) < float(it["min_qty"]) - 1e-12:
+                return None
+        except (TypeError, ValueError, KeyError):
+            return None
+        if p.get("orderType") == "Limit" and p.get("price") is not None:
+            try:
+                up = p.get("side") == "Sell"
+                out["price"] = round_step(float(p["price"]), it["tick"], up=up)
+            except (TypeError, ValueError, KeyError):
+                return None
+            if not p.get("reduceOnly") and float(out["qty"]) * float(out["price"]) < float(it["min_notional"]) - 1e-9:
+                return None
+        return out
+
+    def _carry_cycle(self, now, equity: float, prices: dict):
+        """One carry pass: sync fills, decide (frozen rule), guard, place. Returns acts."""
+        try:
+            f = float(getattr(self, "carry_f", 0.0) or 0.0)
+        except (TypeError, ValueError):
+            return []
+        if not f > 0:
+            return []
+        self._carry_sync()
+        try:
+            cstate = carry_mod.carry_state(self.state)
+        except Exception:
+            return []
+        # Test seam: injected contracts/quotes (no network in unit tests).
+        contracts = getattr(self, "_carry_contracts_override", None)
+        quotes = getattr(self, "_carry_quotes_override", None)
+        if contracts is None:
+            try:
+                pub = getattr(self.ex, "pub", self.ex)
+                contracts = carry_mod.fetch_contracts(pub)
+            except Exception:
+                contracts = {}
+        if quotes is None:
+            try:
+                pub = getattr(self.ex, "pub", self.ex)
+                quotes = carry_mod.fetch_quotes(pub, contracts)
+            except Exception:
+                quotes = {}
+        try:
+            want, logs = carry_mod.decide(now, equity, f, cstate, contracts or {}, quotes or {})
+        except Exception as e:
+            self.log(dict(op="carry_error", note=f"{type(e).__name__}: {e}"[:200]))
+            return []
+        for rec in logs or []:
+            try:
+                self.log(dict(rec))
+            except Exception:
+                pass
+        if not want:
+            return []
+        try:
+            allowed, rejected = carry_mod.guard_carry(want, self.state.get("ledger"), equity, prices or {})
+        except Exception as e:
+            self.log(dict(op="risk_reject", link=None, symbol=None, reason=f"carry_guard_error:{type(e).__name__}"))
+            return []
+        for r in rejected or []:
+            try:
+                self.log(dict(op="risk_reject", link=r.get("link"), symbol=r.get("symbol"), reason=r.get("reason")))
+            except (AttributeError, TypeError):
+                pass
+        if not allowed:
+            return []
+        acts = []
+        skipped = []
+        for p in allowed:
+            try:
+                link = p.get("orderLinkId")
+            except AttributeError:
+                continue
+            rp = self._carry_round(p)
+            if rp is None:
+                skipped.append(link)
+                continue
+            self.log(dict(op="place", payload=rp, carry=True))
+            try:
+                # Bybit.place hardcodes category="linear" (dict(category=..,
+                # **o) raises on a category key), so signed clients go via
+                # post() with the carry category; paper/fake exchanges keep
+                # the category inside the payload (paper fills branch on it).
+                if isinstance(self.ex, Bybit):
+                    cat = rp.get("category", "linear")
+                    body = {k: v for k, v in rp.items() if k != "category"}
+                    body["category"] = cat
+                    res = self.send(self.ex.post, "/v5/order/create", body)
+                else:
+                    res = self.send(self.ex.place, rp)
+            except Exception:
+                continue
+            if res is not None or self.mode == "dry":
+                self.state.setdefault("links", {})[link] = dict(order=dict(link=link), carry_payload=rp)
+                acts.append(dict(op="place", payload=rp))
+        self._log_skipped([s for s in skipped if s], now, equity)
+        return acts
+
+
     def sync_fills(self):
         """Exchange executions of bot links -> piece ledger (testnet / live only)."""
         if self.mode == "dry":
@@ -271,6 +445,8 @@ class Runner:
             link = e.get("orderLinkId") or ""
             if e["execId"] in seen or link not in self.state["links"]:
                 continue
+            if link.startswith(carry_mod.LINK_PREFIX):
+                continue  # bot_carry: handled by _carry_sync (carry.note_exec), not the book/dip ledger
             o = mirror.Order(**self.state["links"][link]["order"])
             mirror.apply_fill(self.state["ledger"], o, float(e["execQty"]), float(e["execPrice"]), pd.Timestamp(int(e["execTime"]), unit="ms", tz="UTC"))
             seen.add(e["execId"])
@@ -610,6 +786,17 @@ class Runner:
                             rest.update({k2: a[k2] for k2 in ("price", "trigger", "qty") if k2 in a})
                 _stages["order_ms"] += (_cycle_now() - _t) * 1000.0
                 self._log_skipped(skipped, now, equity)
+                if float(getattr(self, "carry_f", 0.0) or 0.0) > 0:
+                    _t = _cycle_now()
+                    try:
+                        _cp = self._guard_prices(None, last5 if isinstance(last5, dict) else {}, {"coins": {}})
+                    except NameError:
+                        _cp = {}
+                    try:
+                        acts = list(acts) + list(self._carry_cycle(now, equity, _cp))
+                    except Exception:
+                        pass
+                    _stages["order_ms"] += (_cycle_now() - _t) * 1000.0
                 self._store_cycle_timing(_stages, t_all)
                 return acts
         stale = now - pd.Timestamp(plan["generated_at"]) > STALE_PLAN
@@ -782,6 +969,17 @@ class Runner:
                             pc.pop("unprotected_cycles", None)
         _stages["order_ms"] += (_cycle_now() - _t) * 1000.0
         self._log_skipped(skipped, now, equity)
+        if float(getattr(self, "carry_f", 0.0) or 0.0) > 0:
+            _t = _cycle_now()
+            try:
+                _cp2 = self._guard_prices(lc, _last5_for_cycle, plan)
+            except Exception:
+                _cp2 = {}
+            try:
+                acts = list(acts) + list(self._carry_cycle(now, equity, _cp2))
+            except Exception:
+                pass
+            _stages["order_ms"] += (_cycle_now() - _t) * 1000.0
         self._store_cycle_timing(_stages, t_all)
         return acts
 
@@ -819,6 +1017,7 @@ def main():
     ap.add_argument("--tag", default=None, help="state dir artifacts/bot/<mode>[_<tag>] (default no tag = unchanged paths)")
     ap.add_argument("--no-risk-guard", action="store_true", help="disable the pre-trade risk guard (testnet/live: guard ON by default)")
     ap.add_argument("--risk-guard", action="store_true", help="enable the pre-trade risk guard in paper/dry (default off there so paper stays engine-faithful)")
+    ap.add_argument("--carry-f", type=float, default=0.0, metavar="F", help="cash-and-carry sleeve fraction per leg per coin (default 0 = off, orders bit-for-bit unchanged)")
     a = ap.parse_args()
     if a.mode == "live" and os.environ.get("BOT_ALLOW_LIVE") != "yes-real-money":
         sys.exit("live trading is locked: the account owner must set BOT_ALLOW_LIVE=yes-real-money")
@@ -828,7 +1027,8 @@ def main():
     r = Runner(a.mode, Path(a.plan), a.equity, risk_mult=a.risk_mult, corr=a.corr_size, tag=a.tag, dip_mult=a.dip_mult,
              bear_book=a.bear_book, dip_cooldown_h=a.dip_cooldown_h, dip_sl_coin=parse_dip_sl_coin(a.dip_sl_coin),
              dip_gross_cap=a.dip_gross_cap, adopt_fresh=a.adopt_fresh,
-             no_risk_guard=a.no_risk_guard or (a.mode in ("paper", "dry") and not a.risk_guard))
+             no_risk_guard=a.no_risk_guard or (a.mode in ("paper", "dry") and not a.risk_guard),
+             carry_f=a.carry_f)
     while True:
         try:
             r.cycle()

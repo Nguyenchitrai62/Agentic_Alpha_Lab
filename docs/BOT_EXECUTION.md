@@ -120,6 +120,26 @@ for fresh plans; a new fill has no exit orders until the next cycle (<= 20 s) pl
 - Tests: `tests/test_bot_cycletime.py` (fake `_cycle_now` clock for slow_cycle, injected lock wait, real held OS lock with
   a short timeout for the direct-fetch fallback, health warning).
 
+## CHANGES (bot_carry 2026-10-06: cash-and-carry sleeve, default off)
+- Opt-in `python -m bot.run --carry-f F` (default 0 = off, orders bit-for-bit unchanged when off): per coin
+  (BTC, ETH) the SAME frozen rule as `scripts/carry_paper.py` (imports its `RULE_PARAMS` and
+  `is_quarterly_delivery`, never re-defined): flat + roll due (no open pair and the front quarterly has
+  <= 7 d left, or first availability) + annualised basis ln(F/S)*365/DTE >= 4 %/yr -> spot BUY (category
+  spot, limit at the ask, IOC) + quarterly SELL (category linear/inverse as listed, limit at the bid,
+  IOC), each leg notional = F x equity, equal coin quantity, bot-owned link ids with prefix `c`.
+  Single-fill opens retry the missing leg at market next cycle (`op=carry_unhedged`); never left unhedged
+  > 2 cycles, otherwise the filled leg is closed (`op=carry_close`). Held to delivery; after delivery the
+  spot leg is sold at market (plus a safety reduce-only futures buy-back for sim accounts where dated
+  shorts do not auto-settle) and realised P&L is logged (`op=carry_settle/carry_settled` via the frozen
+  `realised_pnl_pair`). All carry orders pass through `risk_guard` (extended allowlist for dated symbols;
+  extra cap: futures short notional <= 0.30 x equity per coin, `op=carry_cap`/`risk_reject`) and are never
+  counted in the dip gross cap. Paper fills: spot + dated futures on 1m trade-through like every other
+  paper order (`bot/paper.py`: physical spot vs cash, dated shorts like perps, no short funding).
+  Live note: `Bybit.place` hardcodes linear, so carry posts via `post()` with the leg category; spot IOC
+  legs do not rest, so the preflight `^[bd]` link regex still sees no resting `c` orders in practice.
+  Tests: `tests/test_bot_carry.py` (entry, skip < 4 %, partial-hedge recovery, delivery settlement,
+  flag-off no-change, all through `tests/mock_bybit_v5.py`).
+
 ## Failure modes (tests/test_bot_resilience.py, fake exchange, no network)
 - Restart mid-position: new Runner adopts state.json + exchange stops/TPs, no duplicate entries, filled rungs never re-placed.
 - Partial dip fill: TP/stop size to the filled qty, remainder stays resting (same link), budget counts only the filled part.
