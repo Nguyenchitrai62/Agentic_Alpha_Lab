@@ -32,6 +32,10 @@ BOT_REL = Path("artifacts/bot")
 PLAN_REL = Path("artifacts/research/advisor_shadow/trade_plan_v376.json")
 CARRY_REL = Path("artifacts/bot/paper_carry/state.json")
 REPORTS_REL = Path("artifacts/reports")
+OOS_REL = Path("research/diagnostics/oc_bookoos/results.json")
+OOS_REFRESH_CMD = (".venv/Scripts/python.exe research/diagnostics/oc_bookoos/score_oos.py"
+                   " --fetch --run")
+OOS_MAX_AGE_DAYS = 8.0
 
 RUNNERS = ("paper_d17bfg2", "paper_d17bfg2c")
 GO_LIVE_MIN_DAYS = 56.0
@@ -374,13 +378,135 @@ def summarize_carry(root: Path, now: datetime) -> dict:
     return res
 
 
+def summarize_oos(root: Path, now: datetime) -> dict:
+    """Doc LATEST oc_bookoos results.json (chi doc, khong chay scorer nang).
+
+    Tra ve dict luon co: exists, path, refresh_cmd, age_days, stale.
+    Neu doc duoc: window_start/end/days, total_pct, gate_dd_pct,
+    max_dd_close_pct, max_dd_1m_pct, trades, band (p5/p50/p95),
+    oos_percentile, reading (trong bien / duoi p5 -> dieu tra / tren p95).
+    """
+    path = root / OOS_REL
+    base: dict = {"path": OOS_REL.as_posix(), "refresh_cmd": OOS_REFRESH_CMD,
+                  "max_age_days": OOS_MAX_AGE_DAYS}
+    if not path.exists():
+        base.update({"exists": False, "ok": False, "age_days": None, "stale": True,
+                     "note": "chua co results.json (chua chay scorer OOS)"})
+        return base
+    try:
+        mtime = datetime.fromtimestamp(path.stat().st_mtime, tz=timezone.utc)
+        age_days = (now - mtime).total_seconds() / 86400.0
+    except (OSError, OverflowError):
+        age_days = None
+    res = load_json(path)
+    if not isinstance(res, dict):
+        base.update({"exists": True, "ok": False, "age_days": age_days,
+                     "stale": True, "note": "khong doc duoc results.json (JSON loi)"})
+        return base
+    stale = age_days is None or age_days > OOS_MAX_AGE_DAYS
+    w = res.get("window") if isinstance(res.get("window"), dict) else {}
+    tr = res.get("trades") if isinstance(res.get("trades"), dict) else {}
+    band_all = res.get("expectation_band") if isinstance(res.get("expectation_band"), dict) else {}
+    band = band_all.get("total_pct") if isinstance(band_all.get("total_pct"), dict) else {}
+
+    def _num(x):
+        try:
+            v = float(x)
+        except (TypeError, ValueError):
+            return None
+        return v if v == v else None  # NaN -> None
+
+    total = _num(res.get("total_pct"))
+    p5, p50, p95 = _num(band.get("p5")), _num(band.get("p50")), _num(band.get("p95"))
+    pctile = _num(res.get("oos_percentile_vs_band"))
+    if total is None or p5 is None or p95 is None:
+        reading = "n/a (chua du du lieu)"
+    elif total < p5:
+        reading = "duoi p5 -> dieu tra"
+    elif total > p95:
+        reading = "tren p95 (vuot ky vong)"
+    else:
+        reading = "trong bien (binh thuong)"
+    base.update({
+        "exists": True, "ok": True, "age_days": age_days, "stale": bool(stale),
+        "window_start": w.get("start"), "window_end": w.get("end_exclusive"),
+        "window_days": w.get("days"),
+        "total_pct": total,
+        "gate_dd_pct": _num(res.get("gate_dd_pct")),
+        "max_dd_close_pct": _num(res.get("max_dd_close_pct")),
+        "max_dd_1m_pct": _num(res.get("max_dd_1m_pct")),
+        "trades": tr,
+        "band": {"p5": p5, "p50": p50, "p95": p95,
+                 "n": band_all.get("n"), "window_days": band_all.get("window_days")},
+        "oos_percentile": pctile,
+        "reading": reading,
+        "label": res.get("label"),
+        "mode": res.get("mode"),
+    })
+    return base
+
+
+def _oos_trades_text(tr: dict) -> str:
+    if not isinstance(tr, dict) or not tr:
+        return "n/a"
+    try:
+        r, rw = int(tr.get("rungs") or 0), int(tr.get("rung_wins") or 0)
+        b, bw = int(tr.get("book_episodes") or 0), int(tr.get("book_wins") or 0)
+        a, aw = int(tr.get("all") if tr.get("all") is not None else r + b), \
+            int(tr.get("all_wins") if tr.get("all_wins") is not None else rw + bw)
+    except (TypeError, ValueError):
+        return "n/a"
+    def _wr(w, n):
+        return f"{100.0 * w / n:.1f}% ({w}/{n})" if n else "n/a (0)"
+    return (f"{r} rung (win {_wr(rw, r)}), {b} book episodes (win {_wr(bw, b)}), "
+            f"tong {a} (win {_wr(aw, a)})")
+
+
+def format_oos_lines(oos: dict) -> list:
+    L = ["## OOS sach (du lieu moi)"]
+    cmd = oos.get("refresh_cmd", OOS_REFRESH_CMD)
+    age = oos.get("age_days")
+    age_s = "n/a" if age is None else f"{max(0.0, age):.1f} ngay"
+    if not oos.get("exists"):
+        L.append(f"- chua co {oos.get('path', OOS_REL)} (du lieu moi) — "
+                 f"lam moi: `{cmd}`")
+        L.append("")
+        return L
+    if not oos.get("ok"):
+        L.append(f"- {oos.get('note', 'khong doc duoc results.json')} — "
+                 f"lam moi: `{cmd}` (tuoi ket qua: {age_s})")
+        L.append("")
+        return L
+    if oos.get("stale"):
+        L.append(f"- Ket qua CU {age_s} (> {OOS_MAX_AGE_DAYS:.0f} ngay) — "
+                 f"can lam moi: `{cmd}` (so lieu duoi day la so cu)")
+    else:
+        L.append(f"- Nguon: `{oos.get('path')}` (tuoi {age_s}; lam moi: `{cmd}`)")
+    L.append(f"- Cua so: {oos.get('window_start', 'n/a')} .. {oos.get('window_end', 'n/a')} "
+             f"({oos.get('window_days', 'n/a')} ngay; {oos.get('label', '')})")
+    dd = oos.get("gate_dd_pct")
+    L.append(f"- Tong: {_fp(oos.get('total_pct'))}; DD gate "
+             + (f"{dd:.2f}%" if isinstance(dd, (int, float)) else "n/a")
+             + f" (close {_f2(oos.get('max_dd_close_pct'))}% / 1m {_f2(oos.get('max_dd_1m_pct'))}%)")
+    L.append(f"- Trades: {_oos_trades_text(oos.get('trades') or {})}")
+    b = oos.get("band") or {}
+    n = b.get("n")
+    L.append(f"- Band ky vong ({b.get('window_days', '?')}d, n={n if n is not None else '?'}): "
+             f"p5 {_fp(b.get('p5'))} / p50 {_fp(b.get('p50'))} / p95 {_fp(b.get('p95'))}; "
+             f"OOS percentile {oos.get('oos_percentile', 'n/a') if oos.get('oos_percentile') is not None else 'n/a'}")
+    L.append(f"- Nhan dinh: {oos.get('reading', 'n/a')}")
+    L.append("")
+    return L
+
+
 def build_report(root: Path = ROOT, now: datetime | None = None) -> dict:
     now = ref_now(root, override=now)
     runners = [summarize_runner(root, n, now) for n in RUNNERS]
     carry = summarize_carry(root, now)
+    oos = summarize_oos(root, now)
     iso_y, iso_w, _ = now.isocalendar()
     return {"now": now, "iso_week": f"{iso_y}-W{iso_w:02d}",
-            "runners": runners, "carry": carry}
+            "runners": runners, "carry": carry, "oos": oos}
 
 
 def _dv_text(dv: dict) -> str:
@@ -444,7 +570,8 @@ def format_markdown(rep: dict) -> str:
                  f"lon nhat {_f2(c.get('biggest_win'))} / {_f2(c.get('biggest_loss'))} USDT")
         L.append(f"- Tuan: vao {c.get('n_entered_week', 0)} / quyet toan {c.get('n_settled_week', 0)}")
         L.append(f"- Cap nhat: {c.get('updated_at', 'n/a')}")
-    L += ["", "## Tom tat 3 dong"]
+    L += [""] + format_oos_lines(rep.get("oos") or {"exists": False})
+    L += ["## Tom tat 3 dong"]
     L += ["- " + x for x in plain_summary(rep)]
     L.append("")
     return "\n".join(L)

@@ -23,7 +23,7 @@ Scope: BOT = book + dip ladder (needs bot); MANUAL = book-only human [FINAL_REPO
 - Continuous D17BF: 4h-close DD 15.34, 1m-marked 16.90, gate 16.90, 5y net +2534% (26.3x) [oc_kpi].
 - G2 KPI [oc_kpi_g2]: 26.4x after 5y, win all 65.3-65.5% (book 51.5%, dip rung 68.6-68.7%, n G2=5064/21513/26577), no losing year; 41% months >= +5%, ~70.5-72% months non-losing [oc_kpi_g2].
 - G2+carry f=0.25 one UTA, LOWER BOUND (oc_carrycombo keeps carry P&L as non-compounding cash outside the BOT equity path, so yearly rates are diluted) [oc_carrycombo]: G2 5.410/2.588/16.91/16.82 (close 16.05) -> +carry 5.413/2.647/16.78/full-marked 16.34 (close 15.60); f=0.50: 5.418/2.705/16.65/15.86 [oc_carrycombo].
-- Same combo year-start rebalance (BEST ESTIMATE of the additive one-UTA overlay (carry sized at f x year-start equity, BOT sizes on total equity)): f=0.25: 5.533/2.736/16.78; f=0.50: 5.654/2.881/16.64 [oc_carryfric; OWNER_SUMMARY_VI].
+- Same combo year-start rebalance (conservative additive estimate; the account-realistic compounded estimate is oc_carrycompound 5.634): f=0.25: 5.533/2.736/16.78; f=0.50: 5.654/2.881/16.64 [oc_carryfric; OWNER_SUMMARY_VI].
 - Yearly G2+carry f=0.25 roll-only (R/DD): 2021 2.647/10.79; 2022 3.283/16.78; 2023 6.168/15.72; 2024 10.559/8.08; 2025 4.593/12.57 [oc_carrycombo].
 - Carry sleeve alone (BTC/ETH quarterlies, ENTER iff annualised basis >= 4%/yr, hold to delivery, fee drag 0.275% allocated): 33 entered of 50 seen, 33/33 net positive (min +0.18% allocated) [oc_cashcarry].
 - Carry allocated yearly sums: 2021 0.0470; 2022 0.0528; 2023 0.2960; 2024 0.1219; 2025 0.0058 [oc_cashcarry].
@@ -66,7 +66,7 @@ Scope: BOT = book + dip ladder (needs bot); MANUAL = book-only human [FINAL_REPO
 - Go-live only after >=8 weeks paper + mandatory testnet, when ALL 4 hold: (a) paper >= p20 bootstrap; (b) paper DD <=15%; (c) bot-vs-plan <=1.5pp/mo (14 days to judge); (d) no cycle_error >1h, no stop-less position [DEPLOYMENT_PLAN_VI].
 
 ## 7. Open risks
-- Testnet carry NO-GO until review F1+F2 fixed: guard rejects carry hedge-recovery/timeout-close/delivery-sale markets (paper guard OFF hides it), and spot carry fills invisible to `_carry_sync` (linear-only poll) [CODEREVIEW_BOT_20261006].
+- Testnet: code-review findings F1-F7 + N1-N4 were FIXED (commit 359004f, bot_reviewfix; 124 bot tests green); carry-enabled testnet is now allowed after preflight PASS; live only after a clean 7-day testnet [docs/opencode/CODEREVIEW_BOT_20261006.md; docs/BOT_EXECUTION.md].
 - Frontend already deployed the paper-carry panel calling `GET /api/carry`, but the old local backend lacks the route — restart the local backend ONCE (`backend/carry_view.py` reads `paper_carry/state.json`, audit SAFE TO PUSH) [OWNER_SUMMARY_VI].
 - Old dip cap in the bot was TIGHTER than the engine; engine-faithful fix done on paper (C_on 3.20%/261 fills vs uncapped 3.58%/271, old cap 1.12%/209) but until merged run WITHOUT cap or accept lower [bot_capfix].
 - Capital must withstand 25% DD: bootstrap P(DD>20%) ~11%, P(>25%) ~2.1% [oc_mcdd].
@@ -77,7 +77,7 @@ Scope: BOT = book + dip ladder (needs bot); MANUAL = book-only human [FINAL_REPO
 | Numbers above (canonical) | docs/FINAL_REPORT_VI.md; docs/OWNER_SUMMARY_VI.md; docs/DEPLOYMENT_PLAN_VI.md |
 | Closed vs open directions, 6 lessons | docs/CLOSED_DIRECTIONS.md |
 | Go-live gates, stops, paper/testnet/live path | docs/DEPLOYMENT_PLAN_VI.md; docs/BOT_RUNBOOK_VI.md; docs/QUICKSTART_VI.md |
-| Bot code NO-GO (F1/F2) + fix order | docs/opencode/CODEREVIEW_BOT_20261006.md |
+| Bot code review (F1-F7, fixed in 359004f) | docs/opencode/CODEREVIEW_BOT_20261006.md |
 | Carry rule, margin, parity, audit | oc_cashcarry; oc_carrycombo; oc_utamargin/oc_utamargin2; oc_carryparity; carry_audit/COMPARISON.md |
 | Frictions, clock luck, crash, saturation, decay | oc_carryfric; oc_clockluck; oc_stopslip; oc_gapstress; oc_crash2020; oc_outage; oc_saturation; oc_edgedecay |
 | Paper runners and daily ops | PAPER_DAY1_20261006; PROSPECTIVE_20261006; scripts/daily_status.py + bot_health.py + paper_report.py + prospective_scorecard.py |

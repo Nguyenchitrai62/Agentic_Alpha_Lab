@@ -13,7 +13,7 @@
 - `--adopt-fresh` BẬT (lệnh đóng băng mọi mode đều có `--adopt-fresh`; mặc định code là TẮT).
 - Risk guard BẬT mặc định ở testnet/live (không thêm `--no-risk-guard`; paper/dry mới cần `--risk-guard` riêng).
 - `--equity` KHÔNG dùng ở testnet/live (lấy vốn thật trên sàn). `--interval 25` (lệnh đóng băng mọi mode dùng `--interval 25`).
-- Carry-enabled testnet là NO-GO cho tới khi các phát hiện code-review bot F1/F2 được sửa (bot_reviewfix); testnet chỉ book/dip (không `--carry-f`) được phép nhưng thận trọng.
+- Code-review bot F1-F7 + N1-N4 ĐÃ SỬA (commit 359004f, bot_reviewfix; 124 test bot xanh): testnet có carry (--carry-f 0.25) nay được phép — vẫn bắt buộc preflight PASS và testnet sạch 7 ngày trước live.
 - Một runner / một thư mục state (khóa OS `runner.lock`). Tag testnet riêng, không trùng paper.
 
 ## 1. Việc chủ tài khoản làm trước ngày 0 (prerequisites)

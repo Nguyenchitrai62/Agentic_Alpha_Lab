@@ -1,7 +1,7 @@
 # Sổ tay vận hành BOT (G2 + carry f=0.25, một Bybit UTA)
 
 > Triển khai duy nhất: BOT G2 = R2B1D17BF + trần dip 2x (`--corr-size --dip-mult 1.7 --bear-book --dip-gross-cap 2.0 --adopt-fresh --carry-f 0.25 --interval 25`, plan `trade_plan_v376.json`, v421/v422 twin numbers, v422 audited: 5,41/worst 2,588 %/tháng, DD 16,91/toàn đường 16,82) + sleeve carry quý `f=0,25` trên CÙNG một Bybit UTA.
-> Carry-enabled testnet là NO-GO cho tới khi các phát hiện code-review bot F1/F2 được sửa (bot_reviewfix); testnet chỉ book/dip (không `--carry-f`) được phép nhưng thận trọng.
+> Code-review bot F1-F7 + N1-N4 ĐÃ SỬA (commit 359004f, bot_reviewfix; 124 test bot xanh): testnet có carry (--carry-f 0.25) nay được phép — vẫn bắt buộc preflight PASS và testnet sạch 7 ngày trước live.
 > Kỳ vọng, ngưỡng go-live/dừng lấy nguyên văn từ `docs/DEPLOYMENT_PLAN_VI.md` (đăng ký trước 2026-10-05, không sửa sau khi thấy dữ liệu paper).
 > Chi tiết kỹ thuật: `docs/BOT_EXECUTION.md` (các mục CHANGES), code `bot/run.py`. Lịch testnet 7 ngày: `docs/TESTNET_PLAN_VI.md`. Bắt đầu nhanh: `docs/QUICKSTART_VI.md`.
 > Mọi lệnh chạy từ repo root. Windows dùng `.venv\Scripts\python.exe`. GIT READ-ONLY: không bao giờ stash/reset/checkout/clean/commit.

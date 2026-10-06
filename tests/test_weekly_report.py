@@ -2,6 +2,7 @@
 
 import importlib.util
 import json
+import os
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
@@ -170,3 +171,83 @@ def test_missing_exchange_graceful(tmp_path):
     r = rep["runners"][0]
     assert r["exists"] is True and r["ret_all"] is None
     assert "n/a" in wr.format_markdown(rep)
+
+
+def _fake_oos(total_pct=1.995, pctile=72.7):
+    return {
+        "version": "oc_bookoos",
+        "label": "clean OOS, tiny sample",
+        "window": {"start": "2026-09-30 00:00:00+00:00",
+                   "end_exclusive": "2026-10-06 00:00:00+00:00", "days": 6},
+        "mode": "full G2 book+dip rule-based",
+        "total_pct": total_pct,
+        "max_dd_close_pct": 0.129,
+        "max_dd_1m_pct": 0.766,
+        "gate_dd_pct": 0.766,
+        "trades": {"rungs": 10, "rung_wins": 9, "rung_win_rate": 0.9,
+                   "book_episodes": 0, "book_wins": 0, "book_win_rate": None,
+                   "all": 10, "all_wins": 9, "all_win_rate": 0.9,
+                   "book_events": 12},
+        "expectation_band": {"n": 10000, "window_days": 6,
+                             "source": "fake",
+                             "total_pct": {"p5": -3.309, "p50": 0.466, "p95": 7.477},
+                             "dd_pct": {"p50": 0.832, "p95": 5.32}},
+        "oos_percentile_vs_band": pctile,
+    }
+
+
+def _write_oos(root: Path, payload: dict, mtime: datetime):
+    p = root / "research" / "diagnostics" / "oc_bookoos" / "results.json"
+    p.parent.mkdir(parents=True, exist_ok=True)
+    p.write_text(json.dumps(payload), encoding="utf-8")
+    os.utime(p, (mtime.timestamp(), mtime.timestamp()))
+    return p
+
+
+def test_oos_fresh_inside_band(tmp_path):
+    now = T0 + timedelta(days=20)
+    _write_oos(tmp_path, _fake_oos(total_pct=1.995, pctile=72.7), now - timedelta(days=1))
+    oos = wr.summarize_oos(tmp_path, now)
+    assert oos["exists"] is True and oos["ok"] is True
+    assert oos["stale"] is False
+    assert oos["window_days"] == 6
+    assert oos["total_pct"] == 1.995
+    assert oos["gate_dd_pct"] == 0.766
+    assert oos["oos_percentile"] == 72.7
+    assert oos["reading"] == "trong bien (binh thuong)"
+    rep = wr.build_report(tmp_path, now)
+    text = wr.format_markdown(rep)
+    for needle in ("OOS sach", "2026-09-30", "+2.00%", "0.77",
+                   "10", "72.7", "trong bien",
+                   "score_oos.py --fetch --run"):
+        assert needle in text
+
+
+def test_oos_stale_shows_refresh(tmp_path):
+    now = T0 + timedelta(days=20)
+    _write_oos(tmp_path, _fake_oos(), now - timedelta(days=10))
+    oos = wr.summarize_oos(tmp_path, now)
+    assert oos["exists"] is True and oos["stale"] is True
+    assert oos["age_days"] is not None and oos["age_days"] > 8.0
+    text = wr.format_markdown(wr.build_report(tmp_path, now))
+    assert "OOS sach" in text
+    assert "CU" in text or "cu" in text.lower()
+    assert "score_oos.py --fetch --run" in text
+
+
+def test_oos_missing_shows_refresh(tmp_path):
+    now = T0 + timedelta(days=20)
+    oos = wr.summarize_oos(tmp_path, now)
+    assert oos["exists"] is False and oos["stale"] is True
+    text = wr.format_markdown(wr.build_report(tmp_path, now))
+    assert "OOS sach" in text
+    assert "chua co" in text
+    assert "score_oos.py --fetch --run" in text
+
+
+def test_oos_reading_bands(tmp_path):
+    now = T0 + timedelta(days=20)
+    _write_oos(tmp_path, _fake_oos(total_pct=-5.0), now - timedelta(days=1))
+    assert wr.summarize_oos(tmp_path, now)["reading"] == "duoi p5 -> dieu tra"
+    _write_oos(tmp_path, _fake_oos(total_pct=9.0), now - timedelta(days=1))
+    assert wr.summarize_oos(tmp_path, now)["reading"].startswith("tren p95")
