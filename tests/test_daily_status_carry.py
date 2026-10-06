@@ -99,6 +99,79 @@ def test_status_includes_new_sections(tmp_path):
     st = ds.build_status(tmp_path, NOW,
                          health_url="http://127.0.0.1:1/health")  # backend chet nhung chi ktra section
     txt = ds.format_text(st)
-    assert "4) Carry:" in txt and "5) Chu ky runner" in txt
+    assert "4) Carry:" in txt and "2) Runner health" in txt
     md = ds.format_markdown(st)
     assert "Carry:" in md and "runner" in md
+
+
+def test_section_ordering(tmp_path):
+    write_carry(tmp_path)
+    write_runner(tmp_path, "paper_a", age_s=10.0, cycle_ms=1000.0)
+    st = ds.build_status(tmp_path, NOW, health_url="http://127.0.0.1:1/health")
+    txt = ds.format_text(st)
+    idx = [txt.index("TONG:"),
+           txt.index("1) Stop rules + bao ve"),
+           txt.index("2) Runner health"),
+           txt.index("3) Backend & plan"),
+           txt.index("4) Carry:"),
+           txt.index("5) Canh bao som edge"),
+           txt.index("6) Thi truong hien tai"),
+           txt.index("7) Collector")]
+    assert idx == sorted(idx)
+
+
+def test_fast_skips_network_and_reports_runtime(tmp_path, monkeypatch, capsys):
+    import urllib.request
+
+    def _boom(*a, **k):
+        raise AssertionError("network goi trong --fast")
+
+    monkeypatch.setattr(urllib.request, "urlopen", _boom)
+    write_carry(tmp_path)
+    write_runner(tmp_path, "paper_a", age_s=10.0, cycle_ms=1000.0)
+    st = ds.build_status(tmp_path, NOW, fast=True)
+    assert "bo qua (--fast" in st["backend"]["line"]
+    txt = ds.format_text(st)
+    assert "[--fast]" in txt and "tong thoi gian:" in txt
+
+    monkeypatch.setattr(ds, "utcnow", lambda: NOW)
+    rc = ds.main(["--root", str(tmp_path), "--fast", "--json"])
+    assert rc in (0, 1, 2)
+    out = capsys.readouterr()
+    assert '"verdict"' in out.out  # JSON mode: status object
+    assert "tong thoi gian:" in (out.out + out.err).lower()
+
+
+def test_failing_section_never_crashes(tmp_path, monkeypatch):
+    write_carry(tmp_path)
+    write_runner(tmp_path, "paper_a", age_s=10.0, cycle_ms=1000.0)
+
+    def _boom(_root, _now):
+        raise RuntimeError("carry hong gia lap")
+
+    monkeypatch.setattr(ds, "check_carry", _boom)
+    monkeypatch.setattr(ds, "check_backend",
+                        lambda *a, **k: {"ok": True, "severity": "ok",
+                                         "line": "backend song (gia lap)", "detail": ""})
+    st = ds.build_status(tmp_path, NOW)
+    txt = ds.format_text(st)
+    assert "loi: carry" in txt
+    assert "KET LUAN" in txt  # trang van day du, khong sap
+
+
+def test_protection_flags_unprotected(tmp_path):
+    import json as _json
+    d = tmp_path / "artifacts" / "bot" / "paper_p"
+    d.mkdir(parents=True, exist_ok=True)
+    (d / "actions.jsonl").write_text("", encoding="utf-8")
+    (d / "state.json").write_text(_json.dumps({
+        "ledger": {"b1": {"qty": 1.0, "side": 1, "symbol": "BTCUSDT"}},
+        "links": {}}), encoding="utf-8")
+    import os as _os
+    _os.utime(d / "state.json", None)
+    from datetime import timezone as _tz, datetime as _dt
+    now = _dt.now(_tz.utc)
+    bots = ds.check_bots(tmp_path, now)
+    prot = ds.check_protection(bots)
+    assert prot["severity"] == "critical"
+    assert "unprotected" in prot["line"]

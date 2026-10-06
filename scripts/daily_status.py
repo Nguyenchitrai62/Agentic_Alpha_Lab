@@ -1,22 +1,32 @@
 """Trang thai hang ngay cho nguoi van hanh (chi doc, khong network ngoai localhost, khong khoa).
 
 Su dung:
-  python scripts/daily_status.py [--md out.md]
+  python scripts/daily_status.py [--md out.md] [--fast] [--json]
 
-Noi dung (tieng Viet, 1 trang):
-  (1) backend con song? (http://127.0.0.1:8724/health, timeout 3s;
-       that bai -> CRITICAL "backend tat: plan se cu", ke ca khi plan con tuoi) + do tuoi plan
-       (artifacts/research/advisor_shadow/trade_plan_v376.json generated_at;
-       > 1h15m = WARNING, > 4h30m = CRITICAL),
-  (2) moi thu muc artifacts/bot/paper*: dong trang thai bot_health +
-      equity/return/max DD/fills tu paper_report,
-  (3) collector: thoi diem liquidation va top-of-book cuoi cung theo venue
+Mot trang owner view (tieng Viet), thu tu:
+  (1) TONG: OK / WATCH / CRITICAL + ten muc xau nhat,
+  (2) stop rules + bao ve (unprotected, qty mismatch tu bot_health),
+  (3) runner health (bot_health + paper_report) + cycle time,
+  (4) backend (http://127.0.0.1:8724/health, timeout 3s; that bai -> CRITICAL
+      "backend tat: plan se cu") + do tuoi plan
+      (artifacts/research/advisor_shadow/trade_plan_v376.json generated_at;
+      > 1h15m = WARNING, > 4h30m = CRITICAL),
+  (5) carry (artifacts/bot/paper_carry/state.json),
+  (6) edge monitor (canh bao som, diagnostic-only),
+  (7) market regime (scripts/regime_now.py, offline local only),
+  (8) collector: liquidations + topbook theo venue
       (data/raw/liquidations_live, data/raw/topbook_live) + gap > 5 phut
-      trong 24h qua,
-  (4) 1 dong ket luan (OK / WARNING / CRITICAL) + exit code 0/1/2.
+      trong 24h qua.
+  Cuoi trang: 1 dong KET LUAN (tuong thich cu) + tong thoi gian chay.
+
+  --fast: khong goi network (bo qua check backend), chi doc file local.
+  --json: in JSON cua status ra stdout (kem --md van duoc).
+  Moi section duoc cach ly loi: section hong in dung mot dong
+  'loi: <ten section> (...)' va khong bao gio lam sap trang.
 
 Tai su dung module san co (import): scripts/bot_health.py,
-scripts/paper_report.py, research/tournament/oc_liqlive/load_liq.py
+scripts/paper_report.py, scripts/edge_monitor.py, scripts/stop_rules.py,
+scripts/regime_now.py, research/tournament/oc_liqlive/load_liq.py
 (coverage_gaps, ms_to_utc). Chi doc file; khong cham .env, khong start/stop
 process, khong commit.
 """
@@ -26,6 +36,7 @@ import argparse
 import importlib.util
 import json
 import sys
+import time
 import urllib.request
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -186,7 +197,9 @@ def check_bots(root: Path, now: datetime) -> list[dict]:
         line = (f"[{sev.upper()}] {d.name}: chu ky cuoi {fmt_age_s(age)} truoc; "
                 f"{extra}" + (f" | {probs}" if probs else ""))
         out.append({"name": d.name, "severity": sev, "line": line,
-                    "health": rep.get("status"), "summary": pr})
+                    "health": rep.get("status"), "summary": pr,
+                    "unprotected": list(rep.get("unprotected") or []),
+                    "qty_mismatch": list(rep.get("qty_mismatch") or [])})
     if not out:
         out.append({"name": "-", "severity": "warning",
                     "line": "khong thay thu muc artifacts/bot/paper* nao"})
@@ -520,123 +533,265 @@ def check_regime(root: Path) -> dict:
                 "lines": []}
 
 
+def check_protection(bots: list[dict]) -> dict:
+    """Bao ve moi vi the: tong hop unprotected + qty mismatch tu bot_health.
+
+    Input la ket qua check_bots (da giu nguyen moi check cu). Severity
+    critical khi co bat ky piece mo thieu stop+TP hoac lech ledger/exchange.
+    """
+    bad_unprot, bad_qty = [], []
+    for b in bots or []:
+        name = b.get("name", "-")
+        for u in b.get("unprotected") or []:
+            bad_unprot.append(f"{name}:{u}")
+        for q in b.get("qty_mismatch") or []:
+            bad_qty.append(f"{name}:{q}")
+    if bad_unprot or bad_qty:
+        parts = []
+        if bad_unprot:
+            parts.append(f"unprotected: {', '.join(bad_unprot)}")
+        if bad_qty:
+            parts.append(f"qty mismatch: {', '.join(bad_qty)}")
+        return {"severity": "critical",
+                "line": "bao ve VI PHAM: " + "; ".join(parts),
+                "unprotected": bad_unprot, "qty_mismatch": bad_qty}
+    if not bots:
+        return {"severity": "warning", "line": "loi: bao ve (khong co runner de kiem tra)",
+                "unprotected": [], "qty_mismatch": []}
+    return {"severity": "ok", "line": "bao ve OK: moi piece mo co stop+TP, ledger khop exchange",
+            "unprotected": [], "qty_mismatch": []}
+
+
+def _section_ok_dict(line: str = "") -> dict:
+    return {"severity": "ok", "line": line, "lines": []}
+
+
+def _call_safe(section: str, fn, *args, **kwargs):
+    """Goi mot section, hong thi tra ve placeholder warning voi 1 dong 'loi: ...'."""
+    try:
+        return fn(*args, **kwargs)
+    except Exception as e:  # moi section hong khong duoc sap trang
+        return {"severity": "warning", "section_error": section,
+                "line": f"loi: {section} ({type(e).__name__}: {e})",
+                "lines": [f"loi: {section} ({type(e).__name__}: {e})"],
+                "name": section, "runner": section,
+                "venue": section, "feed": section}
+
+
+def _call_safe_list(section: str, fn, *args, **kwargs) -> list:
+    try:
+        out = fn(*args, **kwargs)
+        return out if isinstance(out, list) else [out]
+    except Exception as e:  # moi section hong khong duoc sap trang
+        return [{"severity": "warning", "section_error": section,
+                 "line": f"loi: {section} ({type(e).__name__}: {e})",
+                 "lines": [f"loi: {section} ({type(e).__name__}: {e})"],
+                 "name": section, "runner": section,
+                 "venue": section, "feed": section}]
+
+
+def worst_item(st: dict) -> str:
+    """Ten muc xau nhat cho dong TONG (uu tien section hong/critical truoc)."""
+    verdict = st.get("verdict", "ok")
+    if verdict == "ok":
+        return "tat ca OK"
+    cands: list[tuple[str, str]] = []
+
+    def _add(sev, label):
+        if sev == verdict:
+            cands.append((sev, label))
+    be, plan = st.get("backend") or {}, st.get("plan") or {}
+    _add(be.get("severity"), f"backend ({be.get('line', '')})")
+    _add(plan.get("severity"), f"plan ({plan.get('line', '')})")
+    prot = st.get("protection") or {}
+    _add(prot.get("severity"), f"bao ve ({prot.get('line', '')})")
+    for s in st.get("stops") or []:
+        _add(s.get("severity"), f"stop {s.get('runner', '-')}")
+    for b in st.get("bots") or []:
+        _add(b.get("severity"), f"bot {b.get('name', '-')}")
+    for r in st.get("cycles") or []:
+        _add(r.get("severity"), f"cycle {r.get('name', '-')}")
+    carry = st.get("carry") or {}
+    _add(carry.get("severity"), "carry")
+    for e in st.get("edge") or []:
+        _add(e.get("severity"), f"edge {e.get('name', '-')}")
+    for c in st.get("collectors") or []:
+        _add(c.get("severity"), f"collector {c.get('feed', '-')}/{c.get('venue', '-')}")
+    if cands:
+        return cands[0][1]
+    return verdict
+
+
+def tong_label(verdict: str) -> str:
+    return {"ok": "OK", "warning": "WATCH", "critical": "CRITICAL"}.get(verdict, verdict.upper())
+
+
 def build_status(root: Path = ROOT, now: datetime | None = None,
-                 health_url: str = HEALTH_URL) -> dict:
+                 health_url: str = HEALTH_URL, fast: bool = False) -> dict:
+    t0 = time.perf_counter()
     now = now or utcnow()
-    be = check_backend(health_url)
-    plan = check_plan(root, now)
-    bots = check_bots(root, now)
-    cols = check_collectors(root, now)
-    carry = check_carry(root, now)
-    cycles = check_cycles(root, now)
-    edge = check_edge(root)
-    stops = check_stops(root)
-    regime = check_regime(root)
-    verdict = worst(be["severity"], plan["severity"], carry["severity"],
-                    *(b["severity"] for b in bots), *(c["severity"] for c in cols),
-                    *(r["severity"] for r in cycles),
-                    *(e["severity"] for e in edge),
-                    *(s["severity"] for s in stops))
-    return {"now": now, "backend": be, "plan": plan, "bots": bots,
-            "collectors": cols, "carry": carry, "cycles": cycles,
-            "edge": edge, "stops": stops, "regime": regime, "verdict": verdict,
-            "exit": {"ok": 0, "warning": 1, "critical": 2}[verdict]}
+    if fast:
+        be = {"ok": True, "severity": "ok",
+              "line": "backend bo qua (--fast, khong network)",
+              "detail": "skipped --fast"}
+    else:
+        be = _call_safe("backend", check_backend, health_url)
+    plan = _call_safe("plan", check_plan, root, now)
+    bots = _call_safe_list("bots", check_bots, root, now)
+    try:
+        prot = check_protection(bots)
+    except Exception as e:  # pragma: no cover - phong thu
+        prot = {"severity": "warning",
+                "line": f"loi: bao ve ({type(e).__name__}: {e})",
+                "unprotected": [], "qty_mismatch": []}
+    cols = _call_safe_list("collectors", check_collectors, root, now)
+    carry = _call_safe("carry", check_carry, root, now)
+    cycles = _call_safe_list("cycles", check_cycles, root, now)
+    edge = _call_safe_list("edge", check_edge, root)
+    stops = _call_safe_list("stops", check_stops, root)
+    regime = _call_safe("regime", check_regime, root)
+    verdict = worst(be.get("severity", "warning"), plan.get("severity", "warning"),
+                    prot.get("severity", "warning"), carry.get("severity", "warning"),
+                    regime.get("severity", "ok") if regime.get("severity") == "ok" else "ok",
+                    *(b.get("severity", "warning") for b in bots),
+                    *(c.get("severity", "warning") for c in cols),
+                    *(r.get("severity", "warning") for r in cycles),
+                    *(e.get("severity", "warning") for e in edge),
+                    *(s.get("severity", "warning") for s in stops))
+    # regime luon severity ok theo dinh nghia (thong tin, khong anh huong verdict).
+    st = {"now": now, "fast": bool(fast), "backend": be, "plan": plan, "bots": bots,
+          "protection": prot, "collectors": cols, "carry": carry, "cycles": cycles,
+          "edge": edge, "stops": stops, "regime": regime, "verdict": verdict,
+          "exit": {"ok": 0, "warning": 1, "critical": 2}[verdict]}
+    st["worst_item"] = worst_item(st)
+    st["elapsed_s"] = time.perf_counter() - t0
+    return st
 
 
 def format_text(st: dict) -> str:
-    L = [f"TRANG THAI HANG NGAY ({st['now'].isoformat()})",
-         f"1) Backend & plan: {st['backend']['line']}",
-         f"   Plan: {st['plan']['line']}"]
-    L.append(f"2) Bot paper ({len(st['bots'])}) :")
+    fast_tag = " [--fast]" if st.get("fast") else ""
+    L = [f"TRANG THAI HANG NGAY ({st['now'].isoformat()}){fast_tag}",
+         f"TONG: {tong_label(st['verdict'])} (xau nhat: {st.get('worst_item', st['verdict'])})"]
+    L.append(f"1) Stop rules + bao ve: {st.get('protection', {}).get('line', 'n/a')}")
+    if st.get("stops"):
+        for s in st["stops"]:
+            L.append(f"   - {s.get('runner', '-')} [{str(s.get('severity', '?')).upper()}]:")
+            L += [f"     . {x}" for x in s.get("lines", [])]
+    else:
+        L.append("   - chua co runner trien khai (paper_d17bfg2/c)")
+    L.append(f"2) Runner health ({len(st['bots'])}) + cycle ({len(st['cycles'])}) "
+             "[WARNING neu cycle >60s hoac state >2p]:")
     L += [f"   - {b['line']}" for b in st["bots"]]
-    L.append("3) Collector (gap >5p trong 24h):")
-    L += [f"   - {c['line']}" for c in st["collectors"]]
+    L += [f"   - cycle {r['line']}" for r in st["cycles"]]
+    L.append(f"3) Backend & plan: {st['backend']['line']}")
+    L.append(f"   Plan: {st['plan']['line']}")
     L.append(f"4) Carry: {st['carry']['line']}")
     L += [f"   - {x}" for x in st["carry"].get("lines", [])]
-    L.append(f"5) Chu ky runner ({len(st['cycles'])}) [WARNING neu cycle >60s hoac state >2p]:")
-    L += [f"   - {r['line']}" for r in st["cycles"]]
-    L.append("6) Canh bao som edge (oc_edgedecay: 6m<1.61%/thang, TP dip<0.434; vo nguong = dieu tra):")
+    L.append("5) Canh bao som edge (oc_edgedecay: 6m<1.61%/thang, TP dip<0.434; vo nguong = dieu tra):")
     if st.get("edge"):
         for e in st["edge"]:
             L.append(f"   - {e['line']}")
             L += [f"     . {x}" for x in e.get("lines", [])]
     else:
         L.append("   - chua co runner trien khai (paper_d17bfg2/c)")
-    L.append("7) Nguong dung + go-live (DD>20% dung; thang <-10% giam von; phan vi<5 sau 8 tuan dung):")
-    if st.get("stops"):
-        for s in st["stops"]:
-            L.append(f"   - {s['runner']} [{s['severity'].upper()}]:")
-            L += [f"     . {x}" for x in s.get("lines", [])]
-    else:
-        L.append("   - chua co runner trien khai (paper_d17bfg2/c)")
-    L.append("8) Thi truong hien tai (regime_now, offline local):")
+    L.append("6) Thi truong hien tai (regime_now, offline local):")
     rg = st.get("regime") or {}
     for x in rg.get("lines", []) or [rg.get("line", "regime: n/a")]:
         L.append(f"   - {x}")
+    L.append("7) Collector (gap >5p trong 24h):")
+    L += [f"   - {c['line']}" for c in st["collectors"]]
     L.append(f"KET LUAN: {st['verdict'].upper()} "
              f"(0=OK 1=canh bao 2=nguy hiem) -> exit {st['exit']}")
+    if st.get("elapsed_s") is not None:
+        L.append(f"tong thoi gian: {st['elapsed_s']:.1f}s")
     return "\n".join(L)
 
 
 def format_markdown(st: dict) -> str:
-    L = [f"# Trang thai hang ngay ({st['now'].isoformat()})", "",
-         f"- Backend: {st['backend']['line']}",
-         f"- Plan: {st['plan']['line']}", "",
-         "| bot | trang thai | chi tiet |",
-         "| --- | --- | --- |"]
-    for b in st["bots"]:
-        L.append(f"| {b.get('name', '-')} | {b['severity'].upper()} | {b['line']} |")
-    L += ["", "| collector | trang thai | chi tiet |",
-          "| --- | --- | --- |"]
-    for c in st["collectors"]:
-        L.append(f"| {c['feed']}/{c['venue']} | {c['severity'].upper()} | {c['line']} |")
-    L += ["", f"**Carry: {st['carry']['line']}**"]
-    for x in st["carry"].get("lines", []):
-        L.append(f"- {x}")
-    L += ["", "| runner | trang thai | chi tiet |",
-          "| --- | --- | --- |"]
-    for r in st["cycles"]:
-        L.append(f"| {r.get('name', '-')} | {r['severity'].upper()} | {r['line']} |")
-    L += ["", "## Canh bao som edge (oc_edgedecay)",
-          "Nguong: trung binh 6 thang < 1.61%/thang; TP rate dip < 0.434 "
-          "(vo nguong = dieu tra, khong phai hanh dong giao dich).", ""]
-    if st.get("edge"):
-        for e in st["edge"]:
-            L.append(f"- {e['line']} ({e['severity'].upper()})")
-            for x in e.get("lines", []):
-                L.append(f"  - {x}")
-    else:
-        L.append("- chua co runner trien khai (paper_d17bfg2/c)")
-    L += ["", "## Nguong dung + go-live (DEPLOYMENT_PLAN_VI muc 2+4)",
-          "Nguong: DD > 20% dung mo lenh moi; lo thang > 10% giam mot nua von; "
-          "phan vi < 5 sau >= 8 tuan dung.", ""]
+    fast_tag = " [--fast]" if st.get("fast") else ""
+    L = [f"# Trang thai hang ngay ({st['now'].isoformat()}){fast_tag}", "",
+         f"**TONG: {tong_label(st['verdict'])}** (xau nhat: {st.get('worst_item', st['verdict'])})", "",
+         "## 1) Stop rules + bao ve", ""]
+    L.append(f"- Bao ve: {st.get('protection', {}).get('line', 'n/a')}")
     if st.get("stops"):
         for s in st["stops"]:
-            L.append(f"- {s['runner']} ({s['severity'].upper()})")
+            L.append(f"- {s.get('runner', '-')} ({str(s.get('severity', '?')).upper()})")
             for x in s.get("lines", []):
                 L.append(f"  - {x}")
     else:
         L.append("- chua co runner trien khai (paper_d17bfg2/c)")
-    L += ["", "## Thi truong hien tai (regime_now, offline local)", ""]
+    L += ["", "## 2) Runner health + cycle", "",
+          "| runner | trang thai | chi tiet |",
+          "| --- | --- | --- |"]
+    for b in st["bots"]:
+        L.append(f"| {b.get('name', '-')} | {str(b.get('severity', '?')).upper()} | {b.get('line', '')} |")
+    for r in st["cycles"]:
+        L.append(f"| cycle {r.get('name', '-')} | {str(r.get('severity', '?')).upper()} | {r.get('line', '')} |")
+    L += ["", "## 3) Backend & plan", "",
+          f"- Backend: {st['backend']['line']}",
+          f"- Plan: {st['plan']['line']}", ""]
+    L += ["## 4) Carry", "", f"**Carry: {st['carry']['line']}**"]
+    for x in st["carry"].get("lines", []):
+        L.append(f"- {x}")
+    L += ["", "## 5) Canh bao som edge (oc_edgedecay)",
+          "Nguong: trung binh 6 thang < 1.61%/thang; TP rate dip < 0.434 "
+          "(vo nguong = dieu tra, khong phai hanh dong giao dich).", ""]
+    if st.get("edge"):
+        for e in st["edge"]:
+            L.append(f"- {e['line']} ({str(e.get('severity', '?')).upper()})")
+            for x in e.get("lines", []):
+                L.append(f"  - {x}")
+    else:
+        L.append("- chua co runner trien khai (paper_d17bfg2/c)")
+    L += ["", "## 6) Thi truong hien tai (regime_now, offline local)", ""]
     rg = st.get("regime") or {}
     for x in rg.get("lines", []) or [rg.get("line", "regime: n/a")]:
         L.append(f"- {x}")
-    L += ["", f"**KET LUAN: {st['verdict'].upper()}** (exit {st['exit']})", ""]
+    L += ["", "## 7) Collector", "",
+          "| collector | trang thai | chi tiet |",
+          "| --- | --- | --- |"]
+    for c in st["collectors"]:
+        L.append(f"| {c.get('feed', '-')}/{c.get('venue', '-')} | "
+                 f"{str(c.get('severity', '?')).upper()} | {c.get('line', '')} |")
+    L += ["", f"**KET LUAN: {st['verdict'].upper()}** (exit {st['exit']})"]
+    if st.get("elapsed_s") is not None:
+        L.append(f"- tong thoi gian: {st['elapsed_s']:.1f}s")
+    L += [""]
     return "\n".join(L)
+
+
+def status_jsonable(st: dict) -> dict:
+    out = dict(st)
+    if isinstance(out.get("now"), datetime):
+        out["now"] = out["now"].isoformat()
+    return json.loads(json.dumps(out, default=str, ensure_ascii=False))
 
 
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description="Trang thai hang ngay (chi doc).")
     ap.add_argument("--md", default=None, help="ghi ban Markdown ra PATH")
     ap.add_argument("--root", default=None, help="workspace root (mac dinh: repo)")
+    ap.add_argument("--fast", action="store_true",
+                    help="khong goi network, chi doc file local (bo qua check backend)")
+    ap.add_argument("--json", action="store_true",
+                    help="in JSON cua status ra stdout")
     a = ap.parse_args(argv)
     root = Path(a.root) if a.root else ROOT
-    st = build_status(root, utcnow(), HEALTH_URL)
+    t0 = time.perf_counter()
+    st = build_status(root, utcnow(), HEALTH_URL, fast=a.fast)
+    st["elapsed_s"] = time.perf_counter() - t0
     text = format_text(st)
-    print(text)
+    if a.json:
+        print(json.dumps(status_jsonable(st), ensure_ascii=False, indent=1))
+    else:
+        print(text)
     if a.md:
         Path(a.md).write_text(format_markdown(st) + "\n", encoding="utf-8")
         print(f"da ghi {a.md}")
+    if st.get("elapsed_s") is not None and not a.json:
+        pass  # da in trong format_text
+    elif st.get("elapsed_s") is not None and a.json:
+        print(f"tong thoi gian: {st['elapsed_s']:.1f}s", file=sys.stderr)
     return st["exit"]
 
 

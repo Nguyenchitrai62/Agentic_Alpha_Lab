@@ -163,3 +163,38 @@ def test_cli_md_and_reuse(tmp_path, monkeypatch, capsys):
     rc = ds.main(["--root", str(make_root(tmp_path)), "--md", str(md)])
     assert rc == 0 and md.read_text(encoding="utf-8").startswith("# Trang thai")
     assert "KET LUAN" in capsys.readouterr().out
+
+
+def test_tong_line_and_order(tmp_path, monkeypatch):
+    mock_ok(monkeypatch)
+    st = ds.build_status(make_root(tmp_path), NOW)
+    txt = ds.format_text(st)
+    assert "TONG: OK" in txt
+    idx = [txt.index("TONG:"),
+           txt.index("1) Stop rules + bao ve"),
+           txt.index("2) Runner health"),
+           txt.index("3) Backend & plan"),
+           txt.index("4) Carry:"),
+           txt.index("7) Collector")]
+    assert idx == sorted(idx)
+    assert "tong thoi gian:" in txt
+    assert st["protection"]["severity"] == "ok"  # runner sach: co stop? khong vi the mo -> OK
+
+
+def test_fast_no_network(tmp_path, monkeypatch, capsys):
+    def _boom(*a, **k):
+        raise AssertionError("khong duoc goi network o --fast")
+    monkeypatch.setattr(urllib.request, "urlopen", _boom)
+    monkeypatch.setattr(ds, "utcnow", lambda: NOW)
+    rc = ds.main(["--root", str(make_root(tmp_path)), "--fast"])
+    assert rc == 0
+    assert "TONG: OK" in capsys.readouterr().out
+
+
+def test_failing_section_one_loi_line(tmp_path, monkeypatch):
+    mock_ok(monkeypatch)
+    monkeypatch.setattr(ds, "check_collectors", lambda *a, **k: (_ for _ in ()).throw(RuntimeError("boom")))
+    st = ds.build_status(make_root(tmp_path), NOW)
+    txt = ds.format_text(st)
+    assert txt.count("loi: collectors") == 1
+    assert "KET LUAN" in txt
