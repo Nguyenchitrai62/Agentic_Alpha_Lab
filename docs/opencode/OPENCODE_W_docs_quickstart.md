@@ -1,0 +1,3 @@
+# OpenCode task docs_quickstart
+Read docs/BOT_RUNBOOK_VI.md, docs/DEPLOYMENT_PLAN_VI.md, docs/FINAL_REPORT_VI.md, docs/opencode/TESTNET_REVIEW_20261006.md. Write ONLY docs/QUICKSTART_VI.md. No code edits, no commits.
+A one-page Vietnamese quick start for the account owner: (1) what the system is (BOT = book + dip, deployment config, expected return/DD ranges with sources), (2) the 10 steps from zero to paper to testnet to live (backend, account settings Hedge/Cross/5x, keys in .env only, commands, daily checks), (3) the stop rules (from DEPLOYMENT_PLAN_VI), (4) what NOT to do (no manual edits of state.json, no second runner on the same tag, no live without testnet). Link to the long docs. Max ~120 lines.
