@@ -20,5 +20,5 @@ RUN="$1_$(date -u +%Y%m%dT%H%M%SZ)"
 echo "$RUN" > "$D/$1.current"
 "$EXE" run -m "$MODEL" --title "$1" --dir "$ROOT" --format json \
   "Read AGENTS.md, $COMMON and $2 (paths relative to the workspace root) and execute the assignment exactly. ${3:-} Stop when done." \
-  > "$D/$RUN.events.jsonl" 2> "$D/$RUN.stderr.log"
+  < /dev/null > "$D/$RUN.events.jsonl" 2> "$D/$RUN.stderr.log"
 echo "exit=$?" >> "$D/$RUN.stderr.log"
