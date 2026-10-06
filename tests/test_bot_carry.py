@@ -355,3 +355,117 @@ def test_retry_rechecks_basis_threshold():
     assert want2 == []
     assert any(r.get("op") == "carry_abandon" and r.get("reason") == "basis_below_threshold_on_retry" for r in logs2)
     assert "BTC" not in cstate["positions"]
+
+
+# ---- bot_carryqty (paper_d17bfg2c 2026-10-06): qty-step rounding + filled qty ----
+
+def _lots_pair(spot_step="0.001", fut_step="0.01", min_qty="0.001",
+               min_notional="5", sym="BTC-NEXTQ"):
+    return {"BTCUSDT": dict(qty_step=spot_step, min_qty=min_qty,
+                            min_notional=min_notional, tick="0.1"),
+            sym: dict(qty_step=fut_step, min_qty=min_qty,
+                      min_notional=min_notional, tick="0.1")}
+
+
+def test_round_pair_qty_helper():
+    # paper_d17bfg2c: raw BTC 0.014546 filled as 0.014 on a 0.001 step
+    assert carry.round_pair_qty(0.014546, "0.001", "0.001") == 0.014
+    # coarser of the two steps wins, both directions
+    assert abs(carry.round_pair_qty(0.03125, "0.001", "0.01") - 0.03) < 1e-9
+    assert abs(carry.round_pair_qty(0.03125, "0.01", "0.001") - 0.03) < 1e-9
+    # no usable steps -> unchanged
+    assert abs(carry.round_pair_qty(0.03125, None, None) - 0.03125) < 1e-12
+    assert carry.round_pair_qty(0.0, "0.001", "0.01") == 0.0
+
+
+def test_entry_rounds_to_coarser_step_and_stores_it():
+    now = _now()
+    cstate = {"positions": {}, "entered": [], "history": []}
+    lots = _lots_pair()  # spot 0.001 / fut 0.01 -> coarser 0.01; raw 0.03125 -> 0.03
+    want, logs = carry.decide(now, 10000.0, 0.25, cstate, _expiries(now), _quotes(), lots)
+    assert len(want) == 2
+    qtys = sorted(float(p["qty"]) for p in want)
+    assert qtys[0] == qtys[1] == 0.03  # both legs identical, pre-rounding raw never placed
+    pos = cstate["positions"]["BTC"]
+    assert abs(pos["qty"] - 0.03) < 1e-9
+    assert pos["spot_qty_filled"] == 0.0 and pos["fut_qty_filled"] == 0.0
+    # neither-filled retry is rounded too
+    want2, _ = carry.decide(now + pd.Timedelta(minutes=1), 10000.0, 0.25,
+                            cstate, _expiries(now), _quotes(), lots)
+    assert len(want2) == 2
+    assert all(abs(float(p["qty"]) - 0.03) < 1e-9 for p in want2)
+
+
+def test_rounded_below_minimum_skips_with_min_qty():
+    now = _now()
+    # below min_qty
+    cstate = {"positions": {}, "entered": [], "history": []}
+    want, logs = carry.decide(now, 10000.0, 0.25, cstate, _expiries(now), _quotes(),
+                              _lots_pair(min_qty="1.0"))
+    assert want == []
+    assert any(r.get("op") == "carry_skip" and r.get("reason") == "min_qty" for r in logs)
+    assert cstate["positions"] == {}
+    # below min_notional (0.03125 x 80000 = 2500 < 100000)
+    cstate2 = {"positions": {}, "entered": [], "history": []}
+    want2, logs2 = carry.decide(now, 10000.0, 0.25, cstate2, _expiries(now), _quotes(),
+                               _lots_pair(min_notional="100000"))
+    assert want2 == []
+    assert any(r.get("op") == "carry_skip" and r.get("reason") == "min_qty" for r in logs2)
+    assert cstate2["positions"] == {}
+    # no lots -> legacy raw entry still works (default path unchanged)
+    cstate3 = {"positions": {}, "entered": [], "history": []}
+    want3, _ = carry.decide(now, 10000.0, 0.25, cstate3, _expiries(now), _quotes())
+    assert len(want3) == 2
+
+
+def test_partial_fill_quantities_drive_hedge_and_close():
+    now = _now()
+    cstate = {"positions": {}, "entered": [], "history": []}
+    lots = _lots_pair()
+    exp, quo = _expiries(now), _quotes()
+    want, _ = carry.decide(now, 10000.0, 0.25, cstate, exp, quo, lots)
+    spot_link = [p for p in want if p["side"] == "Buy"][0]["orderLinkId"]
+    # two partial spot fills: 0.01 + 0.01 of the 0.03 pair
+    r1 = carry.note_exec(cstate, spot_link, 0.01, 80000.0)
+    r2 = carry.note_exec(cstate, spot_link, 0.01, 80000.0)
+    assert r1 and r2 and r2["filled"] == 0.02
+    pos = cstate["positions"]["BTC"]
+    assert abs(pos["spot_qty_filled"] - 0.02) < 1e-9
+    assert pos["spot_filled"] and not pos["fut_filled"]
+    # hedge sizes from what actually filled (0.02), not the stored 0.03 pair qty
+    want2, logs2 = carry.decide(now + pd.Timedelta(minutes=1), 10000.0, 0.25,
+                               cstate, exp, quo, lots)
+    assert len(want2) == 1 and want2[0]["side"] == "Sell"
+    assert abs(float(want2[0]["qty"]) - 0.02) < 1e-9
+    assert any(r.get("op") == "carry_unhedged" and abs(float(r.get("qty", 0)) - 0.02) < 1e-9
+               for r in logs2)
+    # timeout close also uses the filled leg's qty
+    carry.decide(now + pd.Timedelta(minutes=2), 10000.0, 0.25, cstate, exp, quo, lots)
+    want4, logs4 = carry.decide(now + pd.Timedelta(minutes=3), 10000.0, 0.25,
+                               cstate, exp, quo, lots)
+    assert any(r.get("op") == "carry_close" for r in logs4)
+    assert abs(float(want4[0]["qty"]) - 0.02) < 1e-9
+
+
+def test_settlement_uses_filled_quantities_per_leg():
+    now = _now()
+    cstate = {"positions": {}, "entered": [], "history": []}
+    lots = _lots_pair()
+    exp, quo = _expiries(now), _quotes()
+    want, _ = carry.decide(now, 10000.0, 0.25, cstate, exp, quo, lots)
+    by_side = {p["side"]: p for p in want}
+    # uneven fills: spot partial 0.02, fut full 0.03
+    carry.note_exec(cstate, by_side["Buy"]["orderLinkId"], 0.02, 80000.0)
+    carry.note_exec(cstate, by_side["Sell"]["orderLinkId"], 0.03, 82000.0)
+    pos = cstate["positions"]["BTC"]
+    assert abs(pos["spot_qty_filled"] - 0.02) < 1e-9
+    assert abs(pos["fut_qty_filled"] - 0.03) < 1e-9
+    dlv = pos["delivery_ms"]
+    t_del = pd.Timestamp(dlv + 60_000, unit="ms", tz="UTC")
+    want2, logs2 = carry.decide(t_del, 10000.0, 0.25, cstate, exp,
+                                _quotes(spot=81000.0), lots)
+    assert any(r.get("op") == "carry_settle" for r in logs2)
+    spot_sale = [p for p in want2 if p.get("category") == "spot"][0]
+    fut_close = [p for p in want2 if p.get("category") != "spot"][0]
+    assert abs(float(spot_sale["qty"]) - 0.02) < 1e-9
+    assert abs(float(fut_close["qty"]) - 0.03) < 1e-9

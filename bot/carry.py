@@ -16,6 +16,13 @@ filled leg is closed.
 All carry orders use bot-owned link ids with prefix ``c`` and pass through
 risk_guard (plus a carry cap: short notional <= 0.30 x equity per coin). They
 are never counted in the dip gross cap (added after mirror.desired).
+
+Qty handling (bot_carryqty fix, paper_d17bfg2c 2026-10-06): the pair qty is
+floored to the coarser of the spot / future qty steps BEFORE placing (both
+legs identical) and stored; fills record the actual filled qty per leg
+(``spot_qty_filled`` / ``fut_qty_filled``) and hedge recovery + delivery
+settlement size from those. A rounded qty of 0 or below minimum notional
+logs carry_skip with reason=min_qty.
 """
 from __future__ import annotations
 
@@ -140,6 +147,105 @@ def qty_for(f: float, equity: float, ref_px: float) -> float:
     return float(f) * eq / px
 
 
+def _coarser_step(spot_step, fut_step):
+    """Coarser (larger) of two qty steps as a string, or None when neither is usable."""
+    from decimal import Decimal, InvalidOperation
+
+    def _dec(x):
+        try:
+            d = Decimal(str(x))
+        except (InvalidOperation, ValueError, TypeError, AttributeError):
+            return None
+        return d if d > 0 else None
+
+    ds, df = _dec(spot_step), _dec(fut_step)
+    if ds is None:
+        return None if df is None else str(fut_step)
+    if df is None:
+        return str(spot_step)
+    return str(spot_step) if ds >= df else str(fut_step)
+
+
+def round_pair_qty(qty: float, spot_step=None, fut_step=None) -> float:
+    """Floor `qty` to the coarser of the spot / future qty steps (both legs share it).
+
+    No usable steps -> the input unchanged. Mirrors bot.bybit_v5.round_step
+    (round down) without importing the exchange client.
+    """
+    from decimal import ROUND_DOWN, Decimal, InvalidOperation
+
+    try:
+        q = Decimal(str(qty))
+    except (InvalidOperation, ValueError, TypeError, AttributeError):
+        return 0.0
+    if q <= 0:
+        return 0.0
+    step = _coarser_step(spot_step, fut_step)
+    if step is None:
+        return float(q)
+    try:
+        st = Decimal(str(step))
+        if st <= 0:
+            return float(q)
+        return float((q / st).to_integral_value(rounding=ROUND_DOWN) * st)
+    except (InvalidOperation, ValueError, TypeError, AttributeError):
+        return float(q)
+
+
+def _lots_for(coin: str, fut_symbol, lots):
+    """(spot_lot, fut_lot) instrument dicts for a pair from a Runner.inst-style map.
+
+    Falls back to the coin's perp lot for dated symbols (mirrors
+    Runner._carry_round); missing/unknown -> ({}, {}), i.e. legacy raw sizing.
+    """
+    if not isinstance(lots, dict):
+        return {}, {}
+    try:
+        s_lot = lots.get(spot_symbol(coin)) or {}
+    except (AttributeError, TypeError):
+        s_lot = {}
+    try:
+        f_lot = lots.get(fut_symbol) or {}
+    except (AttributeError, TypeError):
+        f_lot = {}
+    if not isinstance(s_lot, dict):
+        s_lot = {}
+    if not isinstance(f_lot, dict):
+        if isinstance(s_lot, dict):
+            f_lot = s_lot
+        else:
+            f_lot = {}
+    return s_lot, f_lot
+
+
+def _pair_min_ok(qty: float, s_lot: dict, f_lot: dict, s_px: float, f_px: float) -> bool:
+    """True when the rounded pair qty passes both legs' min_qty / min_notional."""
+    try:
+        q = float(qty)
+    except (TypeError, ValueError):
+        return False
+    if not (q > 0):
+        return False
+    for lot, px in ((s_lot or {}, s_px), (f_lot or {}, f_px)):
+        try:
+            mq = float(lot.get("min_qty", 0) or 0)
+        except (TypeError, ValueError, AttributeError):
+            mq = 0.0
+        if mq > 0 and q < mq - 1e-12:
+            return False
+        try:
+            mn = float(lot.get("min_notional", 0) or 0)
+        except (TypeError, ValueError, AttributeError):
+            mn = 0.0
+        try:
+            p = float(px)
+        except (TypeError, ValueError):
+            p = 0.0
+        if mn > 0 and p > 0 and q * p < mn - 1e-9:
+            return False
+    return True
+
+
 def _links(coin: str, now) -> tuple[str, str]:
     base = f"{LINK_PREFIX}{str(coin).upper()}{mirror.t36(now)}"
     return base + "S", base + "F"
@@ -251,12 +357,18 @@ def _pos_open(pos: dict) -> bool:
 
 
 def decide(now, equity: float, f: float, cstate: dict, expiries_by_coin: dict,
-           quotes_by_coin: dict) -> tuple[list, list]:
+           quotes_by_coin: dict, lots=None) -> tuple[list, list]:
     """Pure carry decision for one cycle.
 
     expiries_by_coin: {coin: [{symbol, category, delivery_ms}, ...]}.
     quotes_by_coin: {coin: {spot_ask, spot_bid, spot_mid,
       fut_by_sym: {fut_sym: {bid, ask, mid}}}}; missing quotes -> no entry.
+    lots: optional {symbol: {qty_step, min_qty, min_notional}} map
+      (Runner.inst). When lots cover a pair, its qty is floored to the coarser
+      of the spot / future qty steps BEFORE placing (both legs identical) and
+      stored; a rounded qty of 0 or below minimum notional logs carry_skip
+      with reason=min_qty. Without lots the legacy raw qty_for sizing applies
+      (Runner._carry_round still rounds what is placed).
 
     Returns (want_payloads, logs). want_payloads are raw exchange payloads
     (with category + orderLinkId prefix ``c``). logs are dicts with op in
@@ -281,12 +393,26 @@ def decide(now, equity: float, f: float, cstate: dict, expiries_by_coin: dict,
             dlv = int(pos.get("delivery_ms", 0) or 0)
             if dlv and now_ms >= dlv and _pos_open(pos) and not pos.get("settling"):
                 qty = float(pos.get("qty", 0) or 0)
-                if qty > 0:
+                # Settle what actually filled per leg (paper_d17bfg2c: the stored
+                # raw qty 0.014546 never filled; the rounded 0.014 did).
+                try:
+                    spot_q = float(pos.get("spot_qty_filled", 0) or 0)
+                except (TypeError, ValueError):
+                    spot_q = 0.0
+                try:
+                    fut_q = float(pos.get("fut_qty_filled", 0) or 0)
+                except (TypeError, ValueError):
+                    fut_q = 0.0
+                if not (spot_q > 0):
+                    spot_q = qty
+                if not (fut_q > 0):
+                    fut_q = qty
+                if max(spot_q, fut_q) > 0:
                     s_link = f"{LINK_PREFIX}{coin}X{mirror.t36(now)}S"
                     f_link = f"{LINK_PREFIX}{coin}X{mirror.t36(now)}F"
                     want.append(market_payload(pos.get("spot_symbol", spot_symbol(coin)),
-                                               "Sell", qty, s_link, "spot"))
-                    want.append(market_payload(pos.get("symbol"), "Buy", qty, f_link,
+                                               "Sell", spot_q, s_link, "spot"))
+                    want.append(market_payload(pos.get("symbol"), "Buy", fut_q, f_link,
                                                pos.get("category", "linear"),
                                                reduce_only=True, position_idx=2))
                     pos["settling"] = True
@@ -318,32 +444,41 @@ def decide(now, equity: float, f: float, cstate: dict, expiries_by_coin: dict,
                     n = 1
                 pos["unhedged_cycles"] = n
                 qty = float(pos.get("qty", 0) or 0)
+                try:
+                    spot_fq = float(pos.get("spot_qty_filled", 0) or 0)
+                except (TypeError, ValueError):
+                    spot_fq = 0.0
+                try:
+                    fut_fq = float(pos.get("fut_qty_filled", 0) or 0)
+                except (TypeError, ValueError):
+                    fut_fq = 0.0
                 if n > MAX_UNHEDGED_CYCLES:
                     if sf:
                         link = f"{LINK_PREFIX}{coin}U{mirror.t36(now)}S"
                         want.append(market_payload(pos.get("spot_symbol", spot_symbol(coin)),
-                                                   "Sell", qty, link, "spot"))
+                                                   "Sell", spot_fq or qty, link, "spot"))
                     else:
                         link = f"{LINK_PREFIX}{coin}U{mirror.t36(now)}F"
-                        want.append(market_payload(pos.get("symbol"), "Buy", qty, link,
+                        want.append(market_payload(pos.get("symbol"), "Buy", fut_fq or qty, link,
                                                    pos.get("category", "linear"),
                                                    reduce_only=True, position_idx=2))
                     logs.append(dict(op="carry_close", coin=coin, symbol=pos.get("symbol"),
-                                     reason="unhedged_timeout", cycles=n))
+                                     reason="unhedged_timeout", cycles=n,
+                                     qty=float(spot_fq or qty) if sf else float(fut_fq or qty)))
                     continue
                 if sf:
                     link = f"{LINK_PREFIX}{coin}H{mirror.t36(now)}F"
-                    want.append(market_payload(pos.get("symbol"), "Sell", qty, link,
+                    want.append(market_payload(pos.get("symbol"), "Sell", spot_fq or qty, link,
                                                pos.get("category", "linear"),
                                                position_idx=2))
                     logs.append(dict(op="carry_unhedged", coin=coin, symbol=pos.get("symbol"),
-                                     missing="fut", cycles=n))
+                                     missing="fut", cycles=n, qty=float(spot_fq or qty)))
                 else:
                     link = f"{LINK_PREFIX}{coin}H{mirror.t36(now)}S"
                     want.append(market_payload(pos.get("spot_symbol", spot_symbol(coin)),
-                                               "Buy", qty, link, "spot"))
+                                               "Buy", fut_fq or qty, link, "spot"))
                     logs.append(dict(op="carry_unhedged", coin=coin, symbol=pos.get("symbol"),
-                                     missing="spot", cycles=n))
+                                     missing="spot", cycles=n, qty=float(fut_fq or qty)))
                 continue
             # NEITHER leg filled (both IOCs missed/cancelled): retry the pair at
             # fresh prices, max MAX_ENTRY_ATTEMPTS per roll, then carry_abandon
@@ -391,6 +526,16 @@ def decide(now, equity: float, f: float, cstate: dict, expiries_by_coin: dict,
             r_qty = qty_for(f, equity, r_s_ask)
             if not (r_qty > 0):
                 continue
+            if lots is not None:
+                r_s_lot, r_f_lot = _lots_for(coin, pos.get("symbol"), lots)
+                if r_s_lot or r_f_lot:
+                    r_qty = round_pair_qty(r_qty, (r_s_lot or {}).get("qty_step"),
+                                           (r_f_lot or {}).get("qty_step"))
+                    if not _pair_min_ok(r_qty, r_s_lot, r_f_lot, r_s_ask, r_f_bid):
+                        if not _skip_already(cstate, _skip_hour_key(coin, now)):
+                            logs.append(dict(op="carry_skip", coin=coin, symbol=pos.get("symbol"),
+                                             reason="min_qty", qty=float(r_qty)))
+                        continue
             if not carry_cap_ok(r_qty, r_f_bid, equity):
                 logs.append(dict(op="carry_cap", coin=coin, symbol=pos.get("symbol"),
                                  reason="carry_cap"))
@@ -402,6 +547,7 @@ def decide(now, equity: float, f: float, cstate: dict, expiries_by_coin: dict,
                        S_ask=float(r_s_ask), F_bid=float(r_f_bid),
                        spot_link=r_spot["orderLinkId"], fut_link=r_fut["orderLinkId"],
                        spot_filled=False, fut_filled=False, S_fill=None, F_fill=None,
+                       spot_qty_filled=0.0, fut_qty_filled=0.0,
                        unhedged_cycles=0, attempts=natt + 1, entry_time=str(now))
             logs.append(dict(op="carry_entry", coin=coin, symbol=pos.get("symbol"),
                              category=pos.get("category", "linear"),
@@ -436,6 +582,17 @@ def decide(now, equity: float, f: float, cstate: dict, expiries_by_coin: dict,
         qty = qty_for(f, equity, s_ask)
         if not (qty > 0):
             continue
+        if lots is not None:
+            s_lot, f_lot = _lots_for(coin, cand["symbol"], lots)
+            if s_lot or f_lot:
+                qty = round_pair_qty(qty, (s_lot or {}).get("qty_step"),
+                                     (f_lot or {}).get("qty_step"))
+                if not _pair_min_ok(qty, s_lot, f_lot, s_ask, f_bid):
+                    if not _skip_already(cstate, _skip_hour_key(coin, now)):
+                        logs.append(dict(op="carry_skip", coin=coin, symbol=cand["symbol"],
+                                         reason="min_qty", qty=float(qty),
+                                         ann_basis=round(float(basis), 6)))
+                    continue
         if not carry_cap_ok(qty, f_bid, equity):
             logs.append(dict(op="carry_cap", coin=coin, symbol=cand["symbol"],
                              reason="carry_cap"))
@@ -452,6 +609,7 @@ def decide(now, equity: float, f: float, cstate: dict, expiries_by_coin: dict,
                                entry_time=str(now),
                                spot_filled=False, fut_filled=False,
                                S_fill=None, F_fill=None,
+                               spot_qty_filled=0.0, fut_qty_filled=0.0,
                                 spot_link=spot_p["orderLinkId"], fut_link=fut_p["orderLinkId"],
                                 unhedged_cycles=0, attempts=1, ann_basis=round(float(basis), 6),
                                 dte_days=round(float(dte), 2))
@@ -464,8 +622,46 @@ def decide(now, equity: float, f: float, cstate: dict, expiries_by_coin: dict,
     return want, logs
 
 
+def _acc_leg_fill(pos: dict, leg: str, qty: float, price: float) -> float:
+    """Accumulate a (possibly partial) fill into the leg's filled qty.
+
+    Tracks ``spot_qty_filled`` / ``fut_qty_filled`` (actual filled quantities
+    from the exchange, which is what filled after qty-step rounding) and keeps
+    a VWAP in S_fill / F_fill across partials. Returns the leg total.
+    """
+    key_q = "spot_qty_filled" if leg == "spot" else "fut_qty_filled"
+    key_f = "S_fill" if leg == "spot" else "F_fill"
+    key_b = "spot_filled" if leg == "spot" else "fut_filled"
+    try:
+        prev = float(pos.get(key_q, 0) or 0)
+    except (TypeError, ValueError):
+        prev = 0.0
+    tot = prev + float(qty)
+    pos[key_q] = float(tot)
+    if tot > 0:
+        pos[key_b] = True
+    try:
+        old_px = pos.get(key_f)
+        old_px = float(old_px) if old_px is not None else None
+    except (TypeError, ValueError):
+        old_px = None
+    if old_px is None or not (prev > 0):
+        pos[key_f] = float(price)
+    else:
+        try:
+            pos[key_f] = float((prev * old_px + float(qty) * float(price)) / tot) if tot > 0 else float(price)
+        except (TypeError, ValueError, ZeroDivisionError):
+            pos[key_f] = float(price)
+    return float(tot)
+
+
 def note_exec(cstate: dict, link: str, qty: float, price: float):
-    """Record a fill of a carry link (prefix ``c``) into the carry state."""
+    """Record a fill of a carry link (prefix ``c``) into the carry state.
+
+    Entry, hedge-retry and recovery fills accumulate the ACTUAL filled qty per
+    leg (``spot_qty_filled`` / ``fut_qty_filled``); hedge recovery and delivery
+    settlement size from those, never from the pre-rounding ``qty``.
+    """
     if not str(link or "").startswith(LINK_PREFIX):
         return None
     positions = (cstate or {}).get("positions") or {}
@@ -476,6 +672,8 @@ def note_exec(cstate: dict, link: str, qty: float, price: float):
             q = float(qty)
             px = float(price)
         except (TypeError, ValueError):
+            return None
+        if not (q > 0 and px > 0):
             return None
         if link == pos.get("spot_sale_link"):
             try:
@@ -498,49 +696,37 @@ def note_exec(cstate: dict, link: str, qty: float, price: float):
             return dict(op="carry_settled", coin=coin, symbol=pos.get("symbol"),
                         S_del=float(px), realised_pnl=round(float(pnl), 4))
         if link == pos.get("spot_link"):
-            if not pos.get("spot_filled"):
-                pos["spot_filled"] = True
-                pos["S_fill"] = px
-                if not pos.get("S_entry"):
-                    pos["S_entry"] = px
-                return dict(op="carry_fill", coin=coin, symbol=pos.get("spot_symbol"),
-                            leg="spot", price=float(px))
-            continue
+            tot = _acc_leg_fill(pos, "spot", q, px)
+            if not pos.get("S_entry"):
+                pos["S_entry"] = px
+            return dict(op="carry_fill", coin=coin, symbol=pos.get("spot_symbol"),
+                        leg="spot", price=float(px), qty=float(q), filled=float(tot))
         if link == pos.get("fut_link"):
-            if not pos.get("fut_filled"):
-                pos["fut_filled"] = True
-                pos["F_fill"] = px
-                if not pos.get("F_entry"):
-                    pos["F_entry"] = px
-                ent = f"{coin}:{pos.get('symbol')}"
-                if ent not in cstate.setdefault("entered", []):
-                    cstate["entered"].append(ent)
-                if _pos_open(pos):
-                    pos["unhedged_cycles"] = 0
-                return dict(op="carry_fill", coin=coin, symbol=pos.get("symbol"),
-                            leg="fut", price=float(px))
-            continue
+            tot = _acc_leg_fill(pos, "fut", q, px)
+            if not pos.get("F_entry"):
+                pos["F_entry"] = px
+            ent = f"{coin}:{pos.get('symbol')}"
+            if ent not in cstate.setdefault("entered", []):
+                cstate["entered"].append(ent)
+            if _pos_open(pos):
+                pos["unhedged_cycles"] = 0
+            return dict(op="carry_fill", coin=coin, symbol=pos.get("symbol"),
+                        leg="fut", price=float(px), qty=float(q), filled=float(tot))
         if str(link).startswith(f"{LINK_PREFIX}{coin}") and str(link).endswith("S"):
-            if not pos.get("spot_filled"):
-                pos["spot_filled"] = True
-                pos["S_fill"] = px
-                if _pos_open(pos):
-                    pos["unhedged_cycles"] = 0
-                return dict(op="carry_fill", coin=coin, symbol=pos.get("spot_symbol"),
-                            leg="spot", price=float(px))
-            continue
+            tot = _acc_leg_fill(pos, "spot", q, px)
+            if _pos_open(pos):
+                pos["unhedged_cycles"] = 0
+            return dict(op="carry_fill", coin=coin, symbol=pos.get("spot_symbol"),
+                        leg="spot", price=float(px), qty=float(q), filled=float(tot))
         if str(link).startswith(f"{LINK_PREFIX}{coin}") and str(link).endswith("F"):
-            if not pos.get("fut_filled"):
-                pos["fut_filled"] = True
-                pos["F_fill"] = px
-                if _pos_open(pos):
-                    pos["unhedged_cycles"] = 0
-                ent = f"{coin}:{pos.get('symbol')}"
-                if ent not in cstate.setdefault("entered", []):
-                    cstate["entered"].append(ent)
-                return dict(op="carry_fill", coin=coin, symbol=pos.get("symbol"),
-                            leg="fut", price=float(px))
-            continue
+            tot = _acc_leg_fill(pos, "fut", q, px)
+            if _pos_open(pos):
+                pos["unhedged_cycles"] = 0
+            ent = f"{coin}:{pos.get('symbol')}"
+            if ent not in cstate.setdefault("entered", []):
+                cstate["entered"].append(ent)
+            return dict(op="carry_fill", coin=coin, symbol=pos.get("symbol"),
+                        leg="fut", price=float(px), qty=float(q), filled=float(tot))
     return None
 
 
