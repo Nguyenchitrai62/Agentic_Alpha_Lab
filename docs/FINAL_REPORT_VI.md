@@ -220,3 +220,9 @@ thước đo chính thức. Bot paper D13BF (`--dip-mult 1.3 --bear-book`, tag d
 Bảng agent R2 đang triển khai là seed TỐT NHẤT trong 5 seed ở 2022 và năm gần nhất (2025), hạng 2 năm 2023, hạng chót năm 2024; độ phân
 tán giữa các seed đáng kể. Bỏ phiếu 5 seed không tốt hơn (năm tệ nhất kém hơn). Hàm ý: các con số backtest của R2 có thể hơi lạc quan vì
 may mắn của seed - một lý do nữa để coi bằng chứng paper/tiến cứu là kiểm định chính, và kỳ vọng thận trọng (~4,5-5 %/tháng thay vì 5,4).
+
+## Bổ sung: hồ sơ thận trọng D13BF dưới ma sát (OpenCode oc_d13robust, oc_kpi_d13)
+
+D13BF (dip x1,3 + bear-book): gốc 4,97 %/tháng, DD năm 14,98 / toàn đường 14,86. Dưới mọi ma sát DD vượt 15 (chi phí x2: 4,27 / 15,51;
+trễ 15': 4,79 / 15,08; trễ 30': 4,16 / 15,62; trượt stop: 4,56 / 15,90). => DD < 15 chỉ đạt trên giấy, không bền dưới ma sát thực tế;
+hồ sơ thận trọng nên kỳ vọng ~4,2-4,8 %/tháng với DD ~15-16. Cấu hình triển khai chính vẫn là G2 (DD 16,9; ma sát giữ DD <= 18,1).
