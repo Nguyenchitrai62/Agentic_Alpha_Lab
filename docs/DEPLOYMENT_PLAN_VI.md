@@ -93,3 +93,9 @@ R2B1D17BF với funding thực có dấu 5,55 %/tháng, DD năm 18,32 (gate 5,43
 
 Chênh lệch sàn Bybit vs Binance (~0,5 %/tháng, oc_venuegap + oc_bookvenue): nằm ở thang dip (ít TP hơn trên băng giá Bybit), không ở book
 (khớp/stop/TP gần như giống hệt). Không có lỗi thực thi để sửa; kỳ vọng triển khai trên Bybit dùng hàng "giá Bybit" (~4,9 %/tháng, DD < 20).
+
+## Thời gian "dưới nước" (OpenCode oc_underwater, đường liên tục 5 năm)
+
+G2 (D17BF + trần 2x): 47 lần sụt > 5 %; thời gian dưới đỉnh trung vị ~9 ngày, p90 ~63 ngày, dài nhất ~149 ngày (2022-07..12).
+~29 % thời gian ở dưới đỉnh hơn 5 %, ~5 % thời gian dưới đỉnh hơn 10 %. Các đợt sâu nhất: 16,8 % (2023-04..07, 88 ngày), 14,7 %
+(2024-01-03, 48 ngày), 13,8 % (2023-07..10, 109 ngày), 13,2 % (2022-07..12, 149 ngày). D13BF (thận trọng): 35 lần, dài nhất ~149 ngày.
