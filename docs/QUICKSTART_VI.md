@@ -52,6 +52,7 @@
 Binance −5% [bybitq; oc_carrycombo]).
 - Carry tay 4 quyết định/năm: quarterly kế tiếp khi front còn <=7 ngày, basis ln(F/S)*365/DTE >=4%/năm, mỗi chân f x vốn (f=0,25), long spot + short
 quarterly bằng nhau giữ tới delivery (≈15 vé/năm); sổ paper `scripts/carry_paper.py --once --equity 5000 --f 0.5 --tag carry` [carry_paper.py] (sổ paper chạy f=0,5 chỉ để đo; lãi/lỗ carry tỉ lệ tuyến tính theo f, khi triển khai dùng f=0,25).
+- Chân short quarterly của carry đặt đòn bẩy 10x (đã hedge bằng spot): margin trống thấp nhất 22,5% -> 32,7%; bắt buộc Cross margin; không vượt f=0,25 vì các cặp chồng nhau đã dùng ~96% USDT để mua spot (f lớn hơn phải vay USDT) [oc_utamargin2].
 - Stretch D13BF+carry f=0,25 base 5,104/14,85 ĐẠT [oc_carryd13] nhưng ma sát rớt (chỉ base + S2 f=0,50 giữ) — không deploy [oc_carryfric];
 MANUAL+carry tốt nhất 3,993 vẫn <5 — NO [oc_manualcarry]; plateau G2 giữ deploy [oc_plateau2]; 8-phase NO [oc_phase8]; screens expirydip/usdtdip
 đóng (NO) [oc_expirydip; oc_usdtdip].
