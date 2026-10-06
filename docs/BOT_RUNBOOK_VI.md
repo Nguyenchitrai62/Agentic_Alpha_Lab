@@ -153,6 +153,39 @@ REM Paper carry (lũy thừa theo giờ hoặc chạy tay, idempotent):
 .venv\Scripts\python.exe scripts/carry_paper.py --once --equity 5000 --f 0.5 --tag carry
 ```
 
+## 9. Khởi động lại sau reboot bằng `scripts/restart_all.*` (2026-10-06)
+
+Sau reboot/mất điện, thay vì làm tay từng bước mục 4, chạy MỘT trong hai script
+cùng logic (`restart_all.sh` cho Git Bash, `restart_all.ps1` cho PowerShell).
+Script chỉ đọc process (không bao giờ dừng/kill process), idempotent — chạy
+lại lần hai không khởi động gì thêm; không đặt `BOT_ALLOW_LIVE`, không bao giờ
+chạy testnet/live, không bật tunnel công khai (backend chỉ local 127.0.0.1:8724).
+
+```bat
+REM Xem kế hoạch trước (không khởi động gì):
+bash scripts/restart_all.sh --dry-run
+REM PowerShell: .\scripts\restart_all.ps1 -DryRun
+
+REM Khôi phục đủ (thứ tự: backend local -> 5 bot paper -> vòng carry -> bot_health + daily_status):
+bash scripts/restart_all.sh
+REM Chỉ một nhóm: bash scripts/restart_all.sh --only bots|backend|carry
+```
+
+- Backend: nếu `/health` đã OK thì bỏ qua; nếu chưa, dựng uvicorn local
+  (`backend.server:app`, 127.0.0.1:8724, không tunnel), chờ `/health` rồi chờ
+  plan tươi (< 1h15m). Vòng `loop.sh` cũ đã ngừng từ 2026-09-30 (backend tự chạy
+  advisor shadow), script không dựng lại.
+- Mỗi bot paper chỉ dựng khi không còn tiến trình giữ `runner.lock`
+  (`paper`: R2-4P không tag; `d17bf`/`d13bf`/`d17bfg2`/`g2k20` đúng `--tag`;
+  `d17bfg2`/`g2k20` kèm `--dip-gross-cap 2.0 --adopt-fresh`; tất cả
+  `--interval 25` như đang chạy). Trước khi dựng, `state.json` được sao lưu
+  (`state.json.bak_<UTC>`) và kiểm tra JSON hợp lệ.
+- Vòng carry (`carry_paper.py --once --equity 5000 --f 0.5 --tag carry`, mỗi
+  3600 s) chỉ dựng một bản khi chưa chạy. Cuối cùng script in `bot_health.py`
+  cho cả 5 runner và tóm tắt `daily_status.py`.
+- Kiểm thử: `tests/test_restart_all.py` (nội dung kế hoạch + idempotent với
+  danh sách process giả, không chạy script thật).
+
 - State `artifacts/bot/paper_carry/state.json` (vị thế, basis lúc vào, phí, MtM theo giá mid,
   P&L thực khi giao hàng) + `actions.jsonl` (entry/hold/settle/skip/no_eligible/delisted/error).
   Sha256 quy tắc in đầu mỗi run; đổi quy tắc là đổi sha (không sửa lén).
