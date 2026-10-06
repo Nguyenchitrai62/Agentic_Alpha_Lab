@@ -38,6 +38,7 @@ $bots = @(
   @{ tag = "d17bfg2"; dir = "artifacts/bot/paper_d17bfg2"; args = @("-m", "bot.run", "--mode", "paper", "--equity", "5000", "--corr-size", "--dip-mult", "1.7", "--dip-gross-cap", "2.0", "--bear-book", "--adopt-fresh", "--interval", "25", "--tag", "d17bfg2") },
   @{ tag = "g2k20"; dir = "artifacts/bot/paper_g2k20"; args = @("-m", "bot.run", "--mode", "paper", "--equity", "5000", "--corr-size", "--dip-mult", "2.0", "--dip-gross-cap", "2.0", "--bear-book", "--adopt-fresh", "--interval", "25", "--tag", "g2k20") }
   @{ tag = "d17bfg2c"; dir = "artifacts/bot/paper_d17bfg2c"; args = @("-m", "bot.run", "--mode", "paper", "--equity", "5000", "--corr-size", "--dip-mult", "1.7", "--dip-gross-cap", "2.0", "--bear-book", "--adopt-fresh", "--carry-f", "0.25", "--interval", "25", "--tag", "d17bfg2c") }
+  @{ tag = "g2k20c"; dir = "artifacts/bot/paper_g2k20c"; args = @("-m", "bot.run", "--mode", "paper", "--equity", "5000", "--corr-size", "--dip-mult", "2.0", "--dip-gross-cap", "2.0", "--bear-book", "--adopt-fresh", "--carry-f", "0.25", "--interval", "25", "--tag", "g2k20c") }
 )
 
 function Log([string]$m) { Write-Host "[restart_all] $m" }
@@ -144,6 +145,6 @@ if ($DryRun) {
   Log "dry-run: plan only, started nothing"
   exit 0
 }
-if ($doBots) { & $py "scripts/bot_health.py" "artifacts/bot/paper" "artifacts/bot/paper_d17bf" "artifacts/bot/paper_d13bf" "artifacts/bot/paper_d17bfg2" "artifacts/bot/paper_g2k20" "artifacts/bot/paper_d17bfg2c"; }
+if ($doBots) { & $py "scripts/bot_health.py" "artifacts/bot/paper" "artifacts/bot/paper_d17bf" "artifacts/bot/paper_d13bf" "artifacts/bot/paper_d17bfg2" "artifacts/bot/paper_g2k20" "artifacts/bot/paper_d17bfg2c" "artifacts/bot/paper_g2k20c"; }
 & $py "scripts/daily_status.py"
 Log "done (idempotent: a second run starts nothing new)"
