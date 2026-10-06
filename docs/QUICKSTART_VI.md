@@ -1,77 +1,62 @@
-# QUICKSTART (VI) — từ 0 tới paper → testnet → live
+# QUICKSTART (VI) — từ 0 tới paper → testnet → live (một trang, 2026-10-06)
 
-> Một trang cho chủ tài khoản. Chi tiết đầy đủ:
-> `docs/BOT_RUNBOOK_VI.md` (vận hành), `docs/DEPLOYMENT_PLAN_VI.md` (kỳ vọng + go-live/dừng, đăng ký trước 2026-10-05),
-> `docs/FINAL_REPORT_VI.md` (báo cáo cuối 2026-10-06), `docs/opencode/TESTNET_REVIEW_20261006.md` (sẵn sàng testnet).
+> Một trang cho chủ tài khoản. Chi tiết đầy đủ: `docs/BOT_RUNBOOK_VI.md` (vận hành), `docs/DEPLOYMENT_PLAN_VI.md` (kỳ vọng + go-live/dừng, đăng ký trước 2026-10-05), `docs/OWNER_SUMMARY_VI.md` (tóm tắt), `docs/FINAL_REPORT_VI.md` (báo cáo cuối), `docs/opencode/TESTNET_REVIEW_20261006.md` (sẵn sàng testnet).
 
-## 1. Hệ thống là gì
+## 1. Chạy gì (BOT G2 + carry quý, một Bybit UTA)
 
-- **BOT = book + thang dip** (cần bot chạy 24/7). MANUAL (chỉ book + dip đặt tay) là sản phẩm riêng, chưa đạt base (~3,7 %/tháng).
-- Cấu hình triển khai: **R2B1D17BF (v411) + trần dip 2x = G2 (v421)**: `--corr-size --dip-mult 1.7 --bear-book --dip-gross-cap 2.0`, plan `trade_plan_v376.json`.
-- Bybit USDT perps, **Cross margin + Hedge Mode, đòn bẩy 5x cả 5 coin** BTC/ETH/SOL/BNB/XRP. Vốn **>= 5000 USDT, tốt nhất ~10000**.
-- Kỳ vọng trung thực (nguồn trong ngoặc): **trung vị ~5 %/tháng, năm xấu ~3 %/tháng, DD tới ~18 %** (`BOT_RUNBOOK_VI` mục 6).
-  - 5 năm gate: 5,43 %/tháng; giá Bybit thật ~4,97; G2 5,41, DD năm 16,9 / toàn đường 16,8 (`DEPLOYMENT_PLAN_VI` mục 1; `FINAL_REPORT_VI` mục 1–2).
-  - 49 cửa sổ 12 tháng trượt: trung vị 4,89 (min 2,73 / p10 3,25 / max 11,71), DD trung vị 13,5, 100 % DD < 20, không cửa sổ lỗ.
-  - Bootstrap 10.000 năm: trung vị ~5,1 %/tháng, chỉ ~52 % năm >= 5 %; P(DD > 20 %) ~11 %, P(năm lỗ) ~0,7 %. Vốn phải chịu được DD 25 %.
-  - KPI: 41 % tháng >= +5 %, 72 % tháng không lỗ; win book 51,5 % / dip 68,7 % / tất cả 65,5 %.
-  - Vì sao trần 2x: gap -10 % cả 5 coin nhảy qua mọi stop — phút tệ nhất không trần lỗ 58 % vốn, trần 2x còn 33,5 %; lợi nhuận giữ nguyên.
+- BOT = book + thang dip, cần bot chạy 24/7 [BOT_RUNBOOK_VI]. Bản triển khai G2 = R2B1D17BF + trần dip 2x (v421): `--corr-size --dip-mult 1.7 --bear-book --dip-gross-cap 2.0`, plan `trade_plan_v376.json` [FINAL_REPORT_VI].
+- Cộng carry quý f=0,25 trên CÙNG MỘT Bybit UTA (tài khoản hợp nhất, một vốn chung) [DEPLOYMENT_PLAN_VI]. UTA: Cross margin (vốn chung chịu lỗ chung) + Hedge Mode (giữ long/short riêng) + đòn bẩy perps 5x cả 5 coin BTC/ETH/SOL/BNB/XRP [BOT_RUNBOOK_VI].
+- Chân short quarterly của carry để 10x (đã hedge bằng spot mua bằng tiền thật) [oc_utamargin2]. Vượt f=0,25 phải tách vốn: f=0,50 bị chặn 1 giờ nên không dùng chung UTA [DEPLOYMENT_PLAN_VI].
+- Vốn >= 5.000 USDT, tốt nhất ~10.000 USDT (5.000 đặt gần như mọi lệnh; 2.000 chỉ ~93–96% lệnh) [oc_capscale]. Lệnh PostOnly maker khi vào, stop là market, TP là limit; risk guard bật mặc định ở testnet/live [BOT_RUNBOOK_VI].
 
-## 2. Mười bước từ 0 tới live
+## 2. Kỳ vọng trung thực (khoảng, không phải một số)
 
-1. Cài đặt: clone repo, tạo `.venv`, cài deps. Không đặt secrets vào chat hay commit.
-2. Dựng **backend trước**: `.\run_backend.ps1 -Status` (chỉ `-Background` khi chưa chạy). Plan `artifacts/research/advisor_shadow/trade_plan_v376.json` phải tươi (< 4h30m), không thì bot chỉ giữ exits.
-3. Cài đặt **tài khoản Bybit bằng tay** (bot KHÔNG tự làm): **Cross + Hedge Mode + 5x từng coin** BTC/ETH/SOL/BNB/XRP. Không hạ đòn bẩy khi đang có vị thế.
-4. Keys **chỉ trong `.env` local**: testnet `BYBIT_TESTNET_API_KEY/_SECRET`; xác nhận `BOT_ALLOW_LIVE` chưa set. Không commit `.env`.
-5. Chạy thử khô: `.venv\Scripts\python.exe -m bot.run --once --equity 5000 --corr-size --dip-mult 1.7 --bear-book --dip-gross-cap 2.0`. Không gửi lệnh.
-6. Chạy **paper >= 8 tuần**: `... -m bot.run --mode paper --equity 5000 --corr-size --dip-mult 1.7 --bear-book --dip-gross-cap 2.0 --tag d17bfg2`. Một runner / một thư mục state.
-7. Kiểm tra **hằng ngày 5 phút**: `scripts/daily_status.py` → `scripts/bot_health.py artifacts/bot/paper_d17bfg2` → `scripts/paper_report.py ...` → `scripts/prospective_scorecard.py`. CRITICAL khi `unprotected`/`qty_mismatch`/cycle chết/cycle_error > 1h.
-8. Go-live chỉ khi **đủ cả 4 sau >= 8 tuần paper**: (a) paper >= phân vị 20 bootstrap; (b) DD paper <= 15 %; (c) lệch bot vs plan <= 1,5pp/tháng (`paper_divergence.py`, đủ 14 ngày mới kết luận); (d) không cycle_error > 1h, không vị thế thiếu stop.
-9. Chạy **testnet** (bắt buộc trước live): `... -m bot.run --mode testnet --corr-size --dip-mult 1.7 --bear-book --dip-gross-cap 2.0 --tag d17bfg2`, vốn nhỏ, xác nhận Hedge/5x, lệnh vào là PostOnly (maker; `postonly_reject` = thử lại, không đuổi giá), risk guard bật mặc định (`risk_reject` trong log), rate_limit ~ 0. Xem checklist V1–V9 trong `TESTNET_REVIEW_20261006`.
-10. **Live vốn nhỏ** (chủ tài khoản mở khóa `BOT_ALLOW_LIVE=yes-real-money`), tăng vốn sau 3 tháng live nếu (a)–(c) vẫn đúng. Sau reboot/mất mạng: backend trước, rồi từng runner đúng tag, đối chiếu `actions.jsonl` với vị thế thật.
+- G2 backtest 5 năm: 5,41 %/tháng, năm tệ nhất 2,588 %/tháng, DD năm 16,91 / toàn đường 16,82 [FINAL_REPORT_VI]. Đồng hồ ngẫu nhiên chỉ ~5,24 thay vì 5,41 (triển khai may ~+0,17pp luck dip-clock, biên mỏng, method proxy) — đọc 5,41 kèm caveat này, phạm vi 4–6 %/tháng giữ nguyên [oc_clockluck].
+- Carry f=0,25 cộng thêm chỉ +~0,12 điểm %/tháng cho cả tài khoản (ma sát base 5,533 so với G2 trần 5,41; rớt S1/S3) [oc_carryfric]. Giá Bybit thật thấp hơn Binance ~0,5pp/tháng, nằm ở thang dip [DEPLOYMENT_PLAN_VI].
+- 49 cửa sổ 12 tháng trượt: min 2,73 / p10 3,25 / trung vị 4,89 / p90 8,88 / max 11,71 %/tháng; DD trung vị 13,5 (max 18,7); 100 % DD < 20, không cửa sổ lỗ [DEPLOYMENT_PLAN_VI].
+- Bootstrap 10.000 năm: trung vị ~5,1 %/tháng; chỉ ~52 % năm >= 5 %; P(DD > 20 %) ~11 %; P(năm lỗ) ~0,7 %; vốn phải chịu được DD 25 % [DEPLOYMENT_PLAN_VI].
+- KPI: 41 % tháng >= +5 %, 72 % tháng không lỗ; win book 51,5 % / dip 68,7 % / tất cả 65,5 % [DEPLOYMENT_PLAN_VI]. Tuần xấu G2 tệ nhất -12,3 % (hồi ~54 ngày); vài lần/năm mất 8–12 %/tuần, 1–4 tháng mới về đỉnh là bình thường [DEPLOYMENT_PLAN_VI].
+- Cú sập nặng nhất cho thang dip là COVID 03/2020: mix 4 pha ~-16,1 %, pha đơn tệ nhất -21,8 % (vượt ngưỡng 20 % nên không bao giờ chạy 1 pha đơn) [oc_crash2020]. Gap -10 % cả 5 coin nhảy qua mọi stop: phút tệ nhất không trần lỗ 58 % vốn, trần 2x còn 33,5 % [DEPLOYMENT_PLAN_VI].
 
-## 3. Quy tắc dừng (tiền thật, từ `DEPLOYMENT_PLAN_VI` mục 4)
+## 3. Mười bước paper → testnet → live
 
-- **DD tài khoản > 20 %**: dừng mở mới, chỉ giữ SL/TP; xem xét lại trước khi chạy tiếp.
-- **Lỗ một tháng > 10 %**: halve vốn tháng sau.
-- **Phân vị lợi nhuận < 5 sau >= 8 tuần**: dừng (mô hình không còn khớp nghiên cứu).
+1. Cài đặt: clone repo, tạo `.venv`, cài deps; secrets chỉ trong `.env` local, không commit/không dán chat [BOT_RUNBOOK_VI].
+2. Dựng backend trước: `.\run_backend.ps1 -Status` (chỉ `-Background` khi chưa chạy); plan `trade_plan_v376.json` phải tươi (< 4h30m) không thì bot chỉ giữ exits [BOT_RUNBOOK_VI].
+3. Cài tay tài khoản Bybit: Cross + Hedge Mode + 5x từng coin (bot không tự làm); không hạ đòn bẩy khi đang có vị thế [BOT_RUNBOOK_VI].
+4. Chạy thử khô: `.venv\Scripts\python.exe -m bot.run --once --equity 5000 --corr-size --dip-mult 1.7 --bear-book --dip-gross-cap 2.0` (không gửi lệnh) [BOT_RUNBOOK_VI].
+5. Chạy paper combo đúng MỘT lệnh (G2 + carry 0,25): `.venv\Scripts\python.exe -m bot.run --mode paper --equity 5000 --corr-size --dip-mult 1.7 --dip-gross-cap 2.0 --bear-book --adopt-fresh --carry-f 0.25 --interval 25 --tag d17bfg2c` (>= 8 tuần; một runner/một thư mục state) [restart_all.sh].
+6. Kiểm tra hằng ngày 5 phút: `scripts/daily_status.py` (gồm mục 6 edge monitor) → `scripts/bot_health.py artifacts/bot/paper_d17bfg2c` → `scripts/paper_report.py ...` → `scripts/prospective_scorecard.py` [BOT_RUNBOOK_VI].
+7. Preflight chỉ-đọc trước testnet/live lần đầu: `.venv\Scripts\python.exe scripts/bot_preflight.py --mode testnet` rồi `--mode live` (exit 0 mới tiếp; kiểm tra key, Unified, Hedge, Cross, 5x từng coin, vốn) [BOT_RUNBOOK_VI].
+8. Chạy testnet bắt buộc trước live: cùng flags paper nhưng `--mode testnet` vốn nhỏ, xác nhận Hedge/5x, lệnh vào PostOnly (`postonly_reject` = thử lại, không đuổi giá), risk guard bật, rate_limit ~ 0; checklist V1–V9 trong TESTNET_REVIEW [BOT_RUNBOOK_VI; TESTNET_REVIEW_20261006].
+9. Go-live chỉ khi đủ cả 4 sau >= 8 tuần paper: (a) paper >= phân vị 20 bootstrap; (b) DD paper <= 15 %; (c) lệch bot vs plan <= 1,5pp/tháng (đủ 14 ngày mới kết luận, trước đó `too early`); (d) không cycle_error > 1h, không vị thế thiếu stop [DEPLOYMENT_PLAN_VI].
+10. Live vốn nhỏ (chủ tài khoản mở `BOT_ALLOW_LIVE=yes-real-money`), tăng vốn sau 3 tháng live nếu (a)–(c) vẫn đúng; sau reboot/mất mạng: `bash scripts/restart_all.sh` (xem trước `--dry-run`; backend local 127.0.0.1:8724 rồi 5 paper runner rồi vòng carry), đối chiếu `actions.jsonl` với vị thế thật [BOT_RUNBOOK_VI].
 
-## 4. KHÔNG làm
+## 4. Carry làm tay (~4 quyết định/năm, ~15 vé/năm)
 
-- Không live khi chưa qua testnet sạch + đủ 4 điều kiện paper.
-- Không sửa tay `state.json`; sàn là sự thật khi lệch (`qty_mismatch`).
-- Không chạy 2 runner cùng `--tag`/thư mục state (kẹt `runner.lock`).
-- Không dùng Isolated / one-way / đòn bẩy khác 5x cho bot; không hạ đòn bẩy khi đang có vị thế.
-- Không commit `.env`, keys, hay dán vào chat; không sửa ngưỡng go-live/dừng sau khi đã thấy dữ liệu paper (nếu sửa ghi ngày + lý do).
-- Không kỳ vọng 5 % mọi tháng: ~1/9 năm có thể chạm DD > 20 %; tuần xấu -8 – -12 % vài lần/năm, 1–4 tháng mới về đỉnh cũ là bình thường.
+- Khi hợp đồng front còn <= 7 ngày (hoặc lần đầu có hàng) thì xét hợp đồng quarterly KẾ TIẾP (chu kỳ Mar/Jun/Sep/Dec, thứ Sáu cuối tháng) [oc_carrycombo].
+- Chỉ vào khi basis năm hóa ln(F/S)*365/DTE >= 4 %/năm (ETH skip ví dụ 3,7 %) [oc_carrycombo; PROSPECTIVE_20261006].
+- Mỗi chân = 0,25 x vốn lúc vào (f=0,25): long spot + short quarterly notional bằng nhau, giữ tới delivery; drag phí ~0,275 % allocated [oc_carrycombo].
+- Ngày đáo hạn: sell spot at 08:00 UTC delivery — bán chân spot đúng lúc giao hàng 08:00 UTC (tốt nhất chia nhỏ quanh cửa sổ tính giá index) để giá bán khớp giá thanh toán futures [carry_audit].
+- Sổ paper riêng: `.venv\Scripts\python.exe scripts/carry_paper.py --once --equity 5000 --f 0.5 --tag carry` (sổ đo dùng f=0,5 tuyến tính theo f; triển khai dùng f=0,25) [carry_paper.py].
 
-## 5. Triển khai khuyến nghị docs_update5 (2026-10-06): G2 + carry một UTA
+## 5. Quy tắc dừng + hai đèn vàng edge
 
-- Cấu hình: BOT G2 (`--corr-size --dip-mult 1.7 --bear-book --dip-gross-cap 2.0`, 5,41 %/tháng) + carry quý f=0,25 cùng một UTA cross/hedge/5x
-(roll-only f=0,25: 5,413/full 16,34 [oc_carrycombo]; ma sát year-start f=0,25: base 5,533 / S1 4,696 / S2 5,339 / S3 4,717 / S4 5,033 / S5 5,016
-[oc_carryfric]; f=0,25 CLEAR margin, f=0,50 blocked 1 giờ — trên 0,25 tách vốn [oc_utamargin]; Bybit inverse Z26/H27 + linear 25DEC26 yield ≈
-Binance −5% [bybitq; oc_carrycombo]).
-- Carry tay 4 quyết định/năm: quarterly kế tiếp khi front còn <=7 ngày, basis ln(F/S)*365/DTE >=4%/năm, mỗi chân f x vốn (f=0,25), long spot + short
-quarterly bằng nhau giữ tới delivery (≈15 vé/năm); sổ paper `scripts/carry_paper.py --once --equity 5000 --f 0.5 --tag carry` [carry_paper.py] (sổ paper chạy f=0,5 chỉ để đo; lãi/lỗ carry tỉ lệ tuyến tính theo f, khi triển khai dùng f=0,25).
-- Ngày đáo hạn: bán chân spot đúng lúc giao hàng (08:00 UTC, tốt nhất chia nhỏ quanh cửa sổ tính giá index) để giá bán khớp giá thanh toán của futures; lệch giờ bán ở giờ biến động có thể lệch vài % [carry_audit, leader adjudication].
-- Chân short quarterly của carry đặt đòn bẩy 10x (đã hedge bằng spot): margin trống thấp nhất 22,5% -> 32,7%; bắt buộc Cross margin; không vượt f=0,25 vì các cặp chồng nhau đã dùng ~96% USDT để mua spot (f lớn hơn phải vay USDT) [oc_utamargin2].
-- Stretch D13BF+carry f=0,25 base 5,104/14,85 ĐẠT [oc_carryd13] nhưng ma sát rớt (chỉ base + S2 f=0,50 giữ) — không deploy [oc_carryfric];
-MANUAL+carry tốt nhất 3,993 vẫn <5 — NO [oc_manualcarry]; plateau G2 giữ deploy [oc_plateau2]; 8-phase NO [oc_phase8]; screens expirydip/usdtdip
-đóng (NO) [oc_expirydip; oc_usdtdip].
-- Sau reboot: `bash scripts/restart_all.sh` (loop.sh retired), idempotent, backend local + 5 paper runner + vòng carry [restart_all.sh].
+- DD tài khoản > 20 %: dừng mở mới, chỉ giữ SL/TP; xem xét lại trước khi chạy tiếp [DEPLOYMENT_PLAN_VI].
+- Lỗ một tháng > 10 %: halve (giảm nửa) vốn tháng sau [DEPLOYMENT_PLAN_VI].
+- Phân vị lợi nhuận < 5 sau >= 8 tuần: dừng (mô hình không còn khớp nghiên cứu) [DEPLOYMENT_PLAN_VI].
+- Đèn vàng edge (đã vào `daily_status.py` mục 6, vỡ = ĐIỀU TRA không tự đổi cấu hình): (1) trung bình 6 tháng < 1,61 %/tháng; (2) tỉ lệ chốt lời dip nửa năm < 0,434 (không decay: slope +0,067, CI chứa 0) [oc_edgedecay].
 
-## 6. Bổ sung docs_update6 (2026-10-06)
+## 6. Bảo trì / mất điện / mất mạng
 
-- May mắn đồng hồ (`oc_clockluck`): bốn đồng hồ giờ triển khai may ở sleeve dip — kỳ vọng đồng hồ ngẫu nhiên ~5,24 %/tháng thay vì 5,41 deployed
-(24 offset S min 4,55/max 9,67/mean 7,12; deployed 0=9,67 pct 100%/60=7,54/120=8,76/180=4,90; mean 7,72 vs 7,12 gap −0,59; gap 2023 −0,42 + 2025 −0,15;
-adjusted yearly 2,593/3,233/5,453/10,691/4,401) — giữ số cũ 5,41 kèm giải thích ~0,17pp luck, biên mỏng, proxy; nửa giờ kém cấu trúc nên giữ mix 4 pha
-[oc_clockluck]. Kỳ vọng mục 1 đọc là ~5,24 (proxy) thay vì 5,41, phạm vi 4–6% giữ nguyên kèm caveat này.
-- Carry: short quarterly 10x (hedge bằng spot; f=0,25 free 22,49%→32,67%, bắt buộc Cross), trần một UTA f=0,25; f=0,375 @10x chỉ nếu chấp nhận borrow
-(spot peak 139%); f=0,50 không clear mọi đòn bẩy [oc_utamargin2]. FAR thắng 4/5 năm nhưng là exposure không phải rate — KHÔNG adopt, giữ base
-next-quarterly f=0,25; hướng carry ĐÓNG 2/2 [oc_carryfar Leader decision].
-- Vốn (`oc_capscale`): >=5.000 USDT đặt gần như mọi lệnh (book 0,9990/0,9995; dip 0,9780/0,9985/0,9967); 2.000 USDT ~93–96% count (book 0,9585/0,9704;
-dip 0,9269/0,9950/0,9804; bottleneck BTC/ETH) [oc_capscale].
-- Paper `paper_d17bfg2c` (G2 + carry 0,25) started 2026-10-06 07:19 UTC (BTCUSDT-25DEC26 f=0,25 basis ~5,31%, `--carry-f 0.25`); caveat: carry orders
-trong paper bị generic diff hủy ngày 2026-10-06, fix đang làm [artifacts/bot/paper_d17bfg2c; docs/BOT_EXECUTION.md].
-- Đóng hôm nay: oc_linvinv 0 vào NOT USEFUL [oc_linvinv]; oc_marktrig sum 4/5 nhưng DD/worst 2/5 NOT PROMISING [oc_marktrig]; oc_discsniper 0/5 năm
-(5y −0,5291, placebo 13,3) NOT PROMISING [oc_discsniper]; oc_manual2coin 3,73 vs 3,24 vs 3,39/24,3 FAIL — cả ba NO [oc_manual2coin]; oc_phase8 8-phase
-4,960 vs 4-phase 5,410 NO [oc_phase8].
+- Bảo trì CÓ hẹn: HỦY bid dip đang chờ từ trước giờ bắt đầu 30 phút tới hết giờ kết thúc (file `maintenance.json` hoặc flags `--maint-start/--maint-end` giờ UTC ISO); stop/TP/backstop và chân carry giữ nguyên trên sàn; tốn routine chỉ 1–2,5 % lãi dip [BOT_RUNBOOK_VI; oc_outage].
+- Sau sự cố bất ngờ: ưu tiên xác nhận mọi vị thế mở còn stop/TP native trên sàn (`protection_check` + `bot_health.py` phải hết CRITICAL) rồi mới cho bot chạy tiếp; không đặt tay giờ đầu [BOT_RUNBOOK_VI; oc_outage].
+- Mất mạng dài: stop market + TP limit reduce-only trên sàn vẫn bảo vệ; hở duy nhất là mảnh vừa khớp chưa kịp đặt exit (cửa sổ <= 20s) — kiểm tra tay khi mạng về [BOT_RUNBOOK_VI].
+
+## 7. KHÔNG làm
+
+- Không live khi chưa qua testnet sạch + đủ 4 điều kiện paper >= 8 tuần [DEPLOYMENT_PLAN_VI].
+- Không chạy 2 runner cùng `--tag`/thư mục state (kẹt `runner.lock`); không sửa tay `state.json` (sàn là sự thật khi `qty_mismatch`) [BOT_RUNBOOK_VI].
+- Không Isolated / one-way / đòn bẩy perps khác 5x cho bot; chân short carry giữ 10x hedge bằng spot; không vượt f=0,25 chung UTA; không hạ đòn bẩy khi đang có vị thế [BOT_RUNBOOK_VI; oc_utamargin2].
+- Không bao giờ chạy 1 pha/1 đồng hồ đơn lẻ (pha đơn COVID -21,8 % vượt ngưỡng; mix ~-16 % nằm trong DD) [oc_crash2020].
+- Không bơm size đuổi 8 %/tháng (biên max chỉ ~5,9 %/tháng ở DD > 17,5; edge/đơn vị bất biến) [oc_saturation]; không kỳ vọng 5 % mọi tháng (~1/9 năm chạm DD > 20 %) [DEPLOYMENT_PLAN_VI].
+- Không commit `.env`/keys; không sửa ngưỡng go-live/dừng sau khi đã thấy dữ liệu paper (nếu sửa ghi ngày + lý do) [DEPLOYMENT_PLAN_VI].
