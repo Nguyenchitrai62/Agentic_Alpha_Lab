@@ -469,3 +469,138 @@ def test_settlement_uses_filled_quantities_per_leg():
     fut_close = [p for p in want2 if p.get("category") != "spot"][0]
     assert abs(float(spot_sale["qty"]) - 0.02) < 1e-9
     assert abs(float(fut_close["qty"]) - 0.03) < 1e-9
+
+
+# ---- bot_carryslice (2026-10-06): 6-slice pre-delivery spot exit ----
+
+def _sliced_pos(now, total=0.06, step="0.01"):
+    """Open BTC pair, fill both legs fully, pin delivery 1h out for slicing."""
+    cstate = {"positions": {}, "entered": [], "history": []}
+    lots = _lots_pair(spot_step=step, fut_step="0.001")
+    exp, quo = _expiries(now), _quotes()
+    want, _ = carry.decide(now, 10000.0, 0.25, cstate, exp, quo, lots)
+    by_side = {p["side"]: p for p in want}
+    carry.note_exec(cstate, by_side["Buy"]["orderLinkId"], float(by_side["Buy"]["qty"]), 80000.0)
+    carry.note_exec(cstate, by_side["Sell"]["orderLinkId"], float(by_side["Sell"]["qty"]), 82000.0)
+    pos = cstate["positions"]["BTC"]
+    # force a known filled qty + near delivery for the window test
+    pos["spot_qty_filled"] = float(total)
+    pos["fut_qty_filled"] = float(total)
+    pos["qty"] = float(total)
+    pos["spot_filled"] = True
+    pos["fut_filled"] = True
+    dlv = _ms(now) + 60 * 60 * 1000
+    pos["delivery_ms"] = int(dlv)
+    return cstate, lots, exp, int(dlv)
+
+
+def test_slices_six_buckets_last_exact_remainder():
+    now = _now()
+    cstate, lots, exp, dlv = _sliced_pos(now, total=0.065, step="0.01")
+    start = dlv - 30 * 60 * 1000
+    qtys, links = [], []
+    for b in range(6):
+        t = pd.Timestamp(start + b * 5 * 60 * 1000 + 60 * 1000, unit="ms", tz="UTC")
+        want, logs = carry.decide(t, 10000.0, 0.25, cstate, exp, _quotes(), lots)
+        assert len(want) == 1, b
+        p = want[0]
+        assert p["side"] == "Sell" and p["category"] == "spot"
+        assert p["orderType"] == "Market" and p.get("timeInForce") == "IOC"
+        rec = [r for r in logs if r.get("op") == "carry_slice"]
+        assert len(rec) == 1 and rec[0]["bucket"] == b
+        qtys.append(float(p["qty"]))
+        links.append(p["orderLinkId"])
+        r = carry.note_exec(cstate, p["orderLinkId"], float(p["qty"]), 80000.0 + b)
+        assert r and r["leg"] == "spot_slice"
+    # first five floored to the spot lot, last = exact remainder
+    assert all(abs(q - 0.01) < 1e-9 for q in qtys[:5])
+    assert abs(qtys[5] - (0.065 - 0.05)) < 1e-9
+    assert abs(sum(qtys) - 0.065) < 1e-9
+    assert len(set(links)) == 6
+    pos = cstate["positions"]["BTC"]
+    assert abs(float(pos.get("spot_slice_sold_qty", 0)) - 0.065) < 1e-9
+
+
+def test_slice_one_per_bucket_restart_safe():
+    import copy
+    import json
+    now = _now()
+    cstate, lots, exp, dlv = _sliced_pos(now)
+    start = dlv - 30 * 60 * 1000
+    t0 = pd.Timestamp(start + 60_000, unit="ms", tz="UTC")
+    want, _ = carry.decide(t0, 10000.0, 0.25, cstate, exp, _quotes(), lots)
+    assert len(want) == 1
+    # same bucket again -> nothing (already emitted this bucket)
+    want2, logs2 = carry.decide(t0 + pd.Timedelta(minutes=1), 10000.0, 0.25,
+                                cstate, exp, _quotes(), lots)
+    assert want2 == [] and not [r for r in logs2 if r.get("op") == "carry_slice"]
+    # restart from persisted state.json (json round-trip) mid-window -> no double-sell
+    revived = json.loads(json.dumps(cstate))
+    assert copy.deepcopy(revived) is not None
+    want3, _ = carry.decide(t0 + pd.Timedelta(minutes=2), 10000.0, 0.25,
+                            revived, exp, _quotes(), lots)
+    assert want3 == []
+    # next bucket fires exactly once
+    t1 = pd.Timestamp(start + 5 * 60 * 1000 + 60_000, unit="ms", tz="UTC")
+    want4, logs4 = carry.decide(t1, 10000.0, 0.25, revived, exp, _quotes(), lots)
+    assert len(want4) == 1
+    assert any(r.get("op") == "carry_slice" and r.get("bucket") == 1 for r in logs4)
+
+
+def test_slice_market_passes_guard_and_no_slice_outside_window():
+    now = _now()
+    cstate, lots, exp, dlv = _sliced_pos(now)
+    start = dlv - 30 * 60 * 1000
+    t = pd.Timestamp(start + 60_000, unit="ms", tz="UTC")
+    want, _ = carry.decide(t, 10000.0, 0.25, cstate, exp, _quotes(), lots)
+    assert len(want) == 1
+    allowed, rej = carry.guard_carry(want, {}, 10000.0, {"BTCUSDT": 80000.0})
+    assert rej == [] and len(allowed) == 1
+    # before the window: no slice
+    cstate2, _, exp2, dlv2 = _sliced_pos(now)
+    tb = pd.Timestamp(dlv2 - 31 * 60 * 1000, unit="ms", tz="UTC")
+    wantb, _ = carry.decide(tb, 10000.0, 0.25, cstate2, exp2, _quotes())
+    assert wantb == []
+
+
+def test_delivery_remainder_fallback_with_vwap():
+    now = _now()
+    cstate, lots, exp, dlv = _sliced_pos(now, total=0.06, step="0.01")
+    start = dlv - 30 * 60 * 1000
+    # sell only 2 slices, then delivery passes
+    for b in range(2):
+        t = pd.Timestamp(start + b * 5 * 60 * 1000 + 60 * 1000, unit="ms", tz="UTC")
+        want, _ = carry.decide(t, 10000.0, 0.25, cstate, exp, _quotes(), lots)
+        carry.note_exec(cstate, want[0]["orderLinkId"], float(want[0]["qty"]), 80000.0 + b * 100.0)
+    t_del = pd.Timestamp(dlv + 60_000, unit="ms", tz="UTC")
+    want2, logs2 = carry.decide(t_del, 10000.0, 0.25, cstate, exp, _quotes(spot=81000.0), lots)
+    assert any(r.get("op") == "carry_settle" for r in logs2)
+    spot = [p for p in want2 if p.get("category") == "spot"]
+    fut = [p for p in want2 if p.get("category") != "spot"]
+    assert len(spot) == 1 and len(fut) == 1
+    assert abs(float(spot[0]["qty"]) - (0.06 - 0.02)) < 1e-9  # unsold remainder fallback
+    rec = carry.note_exec(cstate, spot[0]["orderLinkId"], float(spot[0]["qty"]), 80500.0)
+    assert rec and rec["op"] == "carry_settled"
+    vwap = (0.01 * 80000.0 + 0.01 * 80100.0 + 0.04 * 80500.0) / 0.06
+    assert abs(float(rec["S_del"]) - vwap) < 1e-6
+    assert "BTC" not in cstate["positions"]
+
+
+def test_fully_sliced_futures_only_settlement():
+    now = _now()
+    cstate, lots, exp, dlv = _sliced_pos(now, total=0.06, step="0.01")
+    start = dlv - 30 * 60 * 1000
+    for b in range(6):
+        t = pd.Timestamp(start + b * 5 * 60 * 1000 + 60 * 1000, unit="ms", tz="UTC")
+        want, _ = carry.decide(t, 10000.0, 0.25, cstate, exp, _quotes(), lots)
+        carry.note_exec(cstate, want[0]["orderLinkId"], float(want[0]["qty"]), 80000.0)
+    t_del = pd.Timestamp(dlv + 60_000, unit="ms", tz="UTC")
+    want2, logs2 = carry.decide(t_del, 10000.0, 0.25, cstate, exp, _quotes(spot=81000.0), lots)
+    assert any(r.get("op") == "carry_settle" for r in logs2)
+    assert not [p for p in want2 if p.get("category") == "spot"]  # no remainder sale
+    fut = [p for p in want2 if p.get("category") != "spot"]
+    assert len(fut) == 1
+    rec = carry.note_exec(cstate, fut[0]["orderLinkId"], 0.06, 82000.0)
+    assert rec and rec["op"] == "carry_settled"
+    assert abs(float(rec["S_del"]) - 80000.0) < 1e-6
+    assert "BTC" not in cstate["positions"]

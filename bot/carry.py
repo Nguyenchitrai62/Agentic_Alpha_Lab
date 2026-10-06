@@ -7,11 +7,14 @@ annualised_basis / pick_candidate / realised_pnl_pair / MS_DAY.
 Rule per coin (BTC, ETH): flat + roll due (no open pair and front quarterly
 has <= 7 d left, or first availability) + annualised basis ln(F/S)*365/DTE >=
 4 %/yr -> spot BUY + quarterly SELL, each leg notional = f x equity, equal
-coin quantity. Hold to delivery; after delivery sell the spot leg at market
-(plus a safety futures buy-back for sim accounts where dated shorts do not
-auto-settle) and log realised P&L. Single-fill opens are retried at market
-next cycle (op=carry_unhedged); never left unhedged > 2 cycles, otherwise the
-filled leg is closed.
+coin quantity. Hold to delivery; from delivery_ms - 30 min the filled spot
+qty is sold in 6 equal slices (one per 5-minute bucket at the first cycle
+inside each bucket, market IOC on spot, rounded to the spot lot, last slice
+= exact remainder, op=carry_slice, restart-safe via the persisted position
+state); after delivery the futures leg is settled as before and any unsold
+spot remainder is sold at market (fallback, logged). Single-fill opens are
+retried at market next cycle (op=carry_unhedged); never left unhedged
+> 2 cycles, otherwise the filled leg is closed.
 
 All carry orders use bot-owned link ids with prefix ``c`` and pass through
 risk_guard (plus a carry cap: short notional <= 0.30 x equity per coin). They
@@ -47,6 +50,119 @@ MAX_UNHEDGED_CYCLES = 2
 MAX_ENTRY_ATTEMPTS = 3  # a pending pair with NEITHER leg filled is retried at
 # fresh prices up to 3 attempts per roll, then carry_abandon (re-evaluated next cycle)
 CARRY_SHORT_CAP = 0.30  # carry short notional <= 0.30 x equity per coin
+
+# bot_carryslice (2026-10-06): sliced spot exit across the settlement index
+# window (oc_deliverytrack: 6 slices 07:30-08:00 cuts exit noise 29->6bp,
+# worst miss 92->20bp). Delivery at 08:00 UTC; the index averages the window,
+# so the spot leg is sold in 6 equal slices, one per 5-minute bucket.
+SLICE_WINDOW_MS = 30 * 60 * 1000
+SLICE_N = 6
+SLICE_BUCKET_MS = 5 * 60 * 1000
+SLICE_DUST = 1e-12
+SETTLE_GRACE_MS = 60 * 60 * 1000  # zero-remainder settling finalises w/o fut fill after this
+
+
+def _slice_bucket(now_ms: int, delivery_ms: int):
+    """5-minute bucket 0..5 inside [delivery-30min, delivery), else None."""
+    try:
+        start = int(delivery_ms) - SLICE_WINDOW_MS
+        n = int(now_ms)
+        d = int(delivery_ms)
+    except (TypeError, ValueError):
+        return None
+    if n < start or n >= d:
+        return None
+    b = (n - start) // SLICE_BUCKET_MS
+    try:
+        b = int(b)
+    except (TypeError, ValueError):
+        return None
+    if 0 <= b < SLICE_N:
+        return b
+    return None
+
+
+def _floor_to_step(qty: float, step) -> float:
+    """Floor qty to one qty step (spot lot for slices); None step -> raw qty."""
+    from decimal import ROUND_DOWN, Decimal, InvalidOperation
+
+    try:
+        q = Decimal(str(qty))
+    except (InvalidOperation, ValueError, TypeError, AttributeError):
+        return 0.0
+    if q <= 0:
+        return 0.0
+    if step is None:
+        return float(q)
+    try:
+        st = Decimal(str(step))
+        if st <= 0:
+            return float(q)
+        return float((q / st).to_integral_value(rounding=ROUND_DOWN) * st)
+    except (InvalidOperation, ValueError, TypeError, AttributeError):
+        return float(q)
+
+
+def _spot_step_for(coin: str, fut_symbol, lots):
+    """Spot qty_step for slice rounding, or None (raw sizing, runner floors)."""
+    try:
+        s_lot, _f_lot = _lots_for(coin, fut_symbol, lots)
+    except Exception:
+        return None
+    try:
+        return (s_lot or {}).get("qty_step")
+    except (AttributeError, TypeError):
+        return None
+
+
+def _slice_sold(pos: dict) -> float:
+    try:
+        return float(pos.get("spot_slice_sold_qty", 0) or 0)
+    except (TypeError, ValueError):
+        return 0.0
+
+
+def _slice_proceeds(pos: dict) -> float:
+    try:
+        return float(pos.get("spot_slice_proceeds", 0) or 0)
+    except (TypeError, ValueError):
+        return 0.0
+
+
+def _slice_vwap(pos: dict):
+    sold = _slice_sold(pos)
+    if sold > SLICE_DUST:
+        try:
+            return float(_slice_proceeds(pos) / sold)
+        except (TypeError, ValueError, ZeroDivisionError):
+            return None
+    return None
+
+
+def _acc_slice_fill(pos: dict, qty: float, price: float) -> float:
+    """Accumulate a spot-sale (slice or remainder) fill; returns total sold."""
+    try:
+        q = float(qty)
+        px = float(price)
+    except (TypeError, ValueError):
+        return _slice_sold(pos)
+    if not (q > 0 and px > 0):
+        return _slice_sold(pos)
+    pos["spot_slice_sold_qty"] = _slice_sold(pos) + q
+    pos["spot_slice_proceeds"] = _slice_proceeds(pos) + q * px
+    return float(pos["spot_slice_sold_qty"])
+
+
+def _settle_pnl(pos: dict, f: float, s_del: float):
+    try:
+        pnl, ret = realised_pnl_pair(float(pos.get("f", f)),
+                                     float(pos.get("equity_entry", 0)),
+                                     float(pos.get("S_entry", 0) or pos.get("S_fill", 0)),
+                                     float(pos.get("F_entry", 0) or pos.get("F_fill", 0)),
+                                     float(s_del))
+    except (TypeError, ValueError):
+        pnl, ret = 0.0, 0.0
+    return float(pnl), float(ret)
 
 
 def spot_symbol(coin: str) -> str:
@@ -391,8 +507,9 @@ def decide(now, equity: float, f: float, cstate: dict, expiries_by_coin: dict,
 
     Returns (want_payloads, logs). want_payloads are raw exchange payloads
     (with category + orderLinkId prefix ``c``). logs are dicts with op in
-    {carry_entry, carry_unhedged, carry_close, carry_settle, carry_skip,
-    carry_cap} for the runner to emit. cstate is mutated (positions/entered).
+    {carry_entry, carry_unhedged, carry_close, carry_settle, carry_slice,
+    carry_skip, carry_cap} for the runner to emit. cstate is mutated
+    (positions/entered).
     """
     import pandas as pd
 
@@ -421,6 +538,39 @@ def decide(now, equity: float, f: float, cstate: dict, expiries_by_coin: dict,
         pos = positions.get(coin)
         if isinstance(pos, dict):
             dlv = int(pos.get("delivery_ms", 0) or 0)
+            # Settling grace (bot_carryslice): a zero-remainder settling
+            # position whose futures safety Buy never fills (live dated
+            # shorts auto-settle) finalises from the slice VWAP after grace.
+            if pos.get("settling"):
+                try:
+                    _sold_g = _slice_sold(pos)
+                    _slink_g = pos.get("spot_sale_link")
+                    _stot_g = float(pos.get("slice_total", 0) or 0)
+                    _sq_g = float(pos.get("spot_qty_filled", 0) or pos.get("qty", 0) or 0)
+                    _tgt_g = _stot_g if _stot_g > 0 else _sq_g
+                    if (_slink_g is None and _tgt_g > 0
+                            and _sold_g + SLICE_DUST >= _tgt_g
+                            and dlv and now_ms >= dlv + SETTLE_GRACE_MS):
+                        vwap = _slice_vwap(pos)
+                        if vwap:
+                            pnl, ret = _settle_pnl(pos, f, vwap)
+                            rec = dict(pos)
+                            rec.update(status="delivered", S_del=float(vwap),
+                                       realised_pnl=round(float(pnl), 4),
+                                       realised_ret_alloc=round(float(ret), 6),
+                                       settle_note="slices_vwap_autosettle")
+                            cstate.setdefault("history", []).append(rec)
+                            ent = f"{coin}:{pos.get('symbol')}"
+                            if ent not in cstate.setdefault("entered", []):
+                                cstate["entered"].append(ent)
+                            positions.pop(coin, None)
+                            logs.append(dict(op="carry_settled", coin=coin,
+                                             symbol=pos.get("symbol"), S_del=float(vwap),
+                                             realised_pnl=round(float(pnl), 4),
+                                             note="slices_vwap_autosettle"))
+                except (TypeError, ValueError, AttributeError):
+                    pass
+                continue
             if dlv and now_ms >= dlv and _pos_open(pos) and not pos.get("settling"):
                 qty = float(pos.get("qty", 0) or 0)
                 # Settle what actually filled per leg (paper_d17bfg2c: the stored
@@ -437,17 +587,36 @@ def decide(now, equity: float, f: float, cstate: dict, expiries_by_coin: dict,
                     spot_q = qty
                 if not (fut_q > 0):
                     fut_q = qty
+                # bot_carryslice: slices already sold part of the spot leg;
+                # the post-delivery sale is the unsold remainder (fallback).
+                sold = _slice_sold(pos)
+                try:
+                    remainder = float(spot_q) - float(sold)
+                except (TypeError, ValueError):
+                    remainder = float(spot_q)
+                if remainder < 0:
+                    remainder = 0.0
                 if max(spot_q, fut_q) > 0:
-                    s_link = f"{LINK_PREFIX}{coin}X{mirror.t36(now)}S"
                     f_link = f"{LINK_PREFIX}{coin}X{mirror.t36(now)}F"
-                    want.append(market_payload(pos.get("spot_symbol", spot_symbol(coin)),
-                                               "Sell", spot_q, s_link, "spot"))
-                    want.append(market_payload(pos.get("symbol"), "Buy", fut_q, f_link,
-                                               pos.get("category", "linear"),
-                                               reduce_only=True, position_idx=2))
-                    pos["settling"] = True
-                    pos["spot_sale_link"] = s_link
-                    pos["fut_close_link"] = f_link
+                    if remainder > SLICE_DUST:
+                        s_link = f"{LINK_PREFIX}{coin}X{mirror.t36(now)}S"
+                        want.append(market_payload(pos.get("spot_symbol", spot_symbol(coin)),
+                                                     "Sell", remainder, s_link, "spot"))
+                        want.append(market_payload(pos.get("symbol"), "Buy", fut_q, f_link,
+                                                   pos.get("category", "linear"),
+                                                   reduce_only=True, position_idx=2))
+                        pos["settling"] = True
+                        pos["spot_sale_link"] = s_link
+                        pos["fut_close_link"] = f_link
+                    else:
+                        # Fully sliced: futures safety Buy only; note_exec
+                        # finalises on its fill (or the grace path above).
+                        want.append(market_payload(pos.get("symbol"), "Buy", fut_q, f_link,
+                                                   pos.get("category", "linear"),
+                                                   reduce_only=True, position_idx=2))
+                        pos["settling"] = True
+                        pos["spot_sale_link"] = None
+                        pos["fut_close_link"] = f_link
                     try:
                         s_del = float((quotes_by_coin.get(coin) or {}).get("spot_mid") or pos.get("S_entry") or 0)
                         pnl, ret = realised_pnl_pair(float(pos.get("f", f)),
@@ -460,10 +629,92 @@ def decide(now, equity: float, f: float, cstate: dict, expiries_by_coin: dict,
                     logs.append(dict(op="carry_settle", coin=coin, symbol=pos.get("symbol"),
                                      S_del=float(s_del) if s_del else None,
                                      realised_pnl=round(float(pnl), 4),
-                                     ret_alloc=round(float(ret), 6)))
+                                     ret_alloc=round(float(ret), 6),
+                                     slice_sold=round(float(sold), 8),
+                                     spot_remainder=round(float(remainder), 8)))
                 continue
-            if pos.get("settling"):
-                continue
+            # bot_carryslice: pre-delivery sliced exit, one slice per 5-minute
+            # bucket at the first cycle inside the bucket. Restart-safe: the
+            # emitted buckets + slice links + sold qty live in pos (state.json).
+            if (dlv and _pos_open(pos) and not pos.get("settling")
+                    and _slice_bucket(now_ms, dlv) is not None):
+                try:
+                    spot_qw = float(pos.get("spot_qty_filled", 0) or 0)
+                except (TypeError, ValueError):
+                    spot_qw = 0.0
+                if not (spot_qw > 0):
+                    try:
+                        spot_qw = float(pos.get("qty", 0) or 0)
+                    except (TypeError, ValueError):
+                        spot_qw = 0.0
+                if spot_qw > 0:
+                    bucket = _slice_bucket(now_ms, dlv)
+                    try:
+                        done = pos.setdefault("slice_buckets_done", [])
+                        if not isinstance(done, list):
+                            done = pos["slice_buckets_done"] = list(done or [])
+                    except (AttributeError, TypeError):
+                        done = []
+                    if bucket is not None and bucket not in done:
+                        try:
+                            tot = float(pos.get("slice_total", 0) or 0)
+                        except (TypeError, ValueError):
+                            tot = 0.0
+                        if not (tot > 0):
+                            tot = float(spot_qw)
+                            pos["slice_total"] = float(tot)
+                        try:
+                            qmap = pos.setdefault("slice_qtys", {})
+                            if not isinstance(qmap, dict):
+                                qmap = pos["slice_qtys"] = {}
+                        except (AttributeError, TypeError):
+                            qmap = {}
+                        try:
+                            prev = sum(float(qmap.get(str(b), 0) or 0)
+                                       for b in range(SLICE_N - 1) if str(b) in qmap)
+                        except (TypeError, ValueError):
+                            prev = 0.0
+                        step = _spot_step_for(coin, pos.get("symbol"), lots)
+                        if bucket < SLICE_N - 1:
+                            sqty = _floor_to_step(float(tot) / SLICE_N, step)
+                        else:
+                            sqty = float(tot) - float(prev)
+                        if sqty > SLICE_DUST:
+                            s_link = f"{LINK_PREFIX}{coin}D{mirror.t36(now)}{bucket}S"
+                            p = market_payload(pos.get("spot_symbol", spot_symbol(coin)),
+                                               "Sell", float(sqty), s_link, "spot")
+                            p["timeInForce"] = "IOC"  # market IOC on spot
+                            want.append(p)
+                            try:
+                                done.append(int(bucket))
+                            except (TypeError, ValueError):
+                                pass
+                            try:
+                                qmap[str(bucket)] = float(sqty)
+                            except (TypeError, ValueError):
+                                pass
+                            try:
+                                sl = pos.setdefault("slice_links", {})
+                                if not isinstance(sl, dict):
+                                    sl = pos["slice_links"] = {}
+                                sl[s_link] = float(sqty)
+                            except (AttributeError, TypeError):
+                                pass
+                            logs.append(dict(op="carry_slice", coin=coin,
+                                             symbol=pos.get("symbol"), bucket=int(bucket),
+                                             qty=float(sqty), link=s_link,
+                                             delivery_ms=int(dlv)))
+                        else:
+                            # Dust/zero slice: mark done so the bucket never refires.
+                            try:
+                                done.append(int(bucket))
+                            except (TypeError, ValueError):
+                                pass
+                            try:
+                                qmap[str(bucket)] = 0.0
+                            except (TypeError, ValueError):
+                                pass
+                        continue
             sf, ff = bool(pos.get("spot_filled")), bool(pos.get("fut_filled"))
             if sf and ff:
                 continue
@@ -685,12 +936,35 @@ def _acc_leg_fill(pos: dict, leg: str, qty: float, price: float) -> float:
     return float(tot)
 
 
+def _is_slice_link(pos: dict, coin: str, link) -> bool:
+    """True for a persisted pre-delivery slice sale link (bot_carryslice)."""
+    try:
+        sl = pos.get("slice_links") or {}
+        if isinstance(sl, dict) and str(link or "") in sl:
+            return True
+    except (AttributeError, TypeError):
+        pass
+    try:
+        s = str(link or "")
+        # Slice links: c<COIN>D<t36><bucket>S (distinct from entry/hedge/settle links).
+        if s.startswith(f"{LINK_PREFIX}{coin}D") and s.endswith("S"):
+            return True
+    except Exception:
+        pass
+    return False
+
+
 def note_exec(cstate: dict, link: str, qty: float, price: float):
     """Record a fill of a carry link (prefix ``c``) into the carry state.
 
     Entry, hedge-retry and recovery fills accumulate the ACTUAL filled qty per
     leg (``spot_qty_filled`` / ``fut_qty_filled``); hedge recovery and delivery
     settlement size from those, never from the pre-rounding ``qty``.
+
+    Slice fills (bot_carryslice) accumulate ``spot_slice_sold_qty`` /
+    ``spot_slice_proceeds`` for the settlement VWAP and never touch the entry
+    ``spot_qty_filled``; the final spot sale (remainder) finalises with the
+    VWAP across slices + remainder once the full filled qty is sold.
     """
     if not str(link or "").startswith(LINK_PREFIX):
         return None
@@ -706,16 +980,22 @@ def note_exec(cstate: dict, link: str, qty: float, price: float):
         if not (q > 0 and px > 0):
             return None
         if link == pos.get("spot_sale_link"):
+            # Remainder sale: accumulate (partial fills share one link) and
+            # finalise with the VWAP once slices + remainder cover the fill.
+            sold = _acc_slice_fill(pos, q, px)
             try:
-                pnl, ret = realised_pnl_pair(float(pos.get("f", 0)),
-                                             float(pos.get("equity_entry", 0)),
-                                             float(pos.get("S_entry", 0) or pos.get("S_fill", 0)),
-                                             float(pos.get("F_entry", 0) or pos.get("F_fill", 0)),
-                                             float(px))
+                spot_q = float(pos.get("spot_qty_filled", 0) or pos.get("qty", 0) or 0)
             except (TypeError, ValueError):
-                pnl, ret = 0.0, 0.0
+                spot_q = 0.0
+            if spot_q > 0 and sold + SLICE_DUST < spot_q:
+                return dict(op="carry_fill", coin=coin, symbol=pos.get("spot_symbol"),
+                            leg="spot_sale", price=float(px), qty=float(q),
+                            sold=float(sold), pending=True)
+            vwap = _slice_vwap(pos)
+            s_del = float(vwap) if vwap else float(px)
+            pnl, ret = _settle_pnl(pos, 0, s_del)
             rec = dict(pos)
-            rec.update(status="delivered", S_del=float(px),
+            rec.update(status="delivered", S_del=float(s_del),
                        realised_pnl=round(float(pnl), 4),
                        realised_ret_alloc=round(float(ret), 6))
             cstate.setdefault("history", []).append(rec)
@@ -724,7 +1004,36 @@ def note_exec(cstate: dict, link: str, qty: float, price: float):
                 cstate["entered"].append(ent)
             positions.pop(coin, None)
             return dict(op="carry_settled", coin=coin, symbol=pos.get("symbol"),
-                        S_del=float(px), realised_pnl=round(float(pnl), 4))
+                        S_del=float(s_del), realised_pnl=round(float(pnl), 4))
+        if _is_slice_link(pos, coin, link):
+            sold = _acc_slice_fill(pos, q, px)
+            return dict(op="carry_fill", coin=coin, symbol=pos.get("spot_symbol"),
+                        leg="spot_slice", price=float(px), qty=float(q),
+                        sold=float(sold))
+        if link == pos.get("fut_close_link") and pos.get("settling") and not pos.get("spot_sale_link"):
+            # Fully-sliced position: no remainder sale; the futures safety
+            # Buy confirms settlement (slice VWAP is the exit price).
+            vwap = _slice_vwap(pos)
+            s_del = float(vwap) if vwap else None
+            if s_del:
+                pnl, ret = _settle_pnl(pos, 0, s_del)
+            else:
+                pnl, ret = 0.0, 0.0
+            rec = dict(pos)
+            rec.update(status="delivered",
+                       S_del=float(s_del) if s_del else None,
+                       realised_pnl=round(float(pnl), 4),
+                       realised_ret_alloc=round(float(ret), 6),
+                       settle_note="slices_vwap")
+            cstate.setdefault("history", []).append(rec)
+            ent = f"{coin}:{pos.get('symbol')}"
+            if ent not in cstate.setdefault("entered", []):
+                cstate["entered"].append(ent)
+            positions.pop(coin, None)
+            return dict(op="carry_settled", coin=coin, symbol=pos.get("symbol"),
+                        S_del=float(s_del) if s_del else None,
+                        realised_pnl=round(float(pnl), 4),
+                        note="slices_vwap")
         if link == pos.get("spot_link"):
             tot = _acc_leg_fill(pos, "spot", q, px)
             if not pos.get("S_entry"):

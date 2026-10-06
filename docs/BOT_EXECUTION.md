@@ -179,6 +179,40 @@ for fresh plans; a new fill has no exit orders until the next cycle (<= 20 s) pl
   (F3/F4 + F6 race + F7 pagination); full `tests/test_bot_*.py` green. Testnet: GO for carry-enabled runs (F1+F2 fixed;
   book/dip-only was already go-with-caution); live still needs a clean testnet run first.
 
+## CHANGES (bot_carryslice 2026-10-06: sliced pre-delivery spot exit, default behaviour)
+- `bot/carry.py`: from `delivery_ms - 30 min` the filled spot qty is sold in 6 equal slices, one per 5-minute
+  bucket at the first cycle inside each bucket (market IOC on spot, `op=carry_slice` per slice; first five
+  floored to the spot lot, the last slice = exact remainder). Emitted buckets + slice links + sold qty/proceeds
+  persist in the carry position state, so a restart mid-window resumes without double-selling (same bucket never
+  refires; missed buckets fall through to the post-delivery remainder). After delivery the futures leg settles as
+  before and any unsold remainder is sold at market (fallback, logged in `carry_settle` as `slice_sold` /
+  `spot_remainder`); settlement P&L uses the VWAP across slices + remainder. A fully-sliced position emits only
+  the futures safety Buy and finalises on its fill (or from the slice VWAP after a 1h grace for auto-settled
+  dated shorts). Paper/testnet/live share the decision path (venue only); slice markets pass `guard_carry` as
+  carry-recovery like other delivery sales. Rationale: `research/tournament/oc_deliverytrack/REPORT.md` (single
+  08:00 print misses the index by ~20-28bp avg, worst ~90bp; 6 slices 07:30-08:00 cut it to ~5bp / worst 20bp).
+- Tests: `tests/test_bot_carry.py` (+5: six-bucket/remainder math, one-per-bucket + json-round-trip restart,
+  guard passthrough + no slice outside the window, remainder fallback with VWAP, fully-sliced futures-only).
+
+## CHANGES (bot_soakfix 2026-10-06: B1/B2/B3 protection gaps + cycle exceptions, defaults unchanged for valid plans)
+- B3: `mirror.desired(..., on_reject=None)` skips any dip rung / book entry whose limit price, TP or stop is
+  <= 0 or non-finite (plan_reject via on_reject when the runner passes its log; pure skip otherwise, never divides by
+  the limit) and wraps each plan row so one bad row is logged and skipped instead of raising out of `Runner.cycle`;
+  `Runner.cycle` passes its log as on_reject and falls back to ledger-only protection if `desired` ever still raises,
+  so protection is still managed that cycle. Soak harness `tests/soak_bot.py::make_plan` clamps `buy_limit` to a
+  positive tick (test-only; zero-limit rungs no longer emitted).
+- B1: book protection is managed for EVERY open piece of each (phase, symbol), not only the first `next(...)` match:
+  a side-flip second entry now gets its native stop + TP the next cycle; plan add / reduce / close stays on the first
+  piece only (never duplicated). Covered by `tests/test_bot_soakfix.py::test_b1_two_book_pieces_both_protected_after_side_flip`.
+- B2: (a) pre-entry dust guard: a book / dip entry whose filled qty could not carry its protection (qty below the lot
+  minimum, or qty x TP / qty x stop below the symbol minimum notional) is not placed (logged `op=dust_skip`, kept in the
+  legacy `skipped_below_minimum` set too); sizing itself is untouched. (b) fallback: an open piece with KNOWN TP + stop
+  prices that cannot rest on the exchange (below lot / notional, or non-positive / non-finite) is closed with a
+  reduce-only market order in the SAME cycle (logged `op=dust_close`, taker fee), never left unprotected; pieces with no
+  plan levels yet (pending sub, no attached sl/tp) are not dust and stay with divergence / unprotected logic.
+  Helpers `mirror.entry_is_dust / protection_is_dust`; tests in `tests/test_bot_soakfix.py` (8 tests).
+  Full `tests/test_bot_*.py` (181 tests) green; 2h smoke `tests/test_bot_soak_smoke.py` passes with 0 violations.
+
 ## Failure modes (tests/test_bot_resilience.py, fake exchange, no network)
 - Restart mid-position: new Runner adopts state.json + exchange stops/TPs, no duplicate entries, filled rungs never re-placed.
 - Partial dip fill: TP/stop size to the filled qty, remainder stays resting (same link), budget counts only the filled part.
