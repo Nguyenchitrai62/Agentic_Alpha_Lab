@@ -197,6 +197,7 @@ Sources: `docs/FINAL_REPORT_VI.md`, `.claude/skills/alpha-lab-leader/research-ma
 - `oc_idea4_carrymax` | carry only the higher-basis coin (M1/M2) | CLOSED | dev -0.13, 5y -0.10 %/mo vs both coins, DD unchanged | 2026-10-07
 - `oc_idea6_d13carry` | D13BF + concentrated carry f 0.50 (POST-HOC) | CLOSED | base 5.115/DD 14.71 but fails frictions and needs split capital; 8 %/mo unreachable (~2.9pp short) | 2026-10-07
 - `oc_usdccarry` | Bybit USDC linear dated futures as the carry leg | CLOSED | no better than inverse (basis within +-0.6 pp/yr where comparable); gaps 2021-22 and 2025-26, none trading now; keep inverse quarterlies | 2026-10-07
+- `oc_i2_oiguard` | skip dip bids while open interest unwinds | CLOSED | fails the dip placebo gate (+0.273) on dev years; no engine run | 2026-10-07
 - `oc_idea1_kellyrung` | fractional-Kelly dip rung sizing under budget | CLOSED | best K2 dev4 5.54 / 5y 5.35 but full-path DD 21.79 > 20, recent year 4.64; worse than G2 (+carry) on return and DD | 2026-10-07
 - `oc_idea2_dipstop` | fixed per-coin dip stops on G2 (4-phase engine) | CLOSED | +0.005 %/mo vs G2, folds 0/3, slip stress erases it | 2026-10-07
 - `oc_idea5_manualrest` | MANUAL brackets resting to the 4h close (H1) / doubled dips (H2) | CLOSED | H1 +0.29 vs 60-min baseline but -0.07 vs running M5_human; H2 DD 21.3/25.2 > 20; MANUAL still ~1.3 pp short of 5 %/mo | 2026-10-07
