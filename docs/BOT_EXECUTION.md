@@ -140,6 +140,22 @@ for fresh plans; a new fill has no exit orders until the next cycle (<= 20 s) pl
   Tests: `tests/test_bot_carry.py` (entry, skip < 4 %, partial-hedge recovery, delivery settlement,
   flag-off no-change, all through `tests/mock_bybit_v5.py`).
 
+## CHANGES (bot_maint 2026-10-06: opt-in maintenance window + restart protection check, default off)
+- `python -m bot.run --maint-start ISO --maint-end ISO` (UTC) or a per-cycle file
+  `artifacts/bot/<mode[_tag]>/maintenance.json` (`{"start": ISO, "end": ISO}`; present-but-empty = cleared):
+  from 30 minutes before start until end the bot places NO new dip bids and NO new book entries
+  (`mirror` kind `entry` filtered after stale/plan_error trimming, before the risk guard) and cancels its
+  resting dip bids + unfilled book entry limits via the normal `diff` (logged `op=maint_cancel` with
+  `blocked_new`/`cancel_resting`; `op=maint_resume` once on exit). Protection (TP/SL/backstops, market exits,
+  time exits) and carry legs (`c*` links, `_carry_cycle` still runs) are untouched. No flags and no file =
+  inactive, orders bit-for-bit identical. Rationale: `research/tournament/oc_outage/REPORT.md` (routine outages
+  are cheap; cancel resting dip bids before PLANNED maintenance so no fill lands without its software stop).
+- Startup check after every restart: `Runner` logs `op=protection_check` (`open` pieces, `missing` without a
+  resting stop+TP, verified against live open orders). A missing backstop/TP is the existing CRITICAL line in
+  `scripts/bot_health.py` (`unprotected`); after unplanned downtime confirm it is empty before touching anything.
+- Tests: `tests/test_bot_maint.py` (fake clocks for the 30-min pre-window boundaries, `tests/mock_bybit_v5.py`
+  for cycle/cancel/protection/carry behaviour).
+
 ## Failure modes (tests/test_bot_resilience.py, fake exchange, no network)
 - Restart mid-position: new Runner adopts state.json + exchange stops/TPs, no duplicate entries, filled rungs never re-placed.
 - Partial dip fill: TP/stop size to the filled qty, remainder stays resting (same link), budget counts only the filled part.

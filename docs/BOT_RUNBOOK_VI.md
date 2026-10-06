@@ -103,6 +103,26 @@ Bot và backend **không tự chạy lại**. Thứ tự:
 3. Đối chiếu `actions.jsonl` với vị thế sàn (paper: `exchange.json`; live/testnet: Bybit thật): stop/TP thiếu được đặt lại trong <= 20s; mảnh plan đã thoát mà sàn còn mở bị đóng market sau ~3 phút (`plan_closed_divergence`).
 4. Mất mạng dài: stop market + TP limit reduce-only đã nằm trên sàn vẫn bảo vệ vị thế; phần hở duy nhất là mảnh vừa khớp chưa kịp đặt exit (cửa sổ <= 20s) — kiểm tra tay khi mạng trở lại.
 
+## 4b. Bảo trì có kế hoạch + kiểm tra sau restart (`bot_maint`, 2026-10-06)
+
+- Trước bảo trì ĐỊNH KỲ: đặt cửa sổ bảo trì để bot tự hủy bid dip đang chờ + không vào lệnh book mới
+  (từ trước giờ bắt đầu 30 phút tới hết giờ kết thúc; stop/TP/backstop và chân carry giữ nguyên trên sàn):
+
+```bat
+REM Cách 1: flag khi khởi động runner (giờ UTC ISO):
+REM .venv\Scripts\python.exe -m bot.run --mode paper --equity 5000 --corr-size --dip-mult 1.7 --bear-book --dip-gross-cap 2.0 --tag d17bfg2 --maint-start 2026-10-07T01:00:00Z --maint-end 2026-10-07T03:00:00Z
+
+REM Cách 2 (khuyên dùng): ghi file, bot đọc mỗi vòng 20s, xóa/sửa không cần restart:
+REM artifacts/bot/paper_d17bfg2/maintenance.json = {"start": "2026-10-07T01:00:00Z", "end": "2026-10-07T03:00:00Z"}
+```
+
+- Kiểm tra trong `actions.jsonl`: `op=maint_cancel` (đã chặn/hủy lệnh mới) rồi `op=maint_resume` (chạy lại).
+  Mặc định không flag/không file = bot chạy y hệt cũ.
+- Sau MỌI lần restart (reboot/mất điện/mất mạng): runner tự ghi `op=protection_check` liệt kê từng mảnh
+  đang mở và stop/TP native còn trên sàn hay không. Người trực chạy `bot_health.py`: dòng
+  `CRITICAL: open without stop+TP` phải trống mới cho bot chạy tiếp; nếu còn mảnh thiếu stop thì chờ bot đặt
+  lại (<= 20s, quá 2 vòng tự đóng market `unprotected_close`), không đặt tay trong giờ đầu.
+
 ## 5. Vốn, margin, đòn bẩy (cài đặt tài khoản Bybit từ oc_margin, 2026-10-06)
 
 - Tối thiểu **5000 USDT, tốt nhất ~10000 USDT** (`docs/DEPLOYMENT_PLAN_VI.md`). Dưới mức này bậc dip BTC < 0,001 BTC bị bỏ (`skipped_below_minimum`): 10.000 đặt được 100% book / 98% dip; 5.000: 96% / 94%; 2.000: 80% / 81% (mất ~5–20%).
@@ -230,3 +250,29 @@ vs book triển khai 5.601/16.91 → REJECTED; C2 cũng rejected; hướng đón
 - Screens đóng: oc_carrytopup CLOSE (top-up 7d f=0.125 lỗ cả 5/5 năm hai venue + stack phải vay) [oc_carrytopup]; oc_bidttl NOT PROMISING (TTL 120' mất
 -1.339 5y, late fills toàn winner 59-69%) [oc_bidttl]; oc_marktrig NOT PROMISING (sum 4/5 nhưng DD 2/5, mark fire sớm hơn trong crash) — giữ last-price
 [oc_marktrig].
+
+## 12. Sao lưu file untracked (`scripts/snapshot_untracked.py`, 2026-10-06)
+
+- Vì sao: ngày 2026-10-06 một worker chạy `git stash -u` làm mất ~860 file untracked khỏi cây làm việc
+  (file untracked không nằm trong git theo thiết kế — AGENTS.md: kết quả để local). Script này chụp nhanh
+  để lần sau khôi phục được. GIT READ-ONLY: script chỉ ĐỌC qua `git ls-files`, không bao giờ
+  stash/reset/checkout/clean/commit, không bao giờ sửa/xóa file nguồn.
+- Phạm vi: file untracked + gitignored dưới `research/`, `docs/opencode/`, `tests/` và
+  `artifacts/bot/*/{state.json,actions.jsonl,exchange.json}` (loại `data/raw`, `models`, file > 50 MB,
+  `__pycache__`). Zip đích: `artifacts/backups/untracked_<UTC>.zip` gồm file (đường dẫn tương đối) +
+  `manifest.json` (mỗi mục: path, size, sha256). Giữ 14 bản mới nhất; chỉ xóa zip snapshot cũ do chính
+  script tạo, không chạm gì khác.
+
+```bat
+REM Xem kế hoạch trước (không ghi gì):
+.venv\Scripts\python.exe scripts/snapshot_untracked.py --dry-run
+
+REM Chụp thật + tỉa bản cũ:
+.venv\Scripts\python.exe scripts/snapshot_untracked.py
+
+REM Liệt kê nội dung một bản (không ghi gì):
+.venv\Scripts\python.exe scripts/snapshot_untracked.py --restore-list artifacts/backups/untracked_<UTC>.zip
+```
+
+- Kiểm thử: `tests/test_snapshot_untracked.py` (repo git tạm, không chạm cây thật). Chạy tay định kỳ
+  trước các đợt dọn git (stash/clean/reset) và sau mỗi tuần paper.

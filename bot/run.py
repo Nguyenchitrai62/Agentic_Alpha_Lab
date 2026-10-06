@@ -39,6 +39,11 @@ ROOT = Path(__file__).resolve().parents[1]
 PLAN = ROOT / "artifacts/research/advisor_shadow/trade_plan_v376.json"
 SYMS = ["BTCUSDT", "ETHUSDT", "SOLUSDT", "BNBUSDT", "XRPUSDT"]
 STALE_PLAN = pd.Timedelta(hours=4, minutes=30)  # a 4h plan is valid until the next bar plan (+ generation delay)
+# Maintenance window (bot_maint): opt-in only. From 30 minutes before the window
+# start until the window end the bot places no new dip bids / book entries and
+# cancels resting dip bids + unfilled book entry limits. Protection (TP/SL /
+# backstops) and carry legs are untouched. Default (no flags, no file): inactive.
+MAINT_PRE_MIN = 30.0
 # Cycle instrumentation (bot_cycletime): wall-time budget per stage. Thresholds
 # match the assignment: slow_cycle > 60 s, lock_wait > 10 s (cache-lock wait).
 SLOW_CYCLE_S = 60.0
@@ -48,6 +53,47 @@ LOCK_WAIT_WARN_S = float(KLINE_CACHE_LOCK_WARN_S)
 def _cycle_now() -> float:
     """Monotonic clock for cycle timing (patched with fake clocks in tests)."""
     return time.perf_counter()
+
+
+def _parse_maint_ts(x):
+    """Parse an opt-in maintenance ISO timestamp (UTC) or None when unset/invalid."""
+    if x is None:
+        return None
+    try:
+        if isinstance(x, str) and not x.strip():
+            return None
+    except AttributeError:
+        pass
+    try:
+        t = pd.Timestamp(x)
+    except (TypeError, ValueError):
+        return None
+    try:
+        if t.tzinfo is None:
+            t = t.tz_localize("UTC")
+        else:
+            t = t.tz_convert("UTC")
+    except (TypeError, ValueError, AttributeError):
+        pass
+    return t
+
+
+def maint_active_at(now, start, end, pre_min: float = MAINT_PRE_MIN) -> bool:
+    """True while a maintenance window suppresses new entries: start-30min <= now <= end.
+
+    Pure function of explicit timestamps (tests use fake clocks); invalid or
+    missing bounds are inactive.
+    """
+    if start is None or end is None:
+        return False
+    try:
+        n, s, e = pd.Timestamp(now), pd.Timestamp(start), pd.Timestamp(end)
+    except (TypeError, ValueError):
+        return False
+    try:
+        return (s - pd.Timedelta(minutes=float(pre_min))) <= n <= e
+    except (TypeError, ValueError):
+        return False
 
 
 def parse_dip_sl_coin(items) -> dict:
@@ -161,7 +207,8 @@ class Runner:
     def __init__(self, mode: str, plan_path: Path, equity: float | None, risk_mult: float = 1.0, corr: bool = False,
                  tag: str | None = None, dip_mult: float = 1.0, bear_book: bool = False,
                  dip_cooldown_h: float = 0.0, dip_sl_coin: dict | None = None, dip_gross_cap: float | None = None,
-                 adopt_fresh: bool = False, no_risk_guard: bool = False, carry_f: float = 0.0):
+                 adopt_fresh: bool = False, no_risk_guard: bool = False, carry_f: float = 0.0,
+                 maint_start=None, maint_end=None):
         self.mode, self.plan_path = mode, plan_path
         self.risk_mult, self.corr, self.tag, self.dip_mult = float(risk_mult), bool(corr), tag or None, float(dip_mult)
         self.bear_book = bool(bear_book)
@@ -181,6 +228,11 @@ class Runner:
         self._bear = False
         self._last_plan = None
         self._skip_logged = {}
+        # bot_maint (opt-in, default inactive): --maint-start/--maint-end flags,
+        # or per-cycle maintenance.json in the state dir (file wins when valid).
+        self.maint_start = _parse_maint_ts(maint_start)
+        self.maint_end = _parse_maint_ts(maint_end)
+        self._maint_active = False
         self._kline_cache_dir_override = None
         self.dir = ROOT / "artifacts/bot" / (mode if not self.tag else f"{mode}_{self.tag}")
         self.dir.mkdir(parents=True, exist_ok=True)
@@ -201,6 +253,147 @@ class Runner:
                 self.log(dict(op="hedge_mode", note=str(e)))
         self.equity_arg = equity
         self.inst = self.ex.instruments(SYMS)
+        # bot_maint: startup protection check after every restart (never fatal).
+        try:
+            self._startup_protection_check()
+        except Exception:
+            pass
+
+    def maint_window(self):
+        """Effective (start, end) maintenance window: per-cycle maintenance.json wins when valid, else flags.
+
+        File: <state dir>/maintenance.json with {"start": ISO, "end": ISO} (UTC;
+        "maint_start"/"maint_end" spellings also accepted). A present-but-empty
+        or invalid file means no window (cleared). Missing file -> flag values
+        (default None/None = inactive, bit-for-bit unchanged behaviour).
+        """
+        try:
+            mf = self.dir / "maintenance.json"
+        except (AttributeError, TypeError):
+            mf = None
+        if mf is not None:
+            try:
+                if mf.exists():
+                    raw = json.loads(mf.read_text(encoding="utf-8"))
+                    if isinstance(raw, dict):
+                        s = _parse_maint_ts(raw.get("start", raw.get("maint_start")))
+                        e = _parse_maint_ts(raw.get("end", raw.get("maint_end")))
+                        if s is not None and e is not None:
+                            return s, e
+                    return None, None
+            except (OSError, ValueError, AttributeError):
+                pass
+        return getattr(self, "maint_start", None), getattr(self, "maint_end", None)
+
+    def _maint_is_active(self, now) -> bool:
+        """True inside the maintenance suppression window; logs op=maint_resume on exit."""
+        try:
+            s, e = self.maint_window()
+        except Exception:
+            s, e = None, None
+        try:
+            active = bool(maint_active_at(now, s, e))
+        except Exception:
+            active = False
+        try:
+            was = bool(getattr(self, "_maint_active", False))
+        except Exception:
+            was = False
+        try:
+            self._maint_active = bool(active)
+        except Exception:
+            pass
+        if was and not active:
+            try:
+                self.log(dict(op="maint_resume"))
+            except Exception:
+                pass
+        return active
+
+    def _maint_resting_entries(self, have) -> list:
+        """Resting dip-bid / book-entry links (kind == 'entry') present in `have`."""
+        out = []
+        try:
+            links = (self.state or {}).get("links") or {}
+        except (AttributeError, TypeError):
+            return out
+        try:
+            items = list((have or {}).items())
+        except (AttributeError, TypeError):
+            return out
+        for link, _h in items:
+            try:
+                if _is_carry_link(link):
+                    continue
+            except Exception:
+                pass
+            try:
+                kind = ((links.get(link) or {}).get("order") or {}).get("kind")
+            except (AttributeError, TypeError):
+                continue
+            if kind == "entry":
+                out.append(link)
+        return out
+
+    def _startup_protection_check(self):
+        """Startup check after every restart: list each open piece and verify its
+        native backstop/TP still rests (op=protection_check).
+
+        An open piece without BOTH a resting stop and TP is already a CRITICAL
+        line in scripts/bot_health.py (`unprotected`); this log is the restart
+        trigger for that check.
+        """
+        try:
+            have = self.have()
+        except Exception as e:
+            self.log(dict(op="protection_check", error=f"{type(e).__name__}: {e}"[:200]))
+            return dict(open=[], missing=[], error=True)
+        try:
+            ledger = (self.state or {}).get("ledger") or {}
+        except (AttributeError, TypeError):
+            ledger = {}
+        try:
+            links = (self.state or {}).get("links") or {}
+        except (AttributeError, TypeError):
+            links = {}
+        open_pids, missing = [], []
+        try:
+            items = list(ledger.items())
+        except AttributeError:
+            items = []
+        for pid, pc in items:
+            if not isinstance(pc, dict):
+                continue
+            try:
+                qty = float(pc.get("qty", 0.0))
+            except (TypeError, ValueError):
+                continue
+            if not qty > 0:
+                continue
+            open_pids.append(pid)
+            stop_ok = tp_ok = False
+            if (pid + "S") in (have or {}):
+                stop_ok = True
+            if (pid + "T") in (have or {}):
+                tp_ok = True
+            if not (stop_ok and tp_ok):
+                # metadata fallback for nonstandard link ids (same piece/kind)
+                for link in (have or {}):
+                    try:
+                        o = ((links.get(link) or {}).get("order") or {})
+                    except (AttributeError, TypeError):
+                        continue
+                    if o.get("piece") != pid:
+                        continue
+                    if o.get("kind") == "stop":
+                        stop_ok = True
+                    elif o.get("kind") == "tp":
+                        tp_ok = True
+            if not (stop_ok and tp_ok):
+                need = "/".join(x for x, ok in (("stop", stop_ok), ("tp", tp_ok)) if not ok)
+                missing.append(f"{pid}({pc.get('symbol')}:no-{need})")
+        self.log(dict(op="protection_check", open=open_pids, missing=missing))
+        return dict(open=open_pids, missing=missing)
 
     def log(self, rec: dict):
         rec = dict(t=str(pd.Timestamp.now(tz="UTC")), mode=self.mode, **rec)
@@ -741,6 +934,12 @@ class Runner:
                     pass
                 _stages["sync_ms"] += (_cycle_now() - _t) * 1000.0
                 led = self.state["ledger"]
+                # bot_maint: no entries exist on this path (protection-only), but
+                # still track the window so op=maint_resume fires on exit.
+                try:
+                    self._maint_is_active(now)
+                except Exception:
+                    pass
                 _t = _cycle_now()
                 try:
                     last5 = self.last5()
@@ -905,6 +1104,23 @@ class Runner:
         if stale:
             want = {k: o for k, o in want.items() if o.kind in ("tp", "stop", "reduce")}
             self.log(dict(op="stale_plan", generated_at=plan["generated_at"]))
+        # bot_maint (opt-in window): suppress NEW entries (dip bids + book
+        # entries, kind == "entry"); protection (tp/stop/reduce) and carry legs
+        # are untouched. Resting entries cancel via diff() below; the marker op
+        # is logged once have_before is known. Default (no window): unchanged.
+        _maint_on = False
+        try:
+            _maint_on = bool(self._maint_is_active(now))
+        except Exception:
+            _maint_on = False
+        _maint_blocked: list = []
+        if _maint_on:
+            try:
+                _maint_blocked = [k for k, o in want.items() if o.kind == "entry"]
+            except (AttributeError, TypeError):
+                _maint_blocked = []
+            if _maint_blocked:
+                want = {k: o for k, o in want.items() if o.kind != "entry"}
         # PRE-TRADE GUARD (testnet review 2026-10-06 V4, exact call site): filter
         # `want` after stale/plan_error trimming and before rounding/diff.
         # Prices = last closed 1m closes (lc) falling back to 5m closes/plan
@@ -916,6 +1132,16 @@ class Runner:
         _t = _cycle_now()
         have_before = self.have()
         _stages["sync_ms"] += (_cycle_now() - _t) * 1000.0
+        if _maint_on:
+            # bot_maint marker: which new entries were blocked and which resting
+            # entry limits will cancel via diff() below (oc_outage runbook rule).
+            try:
+                _maint_cancels = [l for l in self._maint_resting_entries(have_before) if l not in want]
+            except Exception:
+                _maint_cancels = []
+            if _maint_blocked or _maint_cancels:
+                self.log(dict(op="maint_cancel", blocked_new=sorted(_maint_blocked),
+                              cancel_resting=sorted(_maint_cancels)))
         _t = _cycle_now()
         rounded, skipped = {}, []
         for k, o in want.items():
@@ -1050,6 +1276,8 @@ def main():
     ap.add_argument("--no-risk-guard", action="store_true", help="disable the pre-trade risk guard (testnet/live: guard ON by default)")
     ap.add_argument("--risk-guard", action="store_true", help="enable the pre-trade risk guard in paper/dry (default off there so paper stays engine-faithful)")
     ap.add_argument("--carry-f", type=float, default=0.0, metavar="F", help="cash-and-carry sleeve fraction per leg per coin (default 0 = off, orders bit-for-bit unchanged)")
+    ap.add_argument("--maint-start", default=None, metavar="ISO", help="opt-in maintenance window start, UTC ISO (default off; suppression runs from start-30min until --maint-end)")
+    ap.add_argument("--maint-end", default=None, metavar="ISO", help="opt-in maintenance window end, UTC ISO (default off; or use <state dir>/maintenance.json, read each cycle)")
     a = ap.parse_args()
     if a.mode == "live" and os.environ.get("BOT_ALLOW_LIVE") != "yes-real-money":
         sys.exit("live trading is locked: the account owner must set BOT_ALLOW_LIVE=yes-real-money")
@@ -1060,7 +1288,7 @@ def main():
              bear_book=a.bear_book, dip_cooldown_h=a.dip_cooldown_h, dip_sl_coin=parse_dip_sl_coin(a.dip_sl_coin),
              dip_gross_cap=a.dip_gross_cap, adopt_fresh=a.adopt_fresh,
              no_risk_guard=a.no_risk_guard or (a.mode in ("paper", "dry") and not a.risk_guard),
-             carry_f=a.carry_f)
+             carry_f=a.carry_f, maint_start=a.maint_start, maint_end=a.maint_end)
     while True:
         try:
             r.cycle()
