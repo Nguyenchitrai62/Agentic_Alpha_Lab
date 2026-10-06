@@ -1,0 +1,14 @@
+{
+ "kernel": "nguynchtrai/oc-c2-rank-calibrated",
+ "account": "nguynchtrai",
+ "dataset": "nguynchtrai/oc-c2-rank-calibrated-data",
+ "pushed_utc": "2026-10-06T04:26:47",
+ "kernel_version": 1,
+ "private": true,
+ "files_sha256": {
+  "c2_rank_calibrated.py": "9088d311702c72c5afd7aadb39debe899519c608985043e7bc7e7f9014cb8ad7",
+  "common_impl.py": "8b5b4ff13f876060be751c322335768f8f44ad602c0ed35c4c46e2a39d52353b",
+  "kernel-metadata.json": "164e7416b9eb165c6222b1901f6937642d3ce32e7e7f6c92703cec7bd3428c42",
+  "kernel_run.py": "345320fb7f1deb8787e855dd99b410f4ee1ce9b304cb2ec34f93244ba5427a2a"
+ }
+}
