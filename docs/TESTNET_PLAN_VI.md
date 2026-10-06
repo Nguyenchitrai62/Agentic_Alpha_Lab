@@ -55,7 +55,7 @@ Chỉ gọi endpoint V5 đọc (signed GET + public), không bao giờ POST nên
 ## 4. Lệnh chạy testnet duy nhất trong 7 ngày (đóng băng, không đổi flags giữa chừng)
 
 ```bat
-.venv\Scripts\python.exe -m bot.run --mode testnet --corr-size --dip-mult 1.7 --bear-book --dip-gross-cap 2.0 --carry-f 0.25 --tag tnetg2c
+.venv\Scripts\python.exe -m bot.run --mode testnet --corr-size --dip-mult 1.7 --bear-book --dip-gross-cap 2.0 --adopt-fresh --carry-f 0.25 --interval 25 --tag tnetg2c
 ```
 
 - State: `artifacts/bot/testnet_tnetg2c/state.json`, mọi hành động: `actions.jsonl` cùng thư mục. Không chạy 2 tiến trình cùng tag/dir (kẹt `runner.lock`).
