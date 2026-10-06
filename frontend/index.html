@@ -65,6 +65,7 @@
 
     <!-- ===================== live market ===================== -->
     <section id="view-todo" class="view page todo" hidden>
+      <div id="planFreshBanner" class="fresh-banner" hidden role="alert" aria-live="assertive"></div>
       <div class="page-bar">
         <div class="pipe-status" id="pipeStatus"></div>
         <label class="eq-in">Vốn của bạn <input type="number" id="eqInput" min="10" step="100" inputmode="decimal" /> USDT</label>
@@ -109,6 +110,7 @@
           <div class="panel-h"><span>Danh sách theo dõi</span><span class="muted small" id="wsState">● realtime</span></div>
           <table class="wl" id="watchlist"></table>
         </div>
+        <div id="planFreshBannerLive" class="fresh-banner" hidden role="alert" aria-live="assertive"></div>
         <div class="panel plan" id="planPanel"></div>
       </aside>
     </section>

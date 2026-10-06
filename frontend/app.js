@@ -53,6 +53,37 @@
     clearTimeout(toast._t); toast._t = setTimeout(() => (el.hidden = true), ms);
   }
 
+  // ---- plan freshness (ops_festale 2026-10-06): banner when the plan is stale or the API is unreachable
+  const FRESH_WARN_MS = 75 * 60 * 1000;   // 1h15m -> warning
+  const FRESH_CRIT_MS = 270 * 60 * 1000;  // 4h30m -> critical, do not place new orders
+  function planFreshState() {
+    if (state.live.planFetchFailed) return { level: "offline" };
+    const g = state.live.plan && state.live.plan.generated_at;
+    const t = g ? Date.parse(g) : NaN;
+    if (!isFinite(t)) return { level: state.live.planLoading ? "loading" : "unknown" };
+    const age = Date.now() - t;
+    if (age >= FRESH_CRIT_MS) return { level: "crit", age };
+    if (age >= FRESH_WARN_MS) return { level: "warn", age };
+    return { level: "ok", age };
+  }
+  function renderFreshBanners() {
+    const st = planFreshState();
+    const html = st.level === "offline"
+      ? `Mất kết nối máy chủ — không tải được kế hoạch mới. KHÔNG đặt lệnh mới.<small>Kiểm tra mạng / backend rồi tải lại.</small>`
+      : st.level === "crit"
+        ? `Kế hoạch đã cũ — KHÔNG đặt lệnh mới.<small>Kế hoạch cập nhật lúc ${dt(Date.parse(state.live.plan.generated_at))} (hơn 4 giờ 30 phút trước) — chờ chu kỳ 4h kế tiếp.</small>`
+        : st.level === "warn"
+          ? `Cảnh báo: kế hoạch đã cũ hơn 1 giờ 15 phút — kiểm tra lại trước khi đặt lệnh.<small>Cập nhật lúc ${dt(Date.parse(state.live.plan.generated_at))}.</small>`
+          : "";
+    for (const id of ["planFreshBanner", "planFreshBannerLive"]) {
+      const el = $(id); if (!el) continue;
+      if (!html || !planPipe()) { el.hidden = true; el.innerHTML = ""; continue; }
+      el.hidden = false;
+      el.className = "fresh-banner " + (st.level === "offline" ? "offline" : st.level === "crit" ? "crit" : "warn");
+      el.innerHTML = html;
+    }
+  }
+
   let refreshFlight = null, authEpoch = 0;
   function applySession(out) {
     state.session = out; state.token = out.access_token; state.user = out.user;
@@ -297,14 +328,15 @@
     const gen = ++planGeneration, pipe = planPipe();
     state.live.latest = null;  // the retired v205 live signal is no longer computed; everything comes from the selected pipeline's plan
     if (!pipe) { state.live.plan = null; state.live.paper = []; state.live.planLoading = false; return; }
-    state.live.planLoading = true;
+    state.live.planLoading = true; state.live.planFetchFailed = false;
     const [plan, paper] = await Promise.all([
-      api(`/api/trade_plan?pipeline=${pipe}`).catch(() => null),
+      api(`/api/trade_plan?pipeline=${pipe}`).catch((e) => { state.live.planFetchFailed = true; return null; }),
       Promise.all(visiblePipes().map((p) => p.v).map((v) =>
         api(`/api/trade_plan?pipeline=${v}`).then((pl) => [v, pl]).catch(() => [v, null]))),
     ]);
     if (gen !== planGeneration || pipe !== planPipe() || !state.user) return;
     state.live.plan = plan; state.live.paper = paper; state.live.planLoading = false;
+    if (!plan && !state.live.planFetchFailed) state.live.planFetchFailed = false;
     if (state.user.role === "admin" && !state.live.conf) state.live.conf = await api("/api/confidence").catch(() => null);
   }
   async function loadLive() {
@@ -312,8 +344,8 @@
     try {
       await loadEvidence();
       await loadPlans();
-      renderWatchlist(); renderPlan(); updateTitle();
-    } catch (e) { toast(e.message); }
+      renderWatchlist(); renderPlan(); updateTitle(); renderFreshBanners();
+    } catch (e) { state.live.planFetchFailed = true; renderFreshBanners(); toast(e.message); }
   }
   async function renderPipeStatus() {
     const el = $("pipeStatus"); if (!el) return;
@@ -337,7 +369,7 @@
   function clearPipelineData() {
     planGeneration++; perfGeneration++;
     state.live.plan = null; state.live.paper = []; state.h.pipe = null; state.h.selected = null; state.perfPipe = null;
-    state.live.planLoading = false;
+    state.live.planLoading = false; state.live.planFetchFailed = false;
     ++H.gen;
     if (H.chart) { H.chart.remove(); H.chart = null; }
     if (H.ws) { H.ws.close(); H.ws = null; }
@@ -430,8 +462,8 @@
       await loadEvidence();
       if (pipeOf(planPipe())?.product !== product()) await ensureProductPipe();
       await loadPlans();
-      renderProduct(); renderGoals(); renderPipeBar(); renderBoard(); renderCards(); renderProductPanels(); renderCarry(); updateTitle();
-    } catch (e) { toast(e.message); }
+      renderProduct(); renderGoals(); renderPipeBar(); renderBoard(); renderCards(); renderProductPanels(); renderCarry(); updateTitle(); renderFreshBanners();
+    } catch (e) { state.live.planFetchFailed = true; renderFreshBanners(); toast(e.message); }
   }
 
   // ---- executable trade plan (trade mode): what should be on the exchange now
@@ -593,7 +625,8 @@
     });
     if (gen !== planGeneration || v !== planPipe() || !state.user) return;
     state.live.plan = plan; state.live.planLoading = false;
-    renderPipeBar(); renderBoard(); renderCards(); renderWatchlist(); renderPlan(); renderEvidence(); renderGoals(); renderProductPanels();
+    if (!plan) state.live.planFetchFailed = true;
+    renderPipeBar(); renderBoard(); renderCards(); renderWatchlist(); renderPlan(); renderEvidence(); renderGoals(); renderProductPanels(); renderFreshBanners();
   }
   function renderPipeBar() {
     if (!$("pipeBar")) return;  // the Pipeline tab now selects pipelines in the training-results table
@@ -1554,6 +1587,7 @@
 
   // ------------------------------------------------------------------ boot
   setInterval(() => { if (state.view === "live" && state.user && state.user.role !== "pending" && !document.hidden) loadLive(); }, 120000);
+  setInterval(() => { if (state.user && state.user.role !== "pending" && !document.hidden) renderFreshBanners(); }, 60000);
   setInterval(async () => {
     if (!state.user || document.hidden) return;
     try { await syncAccountAccess(); } catch (e) { toast(e.message); return; }
