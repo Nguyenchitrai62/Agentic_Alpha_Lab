@@ -570,35 +570,38 @@ def test_dip_gross_cap_off_reproduces_old_outputs():
 
 
 def test_dip_gross_cap_shallow_first_cut_and_drop():
-    # frac 0.5 x equity 10000 -> 5000 notional per rung; sub equity 0.25 x 10000 = 2500; G=2 -> room 5000
+    # ENGINE-FAITHFUL (bot_capfix): every resting bid is min(normal size, room) where
+    # room = G x sub equity - OPEN filled notional (NOT minus other resting bids).
+    # frac 0.5 x equity 10000 -> 5000 notional per rung; sub equity 0.25 x 10000 = 2500; G=2 -> room 5000.
     q = plan(dips=[dip(2.5, frac=0.5), dip(3.0, frac=0.5), dip(4.0, frac=0.5)])
     now = T0 + pd.Timedelta(minutes=20)
     assert len(mirror.desired(q, now, 10000, {})) == 2  # guard: budget admits shallow 2.5 + 3.0
     w = mirror.desired(q, now, 10000, {}, dip_gross_cap=2.0)
-    assert len(w) == 1  # only one 5000 rung fits the 5000 room
-    (o,) = w.values()
-    assert abs(_notional(o) - 5000.0) < 1e-6
-    # shallow-first: the survivor is rung 2.5
-    assert o.link == mirror.dip_pid(0, "BTCUSDT", 2.5, T0) + "E"
-    # partial cut: frac 0.05 -> 500 each; G=0.3 -> room 750: first full, second cut to 250
+    assert len(w) == 2  # each bid min(5000, 5000) stays whole; total 10000 <= 2 x G x sub safety bound
+    assert sorted(_notional(o) for o in w.values()) == [5000.0, 5000.0]
+    # the shallowest rungs survive with full size (no cumulative drop)
+    assert set(o.link for o in w.values()) == {mirror.dip_pid(0, "BTCUSDT", k, T0) + "E" for k in (2.5, 3.0)}
+    # single bid bigger than the room is cut to the room: frac 0.5 -> 5000 vs G=0.3 -> room 750
+    q1 = plan(dips=[dip(2.5, frac=0.5)])
+    w1 = mirror.desired(q1, now, 10000, {}, dip_gross_cap=0.3)
+    (o1,) = w1.values()
+    assert abs(_notional(o1) - 750.0) < 1e-6
+    full1 = next(iter(mirror.desired(q1, now, 10000, {}).values()))
+    assert w1[o1.link].price == full1.price  # never chase price
+    assert abs(o1.meta["frac"] / full1.meta["frac"] - 750.0 / 5000.0) < 1e-12
+    # independent (not cumulative): two 500 bids with room 750 are BOTH kept whole
     q2 = plan(dips=[dip(2.5), dip(3.0), dip(4.0)])
     b0 = mirror.desired(q2, now, 10000, {})
     assert len(b0) == 3
     w2 = mirror.desired(q2, now, 10000, {}, dip_gross_cap=0.3)
-    assert len(w2) == 2
-    by_rung = sorted((_notional(o) for o in w2.values()), reverse=True)
-    assert abs(by_rung[0] - 500.0) < 1e-6 and abs(by_rung[1] - 250.0) < 1e-6
-    assert abs(sum(_notional(o) for o in w2.values()) - 750.0) < 1e-6
-    # the cut rung keeps its price (never chase) and scales frac proportionally
-    full = {k: o for k, o in b0.items()}
-    cut_links = [k for k in w2 if abs(_notional(w2[k]) - 250.0) < 1e-6]
-    assert len(cut_links) == 1
-    k = cut_links[0]
-    assert w2[k].price == full[k].price
-    assert abs(w2[k].meta["frac"] / full[k].meta["frac"] - 0.5) < 1e-12
+    assert len(w2) == 3  # each 500 <= 750; total 1500 == 2 x G x sub safety bound exactly
+    assert sorted(_notional(o) for o in w2.values()) == [500.0, 500.0, 500.0]
+    for k in w2:
+        assert abs(w2[k].qty - b0[k].qty) < 1e-12 and w2[k].price == b0[k].price
 
 
 def test_dip_gross_cap_open_reduces_room_and_per_phase():
+    # ENGINE-FAITHFUL (bot_capfix): room = G x sub equity - OPEN notional; every resting bid cut to it.
     q = plan(dips=[dip(2.5), dip(3.0), dip(4.0)])
     now = T0 + pd.Timedelta(minutes=20)
     (k0, o0), = [(k, o) for k, o in mirror.desired(q, now, 10000, {}).items()
@@ -607,19 +610,27 @@ def test_dip_gross_cap_open_reduces_room_and_per_phase():
     mirror.apply_fill(led, o0, o0.qty, 78000.0, T0 + pd.Timedelta(minutes=21))
     (pid,) = led
     open_not = led[pid]["qty"] * led[pid]["entry"]
-    # sub equity 2500, G=0.3 -> room 750; open ~500 leaves 250 for the resting bids
+    # sub equity 2500, G=0.3 -> room 750; open ~500 leaves 250: EACH remaining bid min(500, 250) = 250
     w = mirror.desired(q, now, 10000, led, dip_gross_cap=0.3)
     entries = [o for o in w.values() if o.kind == "entry"]
-    rest_not = sum(_notional(o) for o in entries)
-    assert abs(open_not + rest_not - 750.0) < 1e-4
+    assert len(entries) == 2
+    assert all(abs(_notional(o) - 250.0) < 1e-4 for o in entries)
     assert not [o for o in entries if o.piece == pid]  # filled rung never re-bids while open
-    # per-phase isolation: a phase-1 stop-free book is unaffected by the phase-0 cap
+    # after the fill the remaining bids shrink (recomputed every cycle)
+    assert abs(open_not - 500.0) < 1e-4
+    # per-phase isolation: phase 1 has no open piece so both bids rest whole (each 500 <= room 750)
     p2 = {"generated_at": str(T0), "phases": [{"phase": p, "capital": 0.25} for p in range(2)],
           "coins": {"BTCUSDT": {"subs": [], "dips": [dip(2.5, phase=0), dip(3.0, phase=0),
                                                      dip(2.5, phase=1), dip(3.0, phase=1)]}}}
     w2 = mirror.desired(p2, now, 10000, led, dip_gross_cap=0.3)
     ph1 = [o for o in w2.values() if o.kind == "entry" and o.meta.get("phase") == 1]
-    assert abs(sum(_notional(o) for o in ph1) - 750.0) < 1e-4  # full room, no open in phase 1
+    assert len(ph1) == 2 and all(abs(_notional(o) - 500.0) < 1e-4 for o in ph1)
+    ph0 = [o for o in w2.values() if o.kind == "entry" and o.meta.get("phase") == 0]
+    assert len(ph0) == 1 and abs(_notional(ph0[0]) - 250.0) < 1e-4  # 2.5 filled, 3.0 cut to the 250 room
+    # no room at all (open >= G x sub): all resting bids of that phase drop, other phases untouched
+    w3 = mirror.desired(p2, now, 10000, led, dip_gross_cap=0.2)  # G x sub = 500 <= open 500
+    assert [o for o in w3.values() if o.kind == "entry" and o.meta.get("phase") == 0] == []
+    assert len([o for o in w3.values() if o.kind == "entry" and o.meta.get("phase") == 1]) == 2
 
 
 def test_dip_gross_cap_never_touches_book_or_protection():
@@ -638,14 +649,31 @@ def test_dip_gross_cap_never_touches_book_or_protection():
     w1 = mirror.desired(plan(), now, 10000, led, dip_gross_cap=0.0001)
     assert set(w1) == set(w0) and all(abs(w1[k].qty - w0[k].qty) < 1e-12 for k in w0)
     # a cut resting bid amends qty only when the runner allows entry-qty amends
-    q = plan(dips=[dip(2.5), dip(3.0)])
+    # ENGINE-FAITHFUL (bot_capfix): two 500 bids with room 750 are both whole, so use a
+    # single oversized bid (5000 vs room 750) to exercise the amend path
+    q = plan(dips=[dip(2.5, frac=0.5)])
     b0 = mirror.desired(q, now, 10000, {})
     wcut = mirror.desired(q, now, 10000, {}, dip_gross_cap=0.3)
-    (klink,) = [k for k in wcut if abs(_notional(wcut[k]) - 250.0) < 1e-6]
+    (klink,) = list(wcut)
+    assert abs(_notional(wcut[klink]) - 750.0) < 1e-6
     have = {k: dict(symbol=o.symbol, price=o.price, qty=o.qty) for k, o in b0.items()}
     assert mirror.diff(wcut, have) == []  # default: entry qty changes never amend
     acts = mirror.diff(wcut, have, amend_entry_qty=True)
     assert acts == [dict(op="amend", link=klink, symbol="BTCUSDT", qty=wcut[klink].qty)]
+
+
+def test_dip_gross_cap_safety_bound_caps_total_at_twice_g():
+    # Hard safety bound (bot_capfix): open + resting <= 2 x G x sub equity.
+    # Four 500 bids, G=0.3: room 750 keeps each whole, but total 2000 > 2 x 750 = 1500,
+    # so the bound drops the deepest bid shallow-first (keeps 2.5/3.0/3.5, drops 4.0).
+    q = plan(dips=[dip(2.5), dip(3.0), dip(3.5), dip(4.0)])
+    now = T0 + pd.Timedelta(minutes=20)
+    assert len(mirror.desired(q, now, 10000, {})) == 4  # guard: budget admits all four
+    w = mirror.desired(q, now, 10000, {}, dip_gross_cap=0.3)
+    got = sorted(_notional(o) for o in w.values())
+    assert got == [500.0, 500.0, 500.0]  # 1500 == 2 x G x sub exactly
+    assert mirror.dip_pid(0, "BTCUSDT", 4.0, T0) + "E" not in w  # deepest dropped by the bound
+    assert mirror.dip_pid(0, "BTCUSDT", 2.5, T0) + "E" in w  # shallowest kept
 
 
 # ---- bot_bookgap: dust remainders + in-flight double-spend (window 2026-09-01..09-23) ----

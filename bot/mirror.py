@@ -483,14 +483,17 @@ def desired(plan: dict, now, equity: float, ledger: dict, budget: float = BUDGET
         except (TypeError, ValueError):
             _g = 0.0
         if _g > 0:
-            # Optional dip gross-notional cap (engine sleeve_gross_cap mirror, conservative):
-            # per phase sub-book, open filled dip notional + resting dip entry bids <= G x sub equity,
-            # sub equity = equity x the phase cap used by the budget rule. The room left
-            # (G x sub equity - open dip notional) is allocated to the resting bids in the same
-            # order desired() already admits them (shallow rung first, then phase, then symbol,
-            # i.e. out insertion order per phase); the last admitted bid is cut to the remaining
-            # room and the rest are dropped. Recomputed every cycle (runner amends qty, never price).
-            # Book orders and protection (tp/stop/reduce) are never touched.
+            # Optional dip gross-notional cap (engine sleeve_gross_cap mirror, engine-faithful, bot_capfix):
+            # per phase sub-book, every resting dip bid is sized min(its normal size, room) where
+            # room = G x sub equity - notional of OPEN filled dip pieces of that phase
+            # (NOT minus other resting bids), matching the engine which only cuts a rung at its
+            # FILL minute to (G - notional of rungs open at that minute). Recomputed every cycle
+            # (runner amends qty down/up, never price), so after a fill the remaining bids shrink.
+            # Residual risk: several bids filling inside one cycle can exceed G by at most the sum
+            # of their sizes, which the engine also cannot see within a minute. Hard safety bound:
+            # total open + resting dip notional <= 2 x G x sub equity (enforced shallow-first only
+            # when the per-bid room step still leaves the total above 2G). Book orders and
+            # protection (tp/stop/reduce) are never touched.
             try:
                 _eq = float(equity)
             except (TypeError, ValueError):
@@ -529,6 +532,10 @@ def desired(plan: dict, now, equity: float, ledger: dict, budget: float = BUDGET
                 except (TypeError, ValueError):
                     _sub_eq = _eq * 0.25
                 _room = _g * _sub_eq - _open.get(_ph, 0.0)
+                if _room <= 1e-12:
+                    for _link in _links:
+                        out.pop(_link, None)
+                    continue
                 for _link in _links:
                     _o = out.get(_link)
                     if _o is None:
@@ -537,19 +544,46 @@ def desired(plan: dict, now, equity: float, ledger: dict, budget: float = BUDGET
                         _not = float(_o.qty) * float(_o.price)
                     except (TypeError, ValueError):
                         continue
-                    if _room <= 1e-12:
-                        del out[_link]
-                    elif _not <= _room + 1e-12:
-                        _room -= _not
-                    else:
-                        _f = _room / _not if _not > 0 else 0.0
-                        try:
-                            _old_frac = float(_o.meta.get("frac", 0.0) or 0.0)
-                        except (TypeError, ValueError):
-                            _old_frac = 0.0
-                        _o.qty = _room / float(_o.price) if _o.price else 0.0
-                        _o.meta["frac"] = _old_frac * _f
-                        _room = 0.0
+                    if _not <= _room + 1e-12:
+                        continue
+                    _f = _room / _not if _not > 0 else 0.0
+                    try:
+                        _old_frac = float(_o.meta.get("frac", 0.0) or 0.0)
+                    except (TypeError, ValueError):
+                        _old_frac = 0.0
+                    _o.qty = _room / float(_o.price) if _o.price else 0.0
+                    _o.meta["frac"] = _old_frac * _f
+                # Hard safety bound: total open + resting <= 2 x G x sub equity.
+                _hard = 2.0 * _g * _sub_eq - _open.get(_ph, 0.0)
+                if _hard < 0:
+                    _hard = 0.0
+                _rest = []
+                for _link in _links:
+                    _o = out.get(_link)
+                    if _o is None:
+                        continue
+                    try:
+                        _rest.append((_link, float(_o.qty) * float(_o.price)))
+                    except (TypeError, ValueError):
+                        continue
+                if sum(_n for _, _n in _rest) > _hard + 1e-12:
+                    for _link, _not in _rest:
+                        _o = out.get(_link)
+                        if _o is None:
+                            continue
+                        if _hard <= 1e-12:
+                            del out[_link]
+                        elif _not <= _hard + 1e-12:
+                            _hard -= _not
+                        else:
+                            _f = _hard / _not if _not > 0 else 0.0
+                            try:
+                                _old_frac = float(_o.meta.get("frac", 0.0) or 0.0)
+                            except (TypeError, ValueError):
+                                _old_frac = 0.0
+                            _o.qty = _hard / float(_o.price) if _o.price else 0.0
+                            _o.meta["frac"] = _old_frac * _f
+                            _hard = 0.0
     if bear_book and bear:
         # Bear-regime trim of open book longs (closes the BOT_EXECUTION.md known gap): the research engine (v410)
         # halves the book LONG target in bear, so existing longs are trimmed toward the halved target. For every open

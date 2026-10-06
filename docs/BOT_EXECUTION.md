@@ -66,11 +66,16 @@ for fresh plans; a new fill has no exit orders until the next cycle (<= 20 s) pl
   replaces the 4-sigma dip close-stop for that coin (`mirror.dip_stop_price`, budget `frac*(M*sigma+GAP)`; backstop 8 sigma
   unchanged). Defaults reproduce every old order bit-for-bit.
 - Dip gross-notional cap (research v421 G2 / v422 engine hook `sleeve_gross_cap`, default off): `run.py --dip-gross-cap G`
-  (default 0 = off) keeps, per phase sub-book, open filled dip notional + resting dip entry bids <= G x sub equity
-  (sub equity = equity x the phase cap used by the budget rule). The room (G x sub equity - open dip notional of that
-  phase) is allocated to the resting bids in admission order (shallow rung first, then phase, then symbol); the last
-  admitted bid is cut to the remaining room and the rest are dropped, recomputed every cycle (resting bids amend qty
-  down/up, never chase price). Book orders and protection (tp/stop/reduce) are never touched.
+  (default 0 = off) keeps, per phase sub-book, every resting dip entry bid at min(its normal size, room) where
+  room = G x sub equity - OPEN filled dip notional of that phase (NOT minus other resting bids, recomputed every
+  cycle so bids shrink after a fill; resting bids amend qty down/up, never chase price). This mirrors the engine,
+  which only cuts a rung at its fill minute to (G - notional of rungs open at that minute). Residual risk: several
+  bids filling inside one cycle can exceed G by at most the sum of their sizes (the engine cannot see within a minute
+  either); hard safety bound: open + resting dip notional <= 2 x G x sub equity (shallow-first, rarely binds).
+  Book orders and protection (tp/stop/reduce) are never touched.
+  (bot_capfix 2026-10-06: the previous cumulative room allocation counted resting bids against each other and cost
+  2.46pp on 2026-09-01..23 (C +1.12 % vs +3.58 % uncapped); the engine-faithful cap costs 0.38pp (C +3.20 %,
+  dips 261 vs 271 uncapped; see research/diagnostics/bot_capfix/REPORT.md).
 
 ## CHANGES (bot_adopt: optional --adopt-fresh, default off)
 - `python -m bot.run --adopt-fresh`: when a phase sub-plan holds a book POSITION the bot does not hold for that
