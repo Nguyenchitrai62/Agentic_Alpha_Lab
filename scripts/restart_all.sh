@@ -59,6 +59,7 @@ d17bf|artifacts/bot/paper_d17bf|-m bot.run --mode paper --equity 5000 --corr-siz
 d13bf|artifacts/bot/paper_d13bf|-m bot.run --mode paper --equity 5000 --corr-size --dip-mult 1.3 --bear-book --interval 25 --tag d13bf
 d17bfg2|artifacts/bot/paper_d17bfg2|-m bot.run --mode paper --equity 5000 --corr-size --dip-mult 1.7 --dip-gross-cap 2.0 --bear-book --adopt-fresh --interval 25 --tag d17bfg2
 g2k20|artifacts/bot/paper_g2k20|-m bot.run --mode paper --equity 5000 --corr-size --dip-mult 2.0 --dip-gross-cap 2.0 --bear-book --adopt-fresh --interval 25 --tag g2k20
+d17bfg2c|artifacts/bot/paper_d17bfg2c|-m bot.run --mode paper --equity 5000 --corr-size --dip-mult 1.7 --dip-gross-cap 2.0 --bear-book --adopt-fresh --carry-f 0.25 --interval 25 --tag d17bfg2c
 "
 
 log() { echo "[restart_all] $*"; }
@@ -182,7 +183,7 @@ if [ $DRY_RUN -eq 1 ]; then
 fi
 if [ $do_bots -eq 1 ]; then
   # shellcheck disable=SC2086
-  "$PY" scripts/bot_health.py artifacts/bot/paper artifacts/bot/paper_d17bf artifacts/bot/paper_d13bf artifacts/bot/paper_d17bfg2 artifacts/bot/paper_g2k20 || true
+  "$PY" scripts/bot_health.py artifacts/bot/paper artifacts/bot/paper_d17bf artifacts/bot/paper_d13bf artifacts/bot/paper_d17bfg2 artifacts/bot/paper_g2k20 artifacts/bot/paper_d17bfg2c || true
 fi
 "$PY" scripts/daily_status.py || true
 log "done (idempotent: a second run starts nothing new)"
