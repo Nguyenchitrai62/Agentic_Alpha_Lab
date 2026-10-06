@@ -359,6 +359,13 @@ def cmd_run(args: argparse.Namespace, cmd: list[str]) -> int:
         print("heavy_slot run: no command given (use -- <cmd...>)",
               file=sys.stderr)
         return 2
+    # Windows CreateProcess does not resolve relative paths like .venv/Scripts/python.exe: make them absolute
+    # (or resolve a bare name on PATH) before launching.
+    import shutil
+    if os.path.exists(cmd[0]):
+        cmd = [os.path.abspath(cmd[0])] + cmd[1:]
+    elif shutil.which(cmd[0]):
+        cmd = [shutil.which(cmd[0])] + cmd[1:]
     with heavy_slot(args.tag, max_slots=args.max_slots,
                     min_free_gb=args.min_free_gb, poll=args.poll,
                     timeout_h=args.timeout_h, leader=args.leader,
