@@ -340,6 +340,6 @@ Pooled majors HGB (v92), 2017 spot prefix, causal vol targets, long/short horizo
 ### Screen criteria (2026-10-06, from placebo studies)
 - Dip replica screens: PROMISING legs (4-phase sum >= base 4/5 AND DD within 1 pp 4/5) let 6.7 % of placebo rules pass
   (oc_placebo_dip); additionally require 5y 4-phase-mean sum delta >= +0.273 (placebo p95, ~3.5 % of base) -> FPR 0.7 %.
-- Book vectorised tilts: two PROMISING tilts (expiry, CME gap) failed the full engine; see oc_placebo (book) for its threshold;
+- Book vectorised tilts: two PROMISING tilts (expiry, CME gap) failed the full engine; oc_placebo: require legs + placebo P&L pct >= 95 AND DD pct <= 5 (joint FPR 0.2 %);
   exposure tilts must also beat an exposure-matched control + timing placebo (oc_premexpo: USDT premium passed, CB premium did not).
 - Carry: cash-and-carry with quarterlies (oc_cashcarry) = useful add-on +0.21/+0.42 %/mo at f 0.25/0.5, near zero DD; combo pending.
