@@ -59,6 +59,10 @@ def _load(name: str, rel: str):
 bot_health = _load("daily_status_bot_health", "scripts/bot_health.py")
 paper_report = _load("daily_status_paper_report", "scripts/paper_report.py")
 try:
+    edge_monitor = _load("daily_status_edge_monitor", "scripts/edge_monitor.py")
+except Exception:  # pragma: no cover - thieu file thi van chay
+    edge_monitor = None
+try:
     liq_mod = _load("daily_status_load_liq", "research/tournament/oc_liqlive/load_liq.py")
 except Exception:  # pragma: no cover - pandas/pyarrow thieu thi van chay
     liq_mod = None
@@ -441,6 +445,34 @@ def worst(*sevs: str) -> str:
     return max(sevs, key=lambda s: order.get(s, 1))
 
 
+EDGE_RUNNERS = ("paper_d17bfg2", "paper_d17bfg2c")
+
+
+def check_edge(root: Path) -> list[dict]:
+    """Canh bao som edge (chi doc) cho cac runner trien khai (diagnostic-only)."""
+    out = []
+    if edge_monitor is None:
+        return out
+    for name in EDGE_RUNNERS:
+        d = root / BOT_REL / name
+        if not d.is_dir():
+            continue
+        try:
+            rep = edge_monitor.summarize_dir(d)
+        except Exception as e:  # pragma: no cover - phong thu
+            out.append({"name": name, "severity": "warning",
+                        "line": f"{name}: khong doc duoc edge ({e})",
+                        "lines": []})
+            continue
+        worst_s = rep.get("worst", "OK")
+        sev = {"OK": "ok", "CHUA DU DU LIEU": "ok",
+               "WATCH": "warning", "INVESTIGATE": "warning"}.get(worst_s, "warning")
+        out.append({"name": name, "severity": sev, "worst": worst_s,
+                    "line": f"{name}: edge {worst_s}",
+                    "lines": list(rep.get("lines", []))})
+    return out
+
+
 def build_status(root: Path = ROOT, now: datetime | None = None,
                  health_url: str = HEALTH_URL) -> dict:
     now = now or utcnow()
@@ -450,12 +482,14 @@ def build_status(root: Path = ROOT, now: datetime | None = None,
     cols = check_collectors(root, now)
     carry = check_carry(root, now)
     cycles = check_cycles(root, now)
+    edge = check_edge(root)
     verdict = worst(be["severity"], plan["severity"], carry["severity"],
                     *(b["severity"] for b in bots), *(c["severity"] for c in cols),
-                    *(r["severity"] for r in cycles))
+                    *(r["severity"] for r in cycles),
+                    *(e["severity"] for e in edge))
     return {"now": now, "backend": be, "plan": plan, "bots": bots,
             "collectors": cols, "carry": carry, "cycles": cycles,
-            "verdict": verdict,
+            "edge": edge, "verdict": verdict,
             "exit": {"ok": 0, "warning": 1, "critical": 2}[verdict]}
 
 
@@ -471,6 +505,13 @@ def format_text(st: dict) -> str:
     L += [f"   - {x}" for x in st["carry"].get("lines", [])]
     L.append(f"5) Chu ky runner ({len(st['cycles'])}) [WARNING neu cycle >60s hoac state >2p]:")
     L += [f"   - {r['line']}" for r in st["cycles"]]
+    L.append("6) Canh bao som edge (oc_edgedecay: 6m<1.61%/thang, TP dip<0.434; vo nguong = dieu tra):")
+    if st.get("edge"):
+        for e in st["edge"]:
+            L.append(f"   - {e['line']}")
+            L += [f"     . {x}" for x in e.get("lines", [])]
+    else:
+        L.append("   - chua co runner trien khai (paper_d17bfg2/c)")
     L.append(f"KET LUAN: {st['verdict'].upper()} "
              f"(0=OK 1=canh bao 2=nguy hiem) -> exit {st['exit']}")
     return "\n".join(L)
@@ -495,6 +536,16 @@ def format_markdown(st: dict) -> str:
           "| --- | --- | --- |"]
     for r in st["cycles"]:
         L.append(f"| {r.get('name', '-')} | {r['severity'].upper()} | {r['line']} |")
+    L += ["", "## Canh bao som edge (oc_edgedecay)",
+          "Nguong: trung binh 6 thang < 1.61%/thang; TP rate dip < 0.434 "
+          "(vo nguong = dieu tra, khong phai hanh dong giao dich).", ""]
+    if st.get("edge"):
+        for e in st["edge"]:
+            L.append(f"- {e['line']} ({e['severity'].upper()})")
+            for x in e.get("lines", []):
+                L.append(f"  - {x}")
+    else:
+        L.append("- chua co runner trien khai (paper_d17bfg2/c)")
     L += ["", f"**KET LUAN: {st['verdict'].upper()}** (exit {st['exit']})", ""]
     return "\n".join(L)
 
