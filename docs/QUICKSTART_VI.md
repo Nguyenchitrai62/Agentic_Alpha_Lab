@@ -68,3 +68,8 @@
 - Bản lợi nhuận cao G2K20+carry (+carry giữ >= 5 mọi ma sát, DD ~17,8 / S5 ~19,6) vẫn để dự bị vì rớt năm gần nhất; G2 là bản chính;
 runner paper_g2k20c (từ 06-10 ~14:15 UTC) đang thu bằng chứng [oc_g2k20robust].
 - Tăng trọng book (x1,1/x1,2) không cứu được S1/S3 → KHÔNG làm [oc_bookscale].
+
+## 9. Sự cố 2026-10-06 và bài học (nhớ 2 dòng)
+
+- Sáng 06-10 backend chạy foreground nên tắt theo cửa sổ console (~10:32 UTC, plan đứng yên 4 giờ); 6 paper runner rớt lúc 11:55 UTC vì khởi động từ shell tạm thời — đừng lặp lại kiểu chạy tay này [BACKEND_INCIDENT_20261006; PLAN_NEXT_20261006 mục 14:40 UTC].
+- Muốn máy sống sau reboot/đóng terminal: chỉ dùng `.\scripts\restart_all.ps1` (bản mới tách process bằng WMI), soi nhanh 1 phút bằng `alert_watch.py --once` + `daily_status.py --fast`; watchdog tự dựng (`AlphaLabBackendWatchdog` / `run_backend.ps1 -Ensure`) do chủ quyết định bật hay không. Cách làm chi tiết ở `BOT_RUNBOOK_VI` mục 10.

@@ -146,4 +146,18 @@ REM Liệt kê nội dung một bản (không ghi gì):
 - Không bao giờ chạy 1 pha/1 đồng hồ đơn lẻ; không bơm size đuổi 8 %/tháng (biên max chỉ ~5,9 %/tháng ở DD > 17,5); không kỳ vọng 5 % mọi tháng (~1/9 năm chạm DD > 20 %).
 - Không commit `.env`/keys; không stash/reset/checkout/clean/commit (GIT READ-ONLY cho worker); không dùng `restart_all.sh` cho testnet/live.
 
+## 10. Sự cố 2026-10-06 và bài học (backend + 6 runner chết lặng)
+
+- Backend tắt ~10:32–10:47 UTC: chạy foreground bằng `run_backend.ps1` nên chết theo cửa sổ console bị đóng (log dừng giữa chừng, không dòng shutdown; plan kẹt ở `decision_bar` 08:00 UTC, lỡ chu kỳ 12:00 UTC ~4 giờ). 6 runner paper + vòng carry dừng chu kỳ từ ~11:55 UTC vì là con của một shell có giới hạn thời gian — `Start-Process` cũ chết theo shell chủ.
+- Cách dựng duy nhất từ nay: `.\scripts\restart_all.ps1` (đã sửa, tách tiến trình qua WMI `Win32_Process.Create` nên sống sót khi terminal đóng). Không bao giờ dựng backend/runner từ terminal tạm/foreground rồi đóng cửa sổ.
+- Kiểm tra 1 phút sau mọi lần dựng:
+
+```bat
+.venv\Scripts\python.exe scripts/alert_watch.py --once --no-toast
+.venv\Scripts\python.exe scripts/daily_status.py --fast
+.\run_backend.ps1 -Status
+```
+
+- Tuỳ chọn của chủ tài khoản (quyết định riêng, chưa bật mặc định): enable Task Scheduler `AlphaLabBackendWatchdog` / `run_backend.ps1 -Ensure` để tự dựng lại backend sau reboot/chết; cân nhắc chạy `alert_watch` thường trực (sự cố 4 giờ không ai biết). Chi tiết chẩn đoán: `docs/opencode/BACKEND_INCIDENT_20261006.md`, `docs/opencode/PAPER_DAY5_20261006.md`.
+
 <!-- consistfix 2026-10-06: §8 appended account-realistic G2+carry f=0.25 expectation 5.634/2.778/16.75/16.66 compound [oc_carrycompound] with +0.12pp/5.533 labelled conservative year-start [oc_carryfric], plus fric2 compounded friction row (base 5.634, S1 4.780, S2 5.438, S3 4.806, S4 5.125, S5 5.111, no losing year). Sources re-checked: oc_carrycompound REPORT (5.634/+0.224), oc_carryfric REPORT (5.533/+0.12), oc_carryfric2 REPORT (S-table). -->
