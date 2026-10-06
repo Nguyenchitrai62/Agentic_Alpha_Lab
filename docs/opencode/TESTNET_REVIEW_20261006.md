@@ -1,3 +1,4 @@
+# SUPERSEDED 2026-10-06: §5 "risk_guard NOT wired" và verdict "not ready until V1–V4" đã bị thay thế bởi bot_testnetfix (guard đấu vào, ON mặc định ở testnet/live) — không dùng review này làm cổng live nếu chưa re-review.
 # Testnet / live readiness review — 2026-10-06 (static, no network, no keys)
 
 Scope: `docs/BOT_EXECUTION.md`, `docs/BOT_RUNBOOK_VI.md`, `bot/bybit_v5.py`, `bot/run.py`, `bot/mirror.py`, `bot/risk_guard.py` (+ `bot/paper.py`, `scripts/bot_health.py`, `tests/test_bot_resilience.py`, `tests/test_bot_risk_guard.py` as cited tests). No code changed, no commits, no network calls, no credentials read.

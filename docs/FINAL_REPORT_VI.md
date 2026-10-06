@@ -5,8 +5,8 @@ Mọi số là walk-forward 5 năm (anchor 2021-09-24..2025-09-24, mỗi năm +3
 mix trung bình 4 pha giờ, chi phí gate Bybit: maker 0.02% / taker 0.055%, funding bất lợi long trả 0.01%/8h
 short không nhận). Cả 5 năm nay đều là research data; paper triển vọng mới là kiểm sạch.
 Hiệu chỉnh số trùng: khi hai số lệch nhau do quy ước đo thì giữ số chính thức (official run.log) và ghi cả số
-chained-reset trong ngoặc; khi lệch do rebalance (year-start lift cao hơn roll-only vận hành thật) thì ghi cả hai
-và dùng roll-only làm kỳ vọng; số cũ 5.41 G2 giữ kèm giải thích luck đồng hồ ~0.17pp [oc_clockluck; oc_frontiercarry; oc_carrycombo].
+chained-reset trong ngoặc; khi lệch do rebalance (oc_carryfric cộng thêm, lãi carry tái đầu tư vào tài khoản = ước lượng chính; oc_carrycombo roll-only giữ lãi carry như tiền mặt không tái đầu tư = cận dưới) thì ghi cả hai
+và dùng oc_carryfric (+~0.12 điểm %/tháng) làm kỳ vọng, roll-only là cận dưới; số cũ 5.41 G2 giữ kèm giải thích luck đồng hồ ~0.17pp [oc_clockluck; oc_frontiercarry; oc_carrycombo].
 
 Định nghĩa metric: R = trung bình hình học 5 năm reset mỗi năm; W = năm đơn lẻ tệ nhất 5 năm;
 DD năm = max yearly DD; DD toàn đường = full-path trong run.log (liên tục, không reset);
@@ -58,7 +58,7 @@ full-path official 16.82 (chained 16.91) [oc_frontier; oc_kpi_g2; oc_frontiercar
 G2 KPI [oc_kpi_g2]: gấp 26.4x sau 5 năm, win all 65.3-65.5% (book 51.5%, rung dip 68.6-68.7%, n G2=5064/21513/26577; BF=4955/21389/26344),
 không năm lỗ; 41% tháng >= +5%, ~70.5-72% tháng không lỗ, chuỗi lỗ dài nhất 2 tháng D17BF (G2 4 tháng 2024-04..07).
 Gross đỉnh đo được: BF không trần peak 6.40x vốn (oc_kpi results.json combined 6.4007); G2 có trần 2x mix max 3.41x (oc_margin results.json G_max 3.4113, các phase <=3.78); "~7.1x không trần" chỉ là ước tính trong văn bản oc_margin/REPORT.md:95, không phải giá trị results.json [oc_kpi; oc_margin].
-- G2+carry f=0.25 một UTA: quy ước roll-only vận hành thật (oc_carrycombo): G2 đơn 5.410/2.588/16.91/16.82
+- G2+carry f=0.25 một UTA: quy ước roll-only = CẬN DƯỚI (oc_carrycombo: lãi carry không tái đầu tư vào BOT; ước lượng chính là oc_carryfric 5.533): G2 đơn 5.410/2.588/16.91/16.82
 (close 16.05) -> +carry 5.413/2.647/16.78/full-marked 16.34 (close 15.60); f=0.50: 5.418/2.705/16.65/15.86
 [oc_carrycombo]. Quy ước year-start rebalance (oc_carryfric, lift cao hơn, KHÔNG dùng làm kỳ vọng):
 G2+carry f=0.25: 5.533/2.736/16.78; f=0.50: 5.654/2.881/16.64 [oc_carryfric; OWNER_SUMMARY_VI].

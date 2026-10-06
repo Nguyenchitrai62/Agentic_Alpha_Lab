@@ -8,11 +8,12 @@
 
 ## 0. Triển khai chính xác là gì (đóng băng 7 ngày)
 
-- Pipeline G2 = R2B1D17BF + trần dip 2x: `--corr-size --dip-mult 1.7 --bear-book --dip-gross-cap 2.0`, plan `artifacts/research/advisor_shadow/trade_plan_v376.json`.
+- Pipeline G2 = R2B1D17BF + trần dip 2x: `--corr-size --dip-mult 1.7 --bear-book --dip-gross-cap 2.0 --adopt-fresh --carry-f 0.25 --interval 25`, plan `artifacts/research/advisor_shadow/trade_plan_v376.json`.
 - Cộng sleeve carry quý `f=0.25` trên CÙNG một UTA (`--carry-f 0.25`).
-- `--adopt-fresh` giữ TẮT (mặc định, đúng khuyến nghị runbook; runner paper `d17bfg2c` có bật là runner so sánh riêng, không phải triển khai).
+- `--adopt-fresh` BẬT (lệnh đóng băng mọi mode đều có `--adopt-fresh`; mặc định code là TẮT).
 - Risk guard BẬT mặc định ở testnet/live (không thêm `--no-risk-guard`; paper/dry mới cần `--risk-guard` riêng).
-- `--equity` KHÔNG dùng ở testnet/live (lấy vốn thật trên sàn). `--interval` giữ mặc định 20 s.
+- `--equity` KHÔNG dùng ở testnet/live (lấy vốn thật trên sàn). `--interval 25` (lệnh đóng băng mọi mode dùng `--interval 25`).
+- Carry-enabled testnet là NO-GO cho tới khi các phát hiện code-review bot F1/F2 được sửa (bot_reviewfix); testnet chỉ book/dip (không `--carry-f`) được phép nhưng thận trọng.
 - Một runner / một thư mục state (khóa OS `runner.lock`). Tag testnet riêng, không trùng paper.
 
 ## 1. Việc chủ tài khoản làm trước ngày 0 (prerequisites)
@@ -49,7 +50,7 @@ Chỉ gọi endpoint V5 đọc (signed GET + public), không bao giờ POST nên
 - Mỗi FAIL kèm bước sửa chính xác trên Bybit UI — sửa hết rồi chạy lại. Không khởi động bot khi còn FAIL.
 - Chạy khô (dry, không gửi lệnh, public data only) sau preflight PASS:
 ```bat
-.venv\Scripts\python.exe -m bot.run --once --equity 5000 --corr-size --dip-mult 1.7 --bear-book --dip-gross-cap 2.0 --carry-f 0.25
+.venv\Scripts\python.exe -m bot.run --once --equity 5000 --corr-size --dip-mult 1.7 --bear-book --dip-gross-cap 2.0 --adopt-fresh --carry-f 0.25 --interval 25
 ```
 
 ## 4. Lệnh chạy testnet duy nhất trong 7 ngày (đóng băng, không đổi flags giữa chừng)

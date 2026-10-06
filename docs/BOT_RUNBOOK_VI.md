@@ -1,6 +1,7 @@
 # Sổ tay vận hành BOT (G2 + carry f=0.25, một Bybit UTA)
 
-> Triển khai duy nhất: BOT G2 = R2B1D17BF + trần dip 2x (`--corr-size --dip-mult 1.7 --bear-book --dip-gross-cap 2.0`, plan `trade_plan_v376.json`, v421: 5,41/worst 2,588 %/tháng, DD 16,91/toàn đường 16,82) + sleeve carry quý `f=0,25` trên CÙNG một Bybit UTA.
+> Triển khai duy nhất: BOT G2 = R2B1D17BF + trần dip 2x (`--corr-size --dip-mult 1.7 --bear-book --dip-gross-cap 2.0 --adopt-fresh --carry-f 0.25 --interval 25`, plan `trade_plan_v376.json`, v421/v422 twin numbers, v422 audited: 5,41/worst 2,588 %/tháng, DD 16,91/toàn đường 16,82) + sleeve carry quý `f=0,25` trên CÙNG một Bybit UTA.
+> Carry-enabled testnet là NO-GO cho tới khi các phát hiện code-review bot F1/F2 được sửa (bot_reviewfix); testnet chỉ book/dip (không `--carry-f`) được phép nhưng thận trọng.
 > Kỳ vọng, ngưỡng go-live/dừng lấy nguyên văn từ `docs/DEPLOYMENT_PLAN_VI.md` (đăng ký trước 2026-10-05, không sửa sau khi thấy dữ liệu paper).
 > Chi tiết kỹ thuật: `docs/BOT_EXECUTION.md` (các mục CHANGES), code `bot/run.py`. Lịch testnet 7 ngày: `docs/TESTNET_PLAN_VI.md`. Bắt đầu nhanh: `docs/QUICKSTART_VI.md`.
 > Mọi lệnh chạy từ repo root. Windows dùng `.venv\Scripts\python.exe`. GIT READ-ONLY: không bao giờ stash/reset/checkout/clean/commit.
@@ -23,11 +24,11 @@ REM Dừng: .\run_backend.ps1 -Stop
 
 ## 2. Lệnh chuẩn (đóng băng — thiếu một flag là thành pipeline khác)
 
-Ý nghĩa flags: `--corr-size` (size dip theo tương quan) + `--dip-mult 1.7` (hệ số dip) + `--bear-book` (giảm nửa book long khi bear) + `--dip-gross-cap 2.0` (trần dip khớp engine: mỗi bid chờ <= 2x vốn sub-book trừ notional dip đang mở; trần cứng 4x; giữ ~nguyên lợi nhuận, cắt lỗ phút gap -10 % cả 5 coin từ 58 % xuống 33,5 % vốn) + `--carry-f 0.25` (sleeve carry, mỗi chân 0,25x vốn; legs carry link prefix `c`, không tính vào trần dip, short futures/coin <= 0,30x vốn). `--adopt-fresh` mặc định TẮT; chỉ runner paper so sánh `d17bfg2c` bật để nhận lại vị thế book còn tươi (cửa sổ 5–65 phút sau entry). Testnet/live đóng băng TẮT. `--equity` chỉ dùng cho dry/paper; testnet/live lấy vốn thật. Risk guard BẬT mặc định ở testnet/live (không thêm `--no-risk-guard`); paper/dry mặc định TẮT. Entry book/dip là PostOnly maker (`postonly_reject` = thử lại cùng giá chu kỳ sau, không đuổi giá); TP GTC reduce-only; stop là conditional market reduce-only.
+Ý nghĩa flags: `--corr-size` (size dip theo tương quan) + `--dip-mult 1.7` (hệ số dip) + `--bear-book` (giảm nửa book long khi bear) + `--dip-gross-cap 2.0` (trần dip khớp engine: mỗi bid chờ <= 2x vốn sub-book trừ notional dip đang mở; trần cứng 4x; giữ ~nguyên lợi nhuận, cắt lỗ phút gap -10 % cả 5 coin từ 58 % xuống 33,5 % vốn) + `--carry-f 0.25` (sleeve carry, mỗi chân 0,25x vốn; legs carry link prefix `c`, không tính vào trần dip, short futures/coin <= 0,30x vốn). `--adopt-fresh` mặc định TẮT trong code; lệnh đóng băng triển khai BẬT `--adopt-fresh` ở mọi mode (dry/paper/testnet/live) để nhận lại vị thế book còn tươi (cửa sổ 5–65 phút sau entry). `--equity` chỉ dùng cho dry/paper; testnet/live lấy vốn thật. Risk guard BẬT mặc định ở testnet/live (không thêm `--no-risk-guard`); paper/dry mặc định TẮT. Entry book/dip là PostOnly maker (`postonly_reject` = thử lại cùng giá chu kỳ sau, không đuổi giá); TP GTC reduce-only; stop là conditional market reduce-only.
 
 ```bat
 REM Chạy thử khô (không gửi lệnh):
-.venv\Scripts\python.exe -m bot.run --once --equity 5000 --corr-size --dip-mult 1.7 --bear-book --dip-gross-cap 2.0 --carry-f 0.25
+.venv\Scripts\python.exe -m bot.run --once --equity 5000 --corr-size --dip-mult 1.7 --bear-book --dip-gross-cap 2.0 --adopt-fresh --carry-f 0.25 --interval 25
 
 REM Paper triển khai G2 + carry (runner so sánh d17bfg2c, >= 8 tuần, một runner/một thư mục state):
 .venv\Scripts\python.exe -m bot.run --mode paper --equity 5000 --corr-size --dip-mult 1.7 --dip-gross-cap 2.0 --bear-book --adopt-fresh --carry-f 0.25 --interval 25 --tag d17bfg2c
@@ -133,7 +134,7 @@ REM Liệt kê nội dung một bản (không ghi gì):
 
 ## 8. Kỳ vọng + go-live / dừng (từ DEPLOYMENT_PLAN_VI.md)
 
-- Kỳ vọng trung thực: **trung vị ~5 %/tháng, năm xấu ~3 %/tháng, DD tới ~18 %** (49 cửa sổ 12 tháng trượt: min 2,73/trung vị 4,89/max 11,71 %/tháng; DD trung vị 13,5/max 18,7; không cửa sổ lỗ). Bootstrap 10.000 năm: trung vị ~5,1 %/tháng (p5 1,5/p95 10,3), chỉ ~52 % năm >= 5 %; P(DD > 20 %) ~11 %; P(năm lỗ) ~0,7 %; vốn phải chịu được DD 25 %. KPI: 41 % tháng >= +5 %, 72 % tháng không lỗ, chuỗi lỗ dài nhất 2 tháng; win book 51,5 %/dip 68,7 %/tất cả 65,5 %. Giá Bybit thật thấp hơn Binance ~0,5pp/tháng (ở thang dip). Carry f=0,25 cộng thêm chỉ ~+0,12pp/tháng.
+- Kỳ vọng trung thực: **trung vị ~5 %/tháng, năm xấu ~3 %/tháng, DD tới ~18 %** (49 cửa sổ 12 tháng trượt: min 2,73/trung vị 4,89/max 11,71 %/tháng; DD trung vị 13,5/max 18,7; không cửa sổ lỗ). Bootstrap 10.000 năm: trung vị ~5,1 %/tháng (p5 1,5/p95 10,3), chỉ ~52 % năm >= 5 %; P(DD > 20 %) ~11 %; P(năm lỗ) ~0,7 %; vốn phải chịu được DD 25 %. KPI (G2, oc_kpi_g2): 41 % tháng >= +5 %, 70,5 % tháng không lỗ, chuỗi lỗ dài nhất 4 tháng; win book 51,5 %/dip 68,6 %/tất cả 65,3 %. Giá Bybit thật thấp hơn Binance ~0,5pp/tháng (ở chân book, không phải thang dip — dip gap nhỏ; không phải khớp lệnh book — phần còn lại do sizing/định giá [oc_venuegap; oc_bookvenue]). Carry f=0,25 cộng thêm chỉ ~+0,12pp/tháng.
 - Go-live tiền thật nhỏ (sau tối thiểu 8 tuần paper, ĐỦ cả 4): (a) paper ở phân vị >= 20 bootstrap (`prospective_scorecard.py`); (b) DD paper <= 15 %; (c) lệch bot vs plan <= 1,5pp/tháng (`paper_divergence.py`; trước 14 ngày `too early` là bình thường); (d) không `cycle_error` > 1h, không vị thế thiếu stop. Tăng vốn sau 3 tháng live nếu (a)–(c) vẫn đúng. Testnet 7 ngày PASS đủ 9 tiêu chí `TESTNET_PLAN_VI.md` mục 7 (unprotected = 0, qty_mismatch = 0, mọi entry PostOnly, stop+TP trong 1 chu kỳ, carry hedge <= 2 cycle, không cycle_error > 1h, rate_limit ~ 0, preflight PASS, parity chỉ so cơ chế không so P&L).
 - Dừng: DD tài khoản > 20 % → dừng mở mới, chỉ giữ SL/TP; lỗ một tháng > 10 % → halve vốn tháng sau; phân vị lợi nhuận < 5 sau >= 8 tuần → dừng. Đèn vàng edge (`daily_status.py` mục 6, vỡ = ĐIỀU TRA không tự đổi cấu hình): (1) TB 6 tháng < 1,61 %/tháng; (2) TP rate dip 182 ngày < 0,434.
 

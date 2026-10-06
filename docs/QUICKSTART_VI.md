@@ -4,7 +4,7 @@
 
 ## 1. Chạy gì (BOT G2 + carry quý, một Bybit UTA)
 
-- BOT = book + thang dip, cần bot chạy 24/7 [BOT_RUNBOOK_VI]. Bản triển khai G2 = R2B1D17BF + trần dip 2x (v421): `--corr-size --dip-mult 1.7 --bear-book --dip-gross-cap 2.0`, plan `trade_plan_v376.json` [FINAL_REPORT_VI].
+- BOT = book + thang dip, cần bot chạy 24/7 [BOT_RUNBOOK_VI]. Bản triển khai G2 = R2B1D17BF + trần dip 2x (v421/v422 twin numbers, v422 audited): `--corr-size --dip-mult 1.7 --bear-book --dip-gross-cap 2.0 --adopt-fresh --carry-f 0.25 --interval 25`, plan `trade_plan_v376.json` [FINAL_REPORT_VI].
 - Cộng carry quý f=0,25 trên CÙNG MỘT Bybit UTA (tài khoản hợp nhất, một vốn chung) [DEPLOYMENT_PLAN_VI]. UTA: Cross margin (vốn chung chịu lỗ chung) + Hedge Mode (giữ long/short riêng) + đòn bẩy perps 5x cả 5 coin BTC/ETH/SOL/BNB/XRP [BOT_RUNBOOK_VI].
 - Chân short quarterly của carry để 10x (đã hedge bằng spot mua bằng tiền thật) [oc_utamargin2]. Vượt f=0,25 phải tách vốn: f=0,50 bị chặn 1 giờ nên không dùng chung UTA [DEPLOYMENT_PLAN_VI].
 - Vốn >= 5.000 USDT, tốt nhất ~10.000 USDT (5.000 đặt gần như mọi lệnh; 2.000 chỉ ~93–96% lệnh) [oc_capscale]. Lệnh PostOnly maker khi vào, stop là market, TP là limit; risk guard bật mặc định ở testnet/live [BOT_RUNBOOK_VI].
@@ -12,10 +12,10 @@
 ## 2. Kỳ vọng trung thực (khoảng, không phải một số)
 
 - G2 backtest 5 năm: 5,41 %/tháng, năm tệ nhất 2,588 %/tháng, DD năm 16,91 / toàn đường 16,82 [FINAL_REPORT_VI]. Đồng hồ ngẫu nhiên chỉ ~5,24 thay vì 5,41 (triển khai may ~+0,17pp luck dip-clock, biên mỏng, method proxy) — đọc 5,41 kèm caveat này, phạm vi 4–6 %/tháng giữ nguyên [oc_clockluck].
-- Carry f=0,25 cộng thêm chỉ +~0,12 điểm %/tháng cho cả tài khoản (ma sát base 5,533 so với G2 trần 5,41; rớt S1/S3) [oc_carryfric]. Giá Bybit thật thấp hơn Binance ~0,5pp/tháng, nằm ở thang dip [DEPLOYMENT_PLAN_VI].
+- Carry f=0,25 cộng thêm chỉ +~0,12 điểm %/tháng cho cả tài khoản (ma sát base 5,533 so với G2 trần 5,41; rớt S1/S3) [oc_carryfric]. Giá Bybit thật thấp hơn Binance ~0,5pp/tháng, nằm ở chân book (không phải thang dip — dip gap nhỏ; không phải khớp lệnh book — phần còn lại do sizing/định giá) [oc_venuegap; oc_bookvenue; DEPLOYMENT_PLAN_VI].
 - 49 cửa sổ 12 tháng trượt: min 2,73 / p10 3,25 / trung vị 4,89 / p90 8,88 / max 11,71 %/tháng; DD trung vị 13,5 (max 18,7); 100 % DD < 20, không cửa sổ lỗ [DEPLOYMENT_PLAN_VI].
 - Bootstrap 10.000 năm: trung vị ~5,1 %/tháng; chỉ ~52 % năm >= 5 %; P(DD > 20 %) ~11 %; P(năm lỗ) ~0,7 %; vốn phải chịu được DD 25 % [DEPLOYMENT_PLAN_VI].
-- KPI: 41 % tháng >= +5 %, 72 % tháng không lỗ; win book 51,5 % / dip 68,7 % / tất cả 65,5 % [DEPLOYMENT_PLAN_VI]. Tuần xấu G2 tệ nhất -12,3 % (hồi ~54 ngày); vài lần/năm mất 8–12 %/tuần, 1–4 tháng mới về đỉnh là bình thường [DEPLOYMENT_PLAN_VI].
+- KPI (G2, oc_kpi_g2): 41 % tháng >= +5 %, 70,5 % tháng không lỗ, chuỗi lỗ dài nhất 4 tháng; win book 51,5 % / dip 68,6 % / tất cả 65,3 % [DEPLOYMENT_PLAN_VI]. Tuần xấu G2 tệ nhất -12,3 % (hồi ~54 ngày); vài lần/năm mất 8–12 %/tuần, 1–4 tháng mới về đỉnh là bình thường [DEPLOYMENT_PLAN_VI].
 - Cú sập nặng nhất cho thang dip là COVID 03/2020: mix 4 pha ~-16,1 %, pha đơn tệ nhất -21,8 % (vượt ngưỡng 20 % nên không bao giờ chạy 1 pha đơn) [oc_crash2020]. Gap -10 % cả 5 coin nhảy qua mọi stop: phút tệ nhất không trần lỗ 58 % vốn, trần 2x còn 33,5 % [DEPLOYMENT_PLAN_VI].
 
 ## 3. Mười bước paper → testnet → live
@@ -23,7 +23,7 @@
 1. Cài đặt: clone repo, tạo `.venv`, cài deps; secrets chỉ trong `.env` local, không commit/không dán chat [BOT_RUNBOOK_VI].
 2. Dựng backend trước: `.\run_backend.ps1 -Status` (chỉ `-Background` khi chưa chạy); plan `trade_plan_v376.json` phải tươi (< 4h30m) không thì bot chỉ giữ exits [BOT_RUNBOOK_VI].
 3. Cài tay tài khoản Bybit: Cross + Hedge Mode + 5x từng coin (bot không tự làm); không hạ đòn bẩy khi đang có vị thế [BOT_RUNBOOK_VI].
-4. Chạy thử khô: `.venv\Scripts\python.exe -m bot.run --once --equity 5000 --corr-size --dip-mult 1.7 --bear-book --dip-gross-cap 2.0` (không gửi lệnh) [BOT_RUNBOOK_VI].
+4. Chạy thử khô: `.venv\Scripts\python.exe -m bot.run --once --equity 5000 --corr-size --dip-mult 1.7 --bear-book --dip-gross-cap 2.0 --adopt-fresh --carry-f 0.25 --interval 25` (không gửi lệnh) [BOT_RUNBOOK_VI].
 5. Chạy paper combo đúng MỘT lệnh (G2 + carry 0,25): `.venv\Scripts\python.exe -m bot.run --mode paper --equity 5000 --corr-size --dip-mult 1.7 --dip-gross-cap 2.0 --bear-book --adopt-fresh --carry-f 0.25 --interval 25 --tag d17bfg2c` (>= 8 tuần; một runner/một thư mục state) [restart_all.sh].
 6. Kiểm tra hằng ngày 5 phút: `scripts/daily_status.py` (gồm mục 6 edge monitor) → `scripts/bot_health.py artifacts/bot/paper_d17bfg2c` → `scripts/paper_report.py ...` → `scripts/prospective_scorecard.py` [BOT_RUNBOOK_VI].
 7. Preflight chỉ-đọc trước testnet/live lần đầu: `.venv\Scripts\python.exe scripts/bot_preflight.py --mode testnet` rồi `--mode live` (exit 0 mới tiếp; kiểm tra key, Unified, Hedge, Cross, 5x từng coin, vốn) [BOT_RUNBOOK_VI].
