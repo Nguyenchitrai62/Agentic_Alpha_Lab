@@ -43,6 +43,10 @@ GAP_MS = 5 * 60 * 1000
 STALE_S = 5 * 60.0
 WINDOW_H = 24.0
 VENUES = ("binance", "bybit")
+CARRY_REL = Path("artifacts/bot/paper_carry/state.json")
+CARRY_STALE_S = 2 * 3600.0
+RUNNER_STALE_S = 2 * 60.0
+CYCLE_WARN_MS = 60_000.0
 
 
 def _load(name: str, rel: str):
@@ -134,7 +138,7 @@ def check_plan(root: Path, now: datetime) -> dict:
 def list_paper_dirs(root: Path) -> list[Path]:
     base = root / BOT_REL
     try:
-        dirs = [d for d in base.glob("paper*") if d.is_dir()]
+        dirs = [d for d in base.glob("paper*") if d.is_dir() and d.name != "paper_carry"]  # carry ledger is not a bot runner (own section)
     except OSError:
         return []
     return sorted(dirs)
@@ -305,6 +309,133 @@ def _manual_gaps(intervals: list[tuple[int, int]], since_ms: int) -> tuple[int, 
     return n, note
 
 
+def _state_mtime(p: Path):
+    try:
+        return datetime.fromtimestamp(p.stat().st_mtime, tz=timezone.utc)
+    except OSError:
+        return None
+
+
+def check_carry(root: Path, now: datetime) -> dict:
+    """Carry sleeve (chi doc artifacts/bot/paper_carry/state.json)."""
+    p = root / CARRY_REL
+    st = bot_health.load_json(p)
+    if not isinstance(st, dict) or not isinstance(st.get("positions"), dict):
+        return {"severity": "ok",
+                "line": "carry: chua co ledger (chua chay carry_paper)",
+                "lines": []}
+    mt = _state_mtime(p)
+    if mt is None:
+        mt = bot_health.parse_ts((st or {}).get("updated_at"))
+    age_s = (now - mt).total_seconds() if mt is not None and mt <= now else 0.0
+    now_ms = int(now.timestamp() * 1000)
+    lines = []
+    positions = st.get("positions") or {}
+    soonest = None
+    for coin in sorted(positions):
+        pos = positions[coin] or {}
+        try:
+            dlv_ms = int(pos.get("delivery_ms", 0))
+        except (TypeError, ValueError):
+            dlv_ms = 0
+        dte_d = (dlv_ms - now_ms) / 86_400_000 if dlv_ms else None
+        try:
+            basis = float(pos.get("ann_basis", 0.0)) * 100
+        except (TypeError, ValueError):
+            basis = None
+        try:
+            mtm = float(pos.get("mtm_alloc", 0.0)) * 100
+        except (TypeError, ValueError):
+            mtm = None
+        try:
+            fees = float(pos.get("entry_fees", 0.0))
+        except (TypeError, ValueError):
+            fees = None
+        dlv_s = datetime.fromtimestamp(dlv_ms / 1000, tz=timezone.utc).strftime("%Y-%m-%d") if dlv_ms else "n/a"
+        lines.append(
+            f"mo {coin} {pos.get('symbol', '?')}: basis "
+            f"{basis:+.2f}%/nam" if basis is not None else f"mo {coin} {pos.get('symbol', '?')}: basis n/a")
+        lines[-1] += (f", den han {dte_d:.1f} ngay ({dlv_s})" if dte_d is not None else ", han n/a")
+        lines[-1] += (f", MtM {mtm:+.2f}% von phan bo" if mtm is not None else ", MtM n/a")
+        lines[-1] += (f", phi {fees:.2f}" if fees is not None else ", phi n/a")
+        if dlv_ms and (soonest is None or dlv_ms < soonest[0]):
+            soonest = (dlv_ms, coin)
+    if not lines:
+        lines.append("khong co cap mo (flat)")
+    hist = st.get("history") or []
+    n_set = len(hist) if isinstance(hist, list) else 0
+    tot = st.get("totals") or {}
+    try:
+        rpnl = float(tot.get("realised_pnl", 0.0))
+    except (TypeError, ValueError):
+        rpnl = 0.0
+    try:
+        tfees = float(tot.get("fees_paid", 0.0))
+    except (TypeError, ValueError):
+        tfees = 0.0
+    lines.append(f"da quyet toan: {n_set} cap, P&L {rpnl:+.2f} USDT (phi tich luy {tfees:.2f})")
+    if mt is None:
+        run_s, sev = "khong ro lan chay cuoi", "warning"
+    else:
+        run_s = f"ledger chay lan cuoi {mt.isoformat()} ({fmt_age_s(age_s)} truoc)"
+        sev = "warning" if age_s is not None and age_s > CARRY_STALE_S else "ok"
+        if sev == "warning":
+            run_s += " WARNING: >2h (vong hourly chet?)"
+    lines.append(run_s)
+    if soonest is not None:
+        d = datetime.fromtimestamp(soonest[0] / 1000, tz=timezone.utc).strftime("%Y-%m-%d")
+        left = (soonest[0] - now_ms) / 86_400_000
+        lines.append(f"roll tiep theo: {d} ({soonest[1]}, con {left:.1f} ngay)")
+    else:
+        lines.append("roll tiep theo: n/a (khong co vi the mo)")
+    head = f"carry: {len(positions)} cap mo, P&L {rpnl:+.2f}"
+    if sev == "warning":
+        head += " [WARNING ledger >2h]"
+    return {"severity": sev, "line": head, "lines": lines}
+
+
+def check_cycles(root: Path, now: datetime) -> list[dict]:
+    """Moi paper runner: last_cycle_ms + stage cham nhat + tuoi state.json."""
+    out = []
+    for d in list_paper_dirs(root):
+        sp = d / "state.json"
+        st = bot_health.load_json(sp)
+        if not isinstance(st, dict):
+            out.append({"name": d.name, "severity": "warning",
+                        "line": f"{d.name}: khong doc duoc state.json WARNING"})
+            continue
+        try:
+            cyc = st.get("last_cycle_ms")
+            cyc = float(cyc) if cyc is not None else None
+        except (TypeError, ValueError):
+            cyc = None
+        stages = st.get("last_cycle_stages_ms")
+        slow = None
+        if isinstance(stages, dict) and stages:
+            try:
+                k = max(stages, key=lambda x: float(stages[x]))
+                slow = (k, float(stages[k]))
+            except (TypeError, ValueError):
+                slow = None
+        mt = _state_mtime(sp)
+        age_s = (now - mt).total_seconds() if mt is not None and mt <= now else 0.0
+        cyc_s = "n/a" if cyc is None else f"{cyc / 1000:.1f}s"
+        slow_s = "n/a" if slow is None else f"{slow[0]}={slow[1] / 1000:.1f}s"
+        warn = (cyc is not None and cyc > CYCLE_WARN_MS) or age_s > RUNNER_STALE_S
+        sev = "warning" if warn else "ok"
+        line = f"{d.name}: cycle {cyc_s} (cham nhat {slow_s}); state tuoi {fmt_age_s(age_s)}"
+        if cyc is not None and cyc > CYCLE_WARN_MS:
+            line += " WARNING: cycle >60s"
+        if age_s > RUNNER_STALE_S:
+            line += " WARNING: state >2p (runner dung?)"
+        out.append({"name": d.name, "severity": sev, "line": line,
+                    "cycle_ms": cyc, "slowest": slow, "state_age_s": age_s})
+    if not out:
+        out.append({"name": "-", "severity": "warning",
+                    "line": "khong thay thu muc artifacts/bot/paper* nao"})
+    return out
+
+
 def worst(*sevs: str) -> str:
     order = {"ok": 0, "warning": 1, "critical": 2}
     return max(sevs, key=lambda s: order.get(s, 1))
@@ -317,10 +448,14 @@ def build_status(root: Path = ROOT, now: datetime | None = None,
     plan = check_plan(root, now)
     bots = check_bots(root, now)
     cols = check_collectors(root, now)
-    verdict = worst(be["severity"], plan["severity"],
-                    *(b["severity"] for b in bots), *(c["severity"] for c in cols))
+    carry = check_carry(root, now)
+    cycles = check_cycles(root, now)
+    verdict = worst(be["severity"], plan["severity"], carry["severity"],
+                    *(b["severity"] for b in bots), *(c["severity"] for c in cols),
+                    *(r["severity"] for r in cycles))
     return {"now": now, "backend": be, "plan": plan, "bots": bots,
-            "collectors": cols, "verdict": verdict,
+            "collectors": cols, "carry": carry, "cycles": cycles,
+            "verdict": verdict,
             "exit": {"ok": 0, "warning": 1, "critical": 2}[verdict]}
 
 
@@ -332,6 +467,10 @@ def format_text(st: dict) -> str:
     L += [f"   - {b['line']}" for b in st["bots"]]
     L.append("3) Collector (gap >5p trong 24h):")
     L += [f"   - {c['line']}" for c in st["collectors"]]
+    L.append(f"4) Carry: {st['carry']['line']}")
+    L += [f"   - {x}" for x in st["carry"].get("lines", [])]
+    L.append(f"5) Chu ky runner ({len(st['cycles'])}) [WARNING neu cycle >60s hoac state >2p]:")
+    L += [f"   - {r['line']}" for r in st["cycles"]]
     L.append(f"KET LUAN: {st['verdict'].upper()} "
              f"(0=OK 1=canh bao 2=nguy hiem) -> exit {st['exit']}")
     return "\n".join(L)
@@ -349,6 +488,13 @@ def format_markdown(st: dict) -> str:
           "| --- | --- | --- |"]
     for c in st["collectors"]:
         L.append(f"| {c['feed']}/{c['venue']} | {c['severity'].upper()} | {c['line']} |")
+    L += ["", f"**Carry: {st['carry']['line']}**"]
+    for x in st["carry"].get("lines", []):
+        L.append(f"- {x}")
+    L += ["", "| runner | trang thai | chi tiet |",
+          "| --- | --- | --- |"]
+    for r in st["cycles"]:
+        L.append(f"| {r.get('name', '-')} | {r['severity'].upper()} | {r['line']} |")
     L += ["", f"**KET LUAN: {st['verdict'].upper()}** (exit {st['exit']})", ""]
     return "\n".join(L)
 
