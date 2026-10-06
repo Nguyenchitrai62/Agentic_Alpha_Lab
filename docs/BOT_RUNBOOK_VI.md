@@ -104,7 +104,7 @@ REM PowerShell: .\scripts\restart_all.ps1 -DryRun
 REM Khôi phục đủ:
 bash scripts/restart_all.sh
 REM Chỉ một nhóm:
-bash scripts/restart_all.sh --only bots|backend|carry
+bash scripts/restart_all.sh --only bots      (hoặc --only backend / --only carry: chọn MỘT giá trị)
 ```
 
 - Sau MỌI restart: runner tự ghi `op=protection_check` (từng mảnh mở + stop/TP native còn trên sàn không). Người trực chạy `bot_health.py`: `CRITICAL: open without stop+TP` phải trống mới cho bot chạy tiếp; mảnh thiếu stop được đặt lại <= 20s, quá 2 vòng tự đóng market (`unprotected_close`); không đặt tay trong giờ đầu. Mất mạng dài: stop market + TP limit reduce-only trên sàn vẫn bảo vệ; hở duy nhất là mảnh vừa khớp chưa kịp đặt exit (cửa sổ <= 20s) — kiểm tra tay khi mạng về. Testnet/live sau reboot dựng BẰNG TAY (backend `-Status` + plan tươi, rồi đúng lệnh mục 2, đối chiếu `actions.jsonl` với vị thế thật).
@@ -119,7 +119,7 @@ REM Xem kế hoạch trước (không ghi gì):
 REM Chụp thật + tỉa bản cũ:
 .venv\Scripts\python.exe scripts/snapshot_untracked.py
 REM Liệt kê nội dung một bản (không ghi gì):
-.venv\Scripts\python.exe scripts/snapshot_untracked.py --restore-list artifacts/backups/untracked_<UTC>.zip
+.venv\Scripts\python.exe scripts/snapshot_untracked.py --restore-list artifacts/backups/untracked_20261006T093559Z.zip   (thay bằng tên file zip thật trong artifacts/backups)
 ```
 
 ## 7. Playbook sự cố (dừng mở mới trước, điều tra sau)
