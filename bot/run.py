@@ -21,6 +21,7 @@ from pathlib import Path
 import pandas as pd
 
 from bot import mirror
+from bot import risk_guard
 from bot.bybit_v5 import MAINNET, TESTNET, Bybit, BybitError, cached_call, round_step
 from bot.paper import PaperExchange
 
@@ -77,21 +78,46 @@ def to_exchange(o: mirror.Order, inst: dict) -> dict | None:
     price = round_step(o.price, it["tick"], up=up)
     if not o.reduce_only and float(qty) * float(price) < float(it["min_notional"]):
         return None
-    p.update(orderType="Limit", price=price, timeInForce="GTC")  # a crossing limit fills at once (taker, better price) instead of being lost
     if o.reduce_only:
+        # TP / reduce / close limits stay GTC (reduce-only, may take on touch).
+        p.update(orderType="Limit", price=price, timeInForce="GTC")
         p["reduceOnly"] = True
+    else:
+        # Book entries / adds and dip rung bids are PostOnly (maker-only, as the
+        # research fill rule and the paper exchange assume). A crossing limit is
+        # rejected by the exchange instead of taking (see postonly_reject: retry
+        # next cycle at the same price, never convert to market/taker).
+        p.update(orderType="Limit", price=price, timeInForce="PostOnly")
     return p
+
+
+def _is_postonly_reject_msg(msg: str) -> bool:
+    """True when an exchange error message means a PostOnly order would cross.
+
+    Bybit V5 rejects a PostOnly limit that would take immediately ( maker-only ).
+    Known signals: the words postonly / post-only, or retCodes 110079 / 170146.
+    """
+    try:
+        m = str(msg).lower()
+    except Exception:
+        return False
+    if "postonly" in m or "post-only" in m or "post only" in m:
+        return True
+    if "110079" in m or "170146" in m:
+        return True
+    return False
 
 
 class Runner:
     def __init__(self, mode: str, plan_path: Path, equity: float | None, risk_mult: float = 1.0, corr: bool = False,
                  tag: str | None = None, dip_mult: float = 1.0, bear_book: bool = False,
                  dip_cooldown_h: float = 0.0, dip_sl_coin: dict | None = None, dip_gross_cap: float | None = None,
-                 adopt_fresh: bool = False):
+                 adopt_fresh: bool = False, no_risk_guard: bool = False):
         self.mode, self.plan_path = mode, plan_path
         self.risk_mult, self.corr, self.tag, self.dip_mult = float(risk_mult), bool(corr), tag or None, float(dip_mult)
         self.bear_book = bool(bear_book)
         self.adopt_fresh = bool(adopt_fresh)
+        self.no_risk_guard = bool(no_risk_guard)
         self.dip_cooldown_h = float(dip_cooldown_h or 0.0)
         self.dip_sl_coin = dict(dip_sl_coin or {})
         try:
@@ -133,10 +159,83 @@ class Runner:
         if self.mode == "dry":
             return None
         try:
-            return fn(*a, **kw)
+            res = fn(*a, **kw)
+            if res is None and getattr(fn, "__name__", "") == "place" and a and isinstance(a[0], dict):
+                # Paper PostOnly reject returns None (no exception): a crossing
+                # PostOnly limit is rejected maker-only (bot/paper.py). Retry next
+                # cycle at the same price; never convert to market/taker.
+                pay = a[0]
+                if pay.get("timeInForce") == "PostOnly":
+                    self.log(dict(op="postonly_reject", link=pay.get("orderLinkId"), symbol=pay.get("symbol"),
+                                  price=pay.get("price")))
+            return res
         except (BybitError, OSError) as e:
+            pay = a[0] if a and isinstance(a[0], dict) else {}
+            if isinstance(pay, dict) and pay.get("timeInForce") == "PostOnly" and _is_postonly_reject_msg(str(e)):
+                self.log(dict(op="postonly_reject", link=pay.get("orderLinkId"), symbol=pay.get("symbol"),
+                              price=pay.get("price"), note=str(e)[:200]))
+                return None
             self.log(dict(op="error", call=getattr(fn, "__name__", "?"), note=str(e)))
             return None
+
+    def _guard_prices(self, lc, last5d, plan) -> dict:
+        """Last prices for the pre-trade guard: closed 1m closes (lc) falling
+        back to 5m closes (last5) and plan coin marks. No extra network calls."""
+        prices: dict = {}
+        try:
+            if isinstance(lc, dict):
+                for s, v in lc.items():
+                    try:
+                        if v is not None:
+                            prices[s] = float(v)
+                    except (TypeError, ValueError):
+                        continue
+        except (AttributeError, TypeError):
+            pass
+        try:
+            if isinstance(last5d, dict):
+                for s, v in last5d.items():
+                    if s in prices:
+                        continue
+                    try:
+                        prices[s] = float(v[1])
+                    except (TypeError, ValueError, IndexError):
+                        continue
+        except (AttributeError, TypeError):
+            pass
+        try:
+            for s, c in ((plan or {}).get("coins") or {}).items():
+                if s in prices:
+                    continue
+                try:
+                    px = c.get("price") if isinstance(c, dict) else None
+                    if px is not None:
+                        prices[s] = float(px)
+                except (TypeError, ValueError, AttributeError):
+                    continue
+        except (AttributeError, TypeError):
+            pass
+        return prices
+
+    def _apply_risk_guard(self, want: dict, equity: float, prices: dict):
+        """Filter `want` through risk_guard.check (defaults: per-coin 2.5x, dip
+        2.0x, total 4x, single 1x). Rejects are logged op=risk_reject and not
+        sent; protection / reduce-only orders are never blocked by check()."""
+        try:
+            allowed, rejected = risk_guard.check(want, self.state.get("ledger"), equity, prices)
+        except Exception as e:  # guard must never crash the cycle; fail closed for entries
+            self.log(dict(op="risk_reject", link=None, symbol=None, reason=f"guard_error:{type(e).__name__}"))
+            return {k: o for k, o in want.items() if getattr(o, "reduce_only", False)}
+        for r in rejected or []:
+            try:
+                self.log(dict(op="risk_reject", link=r.get("link"), symbol=r.get("symbol"), reason=r.get("reason")))
+            except (AttributeError, TypeError):
+                self.log(dict(op="risk_reject", link=None, symbol=None, reason="bad_reject"))
+        try:
+            keep = {id(o) for o in (allowed or [])}
+        except Exception:
+            keep = set()
+        return {k: o for k, o in want.items() if id(o) in keep}
 
     def sync_fills(self):
         """Exchange executions of bot links -> piece ledger (testnet / live only)."""
@@ -354,6 +453,15 @@ class Runner:
                         if self.mode == "dry":
                             pc["qty"] = 0.0
                 want = self._protection_only(led)
+                # PRE-TRADE GUARD (testnet review 2026-10-06 V4): filter `want`
+                # before anything is rounded/sent. Protection is reduce-only so
+                # check() never blocks it; this insert is a no-op there.
+                if not getattr(self, "no_risk_guard", False):
+                    try:
+                        _lp = last5 if isinstance(last5, dict) else {}
+                    except NameError:
+                        _lp = {}
+                    want = self._apply_risk_guard(want, equity, self._guard_prices(None, _lp, {"coins": {}}))
                 rounded, skipped = {}, []
                 for k, o in want.items():
                     p = to_exchange(o, self.inst)
@@ -408,7 +516,11 @@ class Runner:
                     pc.pop("plan_gone_since", None)
                 else:
                     pc.setdefault("plan_gone_since", str(now))
-        for pid, why in mirror.exits(plan, now, led, self.last5()):
+        try:
+            _last5_for_cycle = self.last5()
+        except Exception:
+            _last5_for_cycle = {}
+        for pid, why in mirror.exits(plan, now, led, _last5_for_cycle):
             pc = led[pid]
             if pc.get("exit_sent") and now - pd.Timestamp(pc["exit_sent"]) < pd.Timedelta(minutes=2):
                 continue  # a market exit is in flight; wait for its fill before sending another
@@ -451,6 +563,13 @@ class Runner:
         if stale:
             want = {k: o for k, o in want.items() if o.kind in ("tp", "stop", "reduce")}
             self.log(dict(op="stale_plan", generated_at=plan["generated_at"]))
+        # PRE-TRADE GUARD (testnet review 2026-10-06 V4, exact call site): filter
+        # `want` after stale/plan_error trimming and before rounding/diff.
+        # Prices = last closed 1m closes (lc) falling back to 5m closes/plan
+        # marks; equity = exchange equity. check() never blocks reduce-only
+        # exits/protection, so stops/TPs/market exits always pass.
+        if not getattr(self, "no_risk_guard", False):
+            want = self._apply_risk_guard(want, equity, self._guard_prices(lc, _last5_for_cycle, plan))
         have_before = self.have()
         rounded, skipped = {}, []
         for k, o in want.items():
@@ -568,6 +687,8 @@ def main():
     ap.add_argument("--dip-gross-cap", type=float, default=0.0, metavar="G", help="per-phase dip gross-notional cap: open dip notional + resting dip bids <= G x sub equity (default 0 = off)")
     ap.add_argument("--adopt-fresh", action="store_true", help="adopt a fresh paper book position the bot missed (same limit at the plan entry price inside its 5..65 min window, default off = unchanged)")
     ap.add_argument("--tag", default=None, help="state dir artifacts/bot/<mode>[_<tag>] (default no tag = unchanged paths)")
+    ap.add_argument("--no-risk-guard", action="store_true", help="disable the pre-trade risk guard (testnet/live: guard ON by default)")
+    ap.add_argument("--risk-guard", action="store_true", help="enable the pre-trade risk guard in paper/dry (default off there so paper stays engine-faithful)")
     a = ap.parse_args()
     if a.mode == "live" and os.environ.get("BOT_ALLOW_LIVE") != "yes-real-money":
         sys.exit("live trading is locked: the account owner must set BOT_ALLOW_LIVE=yes-real-money")
@@ -576,7 +697,8 @@ def main():
     _lock = single_instance(ROOT / "artifacts/bot" / mode_dir / "runner.lock") if not a.once else None
     r = Runner(a.mode, Path(a.plan), a.equity, risk_mult=a.risk_mult, corr=a.corr_size, tag=a.tag, dip_mult=a.dip_mult,
              bear_book=a.bear_book, dip_cooldown_h=a.dip_cooldown_h, dip_sl_coin=parse_dip_sl_coin(a.dip_sl_coin),
-             dip_gross_cap=a.dip_gross_cap, adopt_fresh=a.adopt_fresh)
+             dip_gross_cap=a.dip_gross_cap, adopt_fresh=a.adopt_fresh,
+             no_risk_guard=a.no_risk_guard or (a.mode in ("paper", "dry") and not a.risk_guard))
     while True:
         try:
             r.cycle()

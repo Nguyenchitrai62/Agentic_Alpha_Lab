@@ -3,12 +3,15 @@
  "account": "nguynchtrai",
  "dataset": "nguynchtrai/oc-c2-rank-calibrated-data",
  "pushed_utc": "2026-10-06T04:26:47",
- "kernel_version": 1,
+ "kernel_version": 2,
  "private": true,
  "files_sha256": {
   "c2_rank_calibrated.py": "9088d311702c72c5afd7aadb39debe899519c608985043e7bc7e7f9014cb8ad7",
   "common_impl.py": "8b5b4ff13f876060be751c322335768f8f44ad602c0ed35c4c46e2a39d52353b",
-  "kernel-metadata.json": "164e7416b9eb165c6222b1901f6937642d3ce32e7e7f6c92703cec7bd3428c42",
+  "kaggle_entry.py": "bd65c44b8996f294722246859d22303e720b2b8a9cd9897a50a3c44ee6b30c5e",
+  "kernel-metadata.json": "04c33b86aa5b68b78e99c25055ba35d4ac93bd7058f808d12d9f1f25f4ab73ca",
   "kernel_run.py": "345320fb7f1deb8787e855dd99b410f4ee1ce9b304cb2ec34f93244ba5427a2a"
- }
+ },
+ "pushed_utc_v2": "2026-10-06T04:28:57",
+ "note": "v1 failed at start (script kernels upload only code_file; c2_rank_calibrated.py missing, no training ran). v2 = same code bundled in a self-extracting kaggle_entry.py; no code or data change."
 }

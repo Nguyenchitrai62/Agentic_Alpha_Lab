@@ -16,7 +16,7 @@ into exchange orders. Logic: `bot/mirror.py` (pure, tests in `tests/test_bot_mir
 
 ## Rules implemented (same as the research engine)
 - Hedge mode: longs positionIdx 1, shorts 2 (a sub-book short never nets against a long dip rung).
-- Book entries: GTC limits (a crossing limit fills at once as taker) from minute 5 after the plan's issue time until `valid_until`; unfilled -> cancelled, never chased.
+- Book entries: PostOnly limits (maker-only, as the research fill rule) from minute 5 after the plan's issue time until `valid_until`; a crossing limit is rejected (logged `postonly_reject`) and retried next cycle, never chased.
 - Every filled piece gets its own reduce-only exits: book = conditional market stop at the plan SL + limit TP (amended when the plan moves
   SL/TP, e.g. break-even / tighten); plan add / reduce / close = limit orders.
 - Dip rungs: limit bids from minute 16 to the bar end, admitted shallow-first inside each sub-book's risk budget (0.26 x sub capital,
@@ -87,6 +87,18 @@ for fresh plans; a new fill has no exit orders until the next cycle (<= 20 s) pl
   opened + 65 min (the engine 60-min book entry window from minute 5). Fills only on a later trade-through (no
   chasing); after the window it cancels like any expired entry. Never adopts older positions, never market-enters,
   never adopts dips. Default off reproduces every old order bit-for-bit.
+
+## CHANGES (bot_testnetfix 2026-10-06: PostOnly entries + wired risk guard)
+- F1: book entries / adds and dip rung bids are sent `timeInForce:"PostOnly"` (maker-only, as the research fill rule
+  and `bot/paper.py` assume); reduce-only TP / reduce limits stay GTC; stops / market exits unchanged. A crossing
+  PostOnly is rejected (paper returns None, live raises PostOnly 110079/170146): logged `op=postonly_reject` and
+  retried next cycle at the same price, never converted to market/taker.
+- V4: `bot/risk_guard.check()` filters `want` after stale/plan_error trimming and before rounding/`diff` in both
+  `Runner.cycle` paths (normal + ledger-only), with exchange equity, ledger positions and last prices (closed 1m
+  closes falling back to 5m closes / plan marks), default limits per-coin 2.5x / dip 2.0x / total 4x / single 1x.
+  Rejects log `op=risk_reject` and are not sent; protection / reduce-only never blocked. Flag `--no-risk-guard`
+  disables in testnet/live (guard ON there by default); in paper/dry the guard is OFF unless `--risk-guard` (leader 2026-10-06: paper stays engine-faithful, e.g. uncapped R2-4P dip gross can exceed 2.0x).
+- `tests/test_bot_testnetfix.py` covers both; `test_bot_mirror` entry payload updated to PostOnly.
 
 ## CHANGES (bot_opsfix 2026-10-06: shared kline cache + quiet skip log, default behaviour unchanged)
 - Shared public-kline cache `artifacts/bot/_kline_cache/<SYMBOL>.json` (TTL 20 s, file lock, existing 10006 backoff kept):

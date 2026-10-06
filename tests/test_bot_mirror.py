@@ -96,7 +96,7 @@ def test_diff_cancels_and_places():
 def test_rounding_and_payloads():
     assert round_step(0.0129, "0.001") == "0.012" and round_step(1.2345, "0.01", up=True) == "1.24"
     buy = to_exchange(mirror.Order("e", "BTCUSDT", "Buy", 0.0129, "entry", price=80000.06), INST)
-    assert buy["qty"] == "0.012" and buy["price"] == "80000" and buy["timeInForce"] == "GTC"
+    assert buy["qty"] == "0.012" and buy["price"] == "80000" and buy["timeInForce"] == "PostOnly"
     assert to_exchange(mirror.Order("e", "BTCUSDT", "Buy", 0.0004, "entry", price=80000.0), INST) is None   # below the lot minimum
     st = to_exchange(mirror.Order("s", "SOLUSDT", "Sell", 1.25, "stop", trigger=100.006, reduce_only=True), INST)
     assert st["orderType"] == "Market" and st["triggerPrice"] == "100" and st["triggerDirection"] == 2 and st["reduceOnly"]

@@ -7,7 +7,7 @@ exits are separate reduce-only orders owned by the bot:
                (break-even / tighten); plan add / reduce / close orders become limit orders (reduce-only for reduce / close).
   dip piece  : take-profit limit, native backstop = conditional market at the plan backstop, bot stop = market close when a CLOSED 5m bar
                closes at or below the plan stop (close5), time exit = market close at the bar end (research: exit at the next 4h open).
-Entries are PostOnly limits (maker only, as the research fill rule); an unfilled entry is cancelled at its expiry and never chased.
+Entries are PostOnly limits (maker only, as the research fill rule); TP/reduce limits stay GTC; an unfilled entry is cancelled at its expiry and never chased.
 Paper and exchange can diverge (a limit the paper filled may not fill on the exchange): the bot follows the EXCHANGE for open pieces and the
 PLAN for new orders; when the plan's book position is gone (paper exit) but the exchange piece is still open after GRACE minutes, the piece is
 closed at market (logged as a divergence).
@@ -313,7 +313,7 @@ def desired(plan: dict, now, equity: float, ledger: dict, budget: float = BUDGET
             if adopt_fresh and sub.get("state") == "position" and sub.get("position") and piece is None:
                 # --adopt-fresh (bot_bookgap): the paper plan already FILLED its book entry limit before the bot
                 # saw a pending order, so the sub-plan shows a fresh POSITION. Re-place the SAME limit the engine
-                # had (side + plan entry price + plan size, PostOnly/GTC like any book entry) with its stop/TP
+                # had (side + plan entry price + plan size, PostOnly like any book entry) with its stop/TP
                 # attached; it fills only on a later trade-through (no chasing) and expires with the window.
                 # Plan fields used: position.opened = the engine's holding-bar start (= entry bar close, e.g.
                 # "2026-10-04 12:00:00+00:00", str(grid[open_i] + 4h) in forward_trade_phase.py) and
