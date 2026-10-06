@@ -336,3 +336,10 @@ Pooled majors HGB (v92), 2017 spot prefix, causal vol targets, long/short horizo
 2. Deployment v2 (v133) is frozen: scripts/v133_advisor.py (vol models artifacts/research/advisor_shadow/v133_vol_models.pkl, cutoff 2026-09-08), logged as v133_deploy_v2.
 3. Kaggle (with authorization) only for a materially new model on the extended panel; DL has failed so far.
 4. More history for XRP/SOL/BNB (other venues) if a source with clean hourly data exists.
+
+### Screen criteria (2026-10-06, from placebo studies)
+- Dip replica screens: PROMISING legs (4-phase sum >= base 4/5 AND DD within 1 pp 4/5) let 6.7 % of placebo rules pass
+  (oc_placebo_dip); additionally require 5y 4-phase-mean sum delta >= +0.273 (placebo p95, ~3.5 % of base) -> FPR 0.7 %.
+- Book vectorised tilts: two PROMISING tilts (expiry, CME gap) failed the full engine; see oc_placebo (book) for its threshold;
+  exposure tilts must also beat an exposure-matched control + timing placebo (oc_premexpo: USDT premium passed, CB premium did not).
+- Carry: cash-and-carry with quarterlies (oc_cashcarry) = useful add-on +0.21/+0.42 %/mo at f 0.25/0.5, near zero DD; combo pending.
