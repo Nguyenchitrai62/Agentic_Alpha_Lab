@@ -375,3 +375,178 @@ maxDD 0,104644→0,113519 (tệ hơn) — mỗi forced close phải mở lại n
 = 2,56%): NOT PROMISING (as assigned) — DD không tệ hơn 4/5 NHƯNG retention >= 98% chỉ 2/5 (chỉ 2022 1,0427 và 2024 1,0020 đỗ; 2021 0,9515 / 2023 0,9583 /
 2025 0,9557 fail vì window P&L dương +0,026/+0,043/+0,033 nên halving tốn 4–5% P&L năm); full 5y P&L 1,970907→1,928287 (−0,0426), maxDD 0,104644→0,103597;
 worst week y hệt cả 5 năm — đóng hướng [oc_fomcbook].
+
+## Bổ sung: cash-and-carry trên vốn nhàn (OpenCode oc_cashcarry, BTC/ETH quarterlies)
+
+Phương pháp khóa trước trong PLAN.md (vào 1 lần mỗi hợp đồng quý, ENTER iff basis năm hóa ln(F/S)*365/DTE >= 4%/yr, long spot + short quarterly
+notional bằng nhau f mỗi coin rows 0.25/0.50, giữ tới delivery, phí spot 0.1%/side + futures 0.055% entry + 0.02% delivery = drag 0.275% allocated;
+delivery futures KHÔNG trả funding nên rule funding perp AGENTS.md không liên quan; chỉ BTC+ETH vì SOL quarterlies từ 2024-09, BNB/XRP là
+coin-margined không dùng; data `data/raw/qbasis_20261003`) [oc_cashcarry]. 50 contracts thấy (25 BTC + 25 ETH expiries 2021-03..2027-03)
+-> 33 vào, 13 skip (basis < 4%), 2 incomplete (delivery 2026-12/2027-03 quá spot bar cuối, loại, không impute P&L); cả 33 lệnh vào đều net
+dương (min +0.18% allocated); 8 pre-window (vào trước 2021-09-24, sum +0.292 allocated) loại khỏi stat 5 năm gộp [oc_cashcarry].
+
+| năm (theo ENTRY; ret_alloc = P&L/allocated) | BTC n / mean basis / sum | ETH n / mean basis / sum | sum năm | worst MtM (alloc) | acct +%/th f=0.25 | acct +%/th f=0.50 |
+|---|---|---|---|---|---|---|
+| 2021-09-24 | 2 / 8.9% / 0.0261 | 2 / 8.0% / 0.0209 | 0.0470 | -1.01% | 0.098 | 0.196 |
+| 2022-09-24 | 3 / 5.6% / 0.0424 | 1 / 5.7% / 0.0105 | 0.0528 | -0.71% | 0.110 | 0.220 |
+| 2023-09-24 | 4 / 13.3% / 0.1579 | 4 / 12.7% / 0.1381 | 0.2960 | -2.65% | 0.617 | 1.233 |
+| 2024-09-24 | 4 / 7.4% / 0.0638 | 4 / 7.4% / 0.0581 | 0.1219 | -0.39% | 0.254 | 0.508 |
+| 2025-09-24 | 1 / 4.2% / 0.0058 | 0 (cả 5 skip, basis < 4%) | 0.0058 | -2.17% | 0.012 | 0.024 |
+[oc_cashcarry].
+
+Gộp 5 năm (25 trades in-window, sum 0.5234 allocated): f=0.25 cộng +13.09% sau 5 năm = +0.218%/tháng số học (+0.213%/tháng hình học);
+f=0.50 cộng +26.17% = +0.436%/tháng số học (+0.416%/tháng hình học); bộ lọc idle đúng — năm gần nhất chỉ 1/6 cơ hội vượt 4%/yr nên sleeve
+đóng góp ~+0.01%/tháng, không ép rủi ro khi không có premium [oc_cashcarry]. Worst MtM 4h-close mỗi năm trên allocated:
+-1.01 / -0.71 / -2.65 / -0.39 / -2.17%; ra account x f: f=0.25 tệ nhất -0.66% (2023), f=0.50 tệ nhất -1.33% (2023) — nhỏ cạnh DD BOT ~17%,
+sleeve không cộng quá ~0.7% (f=0.25) account DD dù widening tệ nhất trùng phút tệ nhất BOT [oc_cashcarry]. Margin (Bybit unified cross
+5x Hedge Mode; haircut 5% BTC / 10% ETH là ASSUMPTION; short quarterly cần IM 5x trên mark, spot không IM; bound check MỌI 4h close
+2021-09-24..2026-09-23 trên `oc_kpi_g2/barsum_s0..s3` + `v421_runs.pkl`; BOT gross <= book_gross(t) + trần dip 2.0, mix max 3.41,
+per-phase max 3.78): worst IM/equity f=0.25: 0.53 / 0.53 / 0.57 / 0.67 (s0..s3); f=0.50: 0.55 / 0.55 / 0.60 / 0.72; blocked 0 mọi phase
+(limit 0.95; phút tệ nhất 2023-10-24 vẫn >= 28% free); pair delta-hedged nên gap đều chỉ mất basis widening, maintenance thêm 0.5% x carry
+gross (~0.5-1.0% equity); median ~93% equity free (oc_margin) nên spot f=0.25/0.50 mua bằng cash nhàn [oc_cashcarry; oc_margin].
+Verdict y nguyên: USEFUL ADD-ON YES — yield nhỏ trung thực gần như không rủi ro, không phải goal-changer; kỳ vọng +0.21%/tháng hình học
+ở f=0.25 (+0.42 ở f=0.50); ~57% gain 5 năm từ regime basis cao 2023, năm gần nhất ~+0.01%/tháng; đóng ~4-8% khoảng trống tới mục tiêu BOT 5%/tháng,
+không tốn DD/margin đo được; deploy gợi ý f=0.25 mỗi coin theo đúng roll rule PLAN.md, cần paper triển vọng như mọi thứ (venue data là Binance,
+live là Bybit; cơ chế delivery/settlement phải xác nhận trên venue live) [oc_cashcarry]. PENDING: nghiên cứu combo BOT+carry và khả dụng
+Bybit (oc_carrycombo) chưa chạy — tới khi xong thì carry là add-on độc lập, chưa cộng vào số triển khai G2/D17BF [oc_cashcarry].
+
+## Bổ sung: phương pháp sau 3/3 vectorised book screens rớt full engine (OpenCode oc_placebo, oc_premexpo, oc_usdt4p, oc_cmegap4p, oc_expiry4p, oc_placebo_dip)
+
+Vectorised book screens FAIL full engine 3/3 trên cùng harness R2B1D17BFG2 4-phase (v421 wiring: phase_offset_full + pipe_setup("v321", agents on)
++ kd=1.7 corr-size + bear-book + G=2.0 cap + win_start=5; gate maker 0.0002/taker 0.00055; adverse long funding 0.0001; reset-metric year_reset +
+v388.mix full-path DD; base tái tạo v421 exact 5y 5.41%/th, max yearly DD 16.91, full-path 16.82) [oc_expiry4p; oc_cmegap4p; oc_usdt4p]:
+- oc_expiry4p (idea #62, halving book x0.5 cả hai phía 48h trước expiry Deribit hàng tháng, 68 expiries, 12 bars mỗi cái): VERDICT NO —
+base 5.410 / worst 2.588 / maxDD 16.91 / full 16.82 / dev4 5.601 / win 0.6533 so với EXP 5.498 / 2.247 / 16.56 / 16.53 / 5.681 / 0.6525
+(gap 5y +0.088, worst -0.341, maxDD -0.35pp, full -0.29pp); theo năm gap R: 2021 -0.341 (2.247/12.68 so với 2.588/10.86), 2022 +0.184
+(3.466/16.56 so với 3.282/16.91), 2023 +0.625 (6.670/16.03 so với 6.045/15.81), 2024 -0.143 (10.534/8.39 so với 10.677/8.27),
+2025 +0.121 (4.769/14.30 so với 4.648/12.90); KEEP cần full-path DD thấp hơn (16.53<16.82 YES) VÀ 5y>=5.30 (YES) VÀ không năm nào tệ hơn
+>0.3%/th (2021 -0.341 NO) — rớt đúng chân thứ ba [oc_expiry4p].
+- oc_cmegap4p (idea #69, tilt long theo CME weekend-gap proxy gap=P(Sun reopen)/P(Fri close)-1, DST winter Fri 21:00/Sun 22:00 summer Fri 20:00/
+Sun 21:00, fill = trade-through đầu tiên của P_fri sau reopen trong 72h, active khi large-gap |gap|>2%: long x0.75 nếu gap>+2%, x1.25 nếu
+gap<-2%, 262 weekends, 58 large 28 up/30 down, fill rate 0.50, active rows 742/10950 mỗi shift up 383/down 359): VERDICT NO — CME 5.424 /
+worst 2.679 / maxDD 17.05 / full 17.03 / dev4 5.602 / win 0.6545 so với base (gap 5y +0.014, worst +0.091, maxDD +0.14pp, full +0.21pp);
+gaps: 2021 +0.091 (2.679 so với 2.588), 2022 -0.081 (3.201 so với 3.282), 2023 -0.416 (5.629 so với 6.045), 2024 +0.430 (11.107 so với
+10.677), 2025 +0.066 (4.714 so với 4.648); KEEP cần full-path DD thấp hơn (17.03<16.82 NO) VÀ 5y>=5.30 (YES) VÀ không năm tệ >0.3 (2023
+-0.416 NO) — rớt chân 1 và 3 [oc_cmegap4p].
+- oc_usdt4p (idea #71, tilt long book x1.15 khi z>1 / x0.85 khi z<-1 theo USDT/USD premium z từ Coinbase USDT-USD 1h 47240 rows
+2021-05-04..2026-09-23, prem=close-1, mean24 rolling 24/min20, z=(mean24-trailing-2160 mean)/std shift 1, as-of end<=T-1s, coverage 100%,
+median premium +0.5 bps, up 1909/down 2109 rows trên 10950): VERDICT NO — USDT 5.168 / worst 2.620 / maxDD 17.01 / full 17.00 / dev4 5.300 /
+win 0.6521 so với base (gap 5y -0.242, worst +0.032, maxDD +0.10pp, full +0.18pp, dev4 -0.301, win -0.0012); gaps: 2021 +0.032 (2.620 so với
+2.588), 2022 -0.143 (3.139 so với 3.282), 2023 -0.421 (5.624 so với 6.045), 2024 -0.701 (9.976 so với 10.677), 2025 -0.009 (4.639 so với
+4.648); book-only attrib cũng thua 4/5 năm R và 5/5 năm DD (5y 2.200 so với 2.319, -0.119); KEEP cần full-path DD không cao hơn >0.3pp
+(17.00-16.82=+0.18 YES) VÀ 5y>=5.45 (5.168 NO) VÀ không năm tệ >0.3 (2024 -0.701, 2023 -0.421 NO) VÀ dev4 cao hơn base (5.300>5.601 NO) —
+rớt 3/4 chân [oc_usdt4p]. Live feasibility: GET Coinbase `/products/USDT-USD/candles?granularity=3600` window 2h HTTP 200, 3 candles,
+0.517s, không auth — plan hourly khả thi [oc_usdt4p].
+Ngay cả sau exposure + placebo book tilt vẫn rớt: oc_premexpo (control = constant long mult exposure-weighted in-year, placebo = 500
+block-shuffles by run, z-vs-z corr full 0.878; costs 0.0002 unified): USDT ALPHA (gain vs control +0.049084, dương 4/5 năm, placebo 5y pct 99.4
+mean -0.051517 sd 0.039581) / CB EXPOSURE (gain +0.035170, dương 5/5 năm, nhưng pct 88.2<95 mean -0.008337 sd 0.038409) / COMBINED ALPHA
+(gain +0.042640, 4/5 năm, pct 97.2 mean -0.035501 sd 0.037056); rule ALPHA chỉ nếu gain>0 >=4/5 VÀ pct>=95 [oc_premexpo] — nhưng USDT ALPHA
+vẫn VERDICT NO ở full engine trên [oc_usdt4p]. oc_placebo (seeded 1000 expiry-like + 1000 CME-like, seed 20261006, grid 10955 bars x 5 coins;
+expiry-like 12-bar window/tháng coverage mean 0.066819 so với real 0.0648; CME-like 10 windows/năm len {12,18,24} coverage 0.081935 so với
+real 0.0677; real rescored unified 0.0005: expiry dPnl +0.013292/dDD -0.008425 legs DD 3/5+ret98 4/5 FAIL, CME +0.005655/-0.0 legs pass
+strict+loose): FPR expiry-like 0.037 (37 pass; DD>=4 0.302, ret>=4 0.082), CME-strict 0.002 (2 pass), CME-loose 0.024 (24 pass);
+placebo dPnl mean expiry -0.077005 (p5 -0.163713/p50 -0.075762/p95 +0.005795/max +0.081580), dDD mean -0.001509; CME dPnl mean -0.003823
+(p95 +0.042143), dDD mean +0.000324; real expiry percentile P&L 97.0 / DD 98.2% (genuine tail outlier nhưng vẫn fail leg-count unified vì tie
+2023 6dp), real CME percentile 63.0/48.1 (typical random tilt — pass screen là selection luck, khớp engine NO 2023 -0.416%/th) [oc_placebo].
+Gate thắt đề xuất (legs + joint placebo-tail: 5y dPnl>=placebo p95 VÀ full-path dDD<=placebo p05; gates expiry +0.005795/-0.007659, CME
++0.042143/-0.004164; joint FPR expiry 0.002 / CME-strict 0.000, single-tail <=0.017): không real rule nào pass joint gate — khớp cả hai
+engine NO [oc_placebo].
+Quy tắc phương pháp mới: book ideas đi THẲNG tới engine 4-phase (không quyết trên vectorised screen nữa); dip screens giữ chân DD nhưng cộng
+gate placebo p95 +0.273 (pooled dSum5y p95 trên 300 placebo dip-rules: full PROMISING legs + dSum>=+0.273 cắt FPR gộp 6.7% (20/300; shapes A 6%/
+B 0%/C 14%, sum-half alone A 40%) xuống 0.7% pooled (<=2% mỗi shape; biến thể S1 full legs + max shape p95 0.3%, +2%-of-base +0.154 thì 2.0%);
+base 5y sum=7.718 nên +0.273 ~3.5% base; S2 sum-half+tail vẫn lọt 15% shape-A nên phải giữ chân DD [oc_placebo_dip]).
+
+## Bổ sung: mô hình book C1/C2 v427 — bug calibration lần chạy Kaggle đầu, audit mù PASS, fixed-run pending
+
+Pre-register C2 (docstring `v427_c2_rank_calibrated.py`, của max 2 variants, direction đóng sau C1/C2): refresh walk-forward book leg BOT/MANUAL
+(dip+agents+execution giữ cố định); C2 thay return regression bằng calibrated rank target (cùng features/windows/embargo/folds/blend như C1,
+majors-only để isolate target effect); data 5 majors (spot 2017 prefix làm training rows); train earliest->anchor-7d, predict [anchor,
+anchor+365d); features O1 y hệt C1 (base v142 xs + TV(17) + v236 whale flow-6) tính trên 5 majors; HGB depth-4 budget (max_depth 4, lr 0.03,
+max_iter 400, min_samples_leaf 300, l2 1.0, seed 0); targets pairwise listwise rank 5 majors 7d vol-norm returns mỗi bar (rank r 0..4 -> r/4*2-1
+trong [-1,1]; v112 sign / v287-v288 path labels KHÔNG tái dùng); ranker HGB + Platt (logistic) với isotonic fallback fit CHỈ trên train folds
+(last 20% pre-cutoff rows = calibration fold, không test-year); calibrated rank -> long/short weights qua v94.weights_ls (clip +-0.5, ribbon
+gating, vol_target_scale giữ); embargo 7d (t_exit và label-realisation < anchor-7d; calibration fold cũng kết thúc trước anchor-7d); folds
+2021-2024 để SELECT, 2025 scored ONCE cho finalist đông lạnh; members annual A/B + quarterly Aq/Bq (cutoff quarter start-7d; A full, B TV-only);
+blend books=0.8x rank-O1 + 0.2x D (D byte-identical deployed (members_v154 D + members_quarterly_D)/2; O1=0.5x(A+B)/2+0.5x(Aq+Bq)/2); eval harness
+reset-metric 4-phase (v376 + r2_decompose5/reset_metric.py, 1/4 vốn mỗi clock 0/1/2/3h, gate costs + adverse funding; book-only VÀ full-pipeline
+với R2 dip cố định + cost-stress/latency-15 rows không selection); chọn CHỈ 2021-2024 theo robust criterion v204+ (DD<=20, không năm lỗ,
+ưu mean>=5%/th nếu có, trong đó worst-year cao nhất, ties -> mean cao hơn); fail dev DD/worst-year thì đóng hướng không chạm năm cuối; không
+statistic nào từ 2025-09-24+ feed choice [v427_c2_rank_calibrated.py PROCESS NOTE/docstring].
+PROCESS NOTE 2026-10-06 (disclosed): lần chạy Kaggle đầu v2 lộ bug calibration (Platt label rank>0 base rate ~0.4 -> calibrated score p*2-1<0
+hầu như luôn luôn -> mọi member short/flat mọi năm; dev R 0.88%/th — KHÔNG phải model result); fix centre trên calibration-fold base rate
+(pre-cutoff rows only), không đổi gì khác; run buggy giữ làm C2-bug (not a model result) [v427_c2_rank_calibrated.py PROCESS NOTE + fit_calibrator
+BUGFIX]. Leakage audit mù v427_out: PASS — 16 files mỗi file 2190 bars index `t` UTC strictly trong [anchor, anchor+365d) (vd 2022
+2022-09-24 00:00 -> 2023-09-23 20:00; 2023 kết 2024-09-22 20:00 vì leap-year; quarterly 546/546/546/552 union 2190, mỗi quarter non-empty),
+training rows anchor 2022 A n=44338 cutoff 2022-09-17 00:00 last t 2022-09-09 16:00 last label end 2022-09-16 20:00<=cutoff (embargo 7d=42 bars
+>= horizon 42 bars +1-bar margin), panel (88818,90) feats A/B 83/77 allowlist không label/rank/pred, feature causality 20-row truncated recompute
+v92/flow/TV/order-flow diffs exact 0.0 cross chỉ fp 4.44e-16<=1e-9, reproduction 2022 A Spearman 1.0 max abs diff 3.997e-15 mean 2.34e-16
+bit-identical, 2025 sealed (không file *2025*, max timestamp 2025-09-23 20:00<2025-09-24 seal, log không anchor 2025, 4 dev anchors 47/80/117/159s),
+symbols majors-only [BNBUSDT,BTCUSDT,ETHUSDT,SOLUSDT,XRPUSDT] finite, code hashes khớp prereg (c2 9088d311.../common 8b5b4ff13...), timing/leakage
+checks feature/label/fit-windows + no-most-recent-year-in-choice PASS, fill timing n/a (output audit, books là limit-entry weights)
+[v427_audit COMPARISON]. Fixed-run result PENDING — chưa có số fixed-run trong báo cáo này, không dùng run buggy 0.88%/th để kết luận model
+[v427_c2_rank_calibrated.py; v427_audit COMPARISON].
+
+## Bổ sung: anatomy phase-3 2023 (OpenCode oc_clockanat, R2B1D17BFG2) — vì sao mix sống
+
+Nguồn `v421/v421_runs.pkl` + rerun phase-3 vendored (live 2021-09-24+3h..2024-09-24+3h, reproduction max abs diff 0.0/2190 bars; units year-start
+points phase equity=1.0 tại 2023-09-24; không simulate/score data >=2025-09-24) [oc_clockanat]. Peak (close) 2024-01-03 11:00 UTC 1.3076; trough
+(marked) 2024-09-20 03:00 0.7424 -> DD 43.23%; trough close 2024-09-20 11:00 0.7427; year end 0.7443 (R -2.431%/tháng); peak->trough-close drop
+-0.5649 trên 1566 bars (~8.5 tháng) [oc_clockanat]. Top-10 losing days (p3 | p0 p1 p2 | mix): 01-03 -0.2453 (-0.018/-0.267/-0.319 | -0.2123);
+06-07 -0.1192 (-0.384/-0.117/+0.011 | -0.1523); 04-13 -0.0965 (+0.020/-0.212/-0.166 | -0.1137); 12-11 -0.0602 (all neg | -0.0418); 11-09 -0.0441
+(all pos | +0.0219); 03-05 -0.0396 (all neg | -0.1615); 04-12 -0.0286; 08-05 -0.0246 (others +0.06..+0.17 | +0.0804); 11-21 -0.0239; 09-28 -0.0191;
+top-10 sum p3 -0.7011 so với mix cùng ngày -0.6129; mix lỗ 7/10 ngày [oc_clockanat]. Split peak->trough: book -0.1317 (23%), dip -0.4332 (77%),
+total -0.5649; dip exits trong window 85 stop / 326 take-profit / 267 timeout (215 losers); top dip losers toàn rung_sl: 01-03 BTC fills min
+51/55/56 của bar T 11:00 depth 2.5/3.0/3.5/4.0 sigma stopped 12:09 (-717 bps, -0.029/-0.019/-0.019/-0.015), 06-07 XRP fills min 180 của bar T
+15:00 depth 2.5/3.0/3.5 sigma stopped trong 5 phút (-979/-914/-849 bps), 04-13 BNB fill min 53 của bar T 19:00 stopped 17 phút sau
+(-1103/-1028 bps), 04-12 XRP fill min 148 stopped giờ sau (-1304 bps) [oc_clockanat]. Đọc: slow bleed 8.5 tháng punctuated by stop cascades,
+không phải một crash — chỉ ngày tệ nhất (-0.2453, 96% year net) giống single event, còn lại là cụm dip-stop lặp lại (01-03, 04-12/13, 06-07)
+cộng 267 timeout exits grind trong downtrend; top-10 loss (-0.70) vượt year net (-0.26) nên +0.44 kiếm lại giữa các episode; boundary phase-3
+cứ arm rungs vài phút trước cascade (fills min 51-61 stopped 10-20 phút sau; XRP min 180 stopped 5 phút sau) [oc_clockanat]. Mix 4-phase thoát
+chủ yếu nhờ dilution (weight 1/4) cộng cushion dày hơn (mix year end 2.02 so với phase-3 0.74; clocks khác +4..+11%/th năm đó), không phải hedge:
+6-7/10 ngày tệ nhất là common losses mọi clock, chỉ 3-4 ngày (11-09, 08-05, partly 04-12/11-21) offsets [oc_clockanat].
+
+## Bổ sung: mỗi closed screen một dòng (số y nguyên báo cáo, nguồn trong ngoặc)
+
+- oc_usdtprem (idea #71, tilt long x1.15/z>1 x0.85/z<-1, costs 0.0005, coverage z 100%): NOT PROMISING — total P&L không thấp hơn 4/5 nhưng maxDD
+không tệ hơn chỉ 2/5 (2021 DD 0.092278→0.089537 đỗ/P&L 0.278895→0.278144 fail; 2022 0.235444→0.242656 đỗ cả hai; 2023-2025 P&L đỗ nhưng DD fail
++0.0001/+0.0037/+0.0028; full 5y total 1.970907→2.062149 +0.091, maxDD 0.104644→0.101883 cải full-path nhưng 3/5 per-year tệ hơn) — return edge,
+no DD control [oc_usdtprem].
+- oc_premexpo (exposure/placebo diagnostic cho 2 premium tilts, costs 0.0002 unified): USDT ALPHA (gain +0.049084, 4/5 năm, pct 99.4) / CB EXPOSURE
+(gain +0.035170, 5/5 năm, pct 88.2<95) / COMBINED ALPHA (gain +0.042640, 4/5 năm, pct 97.2); verdict rule ALPHA chỉ nếu gain>0 >=4/5 VÀ pct>=95 —
+nhưng ALPHA vẫn NO ở full engine [oc_premexpo; oc_usdt4p].
+- oc_placebo (1000 expiry-like + 1000 CME-like, seed 20261006): FPR expiry-legs 3.7% (37 pass), CME-strict 0.2% (2 pass) / loose 2.4% (24 pass);
+real expiry P&L pct 97.0 / DD 98.2% (genuine outlier nhưng fail unified leg-count vì tie 2023) / real CME pct 63.0/48.1 (typical null) — adopt legs +
+joint placebo tails (joint FPR 0.2%/0.0%), cả hai real đều không promote, khớp engine NO [oc_placebo].
+- oc_placebo_dip (300 placebo dip-rules, base 5y sum 7.718): pooled FPR 6.7% (20/300; A 6%/B 0%/C 14%; sum-half alone A 40%) — require full legs +
+dSum>=pooled p95 +0.273 (~3.5% base) cắt xuống 0.7% pooled (<=2% mỗi shape) [oc_placebo_dip].
+- oc_usdt4p: VERDICT NO (USDT 5.168 so với base 5.410, gap -0.242; 2024 -0.701, 2023 -0.421; full-path DD 17.00 so với 16.82 +0.18pp; rớt 3/4 chân
+KEEP) [oc_usdt4p].
+- oc_cmegap4p: VERDICT NO (CME 5.424 so với base 5.410 +0.014 nhưng maxDD 17.05 so với 16.91 +0.14pp / full 17.03 so với 16.82 +0.21pp; 2023 -0.416;
+rớt chân DD + chân năm tệ) [oc_cmegap4p].
+- oc_expiry4p: VERDICT NO (EXP 5.498 so với base 5.410 +0.088, maxDD 16.56 so với 16.91 -0.35pp / full 16.53 so với 16.82 -0.29pp, nhưng 2021 -0.341;
+rớt đúng chân không-năm-tệ->0.3) [oc_expiry4p].
+- oc_clockanat (diagnostic, không phải screen đóng): DD 43.23% phase-3 2023 là grind chậm đồng bộ 2023-04-17→06-15 + cascades (book -0.1317/dip
+-0.4332; 85 stop/326 TP/267 timeout), mix sống nhờ dilution không phải hedge [oc_clockanat].
+- oc_fillttl (fill-relative exits T240/T120 vs D0 next-bar-open, paired 22312 rungs, phase0=D0 5498 tick-identical): T240 sum>=D0 3/5 + DD<=+0.01 1/5
+(chỉ 2024) + disp thấp hơn 1/5 (chỉ 2023) / T120 3/5 + 2/5 (2023,2024) + 2/5 (2021,2023) — cả hai NOT PROMISING, giữ time exit theo đồng hồ 4h;
+win cao hơn mọi năm (D0 66-75% -> T120 68-77% -> T240 70-79%) nhưng sums thua 2021/2025 (-0.40/-0.25, -0.15/-0.04 mean4) và tails tệ hơn (T240 DD
++0.35/+0.16/+0.03/-0.07/+0.43) [oc_fillttl].
+- oc_stoptf (idea #72, close15 S15 / every-1m S1 vs deployed close5 D0, paired 22312, phase0 D0 sums 2.388/0.183/3.810/2.579/0.712 tick-identical):
+S15 sums 4/5 (trừ 2021) nhưng DD chỉ 2/5 (tệ 2021 +0.100, 2022 +0.027, 2024 +0.047; cascade 2021-12-04 -3.68 so với -2.87) / S1 DD 5/5 nhưng sums
+chỉ 2/5 (2021,2022; bleed 2023/2024/2025) — cả hai NOT PROMISING, giữ close5 stop [oc_stoptf].
+- oc_seasondepth (idea #70, seasonal rung depth sigma_eff=sigma_4h*sqrt(s), s walk-forward per-coin hour-of-week [anchor-365d,anchor) 5x5x42,
+sqrt(s) 0.71-1.26, unpaired arms 43424 fills checksum 8ee7c1bdc9afed87): sum RULE>=BASE 1/5 (chỉ 2022 0.877 so với 0.833) và DD<=+0.01 1/5 (chỉ 2024
+2.975/0.305 so với 3.197/0.355; renorm Sr cũng thua 4/5) — NOT PROMISING, đóng hướng [oc_seasondepth].
+- oc_rearm (idea #67, re-arm cùng bid sau TP trong bar, tối đa 1 refill/rung/bar, majors x R2 depths, 4 phases; V1 deployment-scale G1=2.0/K~31.2
+never-binds vs V0 literal G=2.0 binds median-fill-bar, candidates/exits/fees/scoring/decision V0-identical; base shift-0 fills 990/1045/1330/989/1144
+sums 2.39/0.18/3.81/2.58/0.71 tick-identical oc_b1deeper): V1 sum cao hơn 3/5 (2023/2024/2025; base vs rule mean4 0.911→0.466/0.833→0.663/
+2.100→2.171/3.197→3.548/0.677→0.716) VÀ DD trong 1pp 0/5 (tệ mọi năm +0.13..+0.21) VÀ re-armed win 69.0% (62-74% mỗi năm, 4745 fills; V0 64.9%) —
+VERDICT NOT PROMISING (V0 1/5+1/5 cũng NO), giữ limit once-per-bar rung; re-armed fills short-gamma (thua 2021 -0.96x rule total, 2022 -0.26x;
+worst day tệ hơn cả 5 năm) [oc_rearm].
+- oc_liqhist (Binance public archive probe 2026-10-06, prefixes `data/futures/um/daily|monthly/liquidationSnapshot/<SYM>` 5 majors, 4 req/s):
+USABLE for 2021-2026 research NO — UM daily/monthly listings IsTruncated=false 0 Contents/CommonPrefixes cả 5 symbols (10 XML saved), parent
+prefixes cũng empty, control aggTrades 1000 keys/page IsTruncated=true nên method đúng; alt names forceOrders/liquidations cũng empty; download 0
+bytes; coverage 2020-2026 zeros; COIN-M liquidationSnapshot tồn tại nhưng sai margin type và dừng sớm (BTCUSD_PERP 472 zips 2023-06-25..2024-10-14,
+ETHUSD_PERP 474 zips); alternatives verified HTTP 200: UM metrics daily (OI/top-trader/taker ratios 5m từ 2020-09-01, proxy không phải order-level),
+Futures DATA REST + Bybit v5 + OKX public (recent-only), own collectors từ 2026-10-04 (forward-only quá ngắn), /fapi/v1/forceOrders 401 unauthenticated
+[oc_liqhist].

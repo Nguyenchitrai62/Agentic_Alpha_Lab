@@ -200,5 +200,82 @@ DD gần phẳng) — đóng [oc_skewbook2].
 90,3%) — giữ B1 full-size [oc_breadthdip].
 - oc_bookholdcap (flat 1 bar sau 42 bars cùng dấu, 1,2–1,7% cells): NOT PROMISING — P&L>=97% 2/5, DD 2/5 (chỉ 2024 đỗ cả hai; full 1,970907→1,883804,
 DD 0,104644→0,113519, cost +45%) — đóng [oc_bookholdcap].
+## Screens mới đóng đợt này (mỗi hướng một dòng, số y nguyên báo cáo)
+
+- oc_expirybook (halving book x0,5 trong 48h trước expiry Deribit, ~6,6% bars): PROMISING 4/5 DD + 4/5 P&L>=98% (2021 fail cả hai; full P&L
+2,061253→2,077167, DD 0,100471→0,090484) — hiệu ứng nhỏ parameter-free, chưa deploy, cần prospective [oc_expirybook].
+- oc_expirycb (BOTH = expiry sau premium tilt, post-hoc): NOT PROMISING — P&L>base 4/5 nhưng DD<=base chỉ 1/5 (chỉ 2022 đỗ cả hai; full both 2,114578
+cao nhất nhưng DD 0,089602 mất lợi expiry) — không deploy [oc_expirycb].
+- oc_cbpremium (tilt long x1,15/x0,85 theo premium z ±1): NOT PROMISING — P&L 5/5 nhưng DD chỉ 2/5 (full 2,061253→2,102446, DD 0,100471→0,102295) —
+return-only, không deploy [oc_cbpremium].
+- oc_skewbook2 (gate long x0,75 khi skew_z90>q80 walk-forward 0,61–0,67): NOT PROMISING — P&L>=97% chỉ 1/5 (2025 0,976), DD 4/5 (full 2,061253→1,960521,
+DD gần phẳng) — đóng [oc_skewbook2].
+- oc_basisbook (long x0,5 khi basis impulse 7d<p20 walk-forward): NOT PROMISING — P&L 4/5 và DD 3/5 (2023 gãy cả hai: 96,7%, +0,07pp; full
+2,061253→2,072244, DD 0,100471→0,098859) — đóng [oc_basisbook].
+- oc_breadthbook (long x0,75 khi breadth==1,0, on 23,2%): NOT PROMISING — DD 5/5 nhưng P&L>=95% chỉ 2/5 (2024 bleed −13,6% khi on 42%; full
+2,061253→1,923118) — đóng [oc_breadthbook].
+- oc_breadthdip (dip x0,8 khi breadth==1,0, on-bars 2538/10956=23,2%): NOT PROMISING — DD 5/5 nhưng sum>=95% chỉ 1/5 (2025 99,6%; full 9,671→8,729,
+90,3%) — giữ B1 full-size [oc_breadthdip].
+- oc_bookholdcap (flat 1 bar sau 42 bars cùng dấu, 1,2–1,7% cells): NOT PROMISING — P&L>=97% 2/5, DD 2/5 (chỉ 2024 đỗ cả hai; full 1,970907→1,883804,
+DD 0,104644→0,113519, cost +45%) — đóng [oc_bookholdcap].
 - oc_fomcbook (halving x0,5 quanh FOMC [R−24h,R+4h], 280/10955=2,56% bars): NOT PROMISING — DD 4/5 nhưng retention>=98% chỉ 2/5 (window lãi 3/5 năm nên
 halving tốn 4–5% P&L; full 1,970907→1,928287, DD 0,104644→0,103597) — đóng [oc_fomcbook].
+
+## Cash-and-carry trên vốn nhàn (OpenCode oc_cashcarry) — add-on, chưa cộng vào số triển khai
+
+Triển khai gợi ý f=0.25 mỗi coin (spot + short quarterly bằng notional, ENTER iff basis năm hóa >=4%/yr, giữ tới delivery, drag phí 0.275%
+allocated) theo đúng roll rule PLAN.md [oc_cashcarry]. Số vận hành: sum năm (allocated) 2021 0.0470 / 2022 0.0528 / 2023 0.2960 / 2024 0.1219 /
+2025 0.0058 (BTC/ETH chi tiết: 2021 0.0261+0.0209 / 2022 0.0424+0.0105 / 2023 0.1579+0.1381 / 2024 0.0638+0.0581 / 2025 0.0058+0; mean basis
+8.9/8.0, 5.6/5.7, 13.3/12.7, 7.4/7.4, 4.2/—%); worst MtM allocated -1.01/-0.71/-2.65/-0.39/-2.17% -> account f=0.25 tệ nhất -0.66% (2023),
+f=0.50 -1.33%; gộp 5 năm +13.09% (f=0.25) = +0.218%/th số học (+0.213% hình học), f=0.50 +26.17% = +0.436% (+0.416% hình học); năm gần nhất
+~+0.01%/th (1/6 cơ hội vượt filter) [oc_cashcarry]. Margin Bybit cross 5x Hedge: worst IM/equity 0.53/0.53/0.57/0.67 (f=0.25, s0..s3) và
+0.55/0.55/0.60/0.72 (f=0.50), blocked 0/5 năm (limit 0.95; phút tệ nhất 2023-10-24 vẫn >=28% free) — mua bằng cash nhàn (median ~93% equity
+free), không chạm margin BOT [oc_cashcarry; oc_margin]. PENDING: combo BOT+carry và khả dụng Bybit (oc_carrycombo) — tới khi xong thì chạy
+carry paper riêng, không cộng +0.21%/th vào kỳ vọng G2 [oc_cashcarry].
+
+## Quy tắc phương pháp mới (OpenCode oc_placebo, oc_placebo_dip, oc_premexpo, oc_usdt4p, oc_cmegap4p, oc_expiry4p)
+
+Book ideas đi thẳng engine 4-phase: 3/3 vectorised book screens rớt full engine R2B1D17BFG2 (base 5.410 / 16.91 / 16.82) — EXP 5.498 nhưng 2021
+-0.341 (rớt chân năm-tệ) [oc_expiry4p]; CME 5.424 nhưng full DD 17.03 (+0.21pp) và 2023 -0.416 (rớt 2 chân) [oc_cmegap4p]; USDT 5.168 (gap -0.242,
+2024 -0.701, 2023 -0.421; DD 17.00 +0.18pp; rớt 3/4 chân) dù USDT là ALPHA vs exposure-matched control (gain +0.049084, pct 99.4)
+[oc_premexpo; oc_usdt4p]; placebo cho thấy expiry-legs FPR 3.7% và CME-strict 0.2%/loose 2.4% (real CME pct 63.0/48.1 = typical null)
+[oc_placebo]. Dip screens giữ chân DD và cộng gate placebo p95 +0.273 (pooled 300 rules FPR 6.7% -> 0.7% khi require full legs + dSum>=+0.273,
+~3.5% base 7.718) [oc_placebo_dip]. Vận hành: không deploy tilt/halving nào (kể cả USDT ALPHA, expiry PROMISING vectorised) khi chưa PASS
+engine 4-phase + paper; dip rule mới phải qua legs + p95 trước khi xin engine slot [oc_placebo; oc_placebo_dip].
+
+## Mô hình book v427 C2 (OpenCode v427_c2_rank_calibrated, v427_audit COMPARISON) — pending, không đổi triển khai
+
+Lần Kaggle đầu bug calibration (Platt label rank>0 base ~0.4 -> score p*2-1<0 gần luôn luôn -> mọi member short/flat mọi năm; dev 0.88%/th —
+KHÔNG phải model result), đã fix centre trên calibration-fold base rate (pre-cutoff only), run buggy giữ làm C2-bug [v427_c2_rank_calibrated.py
+PROCESS NOTE]. Audit mù v427_out: PASS (16 files x 2190 bars trong [anchor,anchor+365d); train 2022 A n=44338 cutoff 2022-09-17 last label end
+2022-09-16 20:00<=cutoff, embargo 7d=42 bars +1-bar margin; feature recompute diffs 0.0/fp 4.44e-16; reproduction Spearman 1.0 diff 3.997e-15;
+2025 sealed max 2025-09-23 20:00; majors-only; hashes khớp prereg) [v427_audit COMPARISON]. Fixed-run result pending — triển khai giữ D17BF+G2,
+không chờ C2 [v427_c2_rank_calibrated.py; v427_audit COMPARISON].
+
+## Anatomy phase-3 2023 để trực ca (OpenCode oc_clockanat) — mix sống nhờ dilution
+
+Phase-3 2023 DD 43.23% (peak close 2024-01-03 11:00 1.3076 -> trough marked 2024-09-20 03:00 0.7424, drop -0.5649/1566 bars ~8.5 tháng, year end
+0.7443 R -2.431%/th; split book -0.1317/dip -0.4332; exits 85 stop/326 TP/267 timeout 215 losers) là slow bleed + 3 cụm stop cascade (fills vài
+phút trước cascade rồi stopped ngay: BTC 01-03 -717 bps, XRP 06-07 -979/-914/-849 bps trong 5 phút, BNB 04-13 -1103/-1028 bps, XRP 04-12 -1304 bps;
+top-10 loss -0.7011 vượt year net nên +0.44 kiếm lại giữa episodes; mix cùng ngày -0.6129, lỗ 7/10 ngày; mix year end 2.02 so với phase-3 0.74)
+[oc_clockanat]. Hàm ý trực: DD gate tới từ grind đồng bộ (không phải một crash để hedge), mix 4 pha là cách khóa chênh lệch giờ — pha nào
+restart/thiếu phải khôi phục xong mới tin số mix; kỳ vọng vài lần mỗi năm mất 8-12%/tuần và 1-4 tháng về đỉnh [oc_clockanat; oc_stresshist].
+
+## Screens đóng đợt này — mỗi hướng một dòng, không đổi triển khai (số y nguyên báo cáo)
+
+- oc_fillttl: T240 3/1/1 + T120 3/2/2 (sum/DD/disp) — NOT PROMISING, giữ time exit theo đồng hồ 4h (win cao hơn nhưng sums thua 2021/2025, tails tệ
+hơn) [oc_fillttl].
+- oc_stoptf: S15 sums 4/5 nhưng DD 2/5 (+0.100/+0.027/+0.047; 2021-12-04 -3.68 so với -2.87) / S1 DD 5/5 nhưng sums 2/5 — NOT PROMISING, giữ close5
+stop [oc_stoptf].
+- oc_seasondepth: sum 1/5 (chỉ 2022) + DD 1/5 (chỉ 2024) — NOT PROMISING, giữ sigma_4h [oc_seasondepth].
+- oc_rearm: V1 sum 3/5 nhưng DD 0/5 (tệ mọi năm +0.13..+0.21; re-armed win 69.0% nhưng short-gamma 2021 -0.96x/2022 -0.26x rule total) — NOT
+PROMISING, giữ once-per-bar rung [oc_rearm].
+- oc_usdtprem: P&L 4/5 nhưng DD 2/5 (full +0.091 nhưng 2023-2025 DD +0.0001/+0.0037/+0.0028) — NOT PROMISING, không tilt inflow [oc_usdtprem].
+- oc_premexpo: USDT ALPHA (+0.049084, pct 99.4) / CB EXPOSURE (+0.035170, pct 88.2) / COMBINED ALPHA (+0.042640, pct 97.2) — nhưng ALPHA vẫn NO ở
+engine, không deploy [oc_premexpo; oc_usdt4p].
+- oc_usdt4p / oc_cmegap4p / oc_expiry4p: cả ba VERDICT NO (USDT -0.242 + DD +0.18pp; CME +0.014 nhưng DD +0.21pp + 2023 -0.416; EXP +0.088/DD -0.29pp
+nhưng 2021 -0.341) — không deploy tilt/halving nào [oc_usdt4p; oc_cmegap4p; oc_expiry4p].
+- oc_placebo / oc_placebo_dip: FPR book-legs 3.7%/0.2%/2.4% -> joint tails FPR 0.2%/0.0% (không real nào pass) / dip pooled 6.7% -> +p95 gate 0.7% —
+áp làm gate từ nay [oc_placebo; oc_placebo_dip].
+- oc_liqhist: UM liquidationSnapshot trống cả 5 symbols (0 files/rows) — USABLE NO; COIN-M sai margin + dừng 2023-06..2024-10; alternatives chỉ
+recent-only/proxy/OI — không feature liq lịch sử cho 2021-2026 [oc_liqhist].
