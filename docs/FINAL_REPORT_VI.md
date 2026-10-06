@@ -6,7 +6,7 @@ mix trung bình 4 pha giờ, chi phí gate Bybit: maker 0.02% / taker 0.055%, fu
 short không nhận). Cả 5 năm nay đều là research data; paper triển vọng mới là kiểm sạch.
 Hiệu chỉnh số trùng: khi hai số lệch nhau do quy ước đo thì giữ số chính thức (official run.log) và ghi cả số
 chained-reset trong ngoặc; khi lệch do rebalance (oc_carryfric cộng thêm, lãi carry tái đầu tư vào tài khoản = ước lượng chính; oc_carrycombo roll-only giữ lãi carry như tiền mặt không tái đầu tư = cận dưới) thì ghi cả hai
-và dùng oc_carryfric (+~0.12 điểm %/tháng) làm kỳ vọng, roll-only là cận dưới; số cũ 5.41 G2 giữ kèm giải thích luck đồng hồ ~0.17pp [oc_clockluck; oc_frontiercarry; oc_carrycombo].
+và dùng oc_carrycompound (+0.224 điểm %/tháng: G2 5.410 -> 5.634, DD năm 16.75, toàn đường 16.66; lãi carry tái đầu tư, BOT đặt lệnh theo tổng equity) làm kỳ vọng; oc_carryfric (+0.12) là bảo thủ, roll-only (oc_carrycombo) là cận dưới; số cũ 5.41 G2 giữ kèm giải thích luck đồng hồ ~0.17pp [oc_clockluck; oc_frontiercarry; oc_carrycombo].
 
 Định nghĩa metric: R = trung bình hình học 5 năm reset mỗi năm; W = năm đơn lẻ tệ nhất 5 năm;
 DD năm = max yearly DD; DD toàn đường = full-path trong run.log (liên tục, không reset);

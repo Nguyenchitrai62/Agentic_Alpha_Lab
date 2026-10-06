@@ -1,5 +1,5 @@
 
-> Leader note (2026-10-06): the carry overlay estimate is +~0.12 pp/month for G2 at f = 0.25 (oc_carryfric, additive, per-year rebased); oc_carrycombo's +0.003 is a lower bound because its carry gains do not compound inside the BOT equity.
+> Leader note (2026-10-06): the account-realistic carry add for G2 at f = 0.25 is +0.224 pp/month (5.410 -> 5.634, max yearly DD 16.91 -> 16.75, full-path 16.82 -> 16.66; carry profits compound in the account and the BOT sizes on total equity) [oc_carrycompound]; oc_carryfric's +0.12 (year-start sizing) is conservative and oc_carrycombo's +0.003 is a lower bound (carry gains kept outside the BOT equity).
 # Executive summary (EN) — 2026-10-06 (consolidated)
 Scope: BOT = book + dip ladder (needs bot); MANUAL = book-only human [FINAL_REPORT_VI].
 
