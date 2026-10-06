@@ -214,3 +214,9 @@ Lưu ý: cách bot hiện cài `--dip-gross-cap` chặt hơn engine (đang sửa
 Hồ sơ thận trọng R2B1D13BF (dip x1,3 + bear-book): 4,97 %/tháng, DD năm 14,98, toàn đường 14,86 (đạt DD < 15, thiếu 0,03 %/tháng).
 Thêm sleeve TSMOM 0,10: 5,03 %/tháng nhưng DD năm 15,42 (vượt 0,42 pp). Không tổ hợp nào đạt đồng thời >= 5 %/tháng và DD < 15 trên
 thước đo chính thức. Bot paper D13BF (`--dip-mult 1.3 --bear-book`, tag d13bf) chạy từ 2026-10-06 để thu bằng chứng tiến cứu.
+
+## Bổ sung: rủi ro may mắn của seed agent (OpenCode oc_agentens)
+
+Bảng agent R2 đang triển khai là seed TỐT NHẤT trong 5 seed ở 2022 và năm gần nhất (2025), hạng 2 năm 2023, hạng chót năm 2024; độ phân
+tán giữa các seed đáng kể. Bỏ phiếu 5 seed không tốt hơn (năm tệ nhất kém hơn). Hàm ý: các con số backtest của R2 có thể hơi lạc quan vì
+may mắn của seed - một lý do nữa để coi bằng chứng paper/tiến cứu là kiểm định chính, và kỳ vọng thận trọng (~4,5-5 %/tháng thay vì 5,4).
