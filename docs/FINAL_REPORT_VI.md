@@ -652,6 +652,53 @@ Khuyến nghị: TỐI THIỂU 5.000 USDT (1250/sub-book), THOẢI MÁI 10.000 U
 f=0,25 BTCUSDT-25DEC26 ann_basis ~5,31%, equity_entry 5000; equity paper 5000, flags G2 `--corr-size --dip-mult 1.7 --bear-book --dip-gross-cap 2.0`
 + `--carry-f 0.25`): thu bằng chứng triển vọng cho combo triển khai một UTA; caveat 2026-10-06: carry orders trong paper bị generic diff hủy (fix đang làm,
 xem `docs/BOT_EXECUTION.md` bot_carry) — tới khi fix xong thì số paper carry là tiến cứu có nhiễu thực thi, không phải engine-faithful [artifacts/bot/paper_d17bfg2c].
+
+## Bổ sung docs_update7 (2026-10-06)
+
+- Crash lịch sử tệ nhất cho thang dip (`research/tournament/oc_crash2020/REPORT.md`, replay dip-only B1 x kd1.7, 5 cửa sổ x 4 pha, mỗi ô vốn 1.0):
+COVID 12-13/03/2020 (W1) mix-proxy 4 pha ~-16.1% (mean maxLoss 16.08 / mean maxDD 16.56 / endEq 0.901 / peakGross 0.82 / 640 fills-138 stops-49 gap-stops);
+pha tệ nhất s1 -21.85% (DD 22.30, phút tệ nhất 13/03 15:44 UTC, 182 fills/45 stops/13 gap-stops max 2.71sg; s0 -14.28/14.71, s2 -14.64/15.44, s3 -13.56/13.82).
+Crash 19/05/2021 (W4) mix ~-10.0% (pha tệ nhất -13.73%); ba cửa sổ còn lại <=-2.1% (W2/W3/W5). Trần gross 2.0x KHÔNG ràng buộc ở đây: G2 và NOCAP khớp
+bit-for-bit cả 40 ô, peak gross không ô nào quá 1.03x (max W4 s2) so với trần 2.0 — sigma crash làm notional nhỏ lại nên risk budget 0.442 + B1 + stop mới là
+thứ giữ DD, không phải trần. Trần vẫn giữ vì bảo vệ gap khi thị trường yên (phút tệ nhất gap -10% không trần lỗ 58% vốn, trần 2x còn 33.5% [DEPLOYMENT_PLAN_VI]).
+- Outage (`research/tournament/oc_outage/REPORT.md`, overlay dip D0+B1, base 5y 7.718, pooled base 30.873/3.127): routine rẻ — weekly-2h loss +0.188 (2.4%,
+DD 3.127 không đổi), monthly-6h +0.134 (1.7%, DD +0.01), quarterly-24h +0.072 (0.9%, DD +0.01); chi phí chủ yếu là bid bị lỡ (miss 59-141% loss).
+Rủi ro thật là outage đúng lúc flush: adversarial-10h net GAIN -0.367 (4.8%) NHƯNG pooled DD +0.43 (3.127→3.554); giờ xấu nhất 2021-12-04 flash-crash
++0.684 loss (~9% tổng dip 5 năm), miss giúp -0.605 nhưng late-stop trên 70 rung mở sẵn bleed +1.288, DD năm 0.856→1.114, worst day -0.740→-0.945.
+- Carry audit (`research/tournament/carry_audit/COMPARISON.md`, Leader adjudication 2026-10-06): blind replication 26 trades +0.5433 allocated
+(khớp thứ tự entry 25/25 của cc + 1 extra BTC 2026-12-25 quá dữ liệu; basis lệch >0.1pp ở 20/25, max +1.16pp BTC 2022-03-25; return lệch >0.02pp 25/25,
+xấu nhất BTC 2026-03-27 sign-flip rep -0.00937 so với cc +0.00575 do giờ delivery biến động F 69260 vs S 66702.78 gap 3.8%) → verdict audit FAIL về dung sai
+số, NHƯNG PASS leakage/fee/overlay-margin (overlay es_c=es+c/ms_c=ms+c; IM=(G2 gross+carry short)/5, blocked iff IM>95% bal đều khớp code).
+Leader chấp nhận kèm modelling note: khác biệt do mô hình settlement — replication chốt futures ở print 1h cuối + bán spot-proxy trong giờ delivery
+(hai chân khác thời điểm), còn cc chốt cả hai chân ở cùng spot close (đúng kinh tế vì futures đáo hạn settle theo INDEX trung bình spot, hai chân hội tụ
+theo cấu trúc); tổng mức khớp (replication +0.543 so với +0.497 pooled allocated). Hệ quả vận hành: bán chân spot đúng giờ delivery (08:00 UTC, tốt nhất
+rải trong cửa sổ trung bình index) để khớp đúng index — đã vào runbook; code bot `docs/BOT_EXECUTION.md` bot_carry: spot bán market sau delivery (+ safety
+buy-back reduce-only cho sim) và log `carry_settle/carry_settled`.
+- Bão hòa là cơ học (`research/diagnostics/oc_saturation/REPORT.md`): biên R/DD năm D13BF 4.971/14.98 — D17BF 5.425/18.33 — G2 5.410/16.91 —
+D20 5.779/20.95 — G2K20 5.874/17.79 — D20B11 5.894/21.21 (full-path tương ứng 14.86/16.90/16.82/18.89/17.69/19.10). Marginals: không trần ~1 DD đổi 0.15 R
+(D17BF→D18BF +0.139 R/+0.89 DD mỗi 0.1 kd); có trần ~1 DD đổi 0.5 R (G2→G2K20 +0.155 R/+0.29 DD mỗi 0.1 kd; D17BF→G2 -0.015 R/-1.42 DD).
+Edge/đơn vị notional BẤT BIẾN theo kd (pooled 0.0029→0.0028; theo depth 2.5σ 0.19-0.20%/đv timeout 53% tới 5σ 0.51-0.58%/đv TP 75%; late/cascade chỉ ~40%
+early; exit-mix TP/timeout/SL ≈50/46/4% không đổi). Ba kẹp cơ học: B1 1/(1+n) bind 55% fills, cắt ~35% notional (34.8%/34.5%) với edge phẳng;
+trần G=2.0 chỉ tỉa đuôi 1-2% (6.29→2.00 max; 1.2% fills gần trần so với 2.1% vượt khi không trần); governor tự bóp size khi DD cao. Vì vậy 8%/tháng KHÔNG
+tới được bằng sizing — trần biên chỉ ~5.9%/tháng ở DD>17.5, size thêm chỉ đổi thành DD (V2 +0.29 R đổi +5.75 DD).
+- Không suy giảm edge (`research/diagnostics/oc_edgedecay/REPORT.md`, G2 60 tháng 2021-10..2026-09): slope +0.067 pp/tháng, CI bootstrap khối 3m
+[-0.158;+0.160] chứa 0 thoải mái (P(no positive trend)=0.48); 30 tháng sau 6.61 > 30 tháng đầu 5.59 (+1.02, CI [-5.40;+5.51]); 6 tháng gần nhất 7.38
+(pct 65 mọi tháng, pct 78 của 55 rolling-6m); dip -0.008 / book +0.024 pp/tháng (~phẳng); win/TP slopes ~0 (nửa yếu H1/H8 đều bật lại).
+Hai ngưỡng cảnh báo sớm (vỡ = ĐIỀU TRA, không phải đổi cấu hình): (1) trung bình 6 tháng <1.61%/tháng (p10 lịch sử 55 rolling-6m, trung vị 5.44);
+(2) TP rate dip nửa năm kín <0.434 (p10 của 10 nửa năm, trung vị 0.488; tham khảo trailing-12m p10 3.08%). Đã vào `scripts/edge_monitor.py`
+(TRAIL6_ALERT 1.61 / TP_ALERT 0.434) và `scripts/daily_status.py` mục 6.
+- Hướng book-model ĐÓNG (`research/parallel/rounds/parallel-20260906-r2/v428/result_manifest.json` + README; assignment docs_update7):
+v428 C1 dev 2021-2024 = 1.927 / 1.768 / 3.191 / 7.590 %/tháng, mean 3.593, max DD 19.17 (W 1.768, không năm lỗ) so với book triển khai G2_deployed_book
+2.588/3.282/6.045/10.677, dev_R 5.601, DD 16.91 — thua cả 4 năm dev → REJECTED; C2 cũng rejected; hướng đóng 2/2 variants (status rejected, 2025 sealed
+không mở vì đã reject ở dev).
+- Screens đóng đợt này mỗi hướng một dòng (số y nguyên báo cáo): oc_carrytopup (top-up delivery-week f=0.125/coin, 7d, filter >=4%/yr: Binance 11 trades
+sum -0.011209 alloc = -0.0023%/th, Bybit 12 trades -0.007952 = -0.0017%/th, 0/5 năm dương cả hai venue — premium ~0.07-0.08% không bù nổi drag phí 0.275%,
+hòa vốn cần ~16%/yr — và stack với base f=0.25 đã đẩy spot cost tới 1.125 indexed (~1.15 live) phải vay USDT) — CLOSE, hướng carry đóng 2/2
+[oc_carrytopup]. oc_bidttl (TTL bid dip 120' 16..135 so với base tới bar-end, cap-adjusted 4-phase-mean: delta 5y -1.3389 vs gate +0.273, sum>=base 0/5,
+DD<=+1pp 4/5 — late fills (f>=136) win 59-69% mọi năm (+0.31..+2.41), extra fills từ room freed đúng 0) — NOT PROMISING [oc_bidttl].
+oc_marktrig (stop trigger theo mark=close x (1+mean-5m premium) so với last-price, paired 22312 rungs, base 5y 7.718: sum>=BASE 4/5 trừ 2022 -0.227 NHƯNG
+DD chỉ 2/5 + worst-day 2/5, delta 5y +0.057 — mark tránh chỉ 1.5-8.2% stop/năm (0.25-6.25 rungs/phase-năm, hầu hết decay thành timeout) mà trong crash
+premium âm nên mark fire SỚM hơn (2022 pooled stops 59.5→70.8; cascade 2024-01-03 -0.405) — NOT PROMISING, giữ last-price triggers [oc_marktrig].
 - Đóng hôm nay mỗi hướng một dòng (số y nguyên báo cáo): oc_linvinv — 0 lệnh vào (12 skip <3pp, max diff 2,55pp BTC Jun25 lin 7,50 so với inv 4,94;
 16 cặp cùng expiry, net 0,0000) — NOT USEFUL, dislocation cần chưa từng in trong history [oc_linvinv]. oc_marktrig — sum>=BASE 4/5 (trừ 2022 −0,227)
 NHƯNG maxDD chỉ 2/5 + worst-day 2/5 (5y delta +0,057 trên base 7,72; mark âm premium nên fire sớm hơn trong crash, cascade 2024-01-03 −0,405) —

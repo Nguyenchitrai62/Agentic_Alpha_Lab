@@ -346,3 +346,31 @@ Không có suy giảm edge có ý nghĩa thống kê trong 5 năm (độ dốc +
 6 tháng gần nhất 7,38) [oc_edgedecay]. Theo dõi trên paper/live: (1) trung bình 6 tháng gần nhất < 1,61 %/tháng; (2) tỉ lệ chốt lời (TP) của dip
 trong nửa năm gần nhất < 0,434. Vượt ngưỡng = ĐIỀU TRA (so với cơ hội thị trường: số cú flush, biến động), không phải tự động đổi cấu hình.
 `scripts/edge_monitor.py` (đang viết) sẽ đưa hai chỉ số này vào `daily_status.py` [oc_edgedecay].
+
+## Bổ sung docs_update7 (2026-10-06)
+
+- Crash lịch sử tệ nhất cho thang dip (`research/tournament/oc_crash2020/REPORT.md`): COVID 12-13/03/2020 mix-proxy 4 pha ~-16.1%
+(mean maxLoss 16.08/endEq 0.901), pha đơn tệ nhất s1 -21.85% (DD 22.30); crash 19/05/2021 mix ~-10.0% (pha tệ nhất -13.73%). Trần 2.0x không kích hoạt
+lần nào (G2=NOCAP bit-for-bit 40/40 ô, peak gross max 1.03x) — DD crash do risk budget 0.442 + B1 + stop giữ, nhưng vẫn giữ trần vì nó bảo vệ gap lúc
+thị trường yên (gap -10% phút tệ nhất 58%→33.5% vốn). Kỳ vọng vận hành: pha đơn W1 (-21.8%) vượt ngưỡng 20% nên KHÔNG BAO GIỜ chạy 1 pha đơn lẻ;
+mix 4 pha triển khai (~-16%) nằm trong kỳ vọng DD (tương đương tuần xấu -8..-12% ở mức crash COVID, tệ hơn mọi tuần 2021-2026).
+- Outage (`research/tournament/oc_outage/REPORT.md`): bảo trì định kỳ trong giờ yên tốn nhỏ (weekly-2h 2.4% / monthly-6h 1.7% / quarterly-24h 0.9% tổng dip
+5 năm, DD gần như không đổi; tốn chủ yếu do lỡ bid thắng). Rủi ro chính là mất bot đúng lúc flush (giờ xấu nhất 2021-12-04 tốn +0.684 ~9% tổng dip 5 năm,
+DD năm +0.26, pooled DD +0.43 vì stop 4-sigma phần mềm treo). Quy tắc đã vào runbook: HỦY bid dip đang chờ trước bảo trì CÓ KẾ HOẠCH (giữ nguyên TP native +
+backstop 8-sigma trên sàn); sau sự cố bất ngờ ưu tiên xác nhận mọi rung mở còn backstop native rồi mới cho comeback exit in, không đặt tay giờ đầu.
+- Carry audit (`research/tournament/carry_audit/COMPARISON.md`, Leader adjudication 2026-10-06): chấp nhận kèm modelling note (không leakage/fee/overlay/IM-MM
+sai; lệch số do settlement: replication chốt futures ở print 1h cuối vs cc chốt cả hai chân ở cùng spot close — cc đúng kinh tế vì futures đáo hạn settle theo
+INDEX; tổng mức khớp +0.543 vs +0.497 allocated). Quy tắc vận hành thêm: BÁN chân spot đúng giờ delivery (08:00 UTC, tốt nhất rải trong cửa sổ trung bình index)
+để khớp đúng index; bot `docs/BOT_EXECUTION.md` bot_carry đã cài (spot bán market sau delivery + buy-back an toàn cho sim, log carry_settle/carry_settled,
+short futures/coin <=0.30x vốn, không tính vào trần dip).
+- Bão hòa cơ học (`research/diagnostics/oc_saturation/REPORT.md`): 8%/tháng không tới được bằng sizing — biên cao nhất chỉ ~5.9%/tháng ở DD>17.5
+(D20B11 5.894/DD 21.21 FAIL gate; G2K20 5.874/17.79). Edge/đơn vị notional bất biến theo kd (0.0029→0.0028); B1 cắt ~35% notional, trần 2x tỉa đuôi gần miễn phí
+(-1.42 DD đổi -0.015 R), governor bóp size khi DD cao. Triển khai giữ nguyên kd/cap, không tăng size đón 8%.
+- Edge monitor đã vào `daily_status.py` (`research/diagnostics/oc_edgedecay/REPORT.md` + `scripts/edge_monitor.py` + `scripts/daily_status.py` mục 6):
+không decay (slope +0.067 CI [-0.158;+0.160]; sau 6.61 > đầu 5.59; 6m gần nhất 7.38). Hai ngưỡng: (1) TB 6 tháng <1.61%/tháng (p10 55 rolling-6m, median 5.44);
+(2) TP rate dip nửa năm kín <0.434 (p10 10 nửa năm, median 0.488). Vỡ = ĐIỀU TRA, không tự đổi cấu hình.
+- Book-model đóng (`research/parallel/rounds/parallel-20260906-r2/v428/result_manifest.json`): C1 dev 2021-2024 1.927/1.768/3.191/7.590, mean 3.593,
+max DD 19.17 vs book triển khai 5.601/16.91 — thua cả 4 năm → REJECTED; C2 cũng rejected; hướng đóng 2/2. Triển khai giữ D17BF+G2, không chờ model.
+- Screens đóng mỗi hướng một dòng: oc_carrytopup (top-up 7d f=0.125: 5y -0.011209 Binance / -0.007952 Bybit allocated, 0/5 năm dương cả hai venue + stack
+vượt cash phải vay → CLOSE) [oc_carrytopup]. oc_bidttl (TTL 120': delta 5y -1.339 vs gate +0.273, 0/5 sum, late fills win 59-69% → NOT PROMISING)
+[oc_bidttl]. oc_marktrig (sum 4/5 trừ 2022 -0.227 nhưng DD 2/5 + worst 2/5, delta +0.057/7.72 → NOT PROMISING, giữ last-price) [oc_marktrig].

@@ -44,3 +44,22 @@ caveat: carry orders trong paper bị generic diff hủy ngày 2026-10-06, fix �
 - Đóng hôm nay: oc_linvinv 0 vào (max diff 2,55pp) NOT USEFUL [oc_linvinv]; oc_marktrig sum 4/5 nhưng DD 2/5 + worst 2/5 NOT PROMISING [oc_marktrig];
 oc_discsniper 0/5 năm (5y −0,5291, placebo 13,3) NOT PROMISING [oc_discsniper]; oc_manual2coin 3,73 vs 3,24 vs 3,39/24,3 FAIL — cả ba NO [oc_manual2coin];
 oc_phase8 8-phase 4,960 vs 4-phase 5,410 (−0,45pp, +0,5pp DD) NO [oc_phase8].
+
+## 7. Bổ sung docs_update7 (2026-10-06, nói ngắn gọn)
+
+- Sập COVID 2020 là bài test nặng nhất cho thang dip (`oc_crash2020`): cả 4 đồng hồ gộp mất ~16%, đồng hồ đơn tệ nhất -21,8% — nặng hơn mọi tuần 2021-2026
+(tuần tệ nhất G2 -12,3%). Trần an toàn 2x không hề kích hoạt trong crash (thị trường rơi thì lệnh tự nhỏ lại) nhưng vẫn giữ vì nó chặn cú sập lúc yên
+(58%→33,5% vốn). Bài học: không bao giờ chạy 1 đồng hồ đơn lẻ.
+- Mất bot (`oc_outage`): bảo trì thường tốn chỉ 1-2,5% lãi dip, không lo; lo nhất là mất đúng lúc sập mạnh (giờ xấu nhất tốn ~9% lãi dip 5 năm). Quy tắc mới:
+trước bảo trì có hẹn thì HỦY lệnh dip đang chờ; sau sự cố bất ngờ thì kiểm tra lệnh bảo vệ trên sàn còn đủ rồi mới cho bot chạy tiếp.
+- Carry (`carry_audit`, lãnh đạo chốt 2026-10-06): kiểm toán độc lập khớp mức tổng (+0,543 so với +0,497) nhưng lệch chi tiết do cách chốt giá đáo hạn —
+cách của ta (cả hai chân cùng giá spot) đúng kinh tế hơn. Quy tắc thêm: BÁN coin thật đúng giờ đáo hạn (08:00 UTC) để khớp đúng giá chốt.
+- Vì sao 8%/tháng không tới bằng tăng vốn lệnh (`oc_saturation`): tăng size không làm lệnh tốt hơn/đơn vị — lãi tăng tuyến tính mà sụt vốn tăng nhanh hơn;
+cao nhất chỉ ~5,9%/tháng ở sụt vốn trên 17,5. Giữ nguyên cấu hình, không bơm size.
+- Edge không yếu đi (`oc_edgedecay`): xu hướng +0,07 điểm %/tháng (khoảng tin cậy chứa 0), nửa sau tốt hơn nửa đầu (6,61 so với 5,59), 6 tháng gần nhất 7,38%.
+Hai đèn vàng đã vào báo cáo hằng ngày `daily_status.py`: (1) trung bình 6 tháng <1,61%/tháng, (2) tỉ lệ chốt lời dip <0,434 — vượt là điều tra, không tự đổi lệnh.
+- Mô hình book mới thua (`v428/result_manifest.json`): bản C1 4 năm thử chỉ 3,59%/tháng (từng năm 1,927/1,768/3,191/7,590, sụt 19,17) so với bản đang chạy
+5,601/16,91 — thua cả 4 năm nên LOẠI; bản C2 cũng loại; hướng này đóng. Giữ nguyên bản G2 đang chạy.
+- Ba thử nghiệm đóng mỗi cái một dòng: carry top-up tuần đáo hạn lỗ cả 5/5 năm hai sàn + phải vay tiền → ĐÓNG [oc_carrytopup]; rút ngắn lệnh dip còn 2 giờ mất
+lãi 0/5 năm (lệnh muộn toàn lệnh thắng 59-69%) → ĐÓNG [oc_bidttl]; đổi stop theo giá mark thắng lãi 4/5 năm nhưng sụt vốn tệ 3/5 năm → ĐÓNG, giữ stop giá khớp
+[oc_marktrig].

@@ -207,3 +207,26 @@ base 5,104/14,85 ĐẠT [oc_carryd13] nhưng ma sát chỉ còn base + S2 f=0,50
 NO [oc_manualcarry]. Plateau G2 trong 0,3%/0,5pp giữ deploy [oc_plateau2]; 8-phase 4,960/17,32 NO [oc_phase8]. Screens đóng: expirydip +0,0164 vs gate
 +0,273 NO [oc_expirydip]; usdtdip +0,047 NO [oc_usdtdip]. Restart: `bash scripts/restart_all.sh` (loop.sh retired 2026-09-30), xem mục 9
 [restart_all.sh].
+
+## 11. Bổ sung docs_update7 (2026-10-06)
+
+- Crash COVID cho thang dip (`research/tournament/oc_crash2020/REPORT.md`): mix 4 pha ~-16.1%, pha đơn tệ nhất -21.85% (DD 22.30) — vượt ngưỡng 20%
+nên không bao giờ chạy 1 pha đơn lẻ. Trần 2.0x không kích hoạt trong crash (peak gross max 1.03x) nhưng vẫn giữ để chặn gap lúc yên (58%→33.5%).
+- Bảo trì/mất bot (`research/tournament/oc_outage/REPORT.md`): trước bảo trì CÓ KẾ HOẠCH thì HỦY các bid dip đang chờ, xong đặt lại khi bot lên
+(giữ nguyên TP native + backstop 8-sigma trên sàn; tốn lỡ lệnh giờ yên ~0.4 fill/giờ không đáng kể). Sau sự cố bất ngờ: để bot tự exit ở phút mở đầu tiên
+khi trở lại, người trực chỉ xác nhận không còn vị thế mở mà thiếu stop (unprotected) và mọi rung mở còn backstop native, không đặt tay giờ đầu tiên.
+Routine 1-2.5% tổng dip 5 năm, DD gần như không đổi; giờ xấu nhất lịch sử +0.684 (~9% tổng 5 năm), DD +0.26.
+- Carry đáo hạn (`research/tournament/carry_audit/COMPARISON.md` Leader adjudication + `docs/BOT_EXECUTION.md` bot_carry): BÁN chân spot đúng giờ delivery
+(08:00 UTC, tốt nhất rải trong cửa sổ trung bình index) để khớp đúng index đáo hạn; bot đã cài (spot bán market sau delivery + buy-back an toàn cho sim,
+log `carry_settle/carry_settled`, short futures/coin <=0.30x vốn, không tính vào trần dip). Quy tắc vào giữ nguyên: quarterly kế tiếp khi front <=7 ngày,
+basis >=4%/năm, mỗi chân f x vốn (f=0,25), giữ tới delivery.
+- Bão hòa (`research/diagnostics/oc_saturation/REPORT.md`): 8%/tháng không tới bằng tăng size — biên max ~5.9%/tháng ở DD>17.5; edge/đơn vị bất biến
+(0.0029→0.0028), B1 cắt ~35% notional, trần 2x gần miễn phí. Không tăng kd để đuổi return.
+- Cảnh báo sớm edge đã vào kiểm tra hằng ngày (`research/diagnostics/oc_edgedecay/REPORT.md` + `scripts/edge_monitor.py` + `scripts/daily_status.py` mục 6):
+không decay (slope +0.067 CI [-0.158;+0.160]; sau 6.61 > đầu 5.59). `daily_status.py` mục 6 hiện báo cho paper_d17bfg2/c: (1) TB 6 tháng <1.61%/tháng,
+(2) TP rate dip 182 ngày <0.434 — vỡ = ĐIỀU TRA, không tự đổi cấu hình.
+- Book-model đóng (`research/parallel/rounds/parallel-20260906-r2/v428/result_manifest.json`): C1 dev 1.927/1.768/3.191/7.590 mean 3.593 DD 19.17
+vs book triển khai 5.601/16.91 → REJECTED; C2 cũng rejected; hướng đóng 2/2 — giữ flags triển khai mục 1, không chờ model.
+- Screens đóng: oc_carrytopup CLOSE (top-up 7d f=0.125 lỗ cả 5/5 năm hai venue + stack phải vay) [oc_carrytopup]; oc_bidttl NOT PROMISING (TTL 120' mất
+-1.339 5y, late fills toàn winner 59-69%) [oc_bidttl]; oc_marktrig NOT PROMISING (sum 4/5 nhưng DD 2/5, mark fire sớm hơn trong crash) — giữ last-price
+[oc_marktrig].
