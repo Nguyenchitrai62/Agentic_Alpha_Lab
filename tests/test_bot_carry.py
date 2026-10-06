@@ -341,3 +341,17 @@ def test_paper_spot_and_dated_trade_through():
     assert abs(ex.s["pos"]["BTCQ|2"]["qty"] - 0.01) < 1e-9
     exec_links = {e["orderLinkId"] for e in ex.s["execs"]}
     assert {"cBTCtS", "cBTCtF"} <= exec_links
+
+
+def test_retry_rechecks_basis_threshold():
+    # Leader fix 2026-10-06: a retry is a new entry decision; if the basis fell below 4 %/yr the pair is abandoned.
+    now = _now()
+    cstate = {"positions": {}, "entered": [], "history": []}
+    exp = _expiries(now)
+    want, _ = carry.decide(now, 10000.0, 0.25, cstate, exp, _quotes())
+    assert len(want) == 2
+    flat = _quotes(spot=80000.0, fut=80010.0)  # basis ~0.05 %/yr after the first attempt missed
+    want2, logs2 = carry.decide(now + pd.Timedelta(minutes=1), 10000.0, 0.25, cstate, exp, flat)
+    assert want2 == []
+    assert any(r.get("op") == "carry_abandon" and r.get("reason") == "basis_below_threshold_on_retry" for r in logs2)
+    assert "BTC" not in cstate["positions"]

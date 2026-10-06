@@ -372,6 +372,22 @@ def decide(now, equity: float, f: float, cstate: dict, expiries_by_coin: dict,
                 continue
             if not (r_s_mid > 0 and r_f_mid > 0 and r_s_ask > 0 and r_f_bid > 0):
                 continue
+            # Leader fix 2026-10-06: a retry is a NEW entry decision, so the frozen basis threshold applies again
+            # (paper_d17bfg2c entered ETH on retry at ~3.8 %/yr after the first attempt passed at 4.02 %).
+            try:
+                r_dte = (int(pos.get("delivery_ms", 0) or 0) - now_ms) / MS_DAY
+                r_basis = annualised_basis(float(r_f_mid), float(r_s_mid), float(r_dte))
+            except (TypeError, ValueError, ZeroDivisionError):
+                r_basis = float("nan")
+            if not (r_basis >= float(RULE_PARAMS.get("basis_threshold", 0.04))):
+                logs.append(dict(op="carry_abandon", coin=coin, symbol=pos.get("symbol"), attempts=natt,
+                                 reason="basis_below_threshold_on_retry",
+                                 ann_basis=None if r_basis != r_basis else round(float(r_basis), 6)))
+                try:
+                    positions.pop(coin, None)
+                except (AttributeError, TypeError):
+                    pass
+                continue
             r_qty = qty_for(f, equity, r_s_ask)
             if not (r_qty > 0):
                 continue
