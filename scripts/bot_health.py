@@ -7,7 +7,7 @@ Reads, per dir, actions.jsonl, state.json and (paper mode) exchange.json, prints
 compact report and exits 0 (ok), 1 (warnings) or 2 (critical):
 
   last cycle age .......... critical if > 3 x interval or > 5 min
-  plan age vs bar schedule  warning if the plan is older than 4h30m
+  plan age vs bar schedule  warning if the plan is older than 1h15m, critical if older than 4h30m
   24h op counts ........... place / amend / cancel / fill / market_exit / stale_plan / errors
   unprotected pieces ...... critical: open piece without BOTH a resting stop and take-profit
   ledger vs exchange qty .. critical: piece qty disagrees with the exchange position
@@ -24,6 +24,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 CRITICAL_CYCLE_S = 300.0          # 5 minutes
+PLAN_WARN_H = 1.25                # a phase plan should arrive every hour -> warn when older than 1h15m
 PLAN_STALE_H = 4.5                # a 4h plan is valid until the next bar plan (+ delay)
 WINDOW_H = 24.0                   # counting window for ops / fills / errors
 
@@ -197,9 +198,12 @@ def check_dir(d: Path, plan: dict | None, now: datetime, interval: float) -> dic
     if gen is None:
         rep["warnings"].append("plan generated_at unknown")
     elif rep["plan_age_h"] > PLAN_STALE_H:
+        rep["status"] = "critical"
+        rep["problems"].append(f"plan age {rep['plan_age_h']:.1f}h (>4h30m)")
+    elif rep["plan_age_h"] > PLAN_WARN_H:
         if rep["status"] == "ok":
             rep["status"] = "warning"
-        rep["warnings"].append(f"plan age {rep['plan_age_h']:.1f}h (>4h30m)")
+        rep["warnings"].append(f"plan age {rep['plan_age_h']:.1f}h (>1h15m)")
 
     # op counts in the last 24h
     cutoff = now - timedelta(hours=WINDOW_H)

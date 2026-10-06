@@ -123,9 +123,16 @@ def test_backend_down_is_critical(tmp_path, monkeypatch):
     def boom(*a, **k):
         raise ConnectionRefusedError("down")
     monkeypatch.setattr(urllib.request, "urlopen", boom)
-    st = ds.build_status(make_root(tmp_path), NOW)
+    st = ds.build_status(make_root(tmp_path), NOW)  # plan tuoi 1.0h van CRITICAL vi backend tat
+    assert st["plan"]["severity"] == "ok"
     assert st["verdict"] == "critical" and st["exit"] == 2
     assert "backend tắt: plan sẽ cũ" in ds.format_text(st)
+
+
+def test_stale_plan_warns_early(tmp_path, monkeypatch):
+    mock_ok(monkeypatch)
+    st = ds.build_status(make_root(tmp_path, plan_age_h=2.0), NOW)
+    assert st["plan"]["severity"] == "warning" and st["exit"] == 1
 
 
 def test_stale_plan_is_critical(tmp_path, monkeypatch):
@@ -150,6 +157,7 @@ def test_collector_gap_warns_and_stale_is_critical(tmp_path, monkeypatch):
 
 def test_cli_md_and_reuse(tmp_path, monkeypatch, capsys):
     mock_ok(monkeypatch)
+    monkeypatch.setattr(ds, "utcnow", lambda: NOW)
     assert ds.bot_health.check_dir and ds.paper_report.summarize_dir and ds.liq_mod.coverage_gaps
     md = tmp_path / "r.md"
     rc = ds.main(["--root", str(make_root(tmp_path)), "--md", str(md)])

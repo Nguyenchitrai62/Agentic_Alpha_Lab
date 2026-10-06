@@ -104,7 +104,12 @@ def test_missing_actions_is_critical(tmp_path, capsys):
 
 
 def test_stale_plan_is_warning(tmp_path, capsys):
-    assert run(healthy(tmp_path), tmp_path, plan_age_h=5.0) == 1
+    assert run(healthy(tmp_path), tmp_path, plan_age_h=2.0) == 1
+    assert "plan age 2.0h" in capsys.readouterr().out
+
+
+def test_stale_plan_is_critical(tmp_path, capsys):
+    assert run(healthy(tmp_path), tmp_path, plan_age_h=5.0) == 2
     assert "plan age 5.0h" in capsys.readouterr().out
 
 

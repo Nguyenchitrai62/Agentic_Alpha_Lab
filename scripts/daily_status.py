@@ -5,9 +5,9 @@ Su dung:
 
 Noi dung (tieng Viet, 1 trang):
   (1) backend con song? (http://127.0.0.1:8724/health, timeout 3s;
-      that bai -> CRITICAL "backend tat: plan se cu") + do tuoi plan
-      (artifacts/research/advisor_shadow/trade_plan_v376.json generated_at;
-      > 4h30m = CRITICAL),
+       that bai -> CRITICAL "backend tat: plan se cu", ke ca khi plan con tuoi) + do tuoi plan
+       (artifacts/research/advisor_shadow/trade_plan_v376.json generated_at;
+       > 1h15m = WARNING, > 4h30m = CRITICAL),
   (2) moi thu muc artifacts/bot/paper*: dong trang thai bot_health +
       equity/return/max DD/fills tu paper_report,
   (3) collector: thoi diem liquidation va top-of-book cuoi cung theo venue
@@ -37,6 +37,7 @@ PLAN_REL = Path("artifacts/research/advisor_shadow/trade_plan_v376.json")
 BOT_REL = Path("artifacts/bot")
 LIQ_REL = Path("data/raw/liquidations_live")
 TOP_REL = Path("data/raw/topbook_live")
+PLAN_WARN_H = 1.25
 PLAN_STALE_H = 4.5
 GAP_MS = 5 * 60 * 1000
 STALE_S = 5 * 60.0
@@ -123,6 +124,9 @@ def check_plan(root: Path, now: datetime) -> dict:
     if age_h > PLAN_STALE_H:
         return {"severity": "critical", "age_h": age_h,
                 "line": f"plan CU {age_h:.1f}h (>4h30m, gen {gen.isoformat()})"}
+    if age_h > PLAN_WARN_H:
+        return {"severity": "warning", "age_h": age_h,
+                "line": f"plan cu {age_h:.1f}h (>1h15m, gen {gen.isoformat()})"}
     return {"severity": "ok", "age_h": age_h,
             "line": f"plan tuoi {age_h:.1f}h (gen {gen.isoformat()})"}
 

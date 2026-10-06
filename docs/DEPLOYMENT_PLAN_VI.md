@@ -99,3 +99,60 @@ Chênh lệch sàn Bybit vs Binance (~0,5 %/tháng, oc_venuegap + oc_bookvenue):
 G2 (D17BF + trần 2x): 47 lần sụt > 5 %; thời gian dưới đỉnh trung vị ~9 ngày, p90 ~63 ngày, dài nhất ~149 ngày (2022-07..12).
 ~29 % thời gian ở dưới đỉnh hơn 5 %, ~5 % thời gian dưới đỉnh hơn 10 %. Các đợt sâu nhất: 16,8 % (2023-04..07, 88 ngày), 14,7 %
 (2024-01-03, 48 ngày), 13,8 % (2023-07..10, 109 ngày), 13,2 % (2022-07..12, 149 ngày). D13BF (thận trọng): 35 lần, dài nhất ~149 ngày.
+
+## Trần dip của bot đã sửa khớp engine (OpenCode bot_capfix, cửa sổ 09/2026)
+
+Cửa sổ dùng 2026-09-01..2026-09-23 (assignment 2026-08-01..09-23); baseline engine 0,0710 (+7,10%), dip 219 / book 83 fills.
+Bản sửa: mỗi bid dip chờ = min(size thường, room), room = G x vốn sub − notional dip OPEN đã fill (KHÔNG trừ bid chờ khác),
+tính lại mỗi cycle; bound cứng open + resting <= 2 x G x vốn sub; cap off giữ bit-for-bit. Có trần C_on (cap 2.0 + adopt on =
+cấu hình triển khai): 0,0320 (eq 10320,27), gap −0,0390, dip 261, book 19. Không trần A_off: 0,0358 (eq 10357,95), gap −0,0352,
+dip 271, book 18. Trần cũ: +1,12%, dip 209, gap −5,98pp. => FIXED (209→261 dip, 62,3→76,9 phí so với 80,7 không trần; +1,12%→+3,20%):
+chỉ thua không trần 0,38pp (3,20% so với 3,58%), so với trần cũ tốn 2,46pp — tốn ~không như trần G2 engine. Code bot/mirror.py đã
+sửa cục bộ (chưa commit); tới khi merge xong thì chạy KHÔNG trần hoặc chấp nhận lợi nhuận thấp hơn [bot_capfix].
+
+## May mắn seed ở cấp danh mục (OpenCode oc_seedengine)
+
+G2 (R2B1D17BFG2) chạy đủ engine 4-phase 5 năm với 5 bộ bảng R2 (S0 triển khai + 101/202/303/404, chốt trước outcome; S0 khớp
+v376/tables_hidden exact cả 4 phase nên cache v421 chính là arm S0): 5y 5,343 (S303) / 5,371 (S101) / 5,382 (S404) / 5,410 (S0) /
+5,430 (S202) %/tháng (TB 5,387, std 0,034, range 0,087; triển khai hạng 2/5, hơn TB +0,023); năm tệ nhất đồng nhất 2,588 cả 5 seed
+(2021 zero-dispersion: fit train <10k rows nên split HGB không ngẫu nhiên); DD toàn đường 16,54..17,03 (TB 16,76, std 0,18),
+max yearly DD 16,57..17,06; không seed nào có năm lỗ. Nếu may mắn seed không lặp lại, kỳ vọng ~5,39 %/tháng, worst ~2,59,
+full-path DD ~16,8 (yearly-worst ~16,8) — tức bảng triển khai 5,41/2,59/16,8 trừ ~0,02 %/tháng luck; diagnostic, không chọn lọc
+[oc_seedengine].
+
+## Trượt stop thực tế (OpenCode oc_stopslip) — vì sao giữ trần gross
+
+1699 stops G2 (773 book_stop + 926 rung_sl, exit 2021-10-27..2026-09-22; phủ 100% cả Binance và Bybit 1m, không hàng >= 2026-09-24).
+Trung vị gộp −4,6 Binance / −1,6 Bybit (open kế tốt hơn stop; chỉ 45%/48% slip dương) trong khi S4 tính ~18–19 bps trung vị
+(phân số −0,49/+0,09): S4 bảo thủ ở trung vị, xấp xỉ công bằng trong biến động kiểu 2021 (frac ~0,5..1,5) và vài ô BNB/ETH
+2022–2024 (~0,6..1,5), nhưng quá nhỏ cho đuôi crash (p90 +146/+197, p99 +495/+738, max +813/+1347 bps). 7,2% stops thanh Bybit
+không chạm stop suy từ Binance (venue wick khác nhau); flash 75,5%/74,7% (biên phút exit trung vị ~146 bps vs trailing ~16 bps).
+Top-10 toàn stop long rung dip trong FTX 2022-11-09 (SOL, Bybit 1347 bps do venue gap) và flush 2024-01-03 (XRP). Hàm ý triển khai:
+giữ `--dip-gross-cap 2.0` (phút tệ nhất gap −10% không trần lỗ 58% vốn, trần 2x còn 33,5%) vì stop không cắt được đuôi crash [oc_stopslip].
+
+## Phí VIP (OpenCode oc_vipfees; triển khai giữ VIP0)
+
+Repricing cộng từng bar trên G2 (57.365 legs; maker |w| 1741,9, taker 549,9): VIP1 (giả định maker 0,0180%/taker 0,0400%) +0,1117
+→ 5,7183 %/tháng; VIP2 (0,0160%/0,0375%) +0,1590 → 5,7657 %/tháng (gốc 5,6066; net 5y 2539,21% → 2712,02% → 2788,60%;
++1,35%/năm và +1,92%/năm; saving TB 0,114%/0,163%/tháng); win/DD gần như không đổi. Nhưng tau = 22,98x vốn/tháng nên 5k chỉ
+114.879/tháng (1,1%/0,5% ngưỡng 10M/25M, tiết kiệm 5,70/8,13 USDT), 10k 229.758 (2,3%/0,9%), 50k 1.148.790 (11,5%/4,6%); cần
+~435.241 USDT cho VIP1 và ~1.088.101 USDT cho VIP2 chỉ bằng volume (đường asset ~$100k/$250k cũng ngoài tầm) — giữ phí VIP0 [oc_vipfees].
+
+## Paper ngày đầu (OpenCode PAPER_DAY1_20261006, 2026-10-06 ~03:28 UTC)
+
+5 thư mục (`paper`, `paper_d17bf`, `paper_d17bfg2`, `paper_g2k20`, `paper_d13bf`; không có bot thứ 6). daily_status WARNING duy nhất
+do `paper` 15 lỗi rate-limit 10006 (06:00–12:01 10-05, runner-cụ thể); backend sống, plan tươi 0,5h (`2026-10-06T03:01:12Z`).
+Equity/return/maxDD/dip-book: `paper` 4998,74/−0,03%/0,09%/0/6; ba bot d17bf/d17bfg2/g2k20 mỗi bot 4999,46/−0,01%/0,01%/0/4;
+`d13bf` 4999,64/−0,01%/0,01%/0/3. Toàn book fill đúng giá limit, 0 dip fill, 0 exit, mọi piece có stop+TP, unprotected/qty_mismatch
+none. Stale-plan đúng: 14:03–18:13 không fill nào giữa backend outage 12:39–17:40 (plan kẹt 12:03:26Z; stale 355/281/52/83),
+sau ~18:13 bám lại; `skipped_below_minimum` 596–701 dòng/bot (vài rung BTC sâu dưới minimum ở 5000 — ồn erwart); không double-spend
+(market_exit 0). Chưa kết luận go-live/divergence nào trước 14 ngày. Trước testnet: tách quota kline, báo động stale-plan sớm hơn,
+gộp log skipped, dán nhãn "closest plan v376 R2-4P" cho bot khác cấu hình [PAPER_DAY1_20261006].
+
+## Screens mới đóng đợt 2026-10-06 (mỗi hướng một dòng)
+
+- oc_agentskip (SKIP khi cả hai nửa HGB y1.0 < −0,002): 2/5 sum, 4/5 DD — NOT PROMISING (2023–2025 loại toàn winner) [oc_agentskip].
+- oc_b1wide (B1-wide +0,5*n_alt): sum>=97% 3/5, DD 0/5 (full 96,2%, DD 1,79→2,01) — NOT PROMISING [oc_b1wide].
+- oc_bookfunding (x0,75 long khi funding 7d > p80): P&L>=97% 3/5, DD 3/5 (5y −8,8%) — NOT PROMISING [oc_bookfunding].
+- oc_tpdecay (TP decay 1,0sg→0,5sg): sum 3/5, DD 1/5 (timeout 41%→31% nhưng full chỉ +1%) — NOT PROMISING [oc_tpdecay].
+- oc_trendladder (depth x0,85 up / x1,15 down theo trend BTC r30): sum 3/5, DD 2/5 (2025 1,13→1,74) — NOT PROMISING [oc_trendladder].
