@@ -198,6 +198,7 @@ Sources: `docs/FINAL_REPORT_VI.md`, `.claude/skills/alpha-lab-leader/research-ma
 - `oc_idea6_d13carry` | D13BF + concentrated carry f 0.50 (POST-HOC) | CLOSED | base 5.115/DD 14.71 but fails frictions and needs split capital; 8 %/mo unreachable (~2.9pp short) | 2026-10-07
 - `oc_usdccarry` | Bybit USDC linear dated futures as the carry leg | CLOSED | no better than inverse (basis within +-0.6 pp/yr where comparable); gaps 2021-22 and 2025-26, none trading now; keep inverse quarterlies | 2026-10-07
 - `oc_idea2_dipstop` | fixed per-coin dip stops on G2 (4-phase engine) | CLOSED | +0.005 %/mo vs G2, folds 0/3, slip stress erases it | 2026-10-07
+- `oc_idea5_manualrest` | MANUAL brackets resting to the 4h close (H1) / doubled dips (H2) | CLOSED | H1 +0.29 vs 60-min baseline but -0.07 vs running M5_human; H2 DD 21.3/25.2 > 20; MANUAL still ~1.3 pp short of 5 %/mo | 2026-10-07
 - `oc_idea3_carrytier` | carry f by basis tier (POST-HOC) | CLOSED | T1 +0.07 dev4 but needs 1.5x equity spot (borrow); T2 (cap 0.25) -0.02; keep flat f 0.25 | 2026-10-07
 
 ## 11. Late-day dip / book screens (2026-10-06)
