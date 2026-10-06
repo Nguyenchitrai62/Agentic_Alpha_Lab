@@ -32,7 +32,7 @@
 
 ## 4. Rủi ro đã biết và bug đang mở
 
-- **Bot soak 24h (crash 10/10, BTC -14,9%): B1 piece book thứ 2 thiếu SL/TP (9491 sự kiện hở), B2 lượng lẻ dưới min không được bảo vệ, B3 giá limit = 0 làm chết 264 cycle — trạng thái: ĐANG SỬA (chưa có file fix)** [docs/opencode/BOT_SOAK_20261006.md].
+- **Bot soak 24h (crash 10/10, BTC -14,9%) tìm 3 lỗi (B1 piece book thứ 2 thiếu SL/TP, B2 lượng lẻ dưới min không bảo vệ, B3 giá 0 làm chết cycle) — ĐÃ SỬA và soak lại: lỗ hổng bảo vệ 9491 -> ~0, exception 264 -> 0; leader sửa thêm 2 điểm (piece mồ côi dùng SL/TP của chính nó; plan TP=0 thì giữ SL/TP lúc vào lệnh). Commit 40e5fdf; 6 runner tag đã chạy code mới từ 19:25 UTC 06/10 (runner `paper` R2 cũ vẫn code cũ). Soak riêng carry qua đáo hạn: 0 vi phạm** [docs/opencode/BOT_SOAKFIX_20261006.md] [docs/opencode/BOT_CARRYSOAK_20261007.md].
 - **Backend + 6 runner paper chết 10:32–14:37 UTC ngày 06/10 (plan kẹt bar 08:00, lỡ cycle 12:00, ~4h plan cũ); đã khởi động lại, nguyên nhân là console foreground bị đóng + runner nằm trong shell giới hạn thời gian** [docs/opencode/BACKEND_INCIDENT_20261006.md] [docs/PLAN_NEXT_20261006.md].
 - **Thu thập liquidation/topbook mới phủ ~56% thời gian (32,7/58,0 giờ) vì backend chết — chưa dùng nghiên cứu được cho tới khi chạy liên tục >=95%** [docs/opencode/COLLECTOR_20261006.md].
 - **Xác suất thật: P(DD>20%) ~11%, P(năm lỗ) ~0,7%; chuẩn bị chịu DD tới ~18%, vốn phải chịu được DD 25%** [docs/OWNER_SUMMARY_VI.md].
@@ -43,12 +43,12 @@
 1. **Bật watchdog backend:** chạy `run_backend.ps1 -Ensure` + bật Task `AlphaLabBackendWatchdog` (đang Disabled từ 02/10) để backend/tunnel tự sống lại [docs/opencode/BACKEND_INCIDENT_20261006.md] [docs/PLAN_NEXT_20261006.md].
 2. **Sau mọi reboot/mất điện chỉ chạy MỘT lệnh:** `.\scripts\restart_all.ps1` (chạy từ console của bạn; Start-Process ẩn — bản WMI đã bỏ vì bot chết sau ~30 phút) — không dùng shell tạm [docs/PLAN_NEXT_20261006.md].
 3. **Mỗi ngày xem 5 thứ:** backend sống + plan tươi <4h30m; vòng bot sống; không vị thế thiếu stop; không cycle_error >1h; equity/DD/fills — bằng `daily_status.py` rồi `bot_health.py`, `paper_report.py` [docs/OWNER_SUMMARY_VI.md].
-4. **CHẶN TESTNET cho tới khi bug soak B1–B3 được sửa xong** (mục 4) [docs/PLAN_NEXT_20261006.md].
+4. **Testnet: đã gỡ chặn phía code** (soak fix + carry soak xong). Làm theo docs/TESTNET_PLAN_VI.md: sub-account testnet, key testnet tự điền vào .env, UTA/Hedge/Cross/5x, nạp 5-10k USDT testnet, preflight -> dry --once -> chạy 7 ngày. Live chỉ sau 7 ngày testnet sạch + >= 8 tuần paper + 4 cổng [docs/TESTNET_PLAN_VI.md] [docs/DEPLOYMENT_PLAN_VI.md].
 5. **Testnet (sau khi hết chặn):** theo `docs/TESTNET_PLAN_VI.md` 7 ngày, đủ 9 điều kiện mới xét; lệnh vào PostOnly, risk_guard ON ở testnet/live [docs/FINAL_REPORT_VI.md].
 6. **Live chỉ khi đủ cả 4 (sau >=8 tuần paper, sớm nhất ~01/12/2026):** paper ở phân vị >=20; DD paper <=15%; lệch bot-vs-plan <=1,5 điểm %/tháng (đủ 14 ngày); không lỗi cycle >1h [docs/OWNER_SUMMARY_VI.md] [docs/FINAL_REPORT_VI.md].
 
 ## 6. Phiên nghiên cứu tiếp theo làm gì
 
-- Đọc kết quả 8 worker còn chạy (soak, backenddiag, g2k20compound, g2k20folds, kpackfix, paperday5, audit robust, alertcheck) rồi review diff trước khi commit code/docs [docs/PLAN_NEXT_20261006.md].
+- Cả 6 ý tưởng của bản rà soát 07/10 đều ĐÓNG (Kelly rung, stop dip, carry bậc, carry 1 coin, MANUAL nghỉ 4h, D13BF+carry) [docs/CLOSED_DIRECTIONS.md]; mọi audit hôm nay PASS (capacity, eventstress, deliverytrack, carryborrow, carrymore). Biên lợi nhuận-DD đã cạn: chỉ còn chờ bằng chứng paper/testnet.
 - Nuôi paper đủ >=8 tuần + 4 cổng go-live; divergence >=14 ngày mới kết luận; OOS hằng tuần bằng `score_oos.py --fetch --run` [docs/FINAL_REPORT_VI.md].
 - Chỉ nghiên cứu mới khi có dữ liệu thật mới (liquidation đủ 3 tháng sớm nhất 04/01/2027, log prospective); không lặp lại hướng trong `docs/CLOSED_DIRECTIONS.md` [docs/PLAN_NEXT_20261006.md] [docs/CLOSED_DIRECTIONS.md].
