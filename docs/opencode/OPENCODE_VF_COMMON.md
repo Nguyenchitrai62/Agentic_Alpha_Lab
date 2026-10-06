@@ -26,3 +26,7 @@ NEXT_AGENT.md, ../Kronos, or git state.
 - HEAVY jobs (any 4-phase engine / harness run, any process expected > 0.4 GB): run them through the shared semaphore,
   `.venv/Scripts/python.exe scripts/heavy_slot.py run --tag <your tag> --min-free-gb 2.0 -- <cmd...>` (or
   `with heavy_slot("<tag>", max_slots=2, min_free_gb=2.0):` from scripts/heavy_slot.py); never `--leader`. Waiting for a slot is normal.
+- GIT IS READ-ONLY FOR WORKERS (hard rule, 2026-10-06 incident): never run `git stash` (any form), `git reset`, `git checkout -- <path>`,
+  `git restore`, `git clean`, `git rm`, `git commit`, `git switch`, `git rebase`, `git merge` or anything that changes the working tree, index,
+  stash or HEAD. Other workers and the leader have uncommitted work in this tree; a stash/clean destroys it. To compare against the
+  committed version use `git show HEAD:<path>` or `git diff`. To test "clean", copy files into your own scratch folder instead.
