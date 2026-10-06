@@ -22,30 +22,22 @@ PY="$ROOT/.venv/Scripts/python.exe"
 BACKEND_URL="http://127.0.0.1:8724/health"
 PLAN="$ROOT/artifacts/research/advisor_shadow/trade_plan_v376.json"
 DRY_RUN=0
-ONLY="all"
-
-for a in "$@"; do
-  case "$a" in
+ONLY=all
+# single-pass parser (leader fix 2026-10-06: the old two-loop parser exited on '--only <value>')
+while [ $# -gt 0 ]; do
+  case "$1" in
     --dry-run) DRY_RUN=1 ;;
-    --only) echo "usage: $0 [--dry-run] [--only bots|backend|carry]" >&2; exit 2 ;;
-    --only=*) ONLY="${a#--only=}" ;;
-    bots|backend|carry) ONLY="$a" ;;
-    --only-bots) ONLY="bots" ;;
-    --only-backend) ONLY="backend" ;;
-    --only-carry) ONLY="carry" ;;
-    -h|--help) sed -n '1,20p' "$0"; exit 0 ;;
-    *) echo "unknown arg: $a (usage: $0 [--dry-run] [--only bots|backend|carry])" >&2; exit 2 ;;
+    --only) shift; [ $# -gt 0 ] || { echo "usage: $0 [--dry-run] [--only bots|backend|carry]" >&2; exit 2; }; ONLY="$1" ;;
+    --only=*) ONLY="${1#--only=}" ;;
+    bots|backend|carry) ONLY="$1" ;;
+    --only-bots) ONLY=bots ;;
+    --only-backend) ONLY=backend ;;
+    --only-carry) ONLY=carry ;;
+    -h|--help) echo "usage: $0 [--dry-run] [--only bots|backend|carry]"; exit 0 ;;
+    *) echo "unknown arg: $1 (usage: $0 [--dry-run] [--only bots|backend|carry])" >&2; exit 2 ;;
   esac
+  shift
 done
-# support the space form: --only bots
-prev=""
-set -- "$@"
-ONLY2="all"; WANT=""
-for a in "$@"; do
-  if [ "$prev" = "--only" ]; then ONLY2="$a"; prev=""; continue; fi
-  if [ "$a" = "--only" ]; then prev="--only"; continue; fi
-done
-if [ "$ONLY2" != "all" ]; then ONLY="$ONLY2"; fi
 case "$ONLY" in all|bots|backend|carry) ;; *) echo "bad --only: $ONLY (bots|backend|carry)" >&2; exit 2 ;; esac
 
 # --- canonical commands (must match the observed live processes) ---
