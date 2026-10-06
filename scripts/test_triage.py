@@ -23,8 +23,14 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 TIMEOUT = 300
-LOW_RAM_BYTES = 2 * 1024**3
+# ops_testtriage2 (2026-10-06): gate lowered 2.0 -> 1.5 GB to match the
+# assigned heavy_slot wrapper (--min-free-gb 1.5). The wrapper itself waits
+# for a free slot + RAM, so this pre-check only fast-skips when far below it.
+LOW_RAM_BYTES = int(1.5 * 1024**3)
 BELOW_NORMAL = 0x00004000
+# Outer timeout covers heavy_slot queue wait (default timeout-h 6h) + pytest.
+SLOT_WAIT_S = 6 * 3600
+OUTER_TIMEOUT = TIMEOUT + SLOT_WAIT_S + 60
 
 DEP_PATTERNS = [
     r"research/tournament/[A-Za-z0-9_]+(?:/[A-Za-z0-9_.\-]+)?",
@@ -160,8 +166,14 @@ def run_one(test_file: str) -> dict:
     # NOTE: pyproject sets addopts="-q", so a bare `-q -x` run is really `-q -q -x`
     # and pytest suppresses the "N passed" summary. We keep the assigned flags
     # and add `-v` so per-test lines stay countable; verdict semantics unchanged.
-    cmd = [sys.executable, "-m", "pytest", "-q", "-x", "-v", test_file]
-    kwargs: dict = {"cwd": ROOT, "capture_output": True, "text": True, "timeout": TIMEOUT}
+    # ops_testtriage2: wrap each pytest with the shared heavy_slot semaphore so
+    # the sweep queues behind heavy jobs (assigned wrapper, min-free 1.5 GB).
+    # BELOW_NORMAL is set on the outer heavy_slot process; the inner pytest
+    # inherits the priority class on Windows.
+    inner = [sys.executable, "-m", "pytest", "-q", "-x", "-v", test_file]
+    cmd = [sys.executable, str(ROOT / "scripts" / "heavy_slot.py"), "run",
+           "--tag", "triage", "--min-free-gb", "1.5", "--"] + inner
+    kwargs: dict = {"cwd": ROOT, "capture_output": True, "text": True, "timeout": OUTER_TIMEOUT}
     if sys.platform == "win32":
         kwargs["creationflags"] = BELOW_NORMAL  # low priority per assignment
     t0 = time.time()

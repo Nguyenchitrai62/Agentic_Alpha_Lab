@@ -27,7 +27,7 @@ Hệ thống chỉ gợi ý: không có khoá sàn và không đặt lệnh.
 
 Xem `.env.example`. Các khoá quan trọng:
 
-- `ADMIN_EMAILS=trainguyenchi30@gmail.com`: admin cố định, chỉ khai báo ở đây.
+- `ADMIN_EMAILS=admin@example.com`: placeholder mẫu; admin cố định, chỉ khai báo trong local `.env` (không commit).
 - `AUTH_SESSION_SECRET`: chuỗi ngẫu nhiên dài, đã được tạo sẵn.
 - `GOOGLE_CLIENT_ID`: lấy ở bước 1.
 - `CORS_ALLOW_ORIGINS=https://crypto.nguyenchitrai.id.vn`: domain FE. Chỉ chấp nhận các origin được liệt kê chính xác; thêm domain Vercel cụ thể nếu sử dụng.

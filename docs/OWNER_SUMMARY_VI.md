@@ -96,3 +96,15 @@ phí Bybit VIP0 thật (0,02 % / 0,055 %); nhưng đó vẫn là rủi ro thật
 ## Độ bền tham số (jitter đồng thời ±10 %, 12 bộ, chạy trên Kaggle) [oc_jitter]
 Đổi đồng thời kd / trần G / ngưỡng flush ±10 % quanh G2: cả 12 bộ đều >= 5 %/tháng (5,09–5,95, trung vị 5,54), DD năm 16,3–18,2, không năm nào lỗ;
 bản gốc tái lập đúng v421 (5,41 / 16,91 / 16,82). G2 nằm trên một vùng ổn định, không phải điểm tối ưu mong manh.
+
+## 10. Bổ sung docs_update11 (2026-10-06, nói ngắn gọn)
+
+- Jitter: giữ nguyên mục 'Độ bền tham số' ngay trên [oc_jitter] (12/12 đạt, không nhắc lại số).
+- Latency bot thật [docs/opencode/LATENCY_20261006.md]: bot ổn định chạy ở base (book ~5,3 phút, dip ~16,1–16,3 phút, bảo vệ ~0,3 giây),
+không phải S2 (book 15 phút) hay S3 (book 30 / dip 31 phút); S2 chỉ trễ book, S3 trễ cả book+dip; đuôi p90/max chỉ là backlog lúc khởi động runner.
+Bộ ma sát thực tế để xét BOT từ nay là S1 (phí) / S4 (trượt stop 50%) / S5 (giá Bybit) — đừng trừ chi phí S2/S3 vào kỳ vọng.
+- Hồ sơ dự bị G2K20 + carry f=0,25 [oc_g2k20robust]: G2K20 (kd 2,0) base 5,874 / DD ~17,8; +carry giữ >= 5 %/tháng dưới MỌI ma sát
+(tệ nhất S1 5,022; S3 5,056; S4 5,448; S5 5,465) nhưng DD cao hơn G2 ~1 điểm (base 17,66 so với 16,78; S5 18,63 / full 19,72, vẫn < 20).
+Đã rớt fold năm gần nhất (v422 fold 4: 4,716 so với 5,06 của G2, transfer=False) nên G2 vẫn là bản triển khai chính;
+runner paper `paper_g2k20c` (G2K20 + carry 0,25) chạy từ 2026-10-06 ~14:15 UTC thu bằng chứng triển vọng — chưa kết luận gì trước đủ 14/56 ngày.
+- Tăng trọng book (bookscale) NO [oc_bookscale]: book x1,1/x1,2 vẫn rớt S1/S3 kể cả +carry (cao nhất 4,892 / 4,854) — không adopt, giữ nguyên size G2.

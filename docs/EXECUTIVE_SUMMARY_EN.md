@@ -14,7 +14,7 @@ Scope: BOT = book + dip ladder (needs bot); MANUAL = book-only human [FINAL_REPO
 - ZERO LEAKAGE: feature at t uses only data at close t; labels/normalisation/calibration/thresholds/model/params only before anchor minus embargo >= horizon [AGENTS.md].
 
 ## 2. Deployed system: G2 + quarterly carry f=0.25 in one Bybit UTA
-- BOT G2: R2B1D17BF + dip gross cap 2.0x, flags `--corr-size --dip-mult 1.7 --bear-book --dip-gross-cap 2.0`, plan `trade_plan_v376.json` [FINAL_REPORT_VI].
+- BOT G2: R2B1D17BF + dip gross cap 2.0x, flags `--corr-size --dip-mult 1.7 --bear-book --dip-gross-cap 2.0 --adopt-fresh --carry-f 0.25 --interval 25`, plan `trade_plan_v376.json` [FINAL_REPORT_VI].
 - Account: Bybit cross margin, Hedge Mode, 5x all 5 coins; carry short quarterly leg 10x (spot-hedged), f=0.25 in the SAME UTA; beyond f=0.25 split capital [FINAL_REPORT_VI].
 - Paper equity 5000 (recommended real >= 5000, best ~10000); entries PostOnly maker-only, TP/reduce GTC reduce-only; `risk_guard` ON at testnet/live (per-coin 2.5x / dip 2.0x / total 4x / single 1x), OFF at paper to stay engine-faithful [FINAL_REPORT_VI].
 - G2 base (v421 NO / v422 yes, identical numbers): 5.41 %/month, worst 2.588, yearly maxDD 16.91, full-path official 16.82 (chained 16.91) [oc_frontier; oc_kpi_g2; oc_frontiercarry].
@@ -32,7 +32,7 @@ Scope: BOT = book + dip ladder (needs bot); MANUAL = book-only human [FINAL_REPO
 
 ## 3. Honest numbers: frictions, clock luck, crash
 - Frictions keep DD<=20 every row [FINAL_REPORT_VI]: base gate 5.43/DD 18.33/16.9 [oc_signedfunding]; 15' delay D17BF 5.24, G2 5.21/16.91 [DEPLOYMENT_PLAN_VI]; 50% stop slip (S4) D17BF 5.11/DD 20.0 (G2 4.90/17.31) [oc_stopslip]; real Bybit prices D17BF 4.97/19.9 (G2 4.88/18.11) [DEPLOYMENT_PLAN_VI]; 30' delay D17BF 4.68 (G2 4.58/17.32) [DEPLOYMENT_PLAN_VI]; cost stress (maker 0.0004/taker 0.0007+5bps) 4.58/<=20 (G2 4.57/17.45) [DEPLOYMENT_PLAN_VI].
-- G2+carry f=0.25 under frictions (year-start) [oc_carryfric]: base 5.533; S1 4.696; S2 5.339; S3 4.717; S4 5.033; S5 5.016 — holds >=5.0 at base/S2/S4/S5, FAILS S1 and S3 even at f=0.50 [oc_carryfric].
+- G2+carry f=0.25 under frictions, compounding [oc_carryfric2]: base 5.634; S1 4.780; S2 5.438; S3 4.806; S4 5.125; S5 5.111 (no losing year) — holds >=5.0 at base/S2/S4/S5, FAILS S1 and S3; conservative year-start [oc_carryfric]: base 5.533; S1 4.696; S2 5.339; S3 4.717; S4 5.033; S5 5.016 — FAILS S1 and S3 even at f=0.50 [oc_carryfric].
 - Clock luck [oc_clockluck]: 4 deployed dip clocks mean 7.72 vs 24-offset mean 7.12 (gap -0.59) -> random-clock expectation ~5.24 not 5.41 (adjusted yearly 2.593/3.233/5.453/10.691/4.401); keep 5.41 with ~0.17pp luck note, proxy method [oc_clockluck; OWNER_SUMMARY_VI].
 - Seed luck negligible: 5 G2 seeds 5.343-5.430 (mean 5.387, deployed 5.410 rank 2/5), DD 16.54-17.03, no losing year — minus ~0.02pp [oc_seedengine].
 - Crash/outage: instant -10% all 5 coins worst minute no-cap -58%, cap 2x 33.5% (3x: 39%), median/p99 unchanged [DEPLOYMENT_PLAN_VI; oc_gapstress].
@@ -79,5 +79,20 @@ Scope: BOT = book + dip ladder (needs bot); MANUAL = book-only human [FINAL_REPO
 | Go-live gates, stops, paper/testnet/live path | docs/DEPLOYMENT_PLAN_VI.md; docs/BOT_RUNBOOK_VI.md; docs/QUICKSTART_VI.md |
 | Bot code review (F1-F7, fixed in 359004f) | docs/opencode/CODEREVIEW_BOT_20261006.md |
 | Carry rule, margin, parity, audit | oc_cashcarry; oc_carrycombo; oc_utamargin/oc_utamargin2; oc_carryparity; carry_audit/COMPARISON.md |
-| Frictions, clock luck, crash, saturation, decay | oc_carryfric; oc_clockluck; oc_stopslip; oc_gapstress; oc_crash2020; oc_outage; oc_saturation; oc_edgedecay |
+| Frictions, clock luck, crash, saturation, decay | oc_carryfric2 (compounding) + oc_carryfric (conservative year-start); oc_clockluck; oc_stopslip; oc_gapstress; oc_crash2020; oc_outage; oc_saturation; oc_edgedecay |
 | Paper runners and daily ops | PAPER_DAY1_20261006; PROSPECTIVE_20261006; scripts/daily_status.py + bot_health.py + paper_report.py + prospective_scorecard.py |
+
+## 9. Update docs_update11 (2026-10-06)
+
+- Parameter robustness (joint +-10% jitter on kd/G/k, 12 Kaggle rows) [oc_jitter]: BASE reproduces v421 (5.41/2.588/16.91/16.82) PASS;
+all 12 rows 5.09-5.95 (median 5.54), yearly DD 16.3-18.2, no losing year — ROBUST, no deploy change.
+- Real bot latency [docs/opencode/LATENCY_20261006.md]: steady-state book ~5.3 min, dip ~16.1-16.3 min, protection ~0.3 s = base 5/16,
+not S2 (book 15 min) or S3 (book 30/dip 31 min); S2 delays book only, S3 delays book+dip; tails are runner-start backlogs.
+The realistic friction set for the BOT is S1 (cost) / S4 (stop slip) / S5 (Bybit prices); S2/S3 do not apply.
+- Alternative G2K20+carry f=0.25 [oc_g2k20robust]: return cushion under every friction (base 5.989; worst S1 5.022; S3 5.056;
+S4 5.448; S5 5.465) at ~1pp higher DD than G2 (base 17.66 vs 16.78; S5 18.63/full 19.72, still <20). It failed the most-recent-year
+fold (v422 fold 4: 4.716 vs 5.06, transfer=False), so G2 stays the main deployment; paper runner `paper_g2k20c` (G2K20+carry 0.25)
+started 2026-10-06 ~14:15 UTC collects prospective evidence.
+- Book scale NO [oc_bookscale]: book x1.1/x1.2 keeps neither S1 nor S3 at >=5.0 with or without carry (best 4.892/4.854) — not adopted.
+
+<!-- consistfix 2026-10-06: §2 flags appended --adopt-fresh --carry-f 0.25 --interval 25 to match frozen deploy (--dip-gross-cap 2.0 already present, not duplicated); §3 friction G2+carry headline -> oc_carryfric2 compounded (base 5.634, S1 4.780, S2 5.438, S3 4.806, S4 5.125, S5 5.111, no losing year), oc_carryfric kept as conservative year-start (5.533/4.696/5.339/4.717/5.033/5.016); §8 source row lists fric2 + fric. Sources re-checked: oc_carryfric2 REPORT (friction table + plain answers), oc_carryfric REPORT (year-start S-table), oc_carrycompound REPORT (5.634). -->

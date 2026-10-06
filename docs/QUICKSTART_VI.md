@@ -60,3 +60,11 @@
 - Không bao giờ chạy 1 pha/1 đồng hồ đơn lẻ (pha đơn COVID -21,8 % vượt ngưỡng; mix ~-16 % nằm trong DD) [oc_crash2020].
 - Không bơm size đuổi 8 %/tháng (biên max chỉ ~5,9 %/tháng ở DD > 17,5; edge/đơn vị bất biến) [oc_saturation]; không kỳ vọng 5 % mọi tháng (~1/9 năm chạm DD > 20 %) [DEPLOYMENT_PLAN_VI].
 - Không commit `.env`/keys; không sửa ngưỡng go-live/dừng sau khi đã thấy dữ liệu paper (nếu sửa ghi ngày + lý do) [DEPLOYMENT_PLAN_VI].
+
+## 8. Bổ sung docs_update11 (2026-10-06, 4 dòng)
+
+- G2 đã qua jitter đồng thời ±10% (12/12 đạt, DD < 20) — yên tâm giữ cấu hình, không chỉnh tay [oc_jitter].
+- Bot thật chạy ở base (book ~5 phút, dip ~16 phút), nên chỉ lo 3 ma sát thật: phí cao (S1), trượt stop (S4), giá Bybit (S5) [docs/opencode/LATENCY_20261006.md].
+- Bản lợi nhuận cao G2K20+carry (+carry giữ >= 5 mọi ma sát, DD ~17,8 / S5 ~19,6) vẫn để dự bị vì rớt năm gần nhất; G2 là bản chính;
+runner paper_g2k20c (từ 06-10 ~14:15 UTC) đang thu bằng chứng [oc_g2k20robust].
+- Tăng trọng book (x1,1/x1,2) không cứu được S1/S3 → KHÔNG làm [oc_bookscale].

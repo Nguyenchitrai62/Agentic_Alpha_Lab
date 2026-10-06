@@ -121,7 +121,7 @@ Sources: `docs/FINAL_REPORT_VI.md`, `.claude/skills/alpha-lab-leader/research-ma
 
 ## 4. Sleeves and structural sources
 
-- `oc_cashcarry` | quarterly spot+short hold to delivery | KEPT add-on | +0.21/mo f=0.25, DD ~0; 57% from 2023 | 2026-10-06
+- `oc_cashcarry` | quarterly spot+short hold to delivery | KEPT add-on | +0.21/mo f=0.25, DD ~0; 57% from 2023; headline +0.21/+0.13pp (5.533) is year-start conservative; expectation is oc_carrycompound 5.634/16.75/16.66 | 2026-10-06
 - `oc_xsrev` | 1d cross-sectional reversal sleeve | CLOSED | loses 5/5 (-2.5..-5.4/mo), DD 5/5 worse | 2026-10-06
 - `oc_dailyladder` | daily dip ladder | CLOSED | earns 4/5 corr 0.26 but DD worse 4/5 | 2026-10-05
 - `oc_rips` | regime rip-sell ladder | CLOSED | every rule 5y negative | 2026-10-05
@@ -181,12 +181,12 @@ Sources: `docs/FINAL_REPORT_VI.md`, `.claude/skills/alpha-lab-leader/research-ma
 ## 10. Carry sleeve family (late-day 2026-10-06; base `oc_cashcarry` in §4 stays the rule)
 
 - `oc_carryparity` | frozen carry prospective parity | DIAGNOSTIC | 144/144 contract; 1 stale-basis bug | 2026-10-06
-- `oc_frontiercarry` | carry f0.25 on 80 frontier rows | REPORTING | +0.13pp, 0 stretch; G2+carry 5.533/16.78 | 2026-10-06
+- `oc_frontiercarry` | carry f0.25 on 80 frontier rows | REPORTING | +0.13pp, 0 stretch; G2+carry 5.533/16.78; headline +0.21/+0.13pp (5.533) is year-start conservative; expectation is oc_carrycompound 5.634/16.75/16.66 | 2026-10-06
 - `oc_carryfar` | FAR 6-mo carry tenor | CLOSED (leader: not adopted; FAR ~= base per capital-time) | FAR +0.425geom but 2x capital-time ~= base | 2026-10-06
 - `oc_carrytopup` | delivery-week carry top-up f0.125 | CLOSED | 5y -0.14% Bin/-0.10% Byb, 0/5y pos | 2026-10-06
 - `oc_carryd13` | D13BF + frozen carry f0.25/0.50 | KEPT map | f0.25 5.104/DD14.85; f0.50 5.234/14.71 | 2026-10-06
-- `oc_carrycombo` | BOT/MANUAL + locked carry f0.25/0.50 | REPORTING | G2 +0.00-0.01R/-0.13DD; MAN ~3.75 still <5 | 2026-10-06
-- `oc_carryfric` | carry under frictions S1-S5 | REPORTING | D13 base 5.104/14.85 only; G2 fails S1/S3 | 2026-10-06
+- `oc_carrycombo` | BOT/MANUAL + locked carry f0.25/0.50 | REPORTING | G2 +0.00-0.01R/-0.13DD; MAN ~3.75 still <5; headline +0.21/+0.13pp (5.533) is year-start conservative; expectation is oc_carrycompound 5.634/16.75/16.66 | 2026-10-06
+- `oc_carryfric` | carry under frictions S1-S5 | REPORTING | D13 base 5.104/14.85 only; G2 fails S1/S3 (conservative year-start); compounding [oc_carryfric2] G2+carry f=0.25: base 5.634, S1 4.780, S2 5.438, S3 4.806, S4 5.125, S5 5.111, no losing year; D13BF+carry base 5.198/14.82 | 2026-10-06
 - `oc_linvinv` | same-expiry linear-vs-inverse >=3pp/yr f0.125 | CLOSED | 0 entered, max 2.55<3pp | 2026-10-06
 - `oc_manualcarry` | honest MANUAL + frozen carry | CLOSED | best 3.993 <5; return never passes | 2026-10-06
 - `oc_utamargin` | one UTA G2+carry f0.25/0.50 | KEPT f0.25 | f0.25 safe; f0.50 split-only | 2026-10-06
@@ -259,3 +259,5 @@ Sources: `docs/FINAL_REPORT_VI.md`, `.claude/skills/alpha-lab-leader/research-ma
 - `ops_kaggleengine` | generic Kaggle CPU engine bundle | DIAGNOSTIC | 6/6 pass, G2 5.41/16.91/16.82 | 2026-10-06
 - `r2_4p_robust5` | R2-4P friction robustness S1-S5 (no PLAN) | DIAGNOSTIC | base 4.820/DD25.05/23.08; S1/S4/S5 breach | 2026-10-06
 - `kronos` | Kronos zero-shot forecasts | DIAGNOSTIC (leak) | BOOK IC neg; DIP V1 +2.52 (leak caveat) | 2026-10-06
+
+<!-- consistfix 2026-10-06: §4 oc_cashcarry + §10 oc_frontiercarry/oc_carrycombo appended headline +0.21/+0.13pp (5.533) is year-start conservative; expectation oc_carrycompound 5.634/16.75/16.66 (no number change); §10 oc_carryfric kept conservative numbers, added oc_carryfric2 compounded (G2+carry f=0.25 base 5.634, S1 4.780, S2 5.438, S3 4.806, S4 5.125, S5 5.111, no losing year; D13BF+carry base 5.198/14.82). Sources re-checked: oc_carryfric2 REPORT, oc_carrycompound REPORT (5.634), oc_carryfric REPORT (5.533). -->

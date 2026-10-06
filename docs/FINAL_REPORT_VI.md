@@ -246,4 +246,19 @@ không tự đổi cấu hình [oc_edgedecay]. Vốn phải chịu DD 25% [oc_mc
 Lead book-coin brake PROMISING (cắt ~30% book loss cửa grind -0.0504->-0.0354) chờ đăng ký engine version + paper
 [oc_bookcoinbrake]; v425 (trần trên hàng conservative) đã pre-register [docs/opencode/RESEARCH_MAP_DRAFT_20261006b.md:33].
 
+## 9. Bổ sung docs_update11 (2026-10-06)
+
+- Jitter đồng thời ±10% kd/G/k, 12 bộ Kaggle [oc_jitter]: BASE tái lập v421 (5,41/2,588/16,91/16,82) PASS; cả 12 bộ 5,09–5,95
+(trung vị 5,54), DD năm 16,3–18,2, full 16,28–18,07, không năm lỗ — ROBUST; G2 nằm trên vùng ổn định, không đổi triển khai.
+- Latency bot thật [docs/opencode/LATENCY_20261006.md]: steady-state book ~5,3 phút, dip ~16,1–16,3 phút, bảo vệ ~0,3 giây = base 5/16,
+không phải S2 (book 15 phút) hay S3 (book 30/dip 31 phút); S2 chỉ trễ book, S3 trễ cả book+dip; đuôi p90/max là backlog khởi động runner.
+Bộ ma sát thực tế cho BOT từ nay là S1 (phí) / S4 (trượt stop 50%) / S5 (giá Bybit); S2/S3 không áp dụng.
+- Hồ sơ thay thế G2K20 + carry f=0,25 [oc_g2k20robust]: G2K20 base 5,874/maxDD 17,79/full 17,69; +carry base 5,989/17,66,
+S1 5,022/17,88, S2 5,807/17,67, S3 5,056/17,77, S4 5,448/17,82, S5 5,465/18,63 (full chained 19,72) — giữ >= 5 và DD < 20 dưới
+mọi ma sát (đệm return so với G2+carry rớt S1/S3), nhưng DD cao hơn G2 ~1 điểm (base ~17,8 so với ~16,8; S5 tới ~19,6).
+Đã rớt fold năm gần nhất (v422 fold 4 test 2025-09-24: 4,716 so với 5,06 của R2B1D17BF, transfer=False) nên G2 vẫn là triển khai chính;
+runner paper `paper_g2k20c` (G2K20+carry 0,25) từ 2026-10-06 ~14:15 UTC thu bằng chứng triển vọng.
+- Bookscale NO [oc_bookscale]: G2B11 x1,1 S1 4,769 (+carry 4,892), S3 4,647 (+carry 4,788); G2B12 x1,2 S1 4,673 (+carry 4,799),
+S3 4,715 (+carry 4,854) — rớt mốc 5,0 cả 4 ô có/không carry — không adopt.
+
 <!-- factfix 2026-10-06: fixed L52 (v421 NO / v422 yes); L58 (G2 n=5064/21513/26577, BF=4955/21389/26344); L60 (G2 max 3.41 results.json, BF peak 6.4007, 7.1x REPORT-text only); L80-82 ([bybitq]->research/data_fetch/bybitq/REPORT.md); L85-87 (lat15/S4/Bybit/lat30 as D17BF research-map values + G2 legs DEPLOYMENT_PLAN_VI:75-76; G2 lat15 5.21/16.91); L94 (old oc_lots SUPERSEDED, lead with oc_capscale); L101-102 (mix-2023 6.045/15.81; 2.588 = mix worst 2021); L113-114 (removed no-source 1-3h line, kept oc_outage scenarios); L125 (chained-reset vs official run.log labels); L129-130 (49 windows = v411 D17BF); L133 (2mo BF [oc_kpi], G2 4mo [oc_kpi_g2]); L139-141 (dip NET after TP offset; +6.8 = book-shorts sum); L145 (W=2.588 G2, 2.831 D17BF); L159 (~0.5pp not ~0.6pp); L160 (friction 0.2-0.8pp cited oc_carryfric/oc_d13robust); L175 (43x -> research-map:62); L177 (PROCESS NOTE -> v427 code docstring); L184/188/196/246 ([research-map]->actual draft paths; v425 in ...b.md:33); L192 (FAR Binance +0.425 / Bybit-inverse +0.372 geometric, not adopted exposure-not-rate); L207 (5 dirs at PAPER_DAY1 snapshot, 7 at report time); L212-213 (stale 355/281/52/83/0); L213 (skipped 596-701 only 3/5 bots, d17bf/d13bf 0); L216 (parity 143/144 + 56/144 within 0.2pp, 88 mid-vs-last); L220 ([paper_d17bfg2c]->OPENCODE_W_bot_carryfix + bot/run.py); L229 (carry_audit FAIL disclosed, accepted with note; 33 entered/25 in-window ~5/yr, removed ~4/yr ~15 tickets); L227/232 (testnet F1 PostOnly-not-sent + V1 Cross/5x-manual). Conclusions unchanged. -->
