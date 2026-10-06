@@ -386,11 +386,65 @@ class Bybit:
         acc = self.get("/v5/account/wallet-balance", accountType="UNIFIED")["list"][0]
         return float(acc["totalEquity"])
 
-    def open_orders(self):
+    def open_orders(self, category: str = "linear"):
+        # F2: category-aware (spot + linear + inverse as used). Default
+        # linear keeps every existing book/dip call bit-for-bit identical.
+        try:
+            cat = str(category or "linear")
+        except Exception:
+            cat = "linear"
+        if cat == "spot":
+            return self.get("/v5/order/realtime", category="spot", limit=50)["list"]
+        if cat == "inverse":
+            return self.get("/v5/order/realtime", category="inverse", limit=50)["list"]
         return self.get("/v5/order/realtime", category="linear", settleCoin="USDT", limit=50)["list"]
 
-    def executions(self, start_ms: int):
-        return self.get("/v5/execution/list", category="linear", startTime=start_ms, limit=100)["list"]
+    def executions(self, start_ms: int, category: str = "linear", limit: int = 100,
+                   max_pages: int = 10):
+        # F2 category-aware + F7 paginated (cursor until empty, page cap).
+        # Default (linear, single-page shape) keeps book/dip callers unchanged
+        # when the window holds <= limit execs; larger windows page.
+        try:
+            cat = str(category or "linear")
+        except Exception:
+            cat = "linear"
+        try:
+            lim = int(limit or 100)
+        except (TypeError, ValueError):
+            lim = 100
+        lim = max(1, min(lim, 1000))
+        try:
+            pages = max(1, int(max_pages or 1))
+        except (TypeError, ValueError):
+            pages = 10
+        out: list = []
+        cursor = None
+        for _ in range(pages):
+            kw: dict = dict(category=cat, startTime=int(start_ms), limit=lim)
+            if cursor:
+                kw["cursor"] = cursor
+            try:
+                res = self.get("/v5/execution/list", **kw)
+            except TypeError:
+                # very old fakes: retry without cursor
+                res = self.get("/v5/execution/list", category=cat,
+                               startTime=int(start_ms), limit=lim)
+            if not isinstance(res, dict):
+                break
+            batch = res.get("list") or []
+            if isinstance(batch, dict):
+                batch = batch.get("list") or []
+            out.extend(batch if isinstance(batch, list) else [])
+            try:
+                nxt = res.get("nextPageCursor")
+            except AttributeError:
+                nxt = None
+            if not nxt:
+                break
+            cursor = nxt
+            if len(batch) < lim:
+                break
+        return out
 
     def hedge_mode(self):
         return self.post("/v5/position/switch-mode", {"category": "linear", "coin": "USDT", "mode": 3})

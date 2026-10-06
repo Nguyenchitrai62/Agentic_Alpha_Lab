@@ -156,6 +156,29 @@ for fresh plans; a new fill has no exit orders until the next cycle (<= 20 s) pl
 - Tests: `tests/test_bot_maint.py` (fake clocks for the 30-min pre-window boundaries, `tests/mock_bybit_v5.py`
   for cycle/cancel/protection/carry behaviour).
 
+## CHANGES (bot_reviewfix 2026-10-06: code-review F1-F7 + N1-N4, book/dip defaults bit-for-bit unchanged)
+- F1: carry hedge-recovery / timeout-close / delivery spot-sale markets marked carry-recovery in `carry.guard_carry`
+  (futures legs stay reduce-only where the exchange allows: timeout Buy + delivery Buy already are); `risk_guard`
+  exempts carry-recovery from `market_not_reduce_only`, keeping 0.30x carry cap + single/per-coin/total caps.
+- F2: `Bybit.executions/open_orders` take `category` (default linear); `_carry_sync` polls linear+spot+inverse and
+  `have()` aggregates them (paper/old fakes fall back to one call, deduped); spot fills now mark `spot_filled`.
+- F3: normal-cycle `equity_usdt()` / `have()` (+`sync_fills`) wrapped like the ledger-only path (fallback + local
+  `op=cycle_error` log, still reaches `_store_cycle_timing`); one blip no longer aborts protection.
+- F4: `mirror.desired` uses `.get` defaults for old dip pieces (`frac/dist/planned_qty/entry_px/phase/symbol`);
+  pre-frac ledgers no longer raise `KeyError` (budget contribution 0, protection still emitted).
+- F5: paper IOC with unknown ref price is cancelled (never rests), matching live IOC behaviour.
+- F6: separate execution cursors (`last_exec_ms` book/dip vs `carry_last_exec_ms` carry, each advancing only past
+  execs it processed); new race test proves a book fill between polls still reaches the ledger.
+- F7: `Bybit.executions` paginates `nextPageCursor` until empty (cap 10 pages, limit<=1000); >100-exec restart gaps
+  no longer silently drop the oldest.
+- N1: no NEW carry entries inside the maintenance window (recovery/close/settlement still allowed; blocked entries
+  logged `op=maint_cancel/carry_blocked`); `test_bot_maint` updated to the N1 behaviour. N2: `bear_now` fetch fallback
+  logs `op=bear_fallback` once per outage. N3: empty carry contracts/quotes log throttled `op=carry_noquotes`
+  (hourly). N4: open carry notionals (both legs) join the risk-guard baseline so the total-gross cap sees both sleeves.
+- Tests: `tests/test_bot_review_carry_guard.py` (F1/F2/F5, category-aware fake), `tests/test_bot_review_runner_paths.py`
+  (F3/F4 + F6 race + F7 pagination); full `tests/test_bot_*.py` green. Testnet: GO for carry-enabled runs (F1+F2 fixed;
+  book/dip-only was already go-with-caution); live still needs a clean testnet run first.
+
 ## Failure modes (tests/test_bot_resilience.py, fake exchange, no network)
 - Restart mid-position: new Runner adopts state.json + exchange stops/TPs, no duplicate entries, filled rungs never re-placed.
 - Partial dip fill: TP/stop size to the filled qty, remainder stays resting (same link), budget counts only the filled part.

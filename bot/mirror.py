@@ -298,7 +298,21 @@ def desired(plan: dict, now, equity: float, ledger: dict, budget: float = BUDGET
         for sub in c.get("subs", []):
             ph = sub["phase"]
             o = sub.get("order")
-            piece = next((k for k, v in ledger.items() if v["kind"] == "book" and v["phase"] == ph and v["symbol"] == sym and v["qty"] > 0), None)
+            # F4: old ledgers may miss frac/dist/planned_qty/entry_px/phase/symbol;
+            # never raise KeyError here — .get with safe defaults throughout.
+            def _book_match(kv):
+                _k, _v = kv
+                if not isinstance(_v, dict):
+                    return False
+                try:
+                    if _v.get("kind") != "book":
+                        return False
+                    if _v.get("phase") != ph or _v.get("symbol") != sym:
+                        return False
+                    return float(_v.get("qty", 0) or 0) > 0
+                except (TypeError, ValueError):
+                    return False
+            piece = next((k for k, v in ledger.items() if _book_match((k, v))), None)
             if sub.get("state") == "pending" and o and o.get("kind") == "open":
                 pid = book_pid(ph, sym, o["issued"])
                 ok = _ts(o["issued"]) + pd.Timedelta(minutes=ENTRY_DELAY_MIN) <= now < _ts(o["valid_until"])
@@ -379,25 +393,64 @@ def desired(plan: dict, now, equity: float, ledger: dict, budget: float = BUDGET
         # dip pieces already open: take-profit + native backstop (the 5m-close stop and the time exit are bot actions, see exits())
         # A piece with a market exit in flight carries no other resting order (same double-spend rule as book pieces).
         for pid, pc in ledger.items():
-            if pc["kind"] == "dip" and pc["symbol"] == sym and pc["qty"] > 0 and not _market_inflight(pc, now):
-                out[pid + "T"] = Order(pid + "T", sym, "Sell", pc["qty"], "tp", price=pc["tp"], reduce_only=True, position_idx=1, piece=pid)
-                if pc.get("backstop"):
-                    out[pid + "S"] = Order(pid + "S", sym, "Sell", pc["qty"], "stop", trigger=pc["backstop"], reduce_only=True,
+            # F4: .get defaults so pre-frac/dist ledgers never raise KeyError.
+            if not isinstance(pc, dict):
+                continue
+            try:
+                _q = float(pc.get("qty", 0) or 0)
+            except (TypeError, ValueError):
+                continue
+            if pc.get("kind") != "dip" or pc.get("symbol") != sym or not _q > 0 or _market_inflight(pc, now):
+                continue
+            try:
+                _tp = float(pc.get("tp"))
+            except (TypeError, ValueError):
+                continue
+            if not _tp > 0:
+                continue
+            out[pid + "T"] = Order(pid + "T", sym, "Sell", _q, "tp", price=_tp, reduce_only=True, position_idx=1, piece=pid)
+            if pc.get("backstop"):
+                try:
+                    _bs = float(pc.get("backstop"))
+                except (TypeError, ValueError):
+                    _bs = 0.0
+                if _bs > 0:
+                    out[pid + "S"] = Order(pid + "S", sym, "Sell", _q, "stop", trigger=_bs, reduce_only=True,
                                            position_idx=1, piece=pid)
     # dip bids: admitted shallow-first inside each sub-book's risk budget (open rungs count first).
     # Partially filled rungs count only the filled part (frac scaled by filled/planned).
     used = {ph: 0.0 for ph in caps}
     for pc in ledger.values():
-        if pc["kind"] == "dip" and pc["qty"] > 0:
-            frac = float(pc["frac"])
-            try:
-                planned = float(pc.get("planned_qty", pc["qty"]))
-            except (TypeError, ValueError):
-                planned = float(pc["qty"])
-            scale = float(pc["qty"]) / planned if planned > 0 else 1.0
-            if scale > 1.0:
-                scale = 1.0
-            used[pc["phase"]] = used.get(pc["phase"], 0.0) + frac * scale * (pc["dist"] + GAP)
+        if not isinstance(pc, dict):
+            continue
+        if pc.get("kind") != "dip":
+            continue
+        try:
+            if not float(pc.get("qty", 0) or 0) > 0:
+                continue
+        except (TypeError, ValueError):
+            continue
+        try:
+            frac = float(pc.get("frac", 0) or 0)
+        except (TypeError, ValueError):
+            frac = 0.0
+        try:
+            dist = float(pc.get("dist", 0) or 0)
+        except (TypeError, ValueError):
+            dist = 0.0
+        try:
+            planned = float(pc.get("planned_qty", pc.get("qty", 0)) or 0)
+        except (TypeError, ValueError):
+            planned = 0.0
+        try:
+            _qty = float(pc.get("qty", 0) or 0)
+        except (TypeError, ValueError):
+            _qty = 0.0
+        scale = _qty / planned if planned > 0 else 1.0
+        if scale > 1.0:
+            scale = 1.0
+        _ph = pc.get("phase", 0)
+        used[_ph] = used.get(_ph, 0.0) + frac * scale * (dist + GAP)
     bids = []
     for sym, c in (plan.get("coins") or {}).items():
         for d in c.get("dips", []):

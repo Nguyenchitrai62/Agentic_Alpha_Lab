@@ -144,6 +144,21 @@ def _is_dip_order(o) -> bool:
         return False
 
 
+def _is_carry_recovery(o) -> bool:
+    """True for carry hedge-recovery / timeout-close / delivery-sale markets.
+
+    Marked by bot/carry.py guard_carry with meta kind=carry + carry_recovery.
+    These are exchange-Market orders by construction (no limit price) but are
+    the sleeve's recovery path: exempt from market_not_reduce_only while all
+    notional caps still apply.
+    """
+    try:
+        m = _meta(o)
+        return str(m.get("kind", "")).lower() == "carry" and bool(m.get("carry_recovery"))
+    except Exception:
+        return False
+
+
 def _order_px(o, last) -> float | None:
     for name in ("price", "trigger"):
         v = _px_field(o, name)
@@ -268,7 +283,7 @@ def check(orders, positions=None, equity=None, prices=None, limits=None):
         if sym not in allowed_syms:
             rejections.append(dict(link=link, symbol=sym, reason="symbol_not_allowed"))
             continue
-        if _is_market(o):
+        if _is_market(o) and not _is_carry_recovery(o):
             rejections.append(dict(link=link, symbol=sym, reason="market_not_reduce_only"))
             continue
         last = prices.get(sym)

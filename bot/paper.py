@@ -136,10 +136,13 @@ class PaperExchange:
         return ref + tick, ref - tick
 
     def _ioc_try_fill(self, o) -> bool | None:
-        """Immediate IOC outcome: True = filled now, False = cancelled, None = leave resting.
+        """Immediate IOC outcome: True = filled now, False = cancelled (never rests).
 
         Applies to spot and dated-future IOC limits only. A Buy crosses when
         px >= ask, a Sell when px <= bid; fills book at the limit price (maker).
+        F5: an IOC whose ref price is unknown (no ticker, no last_close) is
+        cancelled like a non-crossing IOC — a real exchange cancels it, it
+        never rests for a later trade-through.
         """
         try:
             px = float(o.get("price"))
@@ -155,7 +158,7 @@ class PaperExchange:
             return False
         ask, bid = self._ioc_book(o.get("symbol"), o.get("category", "linear"))
         if ask is None or bid is None:
-            return None
+            return False
         side = o.get("side")
         if (side == "Buy" and px >= ask) or (side == "Sell" and px <= bid):
             self._fill(link, o, qty, px, MAKER, t_ms)

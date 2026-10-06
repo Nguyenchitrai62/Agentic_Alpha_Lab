@@ -313,10 +313,29 @@ def guard_carry(orders: list, ledger, equity: float, prices: dict):
                 q = abs(float(o.get("qty", 0)))
             except (TypeError, ValueError):
                 q = 0.0
+            # F1: carry hedge-recovery / timeout-close / delivery-sale markets
+            # are non-reduceOnly Markets by construction (spot has no
+            # reduceOnly; a hedge short opens a new position). Mark them
+            # carry-recovery so risk_guard exempts market_not_reduce_only
+            # while keeping single/per-coin/total caps (plus the 0.30x cap
+            # below). Reduce-only futures legs (timeout Buy, delivery Buy)
+            # already pass via the reduce-only path; pass orderType through
+            # so the guard sees them as Markets.
+            try:
+                _is_rec = (str(o.get("orderType", "")).lower() == "market"
+                           and not is_exit)
+            except Exception:
+                _is_rec = False
+            _meta = dict(kind="carry", carry_recovery=bool(_is_rec))
+            try:
+                if str(o.get("orderType", "")).lower() == "market":
+                    _meta["orderType"] = "Market"
+            except Exception:
+                pass
             conv.append(mirror.Order(str(o.get("orderLinkId", "")), sym,
                                      str(o.get("side", "Buy")), q, kind,
                                      price=px, reduce_only=is_exit,
-                                     meta=dict(kind="carry")))
+                                     meta=_meta))
         else:
             conv.append(o)
     try:
@@ -385,6 +404,17 @@ def decide(now, equity: float, f: float, cstate: dict, expiries_by_coin: dict,
         f = 0.0
     want, logs = [], []
     if not (f > 0):
+        return want, logs
+    # N3: throttled carry_noquotes log when contracts/quotes are missing
+    # (silent ([], []) before); one log per coin per UTC hour via the
+    # existing skip-dedupe so testnet triage sees the outage without spam.
+    try:
+        _noq = not expiries_by_coin or not quotes_by_coin
+    except Exception:
+        _noq = True
+    if _noq:
+        if not _skip_already(cstate, "noquotes:" + _skip_hour_key("ALL", now)):
+            logs.append(dict(op="carry_noquotes"))
         return want, logs
     positions = cstate.setdefault("positions", {})
     for coin in list(RULE_PARAMS.get("coins", []) or []):

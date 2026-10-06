@@ -203,6 +203,99 @@ def _acts_without_carry_cancel(acts):
     return out
 
 
+# F2: categories polled for carry sync / open orders (spot + linear +
+# inverse as used). Book/dip symbols are linear perps; extra categories only
+# add carry legs and never change book/dip orders.
+EXEC_CATEGORIES = ("linear", "spot", "inverse")
+
+
+def _execs_category_aware(ex, start_ms):
+    """All executions since start_ms across EXEC_CATEGORIES, deduped by execId.
+
+    Works with the live client (executions(start, category=...)), the paper
+    client (executions(start) returns all categories) and old fakes
+    (executions(start) only): a TypeError on the category kw falls back to a
+    single call. Never raises.
+    """
+    out: list = []
+    seen: set = set()
+    try:
+        start = int(start_ms)
+    except (TypeError, ValueError):
+        return out
+    for cat in EXEC_CATEGORIES:
+        try:
+            batch = ex.executions(start, category=cat)
+        except TypeError:
+            try:
+                batch = ex.executions(start)
+            except Exception:
+                batch = []
+            for e in batch or []:
+                try:
+                    eid = e.get("execId")
+                except AttributeError:
+                    continue
+                if eid is None or eid in seen:
+                    continue
+                seen.add(eid)
+                out.append(e)
+            break
+        except Exception:
+            continue
+        for e in batch or []:
+            try:
+                eid = e.get("execId")
+            except AttributeError:
+                continue
+            if eid is None or eid in seen:
+                continue
+            seen.add(eid)
+            out.append(e)
+    return out
+
+
+def _orders_category_aware(ex):
+    """All open orders across EXEC_CATEGORIES, keyed by orderLinkId.
+
+    Category-aware for live (open_orders(category=...)); falls back to a
+    single open_orders() call for paper/old fakes. Never raises.
+    """
+    merged: dict = {}
+    for cat in EXEC_CATEGORIES:
+        try:
+            batch = ex.open_orders(category=cat)
+        except TypeError:
+            try:
+                batch = ex.open_orders()
+            except Exception:
+                batch = []
+            try:
+                for o in batch or []:
+                    try:
+                        link = o.get("orderLinkId") or ""
+                    except AttributeError:
+                        continue
+                    if link:
+                        merged[link] = o
+            except TypeError:
+                pass
+            break
+        except Exception:
+            continue
+        try:
+            for o in batch or []:
+                try:
+                    link = o.get("orderLinkId") or ""
+                except AttributeError:
+                    continue
+                if link:
+                    merged[link] = o
+        except TypeError:
+            continue
+    return list(merged.values())
+
+
 class Runner:
     def __init__(self, mode: str, plan_path: Path, equity: float | None, risk_mult: float = 1.0, corr: bool = False,
                  tag: str | None = None, dip_mult: float = 1.0, bear_book: bool = False,
@@ -463,12 +556,58 @@ class Runner:
             pass
         return prices
 
+    def _carry_baseline(self) -> list:
+        """Open carry notionals as pseudo-pieces for the guard baseline (N4).
+
+        Each open pair contributes its spot leg (spot_symbol x qty) and its
+        futures leg (dated symbol x qty) with entry refs, so the total-gross
+        cap sees both sleeves. Empty when carry is off: book/dip behaviour
+        bit-for-bit unchanged.
+        """
+        out: list = []
+        try:
+            cstate = (self.state or {}).get("carry") or {}
+            positions = cstate.get("positions") or {}
+            items = list(positions.items()) if isinstance(positions, dict) else []
+        except (AttributeError, TypeError):
+            return out
+        for coin, pos in items:
+            if not isinstance(pos, dict):
+                continue
+            try:
+                q = float(pos.get("qty", 0) or 0)
+            except (TypeError, ValueError):
+                continue
+            if not q > 0:
+                continue
+            try:
+                ss = pos.get("spot_symbol") or carry_mod.spot_symbol(coin)
+            except Exception:
+                continue
+            try:
+                se = float(pos.get("S_entry", 0) or 0)
+            except (TypeError, ValueError):
+                se = 0.0
+            try:
+                fe = float(pos.get("F_entry", 0) or 0)
+            except (TypeError, ValueError):
+                fe = 0.0
+            fs = pos.get("symbol")
+            if ss:
+                out.append(dict(symbol=ss, qty=q, entry=se or None, kind="carry", phase=-1))
+            if fs:
+                out.append(dict(symbol=fs, qty=q, entry=fe or None, kind="carry", phase=-1))
+        return out
+
     def _apply_risk_guard(self, want: dict, equity: float, prices: dict):
         """Filter `want` through risk_guard.check (defaults: per-coin 2.5x, dip
         2.0x, total 4x, single 1x). Rejects are logged op=risk_reject and not
         sent; protection / reduce-only orders are never blocked by check()."""
         try:
-            allowed, rejected = risk_guard.check(want, self.state.get("ledger"), equity, prices)
+            led = self.state.get("ledger")
+            base = list(led.values()) if isinstance(led, dict) else list(led or [])
+            base = [v for v in base if isinstance(v, dict)] + self._carry_baseline()
+            allowed, rejected = risk_guard.check(want, base, equity, prices)
         except Exception as e:  # guard must never crash the cycle; fail closed for entries
             self.log(dict(op="risk_reject", link=None, symbol=None, reason=f"guard_error:{type(e).__name__}"))
             return {k: o for k, o in want.items() if getattr(o, "reduce_only", False)}
@@ -485,7 +624,13 @@ class Runner:
 
     # ---- bot_carry sleeve (opt-in --carry-f; off by default, zero behaviour change) ----
     def _carry_sync(self):
-        """Apply exchange executions of carry links (prefix ``c``) to carry state."""
+        """Apply exchange executions of carry links (prefix ``c``) to carry state.
+
+        F2: polls spot + linear + inverse (category-aware) so spot fills are
+        seen. F6: uses its own ``carry_last_exec_ms`` cursor (migrated from
+        ``last_exec_ms`` once) so book/dip polling can never skip past a
+        carry fill and vice versa.
+        """
         try:
             f = float(getattr(self, "carry_f", 0.0) or 0.0)
         except (TypeError, ValueError):
@@ -496,10 +641,10 @@ class Runner:
             cstate = carry_mod.carry_state(self.state)
         except Exception:
             return
-        last = self.state.get("last_exec_ms")
+        last = self.state.get("carry_last_exec_ms", self.state.get("last_exec_ms"))
         try:
             start = int(last) if last is not None else int((time.time() - 3600) * 1000)
-            ex = self.ex.executions(start)
+            ex = _execs_category_aware(self.ex, start)
         except Exception:
             return
         seen = set(self.state.setdefault("seen_exec", [])[-500:])
@@ -523,7 +668,9 @@ class Runner:
             if rec is not None:
                 self.log(rec)
             try:
-                self.state["last_exec_ms"] = max(int(self.state.get("last_exec_ms") or 0), int(e["execTime"]))
+                # F6: advance only the carry cursor, only past carry execs.
+                cur = self.state.get("carry_last_exec_ms", self.state.get("last_exec_ms") or 0)
+                self.state["carry_last_exec_ms"] = max(int(cur or 0), int(e["execTime"]))
             except (TypeError, ValueError):
                 pass
         self.state["seen_exec"] = list(seen)
@@ -607,6 +754,43 @@ class Runner:
                 pass
         if not want:
             return []
+        # N1: no NEW carry entries inside the maintenance window
+        # (recovery/close/settlement still allowed). Fresh entries are the
+        # decide carry_entry payloads (per-coin links cCOIN...); unhedged
+        # hedges, timeout closes and delivery sales pass through.
+        try:
+            _maint = bool(self._maint_is_active(now))
+        except Exception:
+            _maint = False
+        if _maint:
+            try:
+                entry_coins = {str(r.get("coin", "")).upper() for r in (logs or [])
+                               if isinstance(r, dict) and r.get("op") == "carry_entry"}
+            except Exception:
+                entry_coins = set()
+            if entry_coins:
+                blocked = []
+                kept = []
+                for p in want:
+                    try:
+                        link = str(p.get("orderLinkId", ""))
+                    except (AttributeError, TypeError):
+                        kept.append(p)
+                        continue
+                    drop = any(link.startswith("c" + c) for c in entry_coins if c)
+                    (blocked if drop else kept).append(p)
+                if blocked:
+                    try:
+                        self.log(dict(op="maint_cancel",
+                                      carry_blocked=[b.get("orderLinkId") for b in blocked
+                                                     if isinstance(b, dict)],
+                                      blocked_new=[b.get("orderLinkId") for b in blocked
+                                                   if isinstance(b, dict)]))
+                    except Exception:
+                        pass
+                want = kept
+                if not want:
+                    return []
         try:
             allowed, rejected = carry_mod.guard_carry(want, self.state.get("ledger"), equity, prices or {})
         except Exception as e:
@@ -689,13 +873,26 @@ class Runner:
         self.state["seen_exec"] = list(seen)
 
     def have(self) -> dict:
+        # F2: category-aware open-order poll (spot + linear + inverse as
+        # used); book/dip callers filter via _have_without_carry, so extra
+        # carry legs never change book/dip orders.
         if self.mode == "dry":
             return {k: v["rest"] for k, v in self.state["links"].items() if v.get("rest")}
         out = {}
-        for o in self.ex.open_orders():
-            link = o.get("orderLinkId") or ""
+        try:
+            orders = _orders_category_aware(self.ex)
+        except Exception:
+            orders = []
+        for o in orders:
+            try:
+                link = o.get("orderLinkId") or ""
+            except AttributeError:
+                continue
             if link in self.state["links"]:
-                out[link] = dict(symbol=o["symbol"], price=o.get("price"), trigger=o.get("triggerPrice"), qty=o.get("qty"))
+                try:
+                    out[link] = dict(symbol=o["symbol"], price=o.get("price"), trigger=o.get("triggerPrice"), qty=o.get("qty"))
+                except (KeyError, TypeError, AttributeError):
+                    continue
         return out
 
     def last5(self) -> dict:
@@ -777,7 +974,17 @@ class Runner:
             else:
                 opens, _hit = cached_call("BTCUSDT", "opens_4h", lambda: fn("BTCUSDT"),
                                           cache_dir=self._kline_cache_dir())
-        except Exception:
+        except Exception as e:
+            # N2: log the bear fetch fallback once (then stay silent until the
+            # next success so a long outage does not spam the action log).
+            try:
+                if not getattr(self, "_bear_fallback_logged", False):
+                    self.log(dict(op="bear_fallback",
+                                  note=f"{type(e).__name__}: {e}"[:200],
+                                  bear=bool(getattr(self, "_bear", False))))
+                    self._bear_fallback_logged = True
+            except Exception:
+                pass
             return self._bear if self._bear_at is not None else False
         b = bool(mirror.is_bear(opens))
         try:
@@ -787,6 +994,10 @@ class Runner:
         if self._bear_at is None or b != self._bear:
             self.log(dict(op="bear_state", bear=b, opens=n))
         self._bear, self._bear_at = b, now
+        try:
+            self._bear_fallback_logged = False
+        except Exception:
+            pass
         return b
 
     def _protection_only(self, led) -> dict:
@@ -1035,10 +1246,25 @@ class Runner:
             self.ex.step(now)
             _stages["kline_ms"] += (_cycle_now() - _t) * 1000.0
         _t = _cycle_now()
-        equity = self.equity_arg if self.mode == "dry" else self.ex.equity_usdt()
+        try:
+            equity = self.equity_arg if self.mode == "dry" else self.ex.equity_usdt()
+        except Exception as e:
+            # F3: one equity blip must not abort protection (ledger-only path
+            # already survives it): fall back, log locally, keep the cycle.
+            try:
+                self.log(dict(op="cycle_error", call="equity_usdt", note=f"{type(e).__name__}: {e}"[:200]))
+            except Exception:
+                pass
+            equity = self.equity_arg or 0.0
         _stages["sync_ms"] += (_cycle_now() - _t) * 1000.0
         _t = _cycle_now()
-        self.sync_fills()
+        try:
+            self.sync_fills()
+        except Exception as e:
+            try:
+                self.log(dict(op="cycle_error", call="sync_fills", note=f"{type(e).__name__}: {e}"[:200]))
+            except Exception:
+                pass
         _stages["sync_ms"] += (_cycle_now() - _t) * 1000.0
         led = self.state["ledger"]
         live = mirror.plan_book_live(plan)
@@ -1130,7 +1356,16 @@ class Runner:
             want = self._apply_risk_guard(want, equity, self._guard_prices(lc, _last5_for_cycle, plan))
         _stages["decide_ms"] += (_cycle_now() - _t) * 1000.0
         _t = _cycle_now()
-        have_before = self.have()
+        try:
+            have_before = self.have()
+        except Exception as e:
+            # F3: one open_orders blip must not abort protection: fall back
+            # to empty `have` (all wanted orders place/amend), log locally.
+            try:
+                self.log(dict(op="cycle_error", call="open_orders", note=f"{type(e).__name__}: {e}"[:200]))
+            except Exception:
+                pass
+            have_before = {}
         _stages["sync_ms"] += (_cycle_now() - _t) * 1000.0
         if _maint_on:
             # bot_maint marker: which new entries were blocked and which resting

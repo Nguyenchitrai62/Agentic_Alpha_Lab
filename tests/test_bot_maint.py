@@ -5,7 +5,8 @@ restart protection check:
   - inactive by default: identical order sets with/without maint params
   - maint_active_at: fake-clock boundary checks (start-30min .. end)
   - active window: no new dip bids / book entries, resting entries cancel,
-    protection (TP/SL) and carry legs untouched, op=maint_cancel logged
+    protection (TP/SL) and carry recovery/close/settle untouched (new carry
+    entries blocked per N1), op=maint_cancel logged
   - maintenance.json read each cycle (file wins); window exit logs maint_resume
   - startup op=protection_check lists open pieces; bot_health flags missing
     protection as CRITICAL
@@ -217,8 +218,12 @@ def test_carry_legs_untouched_during_maint(monkeypatch, tmp_path):
                           min_notional="5", tick="0.1")
     r.cycle()
     ops = _ops(r)
-    assert any(x.get("op") == "carry_entry" for x in ops)  # carry still enters
-    assert [k for k in mock.orders if str(k).startswith("c")]  # carry rests
+    # N1 (bot_reviewfix): no NEW carry entries inside the maintenance window;
+    # recovery/close/settlement still allowed. decide still logs carry_entry,
+    # but the entry legs are blocked (maint_cancel) and nothing rests.
+    assert any(x.get("op") == "carry_entry" for x in ops)
+    assert any(x.get("op") == "maint_cancel" and x.get("carry_blocked") for x in ops)
+    assert not [k for k in mock.orders if str(k).startswith("c")]
     assert r._maint_is_active(now) is True
 
 
