@@ -27,7 +27,7 @@
 - **Tăng carry f=0,5 có vay USDT THUA f=0,25 (base 5,569/5,424 so với 5,634; S1 4,696/4,550 so với 4,780) — giữ 0,25** [research/tournament/oc_carryborrow/REPORT.md] [docs/PLAN_NEXT_20261006.md].
 - **Carry thêm BNB/SOL/XRP (post-hoc): +0,145 điểm %/tháng (tổng 5,771 so với 5,626) nhưng peak spot 2,0x vốn phải vay + cần tài khoản Binance — GÁC LẠI** [research/tournament/oc_carrymore/REPORT.md] [docs/PLAN_NEXT_20261006.md].
 - **Carry chỉ 1 coinbasis cao nhất (post-hoc) THUA cả 2 coin (-0,10 điểm %/tháng 5 năm) — giữ cả 2 coin** [research/tournament/oc_idea4_carrymax/REPORT.md].
-- **Vòng ý tưởng 05/10 (oc_idea1–oc_idea10, khác với các idea mới hôm nay): chỉ idea2 (stop XRP 5,5/rest 4) còn PROMISING chờ kiểm engine; còn lại ĐÓNG (lọc funding, throttle basis/dominance, TP nhanh, VRP dial…)** [research/tournament/oc_idea1/REPORT.md] [research/tournament/oc_idea8/REPORT.md].
+- **Vòng ý tưởng 05/10 (oc_idea1–oc_idea10, khác với các idea mới hôm nay): idea2 (stop XRP 5,5/rest 4) đã chấm engine 4 pha = v417-X, BỊ LOẠI (fold 0/3) [research/tournament/oc_oldidea2/REPORT.md]; còn lại ĐÓNG (lọc funding, throttle basis/dominance, TP nhanh, VRP dial…)** [research/tournament/oc_idea1/REPORT.md] [research/tournament/oc_idea8/REPORT.md].
 - **Mô hình book C1/C2 ĐÓNG 2/2 (C1 dev chỉ 3,593/DD 19,17 thua cả 4 năm so với 5,601/16,91 đang chạy)** [docs/OWNER_SUMMARY_VI.md].
 
 ## 4. Rủi ro đã biết và bug đang mở
