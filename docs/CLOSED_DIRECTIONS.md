@@ -192,6 +192,12 @@ Sources: `docs/FINAL_REPORT_VI.md`, `.claude/skills/alpha-lab-leader/research-ma
 - `oc_utamargin` | one UTA G2+carry f0.25/0.50 | KEPT f0.25 | f0.25 safe; f0.50 split-only | 2026-10-06
 - `oc_utamargin2` | carry-short leverage 5/10/20x | DIAGNOSTIC | 10/20x IM-safe but f0.50 haircut-fail | 2026-10-06
 - `carry_audit` | blind carry replication (COMPARISON.md only, no REPORT.md) | DIAGNOSTIC (FAIL numeric) | 20/25 basis + 25/25 ret miss; causality/fees/overlay PASS | 2026-10-06
+- `oc_carryborrow` | carry f=0.5 with USDT borrow for the extra spot (10/15 %/yr APR) | CLOSED | base 5.569/5.424 vs 5.634; S1 4.696/4.550 vs 4.780; DD +0.2-0.35pp; keep f=0.25 | 2026-10-06
+- `oc_carrymore` | same quarterly carry rule on BNB/SOL/XRP via Binance COIN-M (POST-HOC) | PARKED (not deployed) | +0.145 %/mo over BTC+ETH (G2 + carry all majors 5.771 vs 5.626, no new DD); peak 2.0x equity spot needs borrow; Binance account needed (Bybit lists BTC/ETH quarterlies only); funded size ~f 0.125 keeps ~+0.07 | 2026-10-06
+- `oc_idea4_carrymax` | carry only the higher-basis coin (M1/M2) | CLOSED | dev -0.13, 5y -0.10 %/mo vs both coins, DD unchanged | 2026-10-07
+- `oc_idea6_d13carry` | D13BF + concentrated carry f 0.50 (POST-HOC) | CLOSED | base 5.115/DD 14.71 but fails frictions and needs split capital; 8 %/mo unreachable (~2.9pp short) | 2026-10-07
+- `oc_usdccarry` | Bybit USDC linear dated futures as the carry leg | CLOSED | no better than inverse (basis within +-0.6 pp/yr where comparable); gaps 2021-22 and 2025-26, none trading now; keep inverse quarterlies | 2026-10-07
+- `oc_idea3_carrytier` | carry f by basis tier (POST-HOC) | CLOSED | T1 +0.07 dev4 but needs 1.5x equity spot (borrow); T2 (cap 0.25) -0.02; keep flat f 0.25 | 2026-10-07
 
 ## 11. Late-day dip / book screens (2026-10-06)
 
@@ -262,9 +268,4 @@ Sources: `docs/FINAL_REPORT_VI.md`, `.claude/skills/alpha-lab-leader/research-ma
 
 <!-- consistfix 2026-10-06: §4 oc_cashcarry + §10 oc_frontiercarry/oc_carrycombo appended headline +0.21/+0.13pp (5.533) is year-start conservative; expectation oc_carrycompound 5.634/16.75/16.66 (no number change); §10 oc_carryfric kept conservative numbers, added oc_carryfric2 compounded (G2+carry f=0.25 base 5.634, S1 4.780, S2 5.438, S3 4.806, S4 5.125, S5 5.111, no losing year; D13BF+carry base 5.198/14.82). Sources re-checked: oc_carryfric2 REPORT, oc_carrycompound REPORT (5.634), oc_carryfric REPORT (5.533). -->
 
-- 2026-10-06 oc_carryborrow: carry f = 0.5 with USDT borrow for the extra spot (10 / 15 %/yr APR) LOSES vs f = 0.25 (base 5.569 / 5.424 vs 5.634; S1 4.696 / 4.550 vs 4.780; DD +0.2-0.35 pp). Keep f = 0.25. research/tournament/oc_carryborrow/REPORT.md
-- 2026-10-06 oc_carrymore (POST-HOC): same quarterly carry rule on BNB/SOL/XRP via Binance COIN-M adds +0.145 %/mo over BTC+ETH (G2 + carry all majors 5.771 vs 5.626, no new DD) but needs 2.0x equity spot at peak (borrow) and a Binance account (Bybit lists BTC/ETH quarterlies only); funded size ~f 0.125 keeps ~+0.07. PARKED (not deployed; revisit only if the owner opens a Binance account). research/tournament/oc_carrymore/REPORT.md
-- 2026-10-07 oc_idea4_carrymax: carry only the higher-basis coin (M1/M2) REJECT: dev -0.13, 5y -0.10 %/mo vs both coins, DD unchanged. research/tournament/oc_idea4_carrymax/REPORT.md
-- 2026-10-07 oc_idea6_d13carry (POST-HOC): D13BF + concentrated carry f 0.50 base 5.115 / DD 14.71 but fails frictions and needs split capital; 8 %/mo unreachable (~2.9 pp short). Stretch direction CLOSED to new variants; prospective paper only. research/tournament/oc_idea6_d13carry/REPORT.md
-- 2026-10-07 oc_usdccarry: Bybit USDC linear dated futures as the carry leg - no better than inverse (basis within +-0.6 pp/yr where comparable), gaps 2021-22 and 2025-26, none trading now. Keep inverse quarterlies. research/tournament/oc_usdccarry/REPORT.md
-- 2026-10-07 oc_idea3_carrytier (POST-HOC): carry f by basis tier - T1 +0.07 dev4 but needs 1.5x equity spot (borrow); T2 (cap 0.25) -0.02. REJECT; keep flat f 0.25. research/tournament/oc_idea3_carrytier/REPORT.md
+<!-- docs_closedtidy 2026-10-07: moved 6 appended bullets into §10 table, numbers verified verbatim against REPORT.md (no fixes): oc_carryborrow (REPORT base 5.569/5.424 vs 5.634, S1 4.696/4.550 vs 4.780, DD 16.93/17.10 vs 16.75 = +0.18/+0.35pp), oc_carrymore (REPORT 5.771 vs 5.626, +0.145 extra, peak 2.0x spot, ~+0.07 = half extra at f0.125), oc_idea4_carrymax (REPORT dev -0.126, 5y -0.103, DD identical), oc_idea6_d13carry (REPORT 5.115/14.71, 8-5.115=2.885 ~=2.9 short), oc_usdccarry (REPORT basis diff -0.0060..+0.0032 = +-0.6pp/yr, gaps + zero Trading), oc_idea3_carrytier (REPORT dev4 +0.071/-0.020, peak spot 1.50x). -->
