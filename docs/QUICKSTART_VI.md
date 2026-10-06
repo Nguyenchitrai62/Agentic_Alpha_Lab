@@ -43,3 +43,16 @@
 - Không dùng Isolated / one-way / đòn bẩy khác 5x cho bot; không hạ đòn bẩy khi đang có vị thế.
 - Không commit `.env`, keys, hay dán vào chat; không sửa ngưỡng go-live/dừng sau khi đã thấy dữ liệu paper (nếu sửa ghi ngày + lý do).
 - Không kỳ vọng 5 % mọi tháng: ~1/9 năm có thể chạm DD > 20 %; tuần xấu -8 – -12 % vài lần/năm, 1–4 tháng mới về đỉnh cũ là bình thường.
+
+## 5. Triển khai khuyến nghị docs_update5 (2026-10-06): G2 + carry một UTA
+
+- Cấu hình: BOT G2 (`--corr-size --dip-mult 1.7 --bear-book --dip-gross-cap 2.0`, 5,41 %/tháng) + carry quý f=0,25 cùng một UTA cross/hedge/5x
+(roll-only f=0,25: 5,413/full 16,34 [oc_carrycombo]; ma sát year-start f=0,25: base 5,533 / S1 4,696 / S2 5,339 / S3 4,717 / S4 5,033 / S5 5,016
+[oc_carryfric]; f=0,25 CLEAR margin, f=0,50 blocked 1 giờ — trên 0,25 tách vốn [oc_utamargin]; Bybit inverse Z26/H27 + linear 25DEC26 yield ≈
+Binance −5% [bybitq; oc_carrycombo]).
+- Carry tay 4 quyết định/năm: quarterly kế tiếp khi front còn <=7 ngày, basis ln(F/S)*365/DTE >=4%/năm, mỗi chân f x vốn (f=0,25), long spot + short
+quarterly bằng nhau giữ tới delivery (≈15 vé/năm); sổ paper `scripts/carry_paper.py --once --equity 5000 --f 0.5 --tag carry` [carry_paper.py] (sổ paper chạy f=0,5 chỉ để đo; lãi/lỗ carry tỉ lệ tuyến tính theo f, khi triển khai dùng f=0,25).
+- Stretch D13BF+carry f=0,25 base 5,104/14,85 ĐẠT [oc_carryd13] nhưng ma sát rớt (chỉ base + S2 f=0,50 giữ) — không deploy [oc_carryfric];
+MANUAL+carry tốt nhất 3,993 vẫn <5 — NO [oc_manualcarry]; plateau G2 giữ deploy [oc_plateau2]; 8-phase NO [oc_phase8]; screens expirydip/usdtdip
+đóng (NO) [oc_expirydip; oc_usdtdip].
+- Sau reboot: `bash scripts/restart_all.sh` (loop.sh retired), idempotent, backend local + 5 paper runner + vòng carry [restart_all.sh].

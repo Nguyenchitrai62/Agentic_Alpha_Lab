@@ -192,3 +192,18 @@ REM Chỉ một nhóm: bash scripts/restart_all.sh --only bots|backend|carry
 - Không hợp đồng đủ điều kiện / basis < 4 % / delist / lỗi API (retry/backoff) đều chỉ ghi log,
   không crash vòng lặp. Kiểm tra: `tests/test_carry_paper.py` (client giả: vào, giữ, đáo hạn,
   skip, delist, lỗi).
+
+## 10. Triển khai khuyến nghị docs_update5: G2 + carry f=0.25 một UTA (2026-10-06)
+
+KHUYẾN NGHỊ: BOT G2 (`--corr-size --dip-mult 1.7 --bear-book --dip-gross-cap 2.0`, v421 5,41/worst 2,588/maxDD 16,91/full 16,82) + sleeve carry quý
+f=0,25 cùng một UTA cross/hedge/5x [oc_carrycombo; oc_utamargin]. Roll-only (vận hành thật): f=0,25 5,413/2,647/16,78/full 16,34; f=0,50 5,418/2,705/
+16,65/15,86 [oc_carrycombo]. Ma sát (`oc_carryfric` year-start): f=0,25 base 5,533 / S1 4,696 / S2 5,339 / S3 4,717 / S4 5,033 / S5 5,016 (f=0,50 5,654 /
+4,820 / 5,463 / 4,853 / 5,166 / 5,147) — rớt S1/S3 kể cả f=0,50 [oc_carryfric]. Margin (`oc_utamargin`): f=0,25 CLEAR (free min 22,49%, 0 blocked, gap
+−10% −28,85% không liq); f=0,50 KHÔNG clear (1 giờ blocked 2025-09-25 18:00, spot cost 179,9%) — trên 0,25 tách vốn [oc_utamargin]. Bybit live:
+linear BTCUSDT-25DEC26/26MAR27/25JUN27 + inverse BTCUSDZ26/H27 (cả ETH), yield inverse ≈ Binance (−5%) [oc_carrycombo; bybitq].
+Bước tay carry (đóng băng `oc_cashcarry`): quarterly kế tiếp khi front còn <=7 ngày, basis ln(F/S)*365/DTE >=4%/năm, mỗi chân f x vốn (f=0,25), long
+spot + short quarterly bằng notional, giữ tới delivery (~4 quyết định/năm ≈ 15 vé/năm) [carry_paper.py; oc_manualcarry]. Stretch D13BF+carry f=0,25
+base 5,104/14,85 ĐẠT [oc_carryd13] nhưng ma sát chỉ còn base + S2 f=0,50 — không deploy stretch [oc_carryfric]. MANUAL+carry tốt nhất 3,993 vẫn <5 —
+NO [oc_manualcarry]. Plateau G2 trong 0,3%/0,5pp giữ deploy [oc_plateau2]; 8-phase 4,960/17,32 NO [oc_phase8]. Screens đóng: expirydip +0,0164 vs gate
++0,273 NO [oc_expirydip]; usdtdip +0,047 NO [oc_usdtdip]. Restart: `bash scripts/restart_all.sh` (loop.sh retired 2026-09-30), xem mục 9
+[restart_all.sh].

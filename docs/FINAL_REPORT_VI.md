@@ -550,3 +550,73 @@ bytes; coverage 2020-2026 zeros; COIN-M liquidationSnapshot tồn tại nhưng s
 ETHUSD_PERP 474 zips); alternatives verified HTTP 200: UM metrics daily (OI/top-trader/taker ratios 5m từ 2020-09-01, proxy không phải order-level),
 Futures DATA REST + Bybit v5 + OKX public (recent-only), own collectors từ 2026-10-04 (forward-only quá ngắn), /fapi/v1/forceOrders 401 unauthenticated
 [oc_liqhist].
+
+## Bổ sung docs_update5 (2026-10-06): triển khai khuyến nghị = G2 + carry f=0.25 một UTA
+
+KHUYẾN NGHỊ HIỆN TẠI: BOT G2 (R2B1D17BF + `--dip-gross-cap 2.0`, v421: 5,41 %/tháng, worst 2,588, maxDD năm 16,91, full-path 16,82) + sleeve cash-and-carry
+quý f=0,25 trên CÙNG MỘT Bybit UTA (cross, hedge, 5x) [oc_carrycombo; oc_utamargin; FINAL_REPORT_VI mục 1].
+Sleeve độc lập cộng tuyệt đối dương mọi năm (33/33 cặp net dương allocated, min +0,18% allocated [oc_cashcarry]) nhưng tỷ suất gộp nhích nhẹ vì pha loãng
+trên tài khoản tăng nhanh (2024 tài khoản x3,3 trong khi sleeve ăn ~5% cố định trên notional lúc vào) [oc_carrycombo].
+
+Số base (hai quy ước đo, chênh do rebalance — ghi cả hai, nguồn trong ngoặc):
+- Quy ước roll-only rebalance (thực tế vận hành, `oc_carrycombo`): G2 đơn 5,410 / worst 2,588 / maxDD 16,91 / full marked 16,82 (close 16,05);
+G2+carry f=0,25: 5,413 / 2,647 / 16,78 / full 16,34 (close 15,60); f=0,50: 5,418 / 2,705 / 16,65 / full 15,86 (close 15,15) [oc_carrycombo].
+Từng năm G2+carry f=0,25 (R %/tháng / DD %): 2021 2,647/10,79; 2022 3,283/16,78; 2023 6,168/15,72; 2024 10,559/8,08; 2025 4,593/12,57 [oc_carrycombo].
+- Quy ước year-start rebalance (`oc_carryfric`, lift cao hơn nên KHÔNG dùng làm kỳ vọng): G2+carry f=0,25: 5,533 / 2,736 / 16,78 / 16,78;
+f=0,50: 5,654 / 2,881 / 16,64 / 16,64 [oc_carryfric].
+Caveat vốn (split-capital): overlay cần tới 2f cash EXTRA cho chân spot khi cả hai coin cùng mở (f=0,25 -> tới 1,5x funded); R trên tính trên base equity,
+trên tổng vốn funded lift còn nhỏ hơn [oc_carrycombo].
+Dưới ma sát (`oc_carryfric`, cùng quy ước year-start): G2 đơn S1..S5: 4,571 / 5,212 / 4,578 / 4,898 / 4,883; G2+carry f=0,25: 4,696 / 5,339 / 4,717 /
+5,033 / 5,016; f=0,50: 4,820 / 5,463 / 4,853 / 5,166 / 5,147 — giữ >=5,0 ở base, S2, S4 f=0,25/0,50, S5 f=0,25/0,50; RỚT ở S1 (kể cả f=0,50 chỉ 4,820)
+và S3 (f=0,50 chỉ 4,853); sleeve cộng +0,12–0,15pp (f=0,25) / +0,25–0,28pp (f=0,50) và bớt DD 0,1–0,3pp, không năm lỗ ở cả 36 combo [oc_carryfric].
+Margin một UTA (`oc_utamargin`, 43.805 giờ, IM=(G2 gross+carry short)/5, MM tiered live Bybit 2026-10-06, balance=equity−5% spot): f=0,25: free min 22,49%,
+IM/bal max 77,51%, 0 giờ blocked, 0 MM breach, MM/bal max 1,95%, spot cost max 95,8% Eq, gap −10% ở giờ tệ nhất −28,85% không liq — ADDITIVE OK;
+f=0,50: free min 1,85%, IM/bal max 98,15%, 1 giờ blocked (2025-09-25 18:00), spot cost max 179,9% (thiếu USDT mua spot, phải vay) — KHÔNG clear,
+trên 0,25 chỉ SPLIT CAPITAL [oc_utamargin].
+Khả dụng Bybit (`oc_carrycombo` §3 + `bybitq`): linear quarterlies Trading BTCUSDT-25DEC26 / BTCUSDT-26MAR27 / BTCUSDT-25JUN27 (cả ETH), weeklies
+09/16/23/30OCT26 + 27NOV26, deliveryFeeRate 0, fundingInterval 0, maxLeverage 50, unifiedMarginTrade true; inverse quarterlies Trading BTCUSDZ26 /
+BTCUSDH27 / ETHUSDZ26 / ETHUSDH27; phí VIP0 futures taker 0,055%/maker 0,02%, spot 0,1% đúng giả định gate/carry; spot BTC/ETH làm collateral 95%
+(tốt hơn giả định 5%/10%) [oc_carrycombo]. Chuỗi quarterly phủ đủ 5 năm chỉ có inverse coin-margined (H/M/U/Z; USDT-dated chỉ từ 2025-02-18, USDC
+weeklies 2023-03..2025-03) [bybitq]. Yield Bybit-inverse ≈ Binance proxy: +0,4973/23 trades so với +0,5234/25 trades (−5%), f=0,25 +12,43% sau 5 năm =
++0,207%/tháng số học (+0,202% hình học) so với Binance +13,09% = +0,218 (+0,213); f=0,50 +24,86% (+0,414/+0,396) so với +26,17% (+0,436/+0,416);
+worst MtM allocated Bybit −0,42/−0,74/−2,49/−0,52/−1,36% so với Binance −1,01/−0,71/−2,65/−0,39/−2,17% (account f=0,25 tệ nhất −0,62% cả hai venue);
+USDT-linear không tái lập backtest 2021–2024 (chưa tồn tại) [bybitq].
+Carry làm tay được (~4 quyết định roll/năm, ~5 cặp/năm ≈ 15 vé tay/năm; mỗi cặp vào ~3 vé: mua spot + short futures, bán spot lúc đáo hạn, futures tự
+tất toán) [oc_carrycombo; oc_manualcarry]. Bước chủ tài khoản làm (quy tắc đóng băng `oc_cashcarry` PLAN + docstring `scripts/carry_paper.py`):
+(1) mỗi coin BTC/ETH xếp quarterly tới hạn tăng dần, front = đáo hạn sớm nhất còn sống; (2) khi front còn <=7 ngày HOẶC lần đầu có hàng thì xét hợp đồng
+KẾ TIẾP (quarterly chu kỳ Mar/Jun/Sep/Dec thứ Sáu cuối tháng; live dùng inverse Z26/H27 hoặc linear DEC26/MAR27/JUN27); (3) tính basis năm hóa
+ln(F/S)*365/DTE, CHỈ VÀO nếu >=4%/năm (ETH skip vd 3,7% [PROSPECTIVE_20261006]); (4) sizing mỗi chân = f x vốn lúc vào (khuyến nghị f=0,25), long spot +
+short quarterly notional bằng nhau; (5) giữ tới delivery, phí spot taker 0,1%/bên + futures vào 0,055% + delivery 0,02% (drag 0,275% allocated), futures
+delivery KHÔNG funding; (6) sổ paper: `.venv\\Scripts\\python.exe scripts/carry_paper.py --once --equity 5000 --f 0.5 --tag carry` (public REST only,
+không key, không đặt lệnh; state `artifacts/bot/paper_carry/state.json` + `actions.jsonl`, sha256 quy tắc in đầu run) [carry_paper.py docstring].
+Paper carry thực 2026-10-06 06:05Z f=0,5: BTC BTCUSDT-25DEC26 entered (basis +5,42%/năm), ETH skip, MtM alloc −0,15% (−3,68 USDT), giữ tới Dec ~80 ngày,
+quá sớm chưa kết luận [PROSPECTIVE_20261006].
+
+## Bổ sung docs_update5: stretch DD<15, MANUAL+carry, plateau, 8-phase, restart, screens đóng
+
+- Stretch DD<15 (`oc_carryd13` + `oc_carryfric`): D13BF đơn (v424 R2B1D13BF) 4,971 / worst 2,485 / maxDD 14,98 / full 14,86; +carry f=0,25: 5,104 /
+worst 2,634 / maxDD 14,85 / full 14,85; f=0,50: 5,234 / 2,781 / 14,71 / 14,71 — ĐẠT cả 4 bar (≥5,0, DD năm <15, full <15, không năm lỗ) TRÊN GIẤY base
+[oc_carryd13]. TRUNG THỰC dưới ma sát: CHỈ giữ cả hai bar ở base và S2 f=0,50 (5,062/14,80); S2 f=0,25 DD đạt (14,94) nhưng return rớt (4,929);
+S1/S3/S4/S5 kể cả f=0,50 đều rớt (tốt nhất S4 f=0,50 4,845/15,82; DD tệ nhất S5 f=0,50 15,81; return tệ nhất S3 f=0,50 4,453) — DD<15 không bền dưới ma
+sát thực tế, kỳ vọng thận trọng ~4,2–4,8%/tháng DD ~15–16 [oc_carryfric].
+- MANUAL+carry vẫn <5 (`oc_manualcarry` yearly-level + cross-check equity-level `oc_carrycombo`): M5_human đơn 3,728 / worst 0,847 / maxDD 17,94 /
+full 17,79 win book 64,82%; f=0,25: 3,862 / 0,936 (equity-level 3,746); f=0,50: 3,993 / 1,024 (equity 3,765) — combo tốt nhất vẫn thiếu ~1,0pp
+(yearly) / ~1,2pp (equity); G15 f=0,25 3,157 / f=0,50 3,304 (DD 14,93); G10 2,774/2,927 (DD 13,54); humanBF 3,754/3,888 nhưng DD 21,55 FAIL; top2
+3,210/3,350 (DD 19,53) — verdict NO, không hàng MANUAL+carry nào tới floor 5% [oc_manualcarry].
+- G2 plateau (`oc_plateau2`, mỗi biến thể đổi MỘT tham số dip, harness y hệt v421): ref 5,410/2,588/16,91/16,82 win 0,6533; TP08 5,183/2,698/15,84/15,82
+win 0,6796; TP12 5,482/2,546/18,19/18,08 win 0,6326; SL35 5,324/2,617/17,15/17,06; SL45 5,394/2,610/16,80/16,79; G175 5,503/2,527/16,74/16,68;
+G225 5,252/2,598/16,87/16,76 — ON PLATEAU cả ba chiều (5y trong 0,3%/tháng, fullDD trong 1,5pp cả hai phía), không năm lỗ hàng nào, giữ nguyên
+R2B1D17BFG2 [oc_plateau2].
+- 8-phase NO (`oc_phase8`, 8 đồng hồ lệch 30 phút mỗi cái 1/8 vốn, cùng config G2): 8-phase mix 4,960 / worst 2,709 / maxDD 17,98 / full 17,32 win 0,656
+so với 4-phase mix 5,410/2,588/16,91/16,82 — pha loãng return 0,45pp mà fullDD TĂNG 0,5pp; đồng hồ nửa giờ đơn lẻ wild hơn (fullDD 21–37%), crash cùng
+năm 2022–2023 nên averaging không xóa phase luck; 10k USDT chia 8 (1250/clock) thì 47–60% lệnh BTC dưới minimum 100 USDT — NOT placeable —
+verdict NO, giữ mix 4 pha [oc_phase8].
+- Restart sau reboot: `scripts/restart_all.sh` (header) — idempotent, chỉ đọc process không kill, `--dry-run` xem plan, `--only bots|backend|carry`;
+thứ tự backend local 127.0.0.1:8724 (KHÔNG tunnel) chờ /health + plan tươi <1h15m; loop.sh RETIRED từ 2026-09-30 (backend tự chạy advisor shadow);
+5 runner paper chỉ dựng khi runner.lock free (`paper` R2-4P không tag; d17bf/d13bf/d17bfg2/g2k20 đúng `--tag`, `--interval 25`, d17bfg2/g2k20 kèm
+`--dip-gross-cap 2.0 --adopt-fresh`), state.json backup + validate JSON; vòng carry `carry_paper.py --once --equity 5000 --f 0.5 --tag carry` mỗi 3600s;
+cuối in bot_health 5 runner + daily_status; KHÔNG set BOT_ALLOW_LIVE, KHÔNG start testnet/live [restart_all.sh header].
+- Screens đóng đợt này mỗi hướng một dòng (số y nguyên): oc_expirydip (idea #76, thêm 1 rung 5,0-sigma ở bar expiry Deribit, 24 fills/5 năm/4 phases/5 coin,
+21/24 wins nhưng mẫu tí hon): sum 5/5 + DD 5/5 pass trivially nhưng dSum5y +0,0164 chỉ 6% gate placebo p95 +0,273 — NOT PROMISING, đóng không
+full-engine [oc_expirydip]. oc_usdtdip (tilt size x1,2 khi z>1 / x0,8 khi z<−1 theo USDT premium, 22312 fills): sum 3/5 + DD 4/5 + dSum +0,047 (17% gate) +
+control 3/5 (2021 −0,133 sum/+0,074 DD, 2024 edge thuần exposure) — NOT PROMISING, edge book-long USDT không chuyển sang dip [oc_usdtdip].
