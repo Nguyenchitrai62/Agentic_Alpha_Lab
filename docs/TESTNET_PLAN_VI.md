@@ -22,13 +22,22 @@
 2. Tạo API key testnet: quyền Read-Write, bật Contracts/Derivatives (trade + read). Key testnet đọc được qua `GET /v5/user/query-api`; key Read-Only bị preflight FAIL.
 3. Chỉ điền 2 dòng vào file `.env` local (không commit, không dán chat, không gửi file):
    `BYBIT_TESTNET_API_KEY=...` và `BYBIT_TESTNET_API_SECRET=...`.
-4. Xác nhận `BOT_ALLOW_LIVE` KHÔNG được set (để `--mode live` luôn bị từ chối: `bot/run.py:576-577,1282-1283`).
+4. Xác nhận `BOT_ALLOW_LIVE` KHÔNG được set (để `--mode live` luôn bị từ chối: gate live trong `main()` ở `bot/run.py`, kiểm ngày 2026-10-06 ở dòng ~1517-1518; số dòng cũ 576-577,1282-1283 đã stale).
 5. Nạp vốn testnet (faucet/testnet funds): tối thiểu 5000 USDT, tốt nhất ~10000 USDT. Dưới 5000 các rung BTC bị `skipped_below_minimum` (skip bình thường, không phải lỗi).
 6. Dựng backend trước bot: `.\run_backend.ps1 -Status` (chỉ `-Background` khi chưa chạy). Mở `artifacts/research/advisor_shadow/trade_plan_v376.json` xem `generated_at` phải < 4h30m, nếu cũ bot chỉ giữ exits + log `stale_plan`.
 
+### Danh sách việc chủ tài khoản (OWNER, theo thứ tự `docs/opencode/TESTNET_READY_20261006.md`)
+
+1. Tạo sub-account testnet riêng tại `testnet.bybit.com`.
+2. Tạo API key testnet Read-Write, bật Contracts/Derivatives (trade+read); kiểm tra `BOT_ALLOW_LIVE` chưa set.
+3. Tự điền `BYBIT_TESTNET_API_KEY` + `BYBIT_TESTNET_API_SECRET` vào `.env` local (không commit/dán chat).
+4. Nâng UTA, bật Hedge Mode, Cross cả 5 coin, đòn bẩy perps 5x từng coin, quarterly đang giữ 10x; dọn lệnh/vị thế lạ.
+5. Nạp testnet ≥5000 USDT (tốt nhất ~10000); dựng backend (`.\run_backend.ps1 -Status`, plan tươi <4h30m).
+6. Chạy preflight `--mode testnet` tới PASS, rồi dry `--once`, rồi start đúng lệnh §4 với tag `tnetg2c`.
+
 ## 2. Cài đặt tài khoản bằng tay (bot KHÔNG tự làm — gate chặn V1)
 
-Bot chỉ tự gọi Hedge một lần và bỏ qua lỗi (`bot/run.py:117-120`); Cross/đòn bẩy không bao giờ tự set/check (`bot/bybit_v5.py:302-323`). Làm tay trên chính sub-account testnet, kiểm tra lại trên UI:
+Bot chỉ tự gọi hedge một lần và bỏ qua lỗi (`Runner.__init__` trong `bot/run.py`, kiểm ngày 2026-10-06 ở dòng ~343-346; số dòng cũ 117-120 đã stale); Cross/đòn bẩy không bao giờ tự set/check — trong `bot/` không có lệnh set leverage/margin nào, POST duy nhất là `Bybit.hedge_mode()` trong `bot/bybit_v5.py` (gọi `POST /v5/position/switch-mode`, kiểm ngày 2026-10-06 ở dòng ~449-450; tham chiếu cũ `bybit_v5.py:302-323` đã stale, nay là `sign()`/`Bybit._check`/`public()`). Làm tay trên chính sub-account testnet, kiểm tra lại trên UI:
 
 1. Upgrade lên Unified Trading Account (UTA): avatar → Upgrade to Unified Trading Account. Preflight kiểm tra qua `GET /v5/account/wallet-balance?accountType=UNIFIED`.
 2. Position Mode = Hedge Mode (Both long & short): mở chart BTCUSDT Perps → góc Position Mode → chọn Hedge. Bot gửi mọi lệnh kèm `positionIdx` 1 (long) / 2 (short); tài khoản One-Way (`positionIdx=0`) sẽ bị từ chối hàng loạt.
@@ -45,7 +54,7 @@ Chỉ gọi endpoint V5 đọc (signed GET + public), không bao giờ POST nên
 .venv\Scripts\python.exe scripts/bot_preflight.py --mode testnet
 ```
 
-- PASS khi không có dòng `[FAIL]` nào (WARN vẫn exit 0, xem chi tiết `scripts/bot_preflight.py:246-380`).
+- PASS khi không có dòng `[FAIL]` nào (WARN vẫn exit 0, xem `run_preflight()` trong `scripts/bot_preflight.py`, kiểm ngày 2026-10-06 vẫn ở dòng ~246-380).
 - 9 hàng: Mạng / API key / Tài khoản Unified / Hedge Mode / Cross margin / Đòn bẩy 5x / Vốn / Lệnh-vị thế lạ / Giờ server (< 1 s) / Minima sàn ở vốn hiện tại (cỡ lệnh ước tính theo `--dip-mult 1.7`).
 - Mỗi FAIL kèm bước sửa chính xác trên Bybit UI — sửa hết rồi chạy lại. Không khởi động bot khi còn FAIL.
 - Chạy khô (dry, không gửi lệnh, public data only) sau preflight PASS:
@@ -62,7 +71,7 @@ Chỉ gọi endpoint V5 đọc (signed GET + public), không bao giờ POST nên
 - State: `artifacts/bot/testnet_tnetg2c/state.json`, mọi hành động: `actions.jsonl` cùng thư mục. Không chạy 2 tiến trình cùng tag/dir (kẹt `runner.lock`).
 - `scripts/restart_all.sh` KHÔNG bao giờ dựng testnet/live (chỉ paper + backend local + carry paper) — sau reboot/mất điện dựng lại testnet BẰNG TAY theo mục 4 runbook: backend trước (`-Status`, plan tươi), rồi đúng lệnh trên, đối chiếu `actions.jsonl` với vị thế testnet thật.
 - Kỳ vọng đúng sau fix `bot_testnetfix` (2026-10-06): entry book/add + bid dip gửi `timeInForce:"PostOnly"` (maker-only; cross bị từ chối `postonly_reject` rồi thử lại chu kỳ sau, không đuổi giá); TP/reduce GTC reduce-only; stop là conditional market reduce-only `closeOnTrigger`; market exit là market reduce-only.
-- Carry (`bot_carry`): mỗi coin BTC/ETH đủ điều kiện (front quarterly còn <= 7 ngày hoặc lần đầu, basis năm hóa `ln(F/S)*365/DTE >= 4 %`) thì spot BUY + quarterly SELL cùng notional = `0.25 x equity`, link prefix `c`, không tính vào trần dip, qua `risk_guard` + trần short `<= 0.30 x vốn/coin`.
+- Carry (`bot_carry`): mỗi coin BTC/ETH đủ điều kiện (front quarterly còn <= 7 ngày hoặc lần đầu, basis năm hóa `ln(F/S)*365/DTE >= 4 %`) thì spot BUY + quarterly SELL cùng notional = `0.25 x equity`, link prefix `c`, không tính vào trần dip, qua `risk_guard` + trần short `<= 0.30 x vốn/coin`. Ghi chú testnet (kiểm public ngày 2026-10-06): testnet liệt kê 4 quarterly inverse đang Trading (`BTCUSDZ26 BTCUSDH27 ETHUSDZ26 ETHUSDH27`) và spot `BTCUSDT` có giá — carry được hỗ trợ trên testnet.
 
 ## 5. Theo dõi mỗi ngày (~5–10 phút/ngày, giống runbook mục 3)
 
@@ -125,3 +134,13 @@ Select-String -Path artifacts/bot/testnet_tnetg2c/actions.jsonl -Pattern 'unprot
 - Ngày 1–6: mỗi ngày chạy bộ 3 lệnh mục 5, ghi 1 dòng nhật ký; xử lý WARNING/CRITICAL theo mục 8 ngay trong ngày.
 - Ngày 7: chạy đủ 3 lệnh + đối chiếu `actions.jsonl` vs vị thế sàn lần cuối; chấm 9 tiêu chí mục 7 (đủ mới xét live; thiếu thì lặp 7 ngày mới sau khi sửa).
 - Sau 7 ngày: giữ runner chạy hoặc dừng sạch (cancel bid chờ tay trên UI, để stop/TP bảo vệ tới khi đóng hết, sao lưu `state.json` + `actions.jsonl`); live chỉ sau testnet PASS + đủ 4 điều kiện paper >= 8 tuần trong `docs/DEPLOYMENT_PLAN_VI.md` (phân vị >= 20, DD <= 15 %, lệch bot-plan <= 1.5pp/tháng đủ 14 ngày, không cycle_error > 1h/không thiếu stop).
+
+<!--
+docs_testnetfix 2026-10-06 — changes to docs/TESTNET_PLAN_VI.md only (no code, no commits):
+1. §1.4: stale `bot/run.py:576-577,1282-1283` -> gate live trong `main()` ở `bot/run.py` (~1517-1518 as of 2026-10-06).
+2. §2 intro: stale `bot/run.py:117-120` -> `Runner.__init__` trong `bot/run.py` (~343-346, hedge_mode try/except); stale `bot/bybit_v5.py:302-323` -> `Bybit.hedge_mode()` trong `bot/bybit_v5.py` (~449-450, sole POST switch-mode; old lines now sign/_check/public); noted no leverage/margin setter exists in bot/.
+3. §3: `scripts/bot_preflight.py:246-380` verified still current -> kept, reworded to lead with `run_preflight()`.
+4. §1: added OWNER 6-step checklist in the exact order of docs/opencode/TESTNET_READY_20261006.md.
+5. §4 carry bullet: added note that Bybit testnet lists BTC/ETH inverse quarterlies (BTCUSDZ26 BTCUSDH27 ETHUSDZ26 ETHUSDH27) + spot BTCUSDT price, so carry is supported on testnet.
+6. Function names preferred over line numbers throughout; line numbers kept only as ~as-of-2026-10-06 hints.
+-->
