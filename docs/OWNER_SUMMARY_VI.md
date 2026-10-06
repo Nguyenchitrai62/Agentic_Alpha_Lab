@@ -77,3 +77,8 @@ lãi 0/5 năm (lệnh muộn toàn lệnh thắng 59-69%) → ĐÓNG [oc_bidttl]
 - Spread thật (`oc_spreadcost`): spread Bybit đo thật ~30 giờ (~1,1 triệu dòng top-book) chỉ bào ~0,7% lãi dip 5 năm (−0,28 đơn vị eq gộp / −0,18 có trọng số, một nửa nằm ở BNB book rộng ~10x), DD gần như không đổi (+0,01–0,03) — mô hình phí maker/taker + funding hiện tại đã bao phủ, không đổi triển khai, không bù spread thêm.
 - Công cụ mới cho chủ: `alert_watch.py` (canh 6 loại CRITICAL, toast Windows 1 lần/incident + `artifacts/alerts/alerts.log`); `weekly_report.py` (báo cáo tuần 1 trang + tóm tắt 3 dòng, đếm ngược 56 ngày go-live); `regime_now.py` (bear/vol/flush/activity, tháng yên = ít trade không phải edge hỏng); `snapshot_untracked.py` (zip backup research untracked, giữ 14 bản mới nhất); cửa sổ bảo trì `--maint-start/--maint-end` + kiểm tra bảo vệ sau restart (`protection_check`, hủy bid dip chờ trước bảo trì có hẹn) [`BOT_EXECUTION.md` bot_maint; PREPUSH_AUDIT_20261006].
 - VIỆC CHỦ LÀM NGAY: frontend đã deploy panel 'Carry quý (paper)' gọi `GET /api/carry`, nhưng backend local cũ chưa có route này — chỉ cần restart backend local MỘT lần là panel có số liệu (route chỉ đọc `paper_carry/state.json`, kiểm toán pre-push: SAFE TO PUSH, không secret/khóa) [PREPUSH_AUDIT_20261006].
+
+## Tháng yên tĩnh (như đầu tháng 10/2026)
+Hiện chỉ có 6 cú flush 2,5σ / 30 ngày trên 5 coin (lịch sử p25 = 7, trung vị 15) [regime_now]. Trong 12 tháng yên tĩnh lịch sử, G2 có trung vị chỉ +0,7 %/tháng
+(trung bình +4,9; p10 −4,5; p90 +22,4; 4/12 tháng lỗ) — ít cơ hội dip chứ không phải edge hỏng; mẫu nhỏ (n = 12) nên khởi đầu yên tĩnh không phải tín hiệu xấu
+đáng tin [oc_quietmonth]. Đừng đổi cấu hình vì vài tuần yên; chỉ điều tra khi chạm ngưỡng cảnh báo sớm trong daily_status.
