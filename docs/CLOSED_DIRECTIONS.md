@@ -197,6 +197,7 @@ Sources: `docs/FINAL_REPORT_VI.md`, `.claude/skills/alpha-lab-leader/research-ma
 - `oc_idea4_carrymax` | carry only the higher-basis coin (M1/M2) | CLOSED | dev -0.13, 5y -0.10 %/mo vs both coins, DD unchanged | 2026-10-07
 - `oc_idea6_d13carry` | D13BF + concentrated carry f 0.50 (POST-HOC) | CLOSED | base 5.115/DD 14.71 but fails frictions and needs split capital; 8 %/mo unreachable (~2.9pp short) | 2026-10-07
 - `oc_usdccarry` | Bybit USDC linear dated futures as the carry leg | CLOSED | no better than inverse (basis within +-0.6 pp/yr where comparable); gaps 2021-22 and 2025-26, none trading now; keep inverse quarterlies | 2026-10-07
+- `oc_i2_tapecancel` | cancel dip bids on adverse tape (aggTrades) | CLOSED | C1 0/4, C2 1/4 dev years; dSum -0.40 / -0.31 vs gate +0.273; no engine run | 2026-10-07
 - `oc_i2_spreadveto` | veto dip bids on wide-spread / thin-depth bars | CLOSED | fails the placebo gate (S2 -0.28 dev4 vs +0.273); no engine run | 2026-10-07
 - `oc_i2_dvolveto` | veto dip bids on DVOL spikes (change) | CLOSED | removes winning dips: dev4 0/4, dSum5y -1.508 vs gate +0.273; no engine run | 2026-10-07
 - `oc_i2_oiguard` | skip dip bids while open interest unwinds | CLOSED | fails the dip placebo gate (+0.273) on dev years; no engine run | 2026-10-07

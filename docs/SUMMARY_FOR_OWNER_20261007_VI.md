@@ -50,6 +50,6 @@
 
 ## 6. Phiên nghiên cứu tiếp theo làm gì
 
-- Cả 6 ý tưởng của bản rà soát 07/10 đều ĐÓNG (Kelly rung, stop dip, carry bậc, carry 1 coin, MANUAL nghỉ 4h, D13BF+carry) [docs/CLOSED_DIRECTIONS.md]; mọi audit hôm nay PASS (capacity, eventstress, deliverytrack, carryborrow, carrymore). Biên lợi nhuận-DD đã cạn: chỉ còn chờ bằng chứng paper/testnet.
+- Cả 6 ý tưởng của bản rà soát 07/10 đều ĐÓNG (Kelly rung, stop dip, carry bậc, carry 1 coin, MANUAL nghỉ 4h, D13BF+carry) [docs/CLOSED_DIRECTIONS.md]; mọi audit hôm nay PASS (capacity, eventstress, deliverytrack, carryborrow, carrymore). Bản rà soát thứ 2 (vi cấu trúc: DVOL, OI, tape, spread) cũng ĐÓNG cả 4 ở bước sàng lọc placebo. Biên lợi nhuận-DD đã cạn: chỉ còn chờ bằng chứng paper/testnet.
 - Nuôi paper đủ >=8 tuần + 4 cổng go-live; divergence >=14 ngày mới kết luận; OOS hằng tuần bằng `score_oos.py --fetch --run` [docs/FINAL_REPORT_VI.md].
 - Chỉ nghiên cứu mới khi có dữ liệu thật mới (liquidation đủ 3 tháng sớm nhất 04/01/2027, log prospective); không lặp lại hướng trong `docs/CLOSED_DIRECTIONS.md` [docs/PLAN_NEXT_20261006.md] [docs/CLOSED_DIRECTIONS.md].
