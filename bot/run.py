@@ -22,13 +22,31 @@ import pandas as pd
 
 from bot import mirror
 from bot import risk_guard
-from bot.bybit_v5 import MAINNET, TESTNET, Bybit, BybitError, cached_call, round_step
+from bot.bybit_v5 import (
+    KLINE_CACHE_LOCK_WARN_S,
+    MAINNET,
+    TESTNET,
+    Bybit,
+    BybitError,
+    cached_call,
+    pop_kline_lock_stats,
+    round_step,
+)
 from bot.paper import PaperExchange
 
 ROOT = Path(__file__).resolve().parents[1]
 PLAN = ROOT / "artifacts/research/advisor_shadow/trade_plan_v376.json"
 SYMS = ["BTCUSDT", "ETHUSDT", "SOLUSDT", "BNBUSDT", "XRPUSDT"]
 STALE_PLAN = pd.Timedelta(hours=4, minutes=30)  # a 4h plan is valid until the next bar plan (+ generation delay)
+# Cycle instrumentation (bot_cycletime): wall-time budget per stage. Thresholds
+# match the assignment: slow_cycle > 60 s, lock_wait > 10 s (cache-lock wait).
+SLOW_CYCLE_S = 60.0
+LOCK_WAIT_WARN_S = float(KLINE_CACHE_LOCK_WARN_S)
+
+
+def _cycle_now() -> float:
+    """Monotonic clock for cycle timing (patched with fake clocks in tests)."""
+    return time.perf_counter()
 
 
 def parse_dip_sl_coin(items) -> dict:
@@ -402,15 +420,95 @@ class Runner:
                                              price=float(pc["tp"]), reduce_only=True, position_idx=pidx, piece=pid)
         return out
 
+    def _cycle_timing_start(self):
+        """Init per-cycle wall-time buckets; resets the kline-lock wait baseline."""
+        try:
+            pop_kline_lock_stats()
+        except Exception:
+            pass
+        try:
+            t0 = _cycle_now()
+        except Exception:
+            t0 = 0.0
+        return t0, {"plan_ms": 0.0, "kline_ms": 0.0, "sync_ms": 0.0,
+                    "decide_ms": 0.0, "order_ms": 0.0, "state_ms": 0.0}
+
+    def _store_cycle_timing(self, stages, t_all):
+        """Write last_cycle_ms + per-stage ms into state.json; log slow/lock.
+
+        Two state writes: a provisional write (so a crash still leaves a
+        heartbeat with timing keys) then a final rewrite with the measured
+        state_ms included. Trading behaviour is unchanged: orders/logs before
+        this point are bit-for-bit identical; only slow (>60 s) or lock-wait
+        (>10 s) cycles append one extra op=slow_cycle / op=lock_wait action.
+        """
+        if not isinstance(stages, dict):
+            stages = {"plan_ms": 0.0, "kline_ms": 0.0, "sync_ms": 0.0,
+                      "decide_ms": 0.0, "order_ms": 0.0, "state_ms": 0.0}
+        t_s0 = _cycle_now()
+        try:
+            self.state["last_cycle_ms"] = round(float((_cycle_now() - t_all) * 1000.0), 1)
+            self.state["last_cycle_stages_ms"] = {k: round(float(v), 1) for k, v in stages.items()}
+        except Exception:
+            pass
+        try:
+            self.state_f.write_text(json.dumps(self.state, indent=1, default=str))
+        except Exception:
+            pass
+        if self.mode == "paper":
+            try:
+                self.ex.save()
+            except Exception:
+                pass
+        try:
+            state_ms = (_cycle_now() - t_s0) * 1000.0
+        except Exception:
+            state_ms = 0.0
+        try:
+            stages["state_ms"] = float(stages.get("state_ms", 0.0)) + float(state_ms)
+            total_ms = (_cycle_now() - t_all) * 1000.0
+        except Exception:
+            total_ms = 0.0
+        try:
+            wait_s, timeouts = pop_kline_lock_stats()
+        except Exception:
+            wait_s, timeouts = 0.0, 0
+        try:
+            self.state["last_cycle_ms"] = round(float(total_ms), 1)
+            self.state["last_cycle_stages_ms"] = {k: round(float(v), 1) for k, v in stages.items()}
+            self.state["last_cycle_lock_wait_ms"] = round(float(wait_s) * 1000.0, 1)
+        except Exception:
+            pass
+        try:
+            self.state_f.write_text(json.dumps(self.state, indent=1, default=str))
+        except Exception:
+            pass
+        try:
+            if float(total_ms) > SLOW_CYCLE_S * 1000.0:
+                self.log(dict(op="slow_cycle", total_ms=round(float(total_ms), 1),
+                              stages={k: round(float(v), 1) for k, v in stages.items()},
+                              lock_wait_ms=round(float(wait_s) * 1000.0, 1), timeouts=int(timeouts)))
+            if float(wait_s) > float(LOCK_WAIT_WARN_S):
+                self.log(dict(op="lock_wait", lock_wait_ms=round(float(wait_s) * 1000.0, 1),
+                              timeouts=int(timeouts), total_ms=round(float(total_ms), 1),
+                              stages={k: round(float(v), 1) for k, v in stages.items()}))
+        except Exception:
+            pass
+        return total_ms
+
     def cycle(self):
+        t_all, _stages = self._cycle_timing_start()
         now = pd.Timestamp.now(tz="UTC")
         if getattr(self, "_last_plan", None) is None:
             self._last_plan = None
         plan_ok = True
+        _t = _cycle_now()
         try:
             plan = json.loads(self.plan_path.read_text())
             self._last_plan = plan
+            _stages["plan_ms"] += (_cycle_now() - _t) * 1000.0
         except (OSError, json.JSONDecodeError, ValueError) as e:
+            _stages["plan_ms"] += (_cycle_now() - _t) * 1000.0
             self.log(dict(op="plan_error", note=f"{type(e).__name__}: {e}"))
             if isinstance(self._last_plan, dict):
                 plan = self._last_plan
@@ -418,23 +516,32 @@ class Runner:
             else:
                 # No cached plan: keep protection from the ledger only, place nothing new.
                 if self.mode == "paper":
+                    _t = _cycle_now()
                     try:
                         self.ex.step(now)
                     except Exception:
                         pass
+                    _stages["kline_ms"] += (_cycle_now() - _t) * 1000.0
+                _t = _cycle_now()
                 try:
                     equity = self.equity_arg if self.mode == "dry" else self.ex.equity_usdt()
                 except Exception:
                     equity = self.equity_arg or 0.0
+                _stages["sync_ms"] += (_cycle_now() - _t) * 1000.0
+                _t = _cycle_now()
                 try:
                     self.sync_fills()
                 except Exception:
                     pass
+                _stages["sync_ms"] += (_cycle_now() - _t) * 1000.0
                 led = self.state["ledger"]
+                _t = _cycle_now()
                 try:
                     last5 = self.last5()
                 except Exception:
                     last5 = {}
+                _stages["kline_ms"] += (_cycle_now() - _t) * 1000.0
+                _t = _cycle_now()
                 for pid, why in mirror.exits({"phases": [], "coins": {}}, now, led, last5):
                     if why == "plan_closed_divergence":
                         continue
@@ -471,11 +578,17 @@ class Runner:
                         o = replace(o, qty=float(p["qty"]), price=float(p["price"]) if "price" in p else None,
                                     trigger=float(p["triggerPrice"]) if "triggerPrice" in p else None)
                         rounded[k] = (o, p)
+                _stages["decide_ms"] += (_cycle_now() - _t) * 1000.0
+                _t = _cycle_now()
                 try:
                     have = self.have()
                 except Exception:
                     have = {}
+                _stages["sync_ms"] += (_cycle_now() - _t) * 1000.0
+                _t = _cycle_now()
                 acts = mirror.diff({k: o for k, (o, _) in rounded.items()}, have)
+                _stages["decide_ms"] += (_cycle_now() - _t) * 1000.0
+                _t = _cycle_now()
                 for a in acts:
                     if a["op"] == "place":
                         o = a["order"]
@@ -495,19 +608,21 @@ class Runner:
                         if self.send(self.ex.amend, a["symbol"], a["link"], **kw) is not None or self.mode == "dry":
                             rest = self.state["links"][a["link"]].setdefault("rest", {})
                             rest.update({k2: a[k2] for k2 in ("price", "trigger", "qty") if k2 in a})
+                _stages["order_ms"] += (_cycle_now() - _t) * 1000.0
                 self._log_skipped(skipped, now, equity)
-                self.state_f.write_text(json.dumps(self.state, indent=1, default=str))
-                if self.mode == "paper":
-                    try:
-                        self.ex.save()
-                    except Exception:
-                        pass
+                self._store_cycle_timing(_stages, t_all)
                 return acts
         stale = now - pd.Timestamp(plan["generated_at"]) > STALE_PLAN
         if self.mode == "paper":
+            _t = _cycle_now()
             self.ex.step(now)
+            _stages["kline_ms"] += (_cycle_now() - _t) * 1000.0
+        _t = _cycle_now()
         equity = self.equity_arg if self.mode == "dry" else self.ex.equity_usdt()
+        _stages["sync_ms"] += (_cycle_now() - _t) * 1000.0
+        _t = _cycle_now()
         self.sync_fills()
+        _stages["sync_ms"] += (_cycle_now() - _t) * 1000.0
         led = self.state["ledger"]
         live = mirror.plan_book_live(plan)
         for pc in led.values():
@@ -516,10 +631,13 @@ class Runner:
                     pc.pop("plan_gone_since", None)
                 else:
                     pc.setdefault("plan_gone_since", str(now))
+        _t = _cycle_now()
         try:
             _last5_for_cycle = self.last5()
         except Exception:
             _last5_for_cycle = {}
+        _stages["kline_ms"] += (_cycle_now() - _t) * 1000.0
+        _t = _cycle_now()
         for pid, why in mirror.exits(plan, now, led, _last5_for_cycle):
             pc = led[pid]
             if pc.get("exit_sent") and now - pd.Timestamp(pc["exit_sent"]) < pd.Timedelta(minutes=2):
@@ -540,8 +658,14 @@ class Runner:
                                                                           reduce_only=True, position_idx=payload["positionIdx"], piece=pid)))
                 if self.mode == "dry":
                     pc["qty"] = 0.0
+        _stages["decide_ms"] += (_cycle_now() - _t) * 1000.0
+        _t = _cycle_now()
         bear = self.bear_now(now)
+        _stages["kline_ms"] += (_cycle_now() - _t) * 1000.0
+        _t = _cycle_now()
         lc = self.last_close_1m() if (self.corr or self.bear_book) else None
+        _stages["kline_ms"] += (_cycle_now() - _t) * 1000.0
+        _t = _cycle_now()
         _gross = getattr(self, "dip_gross_cap", 0.0) or 0.0
         _adopt = bool(getattr(self, "adopt_fresh", False))
         want = mirror.desired(plan, now, equity, led, risk_mult=self.risk_mult, corr=self.corr,
@@ -570,7 +694,11 @@ class Runner:
         # exits/protection, so stops/TPs/market exits always pass.
         if not getattr(self, "no_risk_guard", False):
             want = self._apply_risk_guard(want, equity, self._guard_prices(lc, _last5_for_cycle, plan))
+        _stages["decide_ms"] += (_cycle_now() - _t) * 1000.0
+        _t = _cycle_now()
         have_before = self.have()
+        _stages["sync_ms"] += (_cycle_now() - _t) * 1000.0
+        _t = _cycle_now()
         rounded, skipped = {}, []
         for k, o in want.items():
             p = to_exchange(o, self.inst)
@@ -582,7 +710,9 @@ class Runner:
                 rounded[k] = (o, p)
         acts = mirror.diff({k: o for k, (o, _) in rounded.items()}, have_before,
                            amend_entry_qty=(self.corr or self.risk_mult != 1.0 or self.dip_mult != 1.0 or bool(getattr(self, "dip_gross_cap", 0.0))))
+        _stages["decide_ms"] += (_cycle_now() - _t) * 1000.0
         failed_stop_pieces, placed_stop_links = set(), set()
+        _t = _cycle_now()
         for a in acts:
             if a["op"] == "place":
                 o = a["order"]
@@ -650,9 +780,9 @@ class Runner:
                             self.state["links"][link] = dict(order=asdict(mirror.Order(link, pc["symbol"], payload["side"], float(q), "reduce",
                                                                                       reduce_only=True, position_idx=payload["positionIdx"], piece=pid)))
                             pc.pop("unprotected_cycles", None)
-        self.state_f.write_text(json.dumps(self.state, indent=1, default=str))
-        if self.mode == "paper":
-            self.ex.save()
+        _stages["order_ms"] += (_cycle_now() - _t) * 1000.0
+        self._log_skipped(skipped, now, equity)
+        self._store_cycle_timing(_stages, t_all)
         return acts
 
 

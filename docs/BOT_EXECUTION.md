@@ -106,6 +106,20 @@ for fresh plans; a new fill has no exit orders until the next cycle (<= 20 s) pl
   machine make ~1 request per symbol per TTL; miss path fetches exactly as before.
 - `skipped_below_minimum` now logs once per (link, 4h bar) instead of every 20 s cycle (tests/test_bot_opsfix.py).
 
+## CHANGES (bot_cycletime 2026-10-06: cycle timing + bounded cache lock, default behaviour unchanged)
+- `Runner.cycle` measures wall time per stage (`plan_ms, kline_ms incl. cache lock wait, sync_ms, decide_ms, order_ms, state_ms`)
+  and writes `last_cycle_ms + last_cycle_stages_ms (+ last_cycle_lock_wait_ms)` into state.json every cycle (two writes:
+  provisional then final with the measured state_ms). One `op=slow_cycle` (with the stage breakdown) logs when a cycle
+  exceeds 60 s; one `op=lock_wait` logs when the accumulated kline-cache lock wait exceeds 10 s. Normal fast cycles log
+  nothing extra, orders bit-for-bit identical.
+- `bot/bybit_v5._kline_locked` now bounds the acquire (`KLINE_CACHE_LOCK_TIMEOUT_S=30 s`, warn `10 s`, wait accumulated
+  for `pop_kline_lock_stats()`): on timeout it yields unlocked and the caller falls back to a direct fetch (get -> miss,
+  put/merge -> skip the write), still never raising. POSIX previously blocked indefinitely; Windows keeps its
+  non-blocking spirit with a bounded retry. `cached_call / kline_cache_get-put / cached_1m_rows` accept `lock_timeout`.
+- `scripts/bot_health.py` shows `cycle_ms=<s>` from `last_cycle_ms` and flags WARNING when > 60 s.
+- Tests: `tests/test_bot_cycletime.py` (fake `_cycle_now` clock for slow_cycle, injected lock wait, real held OS lock with
+  a short timeout for the direct-fetch fallback, health warning).
+
 ## Failure modes (tests/test_bot_resilience.py, fake exchange, no network)
 - Restart mid-position: new Runner adopts state.json + exchange stops/TPs, no duplicate entries, filled rungs never re-placed.
 - Partial dip fill: TP/stop size to the filled qty, remainder stays resting (same link), budget counts only the filled part.

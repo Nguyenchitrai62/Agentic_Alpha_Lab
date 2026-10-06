@@ -184,6 +184,24 @@ def check_dir(d: Path, plan: dict | None, now: datetime, interval: float) -> dic
     rep["last_cycle"] = last_t.isoformat() if last_t else None
     age_s = (now - last_t).total_seconds() if last_t else None
     rep["cycle_age_s"] = age_s
+    # bot_cycletime: instrumented wall time of the last Runner.cycle
+    try:
+        rep["last_cycle_ms"] = float((state or {}).get("last_cycle_ms")) if (state or {}).get("last_cycle_ms") is not None else None
+    except (TypeError, ValueError):
+        rep["last_cycle_ms"] = None
+    try:
+        _st = (state or {}).get("last_cycle_stages_ms")
+        rep["last_cycle_stages_ms"] = dict(_st) if isinstance(_st, dict) else None
+    except (TypeError, ValueError, AttributeError):
+        rep["last_cycle_stages_ms"] = None
+    try:
+        rep["last_cycle_lock_wait_ms"] = float((state or {}).get("last_cycle_lock_wait_ms")) if (state or {}).get("last_cycle_lock_wait_ms") is not None else None
+    except (TypeError, ValueError):
+        rep["last_cycle_lock_wait_ms"] = None
+    if rep["last_cycle_ms"] is not None and rep["last_cycle_ms"] > 60_000:
+        if rep["status"] == "ok":
+            rep["status"] = "warning"
+        rep["warnings"].append(f"last cycle {rep['last_cycle_ms'] / 1000:.1f}s (>60s)")
     if age_s is None:
         rep["status"] = "critical"
         rep["problems"].append("no timestamped actions: runner may be down")
@@ -336,8 +354,10 @@ def fmt_report(rep: dict) -> str:
     age_s = "never" if age is None else (f"{age:.0f}s" if age < 600 else f"{age / 60:.1f}m")
     c = rep["counts_24h"]
     ops = " ".join(f"{k}={c.get(k, 0)}" for k in ("place", "amend", "cancel", "fill", "market_exit", "stale_plan", "errors"))
+    cyc = rep.get("last_cycle_ms")
+    cyc_s = "n/a" if cyc is None else f"{cyc / 1000:.1f}s"
     lines = [
-        f"[{rep['status'].upper()}] {rep['dir']} last_cycle={rep['last_cycle']} (age {age_s})",
+        f"[{rep['status'].upper()}] {rep['dir']} last_cycle={rep['last_cycle']} (age {age_s}) cycle_ms={cyc_s}",
         f"  plan={rep['plan_generated_at']} age={rep['plan_age_h']:.1f}h"
         if rep["plan_age_h"] is not None else "  plan=unknown",
         f"  24h ops: {ops} rate_limit={rep['rate_limit_24h']}",

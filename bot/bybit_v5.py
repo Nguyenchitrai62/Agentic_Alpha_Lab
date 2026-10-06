@@ -28,6 +28,42 @@ RECV_WINDOW = "10000"
 # (miss on any error) and accept cache_dir/now for tests.
 KLINE_CACHE_TTL = 20.0
 KLINE_CACHE_MAX_BARS = 1500
+# Shared-cache lock: bounded acquire so a stuck holder cannot block other
+# runners (paper_d17bfg2 stall 2026-10-06 ~25 min). On timeout the caller
+# falls back to a direct fetch (miss path) / skips the cache write, logged
+# by the runner as op=lock_wait. Warn threshold 10 s, timeout 30 s.
+KLINE_CACHE_LOCK_TIMEOUT_S = 30.0
+KLINE_CACHE_LOCK_WARN_S = 10.0
+
+_kline_lock_wait_s = 0.0
+_kline_lock_timeouts = 0
+
+
+def pop_kline_lock_stats():
+    """(wait_s, timeouts) since the last call; resets both. Never raises."""
+    global _kline_lock_wait_s, _kline_lock_timeouts
+    try:
+        out = (float(_kline_lock_wait_s), int(_kline_lock_timeouts))
+    except Exception:
+        out = (0.0, 0)
+    _kline_lock_wait_s, _kline_lock_timeouts = 0.0, 0
+    return out
+
+
+def _note_lock_wait(dt_s: float) -> None:
+    global _kline_lock_wait_s
+    try:
+        _kline_lock_wait_s += max(0.0, float(dt_s))
+    except Exception:
+        pass
+
+
+def _note_lock_timeout() -> None:
+    global _kline_lock_timeouts
+    try:
+        _kline_lock_timeouts += 1
+    except Exception:
+        pass
 
 
 def kline_cache_dir(cache_dir=None) -> Path:
@@ -42,46 +78,83 @@ def kline_cache_path(symbol: str, cache_dir=None) -> Path:
 
 
 @contextmanager
-def _kline_locked(lock_path: Path):
-    """Exclusive OS lock on a sidecar file (shared across runners); never raises."""
+def _kline_locked(lock_path: Path, timeout: float | None = None):
+    """Exclusive OS lock on a sidecar file (shared across runners); never raises.
+
+    Yields True when the lock is held, False on timeout (caller falls back to
+    a direct fetch / skips the cache write). Bounded wait: `timeout` seconds
+    (default KLINE_CACHE_LOCK_TIMEOUT_S); the acquire wait is accumulated for
+    pop_kline_lock_stats(). Bit-for-bit identical when the lock is free.
+    """
+    if timeout is None:
+        timeout = KLINE_CACHE_LOCK_TIMEOUT_S
+    try:
+        timeout = float(timeout)
+    except (TypeError, ValueError):
+        timeout = KLINE_CACHE_LOCK_TIMEOUT_S
     lock_path.parent.mkdir(parents=True, exist_ok=True)
     f = open(lock_path, "a+b")
+    start = time.monotonic()
+    deadline = start + max(0.0, timeout)
+    acquired = False
     try:
         if os.name == "nt":
             try:
                 import msvcrt
-                f.seek(0)
-                try:
-                    msvcrt.locking(f.fileno(), msvcrt.LK_NBLCK, 1)
-                except OSError:
-                    pass  # contention: proceed; atomic rename still protects readers
+                while True:
+                    f.seek(0)
+                    try:
+                        msvcrt.locking(f.fileno(), msvcrt.LK_NBLCK, 1)
+                        acquired = True
+                        break
+                    except OSError:
+                        now = time.monotonic()
+                        if now >= deadline:
+                            break
+                        time.sleep(min(0.05, max(0.0, deadline - now)))
             except ImportError:
-                pass
+                acquired = True  # no locking primitive: behave as before
         else:
             try:
                 import fcntl
-                fcntl.flock(f, fcntl.LOCK_EX)
-            except (ImportError, OSError):
-                pass
-        yield
+                while True:
+                    try:
+                        fcntl.flock(f, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                        acquired = True
+                        break
+                    except (ImportError, OSError):
+                        now = time.monotonic()
+                        if now >= deadline:
+                            break
+                        time.sleep(min(0.05, max(0.0, deadline - now)))
+            except ImportError:
+                acquired = True
+        try:
+            _note_lock_wait(time.monotonic() - start)
+        except Exception:
+            pass
+        if not acquired:
+            _note_lock_timeout()
+        yield acquired
     finally:
         try:
-            if os.name == "nt":
-                try:
-                    import msvcrt
-                    f.seek(0)
+            if acquired:
+                if os.name == "nt":
                     try:
-                        msvcrt.locking(f.fileno(), msvcrt.LK_UNLCK, 1)
-                    except OSError:
+                        import msvcrt
+                        f.seek(0)
+                        try:
+                            msvcrt.locking(f.fileno(), msvcrt.LK_UNLCK, 1)
+                        except OSError:
+                            pass
+                    except ImportError:
                         pass
-                except ImportError:
-                    pass
-            else:
-                try:
-                    import fcntl
-                    fcntl.flock(f, fcntl.LOCK_UN)
-                except (ImportError, OSError):
-                    pass
+                else:
+                    try:
+                        import fcntl
+                        fcntl.flock(f, fcntl.LOCK_UN)
+                    except (ImportError, OSError):
+                        pass
         finally:
             try:
                 f.close()
@@ -93,14 +166,17 @@ def _cache_now(now=None) -> float:
     return float(now) if now is not None else time.time()
 
 
-def kline_cache_get(symbol: str, field: str, cache_dir=None, ttl: float = KLINE_CACHE_TTL, now=None):
+def kline_cache_get(symbol: str, field: str, cache_dir=None, ttl: float = KLINE_CACHE_TTL, now=None,
+                    lock_timeout: float | None = None):
     """Cached field value, or None on miss/expiry/corruption. Never raises."""
     try:
         t = _cache_now(now)
         path = kline_cache_path(symbol, cache_dir)
         if not path.exists():
             return None
-        with _kline_locked(path.with_suffix(".lock")):
+        with _kline_locked(path.with_suffix(".lock"), timeout=lock_timeout) as locked:
+            if not locked:
+                return None  # lock timeout: treat as miss -> direct fetch fallback
             try:
                 doc = json.loads(path.read_text(encoding="utf-8"))
             except (OSError, ValueError):
@@ -118,14 +194,17 @@ def kline_cache_get(symbol: str, field: str, cache_dir=None, ttl: float = KLINE_
         return None
 
 
-def kline_cache_put(symbol: str, field: str, value, cache_dir=None, now=None) -> None:
+def kline_cache_put(symbol: str, field: str, value, cache_dir=None, now=None,
+                    lock_timeout: float | None = None) -> None:
     """Store a field value (atomic rename). Never raises; ignores None values."""
     if value is None:
         return
     try:
         t = _cache_now(now)
         path = kline_cache_path(symbol, cache_dir)
-        with _kline_locked(path.with_suffix(".lock")):
+        with _kline_locked(path.with_suffix(".lock"), timeout=lock_timeout) as locked:
+            if not locked:
+                return  # lock timeout: skip the write, keep the fetched value
             try:
                 doc = json.loads(path.read_text(encoding="utf-8")) if path.exists() else {}
             except (OSError, ValueError):
@@ -140,21 +219,22 @@ def kline_cache_put(symbol: str, field: str, value, cache_dir=None, now=None) ->
         pass
 
 
-def cached_call(symbol: str, field: str, fetch, cache_dir=None, ttl: float = KLINE_CACHE_TTL, now=None):
+def cached_call(symbol: str, field: str, fetch, cache_dir=None, ttl: float = KLINE_CACHE_TTL, now=None,
+                lock_timeout: float | None = None):
     """Shared-cache wrapper for one fetch: (value, from_cache). Miss -> fetch(),
     store, return. fetch() exceptions propagate (nothing cached)."""
     t = _cache_now(now)
-    hit = kline_cache_get(symbol, field, cache_dir, ttl, now=t)
+    hit = kline_cache_get(symbol, field, cache_dir, ttl, now=t, lock_timeout=lock_timeout)
     if hit is not None:
         return hit, True
     val = fetch()
     if val is not None:
-        kline_cache_put(symbol, field, val, cache_dir, now=t)
+        kline_cache_put(symbol, field, val, cache_dir, now=t, lock_timeout=lock_timeout)
     return val, False
 
 
 def cached_1m_rows(symbol: str, start_ms: int, end_ms: int, fetch_rows, cache_dir=None,
-                   ttl: float = KLINE_CACHE_TTL, now=None):
+                   ttl: float = KLINE_CACHE_TTL, now=None, lock_timeout: float | None = None):
     """1m bars for [start_ms, end_ms) shared across runners.
 
     fetch_rows(start_ms, end_ms) must return Bybit kline rows (newest-first or
@@ -168,7 +248,7 @@ def cached_1m_rows(symbol: str, start_ms: int, end_ms: int, fetch_rows, cache_di
     t = _cache_now(now)
     start_ms, end_ms = int(start_ms), int(end_ms)
     want = set(range(start_ms, end_ms, 60_000)) if end_ms > start_ms else set()
-    cached = kline_cache_get(symbol, "bars_1m", cache_dir, ttl, now=t)
+    cached = kline_cache_get(symbol, "bars_1m", cache_dir, ttl, now=t, lock_timeout=lock_timeout)
     have: dict = {}
     if isinstance(cached, dict):
         for k, v in cached.items():
@@ -188,7 +268,9 @@ def cached_1m_rows(symbol: str, start_ms: int, end_ms: int, fetch_rows, cache_di
     rows = fetch_rows(start_ms, end_ms)
     try:
         path = kline_cache_path(symbol, cache_dir)
-        with _kline_locked(path.with_suffix(".lock")):
+        with _kline_locked(path.with_suffix(".lock"), timeout=lock_timeout) as locked:
+            if not locked:
+                return rows, False  # lock timeout: skip the merge, keep the fetched rows
             try:
                 doc = json.loads(path.read_text(encoding="utf-8")) if path.exists() else {}
             except (OSError, ValueError):
