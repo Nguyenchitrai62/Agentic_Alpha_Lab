@@ -26,9 +26,24 @@ def _sha(p: Path) -> str:
     return hashlib.sha256(Path(p).read_bytes()).hexdigest()
 
 
+def _sha_lf(p: Path) -> str:
+    # Mirror of scripts/opencode_r78_nonwait._sha_lf: tracked text files
+    # are committed LF but check out CRLF under core.autocrlf on
+    # Windows; normalise before hashing so the working tree compares
+    # against the frozen (committed LF) bytes. Frozen SHAs unchanged.
+    raw = Path(p).read_bytes()
+    norm = raw.replace(b"\r\n", b"\n").replace(b"\r", b"\n")
+    return hashlib.sha256(norm).hexdigest()
+
+
 def test_prespec_frozen_shas():
     spec = w2.load_prespec()
     assert w2.verify_frozen(spec)["runner"] == "ok"
+    # Regression for the Windows CRLF checkout: the frozen runner SHA
+    # is the committed LF bytes, so the LF-normalised working file
+    # must match even though the raw working bytes differ.
+    frozen = spec["frozen_policy"]["runner_config_sha256"]
+    assert _sha_lf(ROOT / "configs" / "opencode_r77_advisor.json") == frozen
 
 
 def test_no_replay_audit_runner_sources():

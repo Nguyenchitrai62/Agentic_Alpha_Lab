@@ -69,6 +69,35 @@ def _sha(path: Path) -> str:
     return hashlib.sha256(Path(path).read_bytes()).hexdigest()
 
 
+def _sha_lf(path: Path) -> str:
+    """SHA256 with line endings normalised to LF.
+
+    Git-tracked text files (configs/*.json, scripts/*.py) are committed
+    with LF, but core.autocrlf converts them to CRLF on a Windows
+    checkout, so the raw working-tree bytes hash differently from the
+    frozen (committed LF) bytes. Normalising CRLF->LF (and lone CR->LF)
+    before hashing recovers the canonical bytes. Frozen SHA values are
+    unchanged: they already are the committed LF bytes.
+    """
+    raw = Path(path).read_bytes()
+    norm = raw.replace(b"\r\n", b"\n").replace(b"\r", b"\n")
+    return hashlib.sha256(norm).hexdigest()
+
+
+def _matches_frozen(path: Path, want: str) -> bool:
+    """True if the raw or the LF-normalised bytes match the frozen SHA.
+
+    Accepts both so tracked text verifies on LF checkouts (raw matches)
+    and CRLF checkouts (normalised matches). Binary checkpoints
+    (.safetensors) keep strict raw comparison at their call site: they
+    are git-ignored (no autocrlf conversion) and may contain natural
+    CRLF bytes, so normalising them would corrupt the comparison. The
+    same holds for git-ignored JSON artifacts whose frozen SHAs were
+    recorded on the working bytes as-is (raw matches there too).
+    """
+    return _sha(path) == want or _sha_lf(path) == want
+
+
 def load_prespec() -> dict:
     spec = json.loads(SPEC_PATH.read_text(encoding="utf-8"))
     assert spec["experiment"] == "opencode-r78-W2-nonwait-pipeline"
@@ -86,7 +115,8 @@ def verify_frozen(spec: dict) -> dict:
     fp = spec["frozen_policy"]
     recs = {}
     rc = fp["research_config"]
-    assert _sha(ROOT / rc["path"]) == rc["sha256"], "research config drift"
+    assert _matches_frozen(ROOT / rc["path"], rc["sha256"]), \
+        "research config drift"
     recs["research_config"] = rc["sha256"][:16]
     for rel, want in zip(fp["checkpoints"]["paths"],
                          fp["checkpoints"]["sha256"]):
@@ -94,16 +124,19 @@ def verify_frozen(spec: dict) -> dict:
     recs["checkpoints"] = [s[:16] for s in fp["checkpoints"]["sha256"]]
     for key in ("iso2", "iso4", "isoall"):
         m = fp["calibrators"][key]
-        assert _sha(ROOT / m["path"]) == m["sha256"], f"calibrator drift {key}"
+        assert _matches_frozen(ROOT / m["path"], m["sha256"]), \
+            f"calibrator drift {key}"
     recs["calibrators"] = {k: fp["calibrators"][k]["sha256"][:16]
                            for k in ("iso2", "iso4", "isoall")}
-    assert _sha(RUNNER_CONFIG_PATH) == fp["runner_config_sha256"]
+    assert _matches_frozen(RUNNER_CONFIG_PATH, fp["runner_config_sha256"]), \
+        "runner config drift"
     for name, rel, key in (
             ("infer", "scripts/opencode_r76_infer.py", "infer_sha256"),
             ("core", "scripts/opencode_r77_advisor_core.py", "core_sha256"),
             ("feedexec", "scripts/opencode_r76_feedexec.py",
              "feedexec_sha256")):
-        assert _sha(ROOT / rel) == spec["runner_path"][key], f"{name} drift"
+        assert _matches_frozen(ROOT / rel, spec["runner_path"][key]), \
+            f"{name} drift"
     recs["runner"] = "ok"
     return recs
 

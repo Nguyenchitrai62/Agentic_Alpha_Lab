@@ -12,9 +12,13 @@ pause hook, [r79_roll/1] version stamp.
 """
 import torch  # noqa: F401  (torch truoc pandas: DLL load-order Windows host)
 
+import gc
 import json
+import os
 import shutil
+import stat
 import sys
+import time
 from pathlib import Path
 
 import pandas as pd
@@ -59,6 +63,41 @@ def patched_identity(monkeypatch):
     return _collect
 
 
+def _rmtree_retry(path: Path, tries: int = 6, delay: float = 0.25) -> None:
+    """Windows-robust rmtree for the test out dir.
+
+    Cause of the intermittent PermissionError: on Windows a file with a
+    still-open handle (unclosed parquet/CSV handle from a previous
+    run_main in the same process, or a transient AV/indexer lock from a
+    previous pytest process) cannot be deleted. The old
+    shutil.rmtree(..., ignore_errors=True) masked the partial delete and
+    left stale state that flaked the next run. Fix in the test: release
+    straggler handles via gc.collect(), clear read-only bits via
+    onerror, and retry with short sleeps; a genuine lock still raises
+    loudly on the final attempt instead of being masked.
+    """
+    if not path.exists() and not path.is_symlink():
+        return
+
+    def _onerror(func, p, _exc_info):
+        try:
+            os.chmod(p, stat.S_IWRITE)
+        except OSError:
+            pass
+        try:
+            func(p)
+        except OSError:
+            pass
+
+    for _ in range(tries):
+        gc.collect()  # release any unclosed handles held by this process
+        shutil.rmtree(path, onerror=_onerror)
+        if not path.exists():
+            return
+        time.sleep(delay)
+    shutil.rmtree(path)  # final attempt without masking: real errors raise
+
+
 def run_main(argv, monkeypatch):
     monkeypatch.setattr(sys, "argv", ["opencode_r78_roll.py", *argv])
     roll.main()
@@ -68,7 +107,7 @@ def test_cli_fresh_resume_shifted_idempotent(patched_identity, monkeypatch):
     A_CLI.mkdir(parents=True, exist_ok=True)
     candles(30).to_parquet(A_CLI / "candles_30.parquet", index=False)
     out_rel = "artifacts/research/opencode_r79/a_cli/out_smoke"
-    shutil.rmtree(ROOT / out_rel, ignore_errors=True)
+    _rmtree_retry(ROOT / out_rel)
     run_main(["--mode", "replay", "--config", CFG,
               "--candles",
               "artifacts/research/opencode_r79/a_cli/candles_30.parquet",
