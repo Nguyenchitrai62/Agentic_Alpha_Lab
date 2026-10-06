@@ -121,3 +121,41 @@ Bot và backend **không tự chạy lại**. Thứ tự:
 - KPI: 41% tháng >= +5%, 72% tháng không lỗ, chuỗi lỗ dài nhất 2 tháng; thắng book 51,5%, dip 68,7%, toàn bộ 65,5%.
 - Go-live tiền thật nhỏ (sau tối thiểu 8 tuần paper, ĐỦ cả 4): (a) lợi nhuận paper ở phân vị >= 20 của bootstrap (`prospective_scorecard.py`); (b) DD paper <= 15%; (c) lệch bot so với plan <= 1,5 điểm %/tháng — kiểm tra bằng `python scripts/paper_divergence.py artifacts/bot/paper_d17bfg2` (trước 14 ngày báo `too early` là bình thường); (d) không `cycle_error` > 1 giờ, không vị thế thiếu stop. Tăng vốn sau 3 tháng live nếu (a)–(c) vẫn đúng.
 - Dừng: DD tài khoản > 20% → dừng mở mới, chỉ giữ SL/TP; lỗ một tháng > 10% → halve vốn tháng sau; phân vị lợi nhuận < 5 sau >= 8 tuần → dừng.
+
+## 7. Preflight chỉ-đọc trước testnet/live (`scripts/bot_preflight.py`, 2026-10-06)
+
+Chủ tài khoản chạy trước lần testnet/live đầu tiên (và sau mỗi lần đổi key/settings).
+Chỉ gọi endpoint V5 đọc (signed GET + public), không bao giờ đặt/hủy lệnh hay đổi Hedge/Cross/đòn bẩy;
+key đọc cùng cách `bot/run.py`, không in key. Testnet không cần mở khóa live.
+
+```bat
+.venv\Scripts\python.exe scripts/bot_preflight.py --mode testnet
+.venv\Scripts\python.exe scripts/bot_preflight.py --mode live
+```
+
+Checklist in tiếng Việt, exit 0 chỉ khi không có FAIL: key+quyền trade, tài khoản Unified,
+Hedge Mode, Cross, đòn bẩy 5x từng coin, vốn (cảnh báo < 10000 / < 5000), lệnh/vị thế lạ
+(link bot có dạng `b/d<phase><BTC|ETH|SOL|BNB|XRP>...`, còn lại là WARN), lệch giờ server (< 1s),
+minima sàn ở vốn hiện tại (cỡ lệnh theo pipeline khuyến nghị `--dip-mult 1.7`). Mỗi FAIL kèm bước
+sửa chính xác trên Bybit UI. Test: `tests/test_bot_preflight.py` (mock, PASS + mỗi FAIL).
+
+## 8. Sổ paper carry sleeve (`scripts/carry_paper.py`, 2026-10-06)
+
+Bằng chứng triển vọng cho tay carry (quy tắc đóng băng `research/tournament/oc_cashcarry/PLAN.md`:
+vào quarterly kế tiếp khi hợp đồng hiện tại còn <= 7 ngày hoặc lần đầu có hàng, chỉ khi basis
+năm hóa >= 4 %, long spot + short quarterly bằng notional, mỗi chân = f x vốn lúc vào, giữ tới
+giao hàng; phí spot taker 0,1 %/bên, futures vào 0,055 %, giao hàng 0,02 %). Chỉ đọc endpoint
+công khai Bybit V5 (`instruments-info` linear+inverse, `tickers` spot+futures, `delivery-price`
+lúc đáo hạn) — không key, không đặt/hủy lệnh, không bao giờ chạm tiền thật.
+
+```bat
+REM Paper carry (lũy thừa theo giờ hoặc chạy tay, idempotent):
+.venv\Scripts\python.exe scripts/carry_paper.py --once --equity 5000 --f 0.5 --tag carry
+```
+
+- State `artifacts/bot/paper_carry/state.json` (vị thế, basis lúc vào, phí, MtM theo giá mid,
+  P&L thực khi giao hàng) + `actions.jsonl` (entry/hold/settle/skip/no_eligible/delisted/error).
+  Sha256 quy tắc in đầu mỗi run; đổi quy tắc là đổi sha (không sửa lén).
+- Không hợp đồng đủ điều kiện / basis < 4 % / delist / lỗi API (retry/backoff) đều chỉ ghi log,
+  không crash vòng lặp. Kiểm tra: `tests/test_carry_paper.py` (client giả: vào, giữ, đáo hạn,
+  skip, delist, lỗi).
