@@ -26,7 +26,7 @@
 
 ## Carry quý
 - Carry (cash-and-carry quý) = mua coin thật + bán khống futures quý bằng nhau, ăn chênh giá khi đáo hạn [QUICKSTART_VI]. Ví dụ: mua 1 BTC spot + short 1 BTC quý Dec.
-- f = tỉ lệ vốn cho mỗi chân carry [QUICKSTART_VI]. Ví dụ: f=0,25 nghĩa là mỗi chân 0,25x vốn (tổng cần tới 1,5x khi 2 coin cùng mở).
+- f = tỉ lệ vốn cho mỗi chân carry [QUICKSTART_VI]. Ví dụ: f=0,25 nghĩa là mỗi chân 0,25x vốn (mua spot mỗi coin = 0,25x vốn; khi BTC và ETH cùng mở và các cặp chồng nhau lúc roll, tiền mặt dùng cho spot lên tới ~96% vốn — vì vậy không vượt f=0,25 [oc_utamargin]).
 - Basis = chênh giá futures so với giá hiện tại, tính %/năm [QUICKSTART_VI]. Ví dụ: basis >= 4%/năm mới vào, ETH 3,7% thì bỏ qua.
 
 ## Tài khoản và lệnh sàn
