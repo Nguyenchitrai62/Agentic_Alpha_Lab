@@ -261,3 +261,5 @@ Sources: `docs/FINAL_REPORT_VI.md`, `.claude/skills/alpha-lab-leader/research-ma
 - `kronos` | Kronos zero-shot forecasts | DIAGNOSTIC (leak) | BOOK IC neg; DIP V1 +2.52 (leak caveat) | 2026-10-06
 
 <!-- consistfix 2026-10-06: §4 oc_cashcarry + §10 oc_frontiercarry/oc_carrycombo appended headline +0.21/+0.13pp (5.533) is year-start conservative; expectation oc_carrycompound 5.634/16.75/16.66 (no number change); §10 oc_carryfric kept conservative numbers, added oc_carryfric2 compounded (G2+carry f=0.25 base 5.634, S1 4.780, S2 5.438, S3 4.806, S4 5.125, S5 5.111, no losing year; D13BF+carry base 5.198/14.82). Sources re-checked: oc_carryfric2 REPORT, oc_carrycompound REPORT (5.634), oc_carryfric REPORT (5.533). -->
+
+- 2026-10-06 oc_carryborrow: carry f = 0.5 with USDT borrow for the extra spot (10 / 15 %/yr APR) LOSES vs f = 0.25 (base 5.569 / 5.424 vs 5.634; S1 4.696 / 4.550 vs 4.780; DD +0.2-0.35 pp). Keep f = 0.25. research/tournament/oc_carryborrow/REPORT.md
