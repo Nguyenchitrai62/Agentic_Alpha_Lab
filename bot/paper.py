@@ -19,6 +19,8 @@ from pathlib import Path
 
 import pandas as pd
 
+from bot.bybit_v5 import cached_1m_rows
+
 MAKER, TAKER, FUNDING = 0.0002, 0.00055, 0.0001
 
 
@@ -150,13 +152,24 @@ class PaperExchange:
                 self.s["funding_paid"] += f
 
     def step(self, now=None):
-        """Process every CLOSED 1m bar since the last call (live Bybit klines)."""
+        """Process every CLOSED 1m bar since the last call (live Bybit klines,
+        shared across runners via the on-disk kline cache, TTL 20 s)."""
         now_ms = int(pd.Timestamp(now or pd.Timestamp.now(tz="UTC")).floor("min").timestamp() * 1000)
         for sym in self.symbols:
             start = int(self.s["last_ms"][sym])
             if start >= now_ms:
                 continue
-            rows = self.pub.public("/v5/market/kline", category="linear", symbol=sym, interval="1", start=start, end=now_ms - 1, limit=1000)["list"]
+            cache_dir = getattr(self, "cache_dir", None)
+
+            def _fetch(s=start, e=now_ms - 1, _sym=sym):
+                return self.pub.public("/v5/market/kline", category="linear", symbol=_sym,
+                                       interval="1", start=s, end=e, limit=1000)["list"]
+
+            try:
+                rows, _hit = cached_1m_rows(sym, start, now_ms, _fetch, cache_dir=cache_dir)
+            except Exception:
+                rows = self.pub.public("/v5/market/kline", category="linear", symbol=sym, interval="1",
+                                       start=start, end=now_ms - 1, limit=1000)["list"]
             for r in sorted(rows, key=lambda r: int(r[0])):
                 t = int(r[0])
                 if t < start or t >= now_ms:

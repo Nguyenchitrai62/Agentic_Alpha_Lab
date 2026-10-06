@@ -88,6 +88,12 @@ for fresh plans; a new fill has no exit orders until the next cycle (<= 20 s) pl
   chasing); after the window it cancels like any expired entry. Never adopts older positions, never market-enters,
   never adopts dips. Default off reproduces every old order bit-for-bit.
 
+## CHANGES (bot_opsfix 2026-10-06: shared kline cache + quiet skip log, default behaviour unchanged)
+- Shared public-kline cache `artifacts/bot/_kline_cache/<SYMBOL>.json` (TTL 20 s, file lock, existing 10006 backoff kept):
+  `last_close_1m`, paper `step()` 1m fills and the bear `klines_4h_opens` check all read through it, so N runners on one
+  machine make ~1 request per symbol per TTL; miss path fetches exactly as before.
+- `skipped_below_minimum` now logs once per (link, 4h bar) instead of every 20 s cycle (tests/test_bot_opsfix.py).
+
 ## Failure modes (tests/test_bot_resilience.py, fake exchange, no network)
 - Restart mid-position: new Runner adopts state.json + exchange stops/TPs, no duplicate entries, filled rungs never re-placed.
 - Partial dip fill: TP/stop size to the filled qty, remainder stays resting (same link), budget counts only the filled part.

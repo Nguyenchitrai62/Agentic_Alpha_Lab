@@ -21,7 +21,7 @@ from pathlib import Path
 import pandas as pd
 
 from bot import mirror
-from bot.bybit_v5 import MAINNET, TESTNET, Bybit, BybitError, round_step
+from bot.bybit_v5 import MAINNET, TESTNET, Bybit, BybitError, cached_call, round_step
 from bot.paper import PaperExchange
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -101,6 +101,8 @@ class Runner:
         self._bear_at = None
         self._bear = False
         self._last_plan = None
+        self._skip_logged = {}
+        self._kline_cache_dir_override = None
         self.dir = ROOT / "artifacts/bot" / (mode if not self.tag else f"{mode}_{self.tag}")
         self.dir.mkdir(parents=True, exist_ok=True)
         self.state_f = self.dir / "state.json"
@@ -188,9 +190,40 @@ class Runner:
                 out[s] = (pd.Timestamp(int(k[1][0]), unit="ms", tz="UTC") + pd.Timedelta(minutes=5), float(k[1][4]))
         return out
 
+    def _kline_cache_dir(self):
+        return getattr(self, "_kline_cache_dir_override", None)
+
+    def _skip_bar(self, now) -> str:
+        try:
+            return str(pd.Timestamp(now).floor("4h"))
+        except (TypeError, ValueError):
+            return str(now)
+
+    def _log_skipped(self, skipped, now, equity) -> None:
+        """Log skipped_below_minimum once per (link, 4h bar); repeats in the same bar are dropped."""
+        if not skipped:
+            return
+        bar = self._skip_bar(now)
+        seen = getattr(self, "_skip_logged", None)
+        if not isinstance(seen, dict):
+            seen = self._skip_logged = {}
+        new = []
+        for k in skipped:
+            key = (str(k), bar)
+            if key not in seen:
+                new.append(k)
+            seen[key] = True
+        if len(seen) > 2000:  # bound memory: keep the current bar only
+            for key in list(seen):
+                if key[1] != bar:
+                    del seen[key]
+        if new:
+            self.log(dict(op="skipped_below_minimum", links=new, equity=equity))
+
     def last_close_1m(self) -> dict:
         """Last CLOSED 1m close per symbol (for correlation-aware dip sizing). Paper: the simulated exchange's
-        last_close; testnet / live / dry: Bybit public klines (interval 1, limit 2, take the closed bar)."""
+        last_close; testnet / live / dry: Bybit public klines (interval 1, limit 2, take the closed bar),
+        shared across runners via the on-disk kline cache (TTL 20 s)."""
         if self.mode == "paper":
             try:
                 return {s: float(v) for s, v in self.ex.s.get("last_close", {}).items() if v is not None}
@@ -198,15 +231,19 @@ class Runner:
                 return {}
         out: dict = {}
         for s in SYMS:
-            try:
+            def _fetch(s=s):
                 k = self.ex.klines(s, "1", 2)  # newest first: [0] = bar in progress, [1] = last closed bar
+                if len(k) > 1:
+                    return float(k[1][4])
+                raise ValueError("no closed 1m bar")
+            try:
+                val, _hit = cached_call(s, "close_1m", _fetch, cache_dir=self._kline_cache_dir())
             except Exception:
                 continue
-            if len(k) > 1:
-                try:
-                    out[s] = float(k[1][4])
-                except (TypeError, ValueError, IndexError):
-                    continue
+            try:
+                out[s] = float(val)
+            except (TypeError, ValueError):
+                continue
         return out
 
     def bear_now(self, now) -> bool:
@@ -219,7 +256,11 @@ class Runner:
         try:
             pub = getattr(self.ex, "pub", self.ex)
             fn = getattr(pub, "klines_4h_opens", None) or getattr(self.ex, "klines_4h_opens", None)
-            opens = fn("BTCUSDT") if fn is not None else []
+            if fn is None:
+                opens = []
+            else:
+                opens, _hit = cached_call("BTCUSDT", "opens_4h", lambda: fn("BTCUSDT"),
+                                          cache_dir=self._kline_cache_dir())
         except Exception:
             return self._bear if self._bear_at is not None else False
         b = bool(mirror.is_bear(opens))
@@ -346,8 +387,7 @@ class Runner:
                         if self.send(self.ex.amend, a["symbol"], a["link"], **kw) is not None or self.mode == "dry":
                             rest = self.state["links"][a["link"]].setdefault("rest", {})
                             rest.update({k2: a[k2] for k2 in ("price", "trigger", "qty") if k2 in a})
-                if skipped:
-                    self.log(dict(op="skipped_below_minimum", links=skipped, equity=equity))
+                self._log_skipped(skipped, now, equity)
                 self.state_f.write_text(json.dumps(self.state, indent=1, default=str))
                 if self.mode == "paper":
                     try:
@@ -447,8 +487,7 @@ class Runner:
                 if self.send(self.ex.amend, a["symbol"], a["link"], **kw) is not None or self.mode == "dry":
                     rest = self.state["links"][a["link"]].setdefault("rest", {})
                     rest.update({k2: a[k2] for k2 in ("price", "trigger", "qty") if k2 in a})
-        if skipped:
-            self.log(dict(op="skipped_below_minimum", links=skipped, equity=equity))
+        self._log_skipped(skipped, now, equity)
         # Unprotected positions: an open piece whose stop is wanted but rests nowhere and
         # whose placement just failed. Retry is automatic next cycle (want still has the
         # stop); after > 2 such cycles flatten at market (reduce-only) and log op=unprotected_close.
