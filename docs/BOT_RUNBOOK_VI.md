@@ -5,16 +5,16 @@
 > (đăng ký trước 2026-10-05, không sửa sau khi thấy dữ liệu paper).
 > Chi tiết kỹ thuật: `docs/BOT_EXECUTION.md`, code `bot/run.py`.
 
-> **CẢNH BÁO 2026-10-06:** phép đối chiếu bot-vs-engine (research/diagnostics/bot_parity_adopt) cho thấy cách bot cài
-> `--dip-gross-cap` hiện CHẶT HƠN engine (tính cả lệnh dip đang chờ, chia phòng tích lũy) -> tháng 9/2026 bot có trần chỉ +1,1 % so với
-> +3,6 % không trần. Đang sửa cho khớp engine (bot_capfix). Cho tới khi sửa xong: chạy KHÔNG có `--dip-gross-cap` hoặc chấp nhận lợi nhuận thấp hơn.
+> **CẬP NHẬT 2026-10-06 (bot_capfix):** cách bot cài `--dip-gross-cap` đã được sửa cho khớp engine (mỗi lệnh dip chờ <= phần trống = 2x vốn sub-book
+> trừ notional dip đang mở; giới hạn cứng 4x). Tháng 9/2026: có trần +3,20 % so với không trần +3,58 % (bản cũ chỉ +1,1 %). => Dùng lệnh (B) có
+> `--dip-gross-cap 2.0` làm cấu hình khuyến nghị (trần giảm lỗ phút tệ nhất khi gap -10 % từ 58 % xuống 33,5 % vốn).
 
 ## 1. Lệnh khuyến nghị (R2B1D17BF + trần an toàn)
 
 Mọi lệnh chạy từ thư mục repo root. Windows dùng `.venv\Scripts\python.exe`.
 
-- (A) KHUYẾN NGHỊ cho tới khi bản bot_capfix được merge và `docs/BOT_EXECUTION.md` xác nhận cap khớp engine: BỎ `--dip-gross-cap` (xem CẢNH BÁO đầu sổ tay).
-- (B) Chỉ dùng khi cap đã khớp engine: THÊM `--dip-gross-cap 2.0` vào cùng lệnh.
+- (A) Không trần (chỉ để so sánh): BỎ `--dip-gross-cap`.
+- (B) KHUYẾN NGHỊ (cap đã khớp engine từ 2026-10-06): THÊM `--dip-gross-cap 2.0` vào cùng lệnh.
 - Paper bot `d17bfg2` hiện đang chạy (B) — runner so sánh có trần, không dùng để kết luận lợi nhuận.
 
 ```bat
