@@ -284,7 +284,21 @@ def check_dir(d: Path, plan: dict | None, now: datetime, interval: float) -> dic
                 q = 0.0
             if isinstance(k, str) and "|" in k:
                 ex_qty[k] = q
-        for k in sorted(set(led_qty) | {x for x, q in ex_qty.items() if q > 0}):
+        # Carry sleeve (bot/carry.py, --carry-f): its dated-future shorts live in state['carry'], not in the piece ledger.
+        # Compare them against the carry ledger instead of flagging them as piece mismatches.
+        carry_pos = ((state.get("carry") or {}).get("positions") or {}) if isinstance(state, dict) else {}
+        carry_qty: dict = {}
+        for cp in carry_pos.values():
+            if isinstance(cp, dict) and cp.get("fut_filled") and cp.get("symbol"):
+                carry_qty[f"{cp['symbol']}|2"] = carry_qty.get(f"{cp['symbol']}|2", 0.0) + float(cp.get("qty", 0.0) or 0.0)
+        dated = {k for k in ex_qty if "-" in k.split("|", 1)[0]}  # dated futures (e.g. BTCUSDT-25DEC26) are carry-only
+        for k in sorted(dated):
+            cq, eq_ = carry_qty.get(k, 0.0), ex_qty.get(k, 0.0)
+            if abs(cq - eq_) > max(1e-9, 0.05 * max(cq, eq_)):  # carry ledger keeps the raw (pre-step) qty: allow rounding
+                mismatches.append(f"{k}:carry_ledger={carry_qty.get(k, 0.0):g} exch={ex_qty.get(k, 0.0):g}")
+        if carry_pos:
+            rep["carry_pairs"] = sorted(f"{c}:{(v or {}).get('symbol')}" for c, v in carry_pos.items())
+        for k in sorted((set(led_qty) | {x for x, q in ex_qty.items() if q > 0}) - dated):
             if abs(led_qty.get(k, 0.0) - ex_qty.get(k, 0.0)) > 1e-9:
                 mismatches.append(f"{k}:ledger={led_qty.get(k, 0.0):g} exch={ex_qty.get(k, 0.0):g}")
     else:
