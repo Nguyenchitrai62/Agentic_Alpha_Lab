@@ -1311,11 +1311,67 @@ class Runner:
         _t = _cycle_now()
         _gross = getattr(self, "dip_gross_cap", 0.0) or 0.0
         _adopt = bool(getattr(self, "adopt_fresh", False))
-        want = mirror.desired(plan, now, equity, led, risk_mult=self.risk_mult, corr=self.corr,
-                              last_close=lc, dip_mult=self.dip_mult,
-                              bear_book=self.bear_book, bear=bear,
-                              dip_cooldown_h=self.dip_cooldown_h, dip_sl_coin=self.dip_sl_coin,
-                              dip_gross_cap=_gross, adopt_fresh=_adopt)
+
+        def _on_plan_reject(rec):
+            try:
+                rec = dict(rec or {})
+                rec.setdefault("op", "plan_reject")
+                self.log(rec)
+            except Exception:
+                pass
+
+        try:
+            want = mirror.desired(plan, now, equity, led, risk_mult=self.risk_mult, corr=self.corr,
+                                  last_close=lc, dip_mult=self.dip_mult,
+                                  bear_book=self.bear_book, bear=bear,
+                                  dip_cooldown_h=self.dip_cooldown_h, dip_sl_coin=self.dip_sl_coin,
+                                  dip_gross_cap=_gross, adopt_fresh=_adopt, on_reject=_on_plan_reject)
+        except Exception as e:
+            # bot_soakfix B3: one bad plan row must never kill the cycle; log
+            # and keep protection from the ledger so open pieces stay managed.
+            try:
+                self.log(dict(op="plan_reject", reason=f"desired_error:{type(e).__name__}",
+                              note=str(e)[:200]))
+            except Exception:
+                pass
+            try:
+                want = self._protection_only(led)
+            except Exception:
+                want = {}
+        # bot_soakfix B2a (pre-entry dust guard): never place a book / dip entry
+        # whose filled qty could not carry its protection (qty*TP or qty*stop
+        # below the symbol minimum notional / lot). Sizing itself is untouched;
+        # dust rungs are skipped and logged op=dust_skip (kept in the skipped
+        # set too so the existing skipped_below_minimum signal is preserved).
+        _dust_skipped_links: list = []
+        try:
+            _dust_links: list = []
+            for _lk, _o in list(want.items()):
+                try:
+                    if getattr(_o, "kind", None) != "entry":
+                        continue
+                    _inst = (self.inst or {}).get(_o.symbol)
+                    if _inst is None:
+                        continue
+                    _meta = getattr(_o, "meta", {}) or {}
+                    if (_meta.get("kind") == "dip"):
+                        _tp, _sp = _meta.get("tp"), _meta.get("stop")
+                    else:
+                        _tp, _sp = _meta.get("tp"), _meta.get("sl")
+                    if mirror.entry_is_dust(getattr(_o, "qty", 0), _tp, _sp, _inst):
+                        _dust_links.append(_lk)
+                except Exception:
+                    continue
+            for _lk in _dust_links:
+                _o = want.pop(_lk, None)
+                try:
+                    self.log(dict(op="dust_skip", link=_lk, symbol=getattr(_o, "symbol", None),
+                                  reason="entry_protection_below_minimum"))
+                except Exception:
+                    pass
+            _dust_skipped_links = list(_dust_links)
+        except Exception:
+            pass
         if self.bear_book:
             if bear:
                 for o in want.values():
@@ -1387,6 +1443,15 @@ class Runner:
                 o = replace(o, qty=float(p["qty"]), price=float(p["price"]) if "price" in p else None,
                             trigger=float(p["triggerPrice"]) if "triggerPrice" in p else None)  # compare / amend in exchange units
                 rounded[k] = (o, p)
+        # bot_soakfix B2a: dust-skipped entries keep the legacy skipped_below_minimum signal too.
+        try:
+            for _lk in (_dust_skipped_links or []):
+                if _lk not in skipped:
+                    skipped.append(_lk)
+        except NameError:
+            pass
+        except Exception:
+            pass
         acts = mirror.diff({k: o for k, (o, _) in rounded.items()}, _have_without_carry(have_before),
                            amend_entry_qty=(self.corr or self.risk_mult != 1.0 or self.dip_mult != 1.0 or bool(getattr(self, "dip_gross_cap", 0.0))))
         acts = _acts_without_carry_cancel(acts)
@@ -1417,6 +1482,95 @@ class Runner:
                     rest = self.state["links"][a["link"]].setdefault("rest", {})
                     rest.update({k2: a[k2] for k2 in ("price", "trigger", "qty") if k2 in a})
         self._log_skipped(skipped, now, equity)
+        # bot_soakfix B2b (dust fallback): an open piece whose protection cannot
+        # rest on the exchange (qty below lot, or qty*TP / qty*stop below the
+        # symbol minimum notional, or non-positive / non-finite TP/stop) is
+        # closed with a reduce-only market order in the SAME cycle (taker fee),
+        # never left unprotected. Runs before the unprotected retry counter so
+        # dust never waits 2 cycles.
+        if self.mode != "dry":
+            for pid, pc in list(led.items()):
+                try:
+                    if not isinstance(pc, dict):
+                        continue
+                    try:
+                        _q = float(pc.get("qty", 0.0))
+                    except (TypeError, ValueError):
+                        continue
+                    if not _q > 0:
+                        continue
+                    _sym = pc.get("symbol")
+                    _inst = (self.inst or {}).get(_sym)
+                    if _inst is None:
+                        continue
+                    try:
+                        if mirror._market_inflight(pc, now):
+                            continue
+                    except Exception:
+                        pass
+                    try:
+                        _es = pc.get("exit_sent")
+                        if _es is not None and now - pd.Timestamp(_es) < pd.Timedelta(minutes=2):
+                            continue
+                    except (TypeError, ValueError, AttributeError):
+                        pass
+                    _tp_px = _sp_px = None
+                    try:
+                        for _k, _o in want.items():
+                            try:
+                                if getattr(_o, "piece", None) != pid:
+                                    continue
+                                if getattr(_o, "kind", None) == "tp" and _tp_px is None:
+                                    _tp_px = getattr(_o, "price", None)
+                                elif getattr(_o, "kind", None) == "stop" and _sp_px is None:
+                                    _sp_px = getattr(_o, "trigger", None)
+                            except (AttributeError, TypeError):
+                                continue
+                    except (AttributeError, TypeError):
+                        pass
+                    if _tp_px is None:
+                        _tp_px = pc.get("tp")
+                    if _sp_px is None:
+                        for _fk in ("backstop", "sl", "stop5", "stop"):
+                            try:
+                                _cand = pc.get(_fk)
+                            except (AttributeError, TypeError):
+                                _cand = None
+                            if _cand is not None:
+                                _sp_px = _cand
+                                break
+                    # Only judge dust when BOTH protection prices are known: a piece
+                    # with no plan levels yet (e.g. pending sub, no attached sl/tp)
+                    # is not dust — divergence / unprotected logic owns it.
+                    if _tp_px is None or _sp_px is None:
+                        continue
+                    try:
+                        _is_dust = bool(mirror.protection_is_dust(_q, _tp_px, _sp_px, _inst))
+                    except Exception:
+                        continue
+                    if not _is_dust:
+                        continue
+                    pc["exit_sent"] = str(now)
+                    try:
+                        _qq = round_step(_q, self.inst[_sym]["qty_step"])
+                    except (TypeError, ValueError, KeyError):
+                        continue
+                    _payload = dict(symbol=_sym, side="Sell" if pc.get("side", 1) > 0 else "Buy",
+                                    orderType="Market", qty=_qq, reduceOnly=True, orderLinkId=f"{pid}D{mirror.t36(now)}",
+                                    positionIdx=1 if pc.get("side", 1) > 0 else 2)
+                    try:
+                        self.log(dict(op="dust_close", piece=pid, payload=_payload, reason="protection_below_minimum"))
+                    except Exception:
+                        pass
+                    try:
+                        if self.send(self.ex.place, _payload) is not None:
+                            self.state["links"][_payload["orderLinkId"]] = dict(order=asdict(
+                                mirror.Order(_payload["orderLinkId"], _sym, _payload["side"], float(_qq), "reduce",
+                                             reduce_only=True, position_idx=_payload["positionIdx"], piece=pid)))
+                    except Exception:
+                        continue
+                except Exception:
+                    continue
         # Unprotected positions: an open piece whose stop is wanted but rests nowhere and
         # whose placement just failed. Retry is automatic next cycle (want still has the
         # stop); after > 2 such cycles flatten at market (reduce-only) and log op=unprotected_close.

@@ -1,17 +1,20 @@
-"""2-hour mini version of the BOT soak (OPENCODE_W_bot_soak) that pytest runs.
+"""2-hour mini version of the BOT soak (OPENCODE_W_bot_soak / bot_soak2) that pytest runs.
 
-Same harness as tests/soak_bot.py (72h), same deployment flags
+Same harness as tests/soak_bot.py (24h), same deployment flags
 (corr-size, dip-mult 1.7, bear-book, dip-gross-cap 2.0, adopt-fresh,
 carry-f 0.25) and fake clock, but only the first 2 simulated hours
-(360 cycles at 20 s/cycle) so it fits in a unit test.
+(360 cycles at 20 s/cycle, incl. the mid-replay restart) so it fits in a unit test.
 
 Known bot bug documented here (not a harness failure): hourly plan side
 flips can leave TWO open book pieces in one phase sub-book (old piece not
 yet diverged, new entry filled); bot/mirror.py desired() manages only the
 first piece found per (phase, symbol) (bot/mirror.py:301, `next(...)`), so
-the second piece rests with no stop/TP. The full 72h soak reports it with
+the second piece rests with no stop/TP. The full 24h soak reports it with
 evidence in docs/opencode/BOT_SOAK_20261006.md; this test xfails while any
 `protection` gap remains and passes cleanly once the bot is fixed.
+(bot_soakfix 2026-10-06: B1 now protects EVERY open book piece, so the
+first 2h of this window pass with 0 gaps; see
+docs/opencode/BOT_SOAKFIX_20261006.md for the 24h residual.)
 """
 
 import torch  # noqa: F401  (Windows DLL load order: torch before pandas)

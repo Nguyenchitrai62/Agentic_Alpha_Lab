@@ -22,6 +22,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
+import math
+
 import pandas as pd
 
 GRACE_MIN = 3
@@ -61,6 +63,70 @@ def _zero_dust(left: float, ref: float) -> float:
     except (TypeError, ValueError):
         pass
     return max(0.0, left)
+
+
+def _finite_pos(x) -> bool:
+    """True when x is a finite number > 0 (bot_soakfix B3: reject zero / negative / NaN / inf prices)."""
+    try:
+        v = float(x)
+    except (TypeError, ValueError):
+        return False
+    return math.isfinite(v) and v > 0
+
+
+def _emit_reject(on_reject, **rec) -> None:
+    """Forward a plan_reject record to the runner log when a callback is given (pure when None)."""
+    if on_reject is None:
+        return
+    try:
+        on_reject(dict(rec))
+    except Exception:
+        pass
+
+
+def entry_is_dust(qty, tp_px, stop_px, inst) -> bool:
+    """True when an entry's filled qty could not carry its protection on the exchange (bot_soakfix B2a).
+
+    Dust = qty below the lot minimum, or qty * TP / qty * stop below the
+    symbol minimum notional. Non-finite / non-positive prices count as dust
+    (B3 already skips them; this is the pre-entry guard for the rest).
+    Missing inst or unparseable minima -> not dust (never block on bad config).
+    """
+    try:
+        min_qty = float(inst["min_qty"])
+        min_not = float(inst["min_notional"])
+    except (TypeError, ValueError, KeyError, AttributeError):
+        return False
+    try:
+        q = float(qty)
+    except (TypeError, ValueError):
+        return True
+    # Strict lot check matching to_exchange (no tolerance): a float-edge
+    # remainder just below the lot cannot rest its protection on the exchange.
+    if not (math.isfinite(q) and q >= min_qty):
+        return True
+    for px in (tp_px, stop_px):
+        try:
+            p = float(px)
+        except (TypeError, ValueError):
+            return True
+        if not (math.isfinite(p) and p > 0):
+            return True
+        try:
+            if q * p < min_not - 1e-9:
+                return True
+        except (TypeError, ValueError):
+            return True
+    return False
+
+
+def protection_is_dust(qty, tp_px, stop_px, inst) -> bool:
+    """True when an OPEN piece's protection cannot rest on the exchange (bot_soakfix B2b).
+
+    Same test as entry_is_dust applied to the open qty and its TP / stop
+    prices: below lot, below notional, or non-positive / non-finite prices.
+    """
+    return entry_is_dust(qty, tp_px, stop_px, inst)
 
 
 def t36(ts) -> str:
@@ -283,8 +349,15 @@ def desired(plan: dict, now, equity: float, ledger: dict, budget: float = BUDGET
             corr: bool = False, last_close: dict | None = None, dip_mult: float = 1.0,
             bear_book: bool = False, bear: bool = False, dip_cooldown_h: float = 0.0,
             dip_sl_coin: dict | None = None, dip_gross_cap: float | None = None,
-            adopt_fresh: bool = False) -> dict[str, Order]:
-    """The order set that should rest on the exchange now (link id -> Order). Quantities are in coins, before exchange rounding."""
+            adopt_fresh: bool = False, on_reject=None) -> dict[str, Order]:
+    """The order set that should rest on the exchange now (link id -> Order). Quantities are in coins, before exchange rounding.
+
+    bot_soakfix: any dip rung / book entry whose limit price, TP or stop is
+    <= 0 or non-finite is skipped (plan_reject via on_reject when given) and
+    never divides by the limit price; each plan row is wrapped so one bad row
+    is skipped instead of raising; book protection is emitted for EVERY open
+    piece of each (phase, symbol), not only the first.
+    """
     now = pd.Timestamp(now)
     out: dict[str, Order] = {}
     rk = float(risk_mult)
@@ -312,18 +385,30 @@ def desired(plan: dict, now, equity: float, ledger: dict, budget: float = BUDGET
                     return float(_v.get("qty", 0) or 0) > 0
                 except (TypeError, ValueError):
                     return False
-            piece = next((k for k, v in ledger.items() if _book_match((k, v))), None)
+            pieces = [k for k, v in ledger.items() if _book_match((k, v))]
+            piece = pieces[0] if pieces else None
             if sub.get("state") == "pending" and o and o.get("kind") == "open":
-                pid = book_pid(ph, sym, o["issued"])
-                ok = _ts(o["issued"]) + pd.Timedelta(minutes=ENTRY_DELAY_MIN) <= now < _ts(o["valid_until"])
-                if ok and pid not in ledger:
-                    sgn = 1 if o["side"] == "BUY" else -1
-                    eqty = float(o["weight"]) * equity / float(o["price"]) * rk
-                    if bear_book and bear and sgn > 0:
-                        eqty *= 0.5
-                    out[pid + "E"] = Order(pid + "E", sym, "Buy" if sgn > 0 else "Sell", eqty,
-                                           "entry", price=float(o["price"]), position_idx=_pidx(sgn), piece=pid,
-                                           meta=dict(sl=o.get("sl_if_filled"), tp=o.get("tp_if_filled"), phase=ph, kind="book"))
+                try:
+                    pid = book_pid(ph, sym, o["issued"])
+                    ok = _ts(o["issued"]) + pd.Timedelta(minutes=ENTRY_DELAY_MIN) <= now < _ts(o["valid_until"])
+                    if ok and pid not in ledger:
+                        # bot_soakfix B3: never emit or divide by a non-positive / non-finite limit, SL or TP.
+                        if not (_finite_pos(o.get("price")) and _finite_pos(o.get("sl_if_filled"))
+                                and _finite_pos(o.get("tp_if_filled"))):
+                            _emit_reject(on_reject, op="plan_reject", reason="book_entry_nonpositive_price",
+                                         symbol=sym, phase=ph, price=o.get("price"),
+                                         sl=o.get("sl_if_filled"), tp=o.get("tp_if_filled"))
+                        else:
+                            sgn = 1 if o["side"] == "BUY" else -1
+                            eqty = float(o["weight"]) * equity / float(o["price"]) * rk
+                            if bear_book and bear and sgn > 0:
+                                eqty *= 0.5
+                            out[pid + "E"] = Order(pid + "E", sym, "Buy" if sgn > 0 else "Sell", eqty,
+                                                   "entry", price=float(o["price"]), position_idx=_pidx(sgn), piece=pid,
+                                                   meta=dict(sl=o.get("sl_if_filled"), tp=o.get("tp_if_filled"), phase=ph, kind="book"))
+                except Exception as e:
+                    _emit_reject(on_reject, op="plan_reject", reason=f"book_entry_error:{type(e).__name__}",
+                                 symbol=sym, phase=ph, note=str(e)[:160])
             if adopt_fresh and sub.get("state") == "position" and sub.get("position") and piece is None:
                 # --adopt-fresh (bot_bookgap): the paper plan already FILLED its book entry limit before the bot
                 # saw a pending order, so the sub-plan shows a fresh POSITION. Re-place the SAME limit the engine
@@ -348,7 +433,7 @@ def desired(plan: dict, now, equity: float, ledger: dict, budget: float = BUDGET
                 except (TypeError, ValueError, AttributeError):
                     opened, entry_px, w, sgn2 = None, 0.0, 0.0, 0
                     sl2 = tp2 = 0.0
-                if opened is not None and entry_px > 0 and w > 0 and sgn2 != 0 and sl2 > 0 and tp2 > 0:
+                if opened is not None and _finite_pos(entry_px) and w > 0 and sgn2 != 0 and _finite_pos(sl2) and _finite_pos(tp2):
                     apid = book_pid(ph, sym, opened)
                     if apid not in ledger and apid + "E" not in out:
                         try:
@@ -364,59 +449,105 @@ def desired(plan: dict, now, equity: float, ledger: dict, budget: float = BUDGET
                                                    meta=dict(sl=sl2, tp=tp2, phase=ph, kind="book", adopt=True,
                                                              opened=str(opened),
                                                              valid_until=str(opened + pd.Timedelta(minutes=ADOPT_WINDOW_MIN))))
-            if piece is None:
+            if not pieces:
                 continue
-            pc = ledger[piece]
-            if _market_inflight(pc, now):
-                continue  # a market exit of this piece is in flight: no TP/stop/add/reduce until it fills (bot_bookgap double-spend)
-            pos = sub.get("position")
-            if not pos and pc.get("sl") and pc.get("tp"):  # filled before the plan saw it: protect with the entry's attached levels
-                pos = {"sl": pc["sl"], "tp": pc["tp"]}
-            if pos:  # exits of the open book piece follow the plan's current SL / TP
-                pc_side = "Sell" if pc["side"] > 0 else "Buy"
-                out[piece + "S"] = Order(piece + "S", sym, pc_side, pc["qty"], "stop", trigger=float(pos["sl"]), reduce_only=True,
-                                         position_idx=_pidx(pc["side"]), piece=piece)
-                out[piece + "T"] = Order(piece + "T", sym, pc_side, pc["qty"], "tp", price=float(pos["tp"]), reduce_only=True,
-                                         position_idx=_pidx(pc["side"]), piece=piece)
-                if o and o.get("kind") in ("add", "reduce", "close") and now < _ts(o["valid_until"]):
-                    tag = f"{piece}{o['kind'][0].upper()}{t36(o['valid_until'])}"
-                    if o["kind"] == "add":
-                        aqty = float(o["amount"]) * equity / float(o["price"]) * rk
-                        if bear_book and bear and pc["side"] > 0:
-                            aqty *= 0.5
-                        out[tag] = Order(tag, sym, "Buy" if pc["side"] > 0 else "Sell", aqty, "add",
-                                         price=float(o["price"]), position_idx=_pidx(pc["side"]), piece=piece)
-                    else:
-                        q = pc["qty"] if o["kind"] == "close" else pc["qty"] * min(1.0, float(o["amount"]))
-                        out[tag] = Order(tag, sym, pc_side, q, "reduce", price=float(o["price"]), reduce_only=True,
-                                         position_idx=_pidx(pc["side"]), piece=piece)
+            # bot_soakfix B1: protection for EVERY open book piece of this
+            # (phase, symbol), not only the first (side-flip orphans). Plan
+            # add / reduce / close orders stay on the first piece only so a
+            # plan reduce is never duplicated across pieces.
+            for _pi, piece in enumerate(list(pieces)):
+                try:
+                    pc = ledger[piece]
+                    if _market_inflight(pc, now):
+                        continue  # a market exit of this piece is in flight: no TP/stop/add/reduce until it fills (bot_bookgap double-spend)
+                    pos = sub.get("position")
+                    if not pos and pc.get("sl") and pc.get("tp"):  # filled before the plan saw it: protect with the entry's attached levels
+                        pos = {"sl": pc["sl"], "tp": pc["tp"]}
+                    if not pos:  # no plan levels and no attached levels: nothing to protect with
+                        continue
+                    # bot_soakfix B3: non-positive / non-finite plan SL/TP never raises. An open piece is
+                    # never left bare: fall back to the levels attached at entry (leader fix, soakfix residual).
+                    try:
+                        _sl = float(pos["sl"])
+                        _tp = float(pos["tp"])
+                    except (TypeError, ValueError, KeyError, AttributeError):
+                        _sl = _tp = float("nan")
+                    # side-flip orphan: the plan's levels belong to the other side -> use the piece's own levels
+                    _pside = str(pos.get("side", "")).upper()
+                    if (_pside == "LONG" and pc["side"] < 0) or (_pside == "SHORT" and pc["side"] > 0):
+                        _sl = _tp = float("nan")
+                    if not (_finite_pos(_sl) and _finite_pos(_tp)):
+                        _emit_reject(on_reject, op="plan_reject", reason="book_protect_nonpositive_sl_tp",
+                                     symbol=sym, phase=ph, piece=piece, sl=pos.get("sl"), tp=pos.get("tp"))
+                        try:
+                            _sl = float(pc.get("sl"))
+                            _tp = float(pc.get("tp"))
+                        except (TypeError, ValueError):
+                            continue
+                        if not (_finite_pos(_sl) and _finite_pos(_tp)):
+                            continue
+                    pc_side = "Sell" if pc["side"] > 0 else "Buy"
+                    out[piece + "S"] = Order(piece + "S", sym, pc_side, pc["qty"], "stop", trigger=_sl, reduce_only=True,
+                                             position_idx=_pidx(pc["side"]), piece=piece)
+                    out[piece + "T"] = Order(piece + "T", sym, pc_side, pc["qty"], "tp", price=_tp, reduce_only=True,
+                                             position_idx=_pidx(pc["side"]), piece=piece)
+                    if _pi == 0 and o and o.get("kind") in ("add", "reduce", "close") and now < _ts(o["valid_until"]):
+                        tag = f"{piece}{o['kind'][0].upper()}{t36(o['valid_until'])}"
+                        if o["kind"] == "add":
+                            if not _finite_pos(o.get("price")):
+                                _emit_reject(on_reject, op="plan_reject", reason="book_add_nonpositive_price",
+                                             symbol=sym, phase=ph, piece=piece, price=o.get("price"))
+                            else:
+                                aqty = float(o["amount"]) * equity / float(o["price"]) * rk
+                                if bear_book and bear and pc["side"] > 0:
+                                    aqty *= 0.5
+                                out[tag] = Order(tag, sym, "Buy" if pc["side"] > 0 else "Sell", aqty, "add",
+                                                 price=float(o["price"]), position_idx=_pidx(pc["side"]), piece=piece)
+                        else:
+                            if not _finite_pos(o.get("price")):
+                                _emit_reject(on_reject, op="plan_reject", reason="book_reduce_nonpositive_price",
+                                             symbol=sym, phase=ph, piece=piece, price=o.get("price"))
+                            else:
+                                q = pc["qty"] if o["kind"] == "close" else pc["qty"] * min(1.0, float(o["amount"]))
+                                out[tag] = Order(tag, sym, pc_side, q, "reduce", price=float(o["price"]), reduce_only=True,
+                                                 position_idx=_pidx(pc["side"]), piece=piece)
+                except Exception as e:
+                    _emit_reject(on_reject, op="plan_reject", reason=f"book_piece_error:{type(e).__name__}",
+                                 symbol=sym, phase=ph, piece=str(piece), note=str(e)[:160])
+                    continue
         # dip pieces already open: take-profit + native backstop (the 5m-close stop and the time exit are bot actions, see exits())
         # A piece with a market exit in flight carries no other resting order (same double-spend rule as book pieces).
         for pid, pc in ledger.items():
             # F4: .get defaults so pre-frac/dist ledgers never raise KeyError.
-            if not isinstance(pc, dict):
-                continue
             try:
-                _q = float(pc.get("qty", 0) or 0)
-            except (TypeError, ValueError):
-                continue
-            if pc.get("kind") != "dip" or pc.get("symbol") != sym or not _q > 0 or _market_inflight(pc, now):
-                continue
-            try:
-                _tp = float(pc.get("tp"))
-            except (TypeError, ValueError):
-                continue
-            if not _tp > 0:
-                continue
-            out[pid + "T"] = Order(pid + "T", sym, "Sell", _q, "tp", price=_tp, reduce_only=True, position_idx=1, piece=pid)
-            if pc.get("backstop"):
+                if not isinstance(pc, dict):
+                    continue
                 try:
-                    _bs = float(pc.get("backstop"))
+                    _q = float(pc.get("qty", 0) or 0)
                 except (TypeError, ValueError):
-                    _bs = 0.0
-                if _bs > 0:
-                    out[pid + "S"] = Order(pid + "S", sym, "Sell", _q, "stop", trigger=_bs, reduce_only=True,
-                                           position_idx=1, piece=pid)
+                    continue
+                if pc.get("kind") != "dip" or pc.get("symbol") != sym or not _q > 0 or _market_inflight(pc, now):
+                    continue
+                try:
+                    _tp = float(pc.get("tp"))
+                except (TypeError, ValueError):
+                    continue
+                # bot_soakfix B3: non-positive / non-finite TP never raises and never emits.
+                if not _finite_pos(_tp):
+                    continue
+                out[pid + "T"] = Order(pid + "T", sym, "Sell", _q, "tp", price=_tp, reduce_only=True, position_idx=1, piece=pid)
+                if pc.get("backstop"):
+                    try:
+                        _bs = float(pc.get("backstop"))
+                    except (TypeError, ValueError):
+                        _bs = 0.0
+                    if _finite_pos(_bs):
+                        out[pid + "S"] = Order(pid + "S", sym, "Sell", _q, "stop", trigger=_bs, reduce_only=True,
+                                               position_idx=1, piece=pid)
+            except Exception as e:
+                _emit_reject(on_reject, op="plan_reject", reason=f"dip_protect_error:{type(e).__name__}",
+                             symbol=sym, piece=str(pid), note=str(e)[:160])
+                continue
     # dip bids: admitted shallow-first inside each sub-book's risk budget (open rungs count first).
     # Partially filled rungs count only the filled part (frac scaled by filled/planned).
     used = {ph: 0.0 for ph in caps}
@@ -454,31 +585,57 @@ def desired(plan: dict, now, equity: float, ledger: dict, budget: float = BUDGET
     bids = []
     for sym, c in (plan.get("coins") or {}).items():
         for d in c.get("dips", []):
-            a0, a1 = _ts(d["active_from"]), _ts(d["active_until"])
-            if not (a0 <= now < a1 + pd.Timedelta(minutes=1)):  # the paper 'filled' flag is ignored: the exchange ledger is the truth
+            try:
+                a0, a1 = _ts(d["active_from"]), _ts(d["active_until"])
+                if not (a0 <= now < a1 + pd.Timedelta(minutes=1)):  # the paper 'filled' flag is ignored: the exchange ledger is the truth
+                    continue
+                bar = a0 - pd.Timedelta(minutes=16)
+                pid = dip_pid(d["phase"], sym, d["rung"], bar)
+                if pid in ledger:
+                    continue
+                bids.append((float(d["rung"]), d["phase"], sym, pid, d, bar))
+            except Exception as e:
+                _emit_reject(on_reject, op="plan_reject", reason=f"dip_row_error:{type(e).__name__}",
+                             symbol=sym, note=str(e)[:160])
                 continue
-            bar = a0 - pd.Timedelta(minutes=16)
-            pid = dip_pid(d["phase"], sym, d["rung"], bar)
-            if pid in ledger:
-                continue
-            bids.append((float(d["rung"]), d["phase"], sym, pid, d, bar))
     for rung, ph, sym, pid, d, bar in sorted(bids, key=lambda b: (b[0], b[1], b[2])):
-        if dip_cooled(sym, ph, bar, ledger, dip_cooldown_h):
-            continue  # v417 row C: stop cooldown s < B <= s + H (per phase sub-book); open/resting pieces unaffected
-        frac, lv = float(d["size_frac"]), float(d["buy_limit"])
-        stop_px = dip_stop_price(d, sym, dip_sl_coin)  # v417 row X: per-coin close-stop (default = row stop)
-        dist = (lv - stop_px) / lv if lv else 0.0
-        # engine rule (v400 / v406): the budget 0.26 k counts the ACTUAL rung size (risk k, dip_mult and the corr multiplier included), so
-        # k and dip_mult cancel (v406 scales the budget by the same dip multiplier):
-        # admit while sum(frac * corr_mult * (dist + gap)) <= 0.26 x sub capital
-        mult = corr_mult(dips_by_phase.get(ph, {}), last_close, sym) if corr else 1.0
-        cost = frac * mult * (dist + GAP)
-        if used.get(ph, 0.0) + cost > budget * caps.get(ph, 0.25) + 1e-12:
+        try:
+            if dip_cooled(sym, ph, bar, ledger, dip_cooldown_h):
+                continue  # v417 row C: stop cooldown s < B <= s + H (per phase sub-book); open/resting pieces unaffected
+            # bot_soakfix B3: never emit or divide by a non-positive / non-finite limit, TP or stop.
+            try:
+                frac = float(d["size_frac"])
+                lv = float(d["buy_limit"])
+                _dtp = float(d["tp"])
+            except (TypeError, ValueError, KeyError, AttributeError):
+                _emit_reject(on_reject, op="plan_reject", reason="dip_rung_bad_numbers",
+                             symbol=sym, phase=ph, pid=pid)
+                continue
+            try:
+                stop_px = dip_stop_price(d, sym, dip_sl_coin)  # v417 row X: per-coin close-stop (default = row stop)
+            except Exception:
+                stop_px = 0.0
+            if not (_finite_pos(lv) and _finite_pos(_dtp) and _finite_pos(stop_px)):
+                _emit_reject(on_reject, op="plan_reject", reason="dip_rung_nonpositive_price",
+                             symbol=sym, phase=ph, pid=pid, buy_limit=d.get("buy_limit"),
+                             tp=d.get("tp"), stop=stop_px)
+                continue
+            dist = (lv - stop_px) / lv
+            # engine rule (v400 / v406): the budget 0.26 k counts the ACTUAL rung size (risk k, dip_mult and the corr multiplier included), so
+            # k and dip_mult cancel (v406 scales the budget by the same dip multiplier):
+            # admit while sum(frac * corr_mult * (dist + gap)) <= 0.26 x sub capital
+            mult = corr_mult(dips_by_phase.get(ph, {}), last_close, sym) if corr else 1.0
+            cost = frac * mult * (dist + GAP)
+            if used.get(ph, 0.0) + cost > budget * caps.get(ph, 0.25) + 1e-12:
+                continue
+            used[ph] = used.get(ph, 0.0) + cost
+            out[pid + "E"] = Order(pid + "E", sym, "Buy", frac * equity / lv * rk * mult * float(dip_mult), "entry", price=lv, position_idx=1, piece=pid,
+                                   meta=dict(kind="dip", phase=ph, tp=float(d["tp"]), stop=stop_px, backstop=d.get("backstop"),
+                                             t_exit=str(bar + pd.Timedelta(hours=4)), frac=frac * mult, dist=dist))
+        except Exception as e:
+            _emit_reject(on_reject, op="plan_reject", reason=f"dip_bid_error:{type(e).__name__}",
+                         symbol=sym, phase=ph, pid=str(pid), note=str(e)[:160])
             continue
-        used[ph] = used.get(ph, 0.0) + cost
-        out[pid + "E"] = Order(pid + "E", sym, "Buy", frac * equity / lv * rk * mult * float(dip_mult), "entry", price=lv, position_idx=1, piece=pid,
-                               meta=dict(kind="dip", phase=ph, tp=float(d["tp"]), stop=stop_px, backstop=d.get("backstop"),
-                                         t_exit=str(bar + pd.Timedelta(hours=4)), frac=frac * mult, dist=dist))
     # Partially filled dip entries: the remainder stays resting (same piece/link).
     # Protection (tp/stop above) is already sized to the filled qty; the budget above
     # counts only the filled part, so the remainder does not consume extra budget here.
