@@ -39,6 +39,10 @@ book-refresh direction without touching the last year again. No statistic from 2
 Rationale: book trades are structurally ~50%% winners and all profit comes from longs held > 4 days while
 shorts hedge bear years; a calibrated rank->size mapping targets worst-year selection directly.
 
+PROCESS NOTE (2026-10-06, disclosed): Kaggle run v2 exposed a calibration bug (Platt label rank>0 has base rate ~0.4 ->
+calibrated score p*2-1 < 0 almost always -> every member short/flat in every year; dev R 0.88 %/mo). Fixed by centring on
+the calibration-fold base rate (pre-cutoff data only); no other change. The buggy run is kept as C2-bug (not a model result).
+
 Usage:
   python research/tournament/oc_bookmodel_impl/c2_rank_calibrated.py --smoke
   python research/tournament/oc_bookmodel_impl/c2_rank_calibrated.py --full --out <dir>
@@ -85,18 +89,23 @@ def fit_calibrator(tr_rank_pred: np.ndarray, tr_rank_true: np.ndarray):
     """Platt (logistic) with isotonic fallback; fit on train-calibration fold only."""
     m = tr_rank_pred.reshape(-1, 1)
     try:
-        lr = LogisticRegression().fit(m, (tr_rank_true > 0).astype(int))
-        return ("platt", lr)
+        lab = (tr_rank_true > 0).astype(int)
+        lr = LogisticRegression().fit(m, lab)
+        # BUGFIX 2026-10-06 (leader, disclosed): the label rank>0 = top 2 of 5 coins has base rate ~0.4, so p*2-1 was
+        # almost always < 0 (all members short/flat every year in the first Kaggle run). Centre on the calibration-fold
+        # base rate (pre-cutoff rows only) so the calibrated score is mean-zero in training, as the design intended.
+        return ("platt", lr, float(lab.mean()))
     except Exception:
         ir = IsotonicRegression(out_of_bounds="clip").fit(tr_rank_pred, tr_rank_true)
         return ("isotonic", ir)
 
 
 def apply_calibrator(cal, pred: np.ndarray) -> np.ndarray:
-    kind, m = cal
+    kind, m = cal[0], cal[1]
     if kind == "platt":
         p = m.predict_proba(pred.reshape(-1, 1))[:, 1]
-        return p * 2 - 1
+        base = cal[2] if len(cal) > 2 else 0.5
+        return (p - base) * 2
     return m.predict(pred)
 
 
