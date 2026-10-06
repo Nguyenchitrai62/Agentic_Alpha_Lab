@@ -87,3 +87,8 @@ Hiện chỉ có 6 cú flush 2,5σ / 30 ngày trên 5 coin (lịch sử p25 = 7,
 - G2 đầy đủ (book + dip, 4 pha) 2026-09-30 .. 10-06 (6 ngày): **+2,0 %**, phân vị 72,7 so với các cửa sổ 6 ngày lịch sử (p5 −3,3 / p50 +0,5 / p95 +7,5), DD 0,77 %, 9/10 lệnh đóng thắng [oc_bookoos].
 - Dip sleeve riêng 2026-09-24 .. 10-06 (12 ngày): +0,19 %, phân vị 37,8 [oc_oos12d]. Mẫu rất nhỏ — chỉ để xác nhận "trong biên", không phải kết luận mục tiêu.
 - Chạy lại hằng tuần: `.venv/Scripts/python.exe research/diagnostics/oc_bookoos/score_oos.py --fetch --run`
+
+## G2 + carry dưới ma sát (lãi carry tái đầu tư) [oc_carryfric2]
+Không ma sát 5,63; trễ 15 phút (S2) 5,44; trượt stop 50 % (S4) 5,13; giá Bybit (S5) 5,11 — đều >= 5 %/tháng, không năm lỗ. Chỉ dưới 5 ở
+phí gấp đôi (S1, maker 0,04 % / taker 0,12 %: 4,78) và trễ 30 phút (S3: 4,81). Với BOT, S3 ít liên quan (bot chạy mỗi ~25 giây) và S1 bi quan hơn
+phí Bybit VIP0 thật (0,02 % / 0,055 %); nhưng đó vẫn là rủi ro thật nếu phí tăng hoặc bot/máy chủ trễ lâu — đừng coi 5 %/tháng là chắc chắn.
