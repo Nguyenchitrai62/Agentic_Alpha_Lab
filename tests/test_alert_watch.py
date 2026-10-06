@@ -112,6 +112,39 @@ def test_new_incident_while_other_open_toasts_only_new(tmp_path):
     assert len(calls) == 1
 
 
+def test_backend_down_fires_critical():
+    out = aw.extract_incidents("paper_d17bfg2", healthy_rep(), healthy_stop(), {}, False,
+                               backend_down=True, backend_detail="khong noi duoc")
+    assert [i["kind"] for i in out] == ["backend_down"]
+    assert out[0]["severity"] == "critical"
+    assert out[0]["key"] == "backend:down"
+    # poll_once toast 1 lan cho incident backend moi (fake collect)
+    calls = []
+    open_map: dict = {}
+    import tempfile
+    with tempfile.TemporaryDirectory() as td:
+        from pathlib import Path as _P
+        log = _P(td) / "alerts.log"
+        r = aw.poll_once(_P(td), NOW, open_map, log_path=log,
+                         notifier=lambda t, b: calls.append((t, b)),
+                         collect_fn=lambda _r, _n: out)
+        assert len(r["new"]) == 1 and len(calls) == 1
+
+
+def test_plan_warn_vs_stale_levels():
+    warn = aw.extract_incidents("r", healthy_rep(), healthy_stop(), {}, False,
+                                plan_warn=True, plan_warn_detail="plan cu 2.0h")
+    assert [i["kind"] for i in warn] == ["plan_warn"]
+    assert warn[0]["severity"] == "warning"
+    stale = aw.extract_incidents("r", healthy_rep(), healthy_stop(), {}, True, "plan CU 5.0h")
+    assert [i["kind"] for i in stale] == ["plan_stale"]
+    assert stale[0]["severity"] == "critical"
+    # stale uu tien hon warn (khong double-count)
+    both = aw.extract_incidents("r", healthy_rep(), healthy_stop(), {}, True, "stale",
+                                plan_warn=True, plan_warn_detail="warn")
+    assert [i["kind"] for i in both] == ["plan_stale"]
+
+
 def test_collect_incidents_reads_real_runner_dirs(tmp_path):
     import json
     t = NOW.isoformat()
@@ -128,5 +161,64 @@ def test_collect_incidents_reads_real_runner_dirs(tmp_path):
     p = tmp_path / "artifacts" / "research" / "advisor_shadow" / "trade_plan_v376.json"
     p.parent.mkdir(parents=True, exist_ok=True)
     p.write_text(json.dumps({"generated_at": t}), encoding="utf-8")
-    out = aw.collect_incidents(tmp_path, NOW)
-    assert out == []  # runner khoe + plan tuoi -> khong incident
+    out = aw.collect_incidents(tmp_path, NOW,
+                               check_backend_fn=lambda: (False, "backend song (fake)"))
+    assert out == []  # runner khoe + plan tuoi + backend ok -> khong incident
+
+
+def test_collect_backend_down_and_state_stale(tmp_path):
+    import json
+    import os
+    t = NOW.isoformat()
+    d = tmp_path / "artifacts" / "bot" / "paper_d17bfg2"
+    d.mkdir(parents=True, exist_ok=True)
+    (d / "actions.jsonl").write_text("", encoding="utf-8")  # khong timestamp -> stale
+    (d / "state.json").write_text(json.dumps({"ledger": {}, "links": {}}), encoding="utf-8")
+    old = NOW.timestamp() - 600  # state.json cu 10 phut
+    os.utime(d / "state.json", (old, old))
+    os.utime(d / "actions.jsonl", (old, old))
+    p = tmp_path / "artifacts" / "research" / "advisor_shadow" / "trade_plan_v376.json"
+    p.parent.mkdir(parents=True, exist_ok=True)
+    p.write_text(json.dumps({"generated_at": t}), encoding="utf-8")
+    out = aw.collect_incidents(tmp_path, NOW,
+                               check_backend_fn=lambda: (True, "khong noi duoc (fake)"),
+                               runners=("paper_d17bfg2",))
+    kinds = sorted(i["kind"] for i in out)
+    assert "backend_down" in kinds  # (a) /health khong dap ung -> CRITICAL
+    assert "cycle_stale" in kinds  # (c) state.json > 5 phut -> CRITICAL
+
+
+def test_collect_plan_warn_and_stale(tmp_path):
+    import json
+    from datetime import timedelta
+    for age_h, want in ((2.0, "plan_warn"), (5.0, "plan_stale")):
+        t = (NOW - timedelta(hours=age_h)).isoformat()
+        d = tmp_path / "artifacts" / "bot" / "paper_d17bfg2"
+        d.mkdir(parents=True, exist_ok=True)
+        (d / "actions.jsonl").write_text(json.dumps({"t": NOW.isoformat()}) + "\n", encoding="utf-8")
+        (d / "state.json").write_text(json.dumps({"ledger": {}, "links": {}}), encoding="utf-8")
+        p = tmp_path / "artifacts" / "research" / "advisor_shadow" / "trade_plan_v376.json"
+        p.parent.mkdir(parents=True, exist_ok=True)
+        p.write_text(json.dumps({"generated_at": t}), encoding="utf-8")
+        out = aw.collect_incidents(tmp_path, NOW,
+                                   check_backend_fn=lambda: (False, "ok (fake)"),
+                                   runners=("paper_d17bfg2",))
+        kinds = [i["kind"] for i in out]
+        assert want in kinds, (age_h, kinds)  # (b) 1h15m WARNING / 4h30m CRITICAL
+
+
+def test_once_prints_incident_list_and_exits(tmp_path, capsys):
+    import json
+    t = NOW.isoformat()
+    d = tmp_path / "artifacts" / "bot" / "paper_d17bfg2"
+    d.mkdir(parents=True, exist_ok=True)
+    (d / "actions.jsonl").write_text(json.dumps({"t": t}) + "\n", encoding="utf-8")
+    (d / "state.json").write_text(json.dumps({"ledger": {}, "links": {}}), encoding="utf-8")
+    p = tmp_path / "artifacts" / "research" / "advisor_shadow" / "trade_plan_v376.json"
+    p.parent.mkdir(parents=True, exist_ok=True)
+    p.write_text(json.dumps({"generated_at": t}), encoding="utf-8")
+    rc = aw.main(["--once", "--no-toast", "--root", str(tmp_path),
+                  "--log", str(tmp_path / "alerts.log"), "paper_d17bfg2"])
+    assert rc in (0, 2)  # 2 neu backend that dang tat, 0 neu backend dang song
+    txt = capsys.readouterr().out.lower()
+    assert "incident" in txt  # --once in danh sach incident hien tai roi thoat

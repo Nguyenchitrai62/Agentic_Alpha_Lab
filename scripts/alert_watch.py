@@ -15,17 +15,18 @@ incident moi + ghi them vao artifacts/alerts/alerts.log; khi het thi ghi
 bo nho tien trinh).
 
 6 loai CRITICAL theo doi:
+  (0) backend_down: GET /health localhost that bai (backend tat: plan se cu),
   (1) unprotected: vi the mo thieu stop hoac TP (bot_health.unprotected),
   (2) qty_mismatch: so bot lech vi the san (bot_health.qty_mismatch),
   (3) cycle_stale: chu ky cuoi > 5 phut (state.json mtime / actions.jsonl),
-  (4) plan_stale: plan > 4h30m (daily_status.check_plan),
+  (4) plan_stale: plan > 4h30m CRITICAL, plan > 1h15m WARNING (daily_status.check_plan),
   (5) stop_rule: stop_rules STOP (DD > 20% / lo thang > 10% / phan vi < 5 sau >= 8 tuan),
   (6) carry_unhedged: chan carry lech hedge > 2 cycle (state carry.positions[*].unhedged_cycles).
 
 Toast Windows: BurntToast KHONG co san nen dung [Windows.UI.Notifications]
 co san qua powershell; that bai -> fallback `msg` / beep console.
-LOCAL ONLY: khong gui di dau, khong credentials, khong network (chi doc file
-local; khong goi backend HTTP).
+LOCAL ONLY: khong gui di dau, khong credentials, chi localhost
+(GET /health 127.0.0.1 + doc file local; khong start/stop process, khong commit).
 """
 from __future__ import annotations
 
@@ -44,7 +45,10 @@ ALERT_LOG_REL = Path("artifacts/alerts/alerts.log")
 
 RUNNERS = ("paper_d17bfg2", "paper_d17bfg2c")
 CYCLE_STALE_S = 300.0      # last cycle > 5 phut
+PLAN_WARN_H = 1.25         # plan > 1h15m = WARNING
 PLAN_STALE_H = 4.5         # plan > 4h30m
+HEALTH_URL = "http://127.0.0.1:8724/health"  # localhost only
+HEALTH_TIMEOUT = 3.0
 MAX_UNHEDGED_CYCLES = 2    # carry lech hedge > 2 cycle
 DEFAULT_INTERVAL = 20.0    # bot loop interval (cho bot_health.check_dir)
 
@@ -84,23 +88,47 @@ def _plan_age_h(plan) -> float | None:
     return (utcnow() - gen).total_seconds() / 3600
 
 
+def check_backend_down(url: str = HEALTH_URL, timeout: float = HEALTH_TIMEOUT) -> tuple[bool, str]:
+    """GET /health localhost; True+detail khi khong noi duoc (CRITICAL). Khong bao gio raise."""
+    try:
+        if daily_status is not None and hasattr(daily_status, "check_backend"):
+            res = daily_status.check_backend(url, timeout)
+            down = (not res.get("ok")) or res.get("severity") == "critical"
+            return bool(down), str(res.get("line", ""))
+    except Exception as e:  # phong thu: loi code check -> khong bao dong gia
+        return False, f"check loi: {type(e).__name__}"
+    try:
+        import urllib.request
+        with urllib.request.urlopen(url, timeout=timeout) as r:
+            code = getattr(r, "status", 200)
+            if code != 200:
+                return True, f"backend tat: plan se cu (HTTP {code})"
+            return False, "backend song (GET /health OK)"
+    except Exception as e:
+        return True, f"backend tat: plan se cu (khong noi duoc {url}: {type(e).__name__})"
+
+
 def extract_incidents(runner: str, rep: dict | None, stop_rep: dict | None,
                        carry_positions: dict | None, plan_stale: bool,
-                       plan_detail: str = "") -> list[dict]:
-    """Pure: tu ket qua health (co the fake trong test) -> danh sach incident CRITICAL.
+                       plan_detail: str = "",
+                       plan_warn: bool = False, plan_warn_detail: str = "",
+                       backend_down: bool = False,
+                       backend_detail: str = "") -> list[dict]:
+    """Pure: tu ket qua health (co the fake trong test) -> danh sach incident.
 
-    Moi incident: {"key", "runner", "kind", "title", "detail"}; key on dinh de de-dup.
+    Moi incident: {"key", "runner", "kind", "severity", "title", "detail"};
+    key on dinh de de-dup. CRITICAL cho moi muc tru plan_warn (WARNING).
     """
     out: list[dict] = []
     rep = rep or {}
     for item in rep.get("unprotected") or []:
         out.append({"key": f"{runner}:unprotected:{item}", "runner": runner,
-                    "kind": "unprotected",
+                    "kind": "unprotected", "severity": "critical",
                     "title": f"{runner}: vi the thieu stop/TP",
                     "detail": str(item)})
     for item in rep.get("qty_mismatch") or []:
         out.append({"key": f"{runner}:qty:{item}", "runner": runner,
-                    "kind": "qty_mismatch",
+                    "kind": "qty_mismatch", "severity": "critical",
                     "title": f"{runner}: lech so lieu voi san",
                     "detail": str(item)})
     try:
@@ -111,19 +139,29 @@ def extract_incidents(runner: str, rep: dict | None, stop_rep: dict | None,
     if age_s is None or age_s > CYCLE_STALE_S:
         age_txt = "khong ro (khong co timestamp)" if age_s is None else f"{age_s / 60:.1f} phut truoc"
         out.append({"key": f"{runner}:cycle_stale", "runner": runner,
-                    "kind": "cycle_stale",
+                    "kind": "cycle_stale", "severity": "critical",
                     "title": f"{runner}: chu ky cuoi > 5 phut (runner dung?)",
                     "detail": f"last cycle {age_txt}"})
+    if backend_down:
+        out.append({"key": "backend:down", "runner": "-",
+                    "kind": "backend_down", "severity": "critical",
+                    "title": "backend tat: plan se cu",
+                    "detail": backend_detail or "GET /health khong dap ung"})
     if plan_stale:
         out.append({"key": "plan:stale", "runner": "-",
-                    "kind": "plan_stale",
+                    "kind": "plan_stale", "severity": "critical",
                     "title": "plan cu > 4h30m (bot chi giu bao ve)",
                     "detail": plan_detail or f"plan age > {PLAN_STALE_H}h"})
+    elif plan_warn:
+        out.append({"key": "plan:warn", "runner": "-",
+                    "kind": "plan_warn", "severity": "warning",
+                    "title": "plan cu > 1h15m",
+                    "detail": plan_warn_detail or f"plan age > {PLAN_WARN_H}h"})
     stops = ((stop_rep or {}).get("stops") or {}) if isinstance(stop_rep, dict) else {}
     for rule in ("dd", "month", "percentile"):
         if stops.get(rule) == "STOP":
             out.append({"key": f"{runner}:stop:{rule}", "runner": runner,
-                        "kind": "stop_rule",
+                        "kind": "stop_rule", "severity": "critical",
                         "title": f"{runner}: nguong DUNG ({rule})",
                         "detail": f"stop_rules {rule}=STOP"})
     if isinstance(carry_positions, dict):
@@ -135,7 +173,7 @@ def extract_incidents(runner: str, rep: dict | None, stop_rep: dict | None,
                 n = 0
             if n > MAX_UNHEDGED_CYCLES:
                 out.append({"key": f"{runner}:carry_unhedged:{coin}", "runner": runner,
-                            "kind": "carry_unhedged",
+                            "kind": "carry_unhedged", "severity": "critical",
                             "title": f"{runner}: carry {coin} lech hedge > 2 cycle",
                             "detail": f"{coin} unhedged_cycles={n} (> {MAX_UNHEDGED_CYCLES})"})
     return out
@@ -143,29 +181,46 @@ def extract_incidents(runner: str, rep: dict | None, stop_rep: dict | None,
 
 def collect_incidents(root: Path = ROOT, now: datetime | None = None,
                       interval: float = DEFAULT_INTERVAL,
-                      runners: tuple = RUNNERS) -> list[dict]:
-    """Doc health that (fast/local) cho cac runner trien khai. Khong bao gio raise."""
+                      runners: tuple = RUNNERS,
+                      backend_url: str = HEALTH_URL,
+                      check_backend_fn=None) -> list[dict]:
+    """Doc health that (local + GET /health localhost) cho cac runner. Khong bao gio raise."""
     now = now or utcnow()
     if bot_health is None:
         return [{"key": "watcher:no_bot_health", "runner": "-", "kind": "watcher",
-                 "title": "watcher: thieu scripts/bot_health.py",
-                 "detail": "khong doc duoc health (kiem tra cay repo)"}]
+                  "severity": "critical",
+                  "title": "watcher: thieu scripts/bot_health.py",
+                  "detail": "khong doc duoc health (kiem tra cay repo)"}]
     try:
         plan = bot_health.load_json(root / PLAN_REL)
     except Exception:
         plan = None
     plan_stale, plan_detail = False, ""
+    plan_warn, plan_warn_detail = False, ""
     try:
         if daily_status is not None:
             pres = daily_status.check_plan(root, now)
             plan_stale = pres.get("severity") == "critical"
-            plan_detail = pres.get("line", "")
+            plan_detail = pres.get("line", "") if plan_stale else ""
+            plan_warn = pres.get("severity") == "warning"
+            plan_warn_detail = pres.get("line", "") if plan_warn else ""
         else:
             age_h = _plan_age_h(plan)
             plan_stale = age_h is None or age_h > PLAN_STALE_H
             plan_detail = "khong doc duoc plan" if age_h is None else f"plan age {age_h:.1f}h"
+            plan_warn = (age_h is not None and age_h > PLAN_WARN_H) and not plan_stale
+            plan_warn_detail = "" if not plan_warn else f"plan age {age_h:.1f}h"
     except Exception:
         plan_stale, plan_detail = False, ""
+        plan_warn, plan_warn_detail = False, ""
+    try:
+        if check_backend_fn is not None:
+            _down, _detail = check_backend_fn()
+            backend_down, backend_detail = bool(_down), str(_detail)
+        else:
+            backend_down, backend_detail = check_backend_down(backend_url, HEALTH_TIMEOUT)
+    except Exception:
+        backend_down, backend_detail = False, ""
     out: list[dict] = []
     for runner in runners:
         d = root / BOT_REL / runner
@@ -175,7 +230,7 @@ def collect_incidents(root: Path = ROOT, now: datetime | None = None,
             rep = bot_health.check_dir(d, plan, now, interval)
         except Exception as e:  # phong thu: bo qua runner loi, watcher van chay
             out.append({"key": f"{runner}:read_error", "runner": runner,
-                        "kind": "watcher",
+                        "kind": "watcher", "severity": "critical",
                         "title": f"{runner}: khong doc duoc health",
                         "detail": f"{type(e).__name__}: {e}"[:200]})
             continue
@@ -188,8 +243,10 @@ def collect_incidents(root: Path = ROOT, now: datetime | None = None,
             carry = (st.get("carry") or {}).get("positions")
         except Exception:
             carry = None
-        out.extend(extract_incidents(runner, rep, stop_rep, carry, plan_stale, plan_detail))
-    # plan_stale la global nhung extract them 1 lan moi runner -> dedup theo key
+        out.extend(extract_incidents(runner, rep, stop_rep, carry, plan_stale, plan_detail,
+                                       plan_warn, plan_warn_detail,
+                                       backend_down, backend_detail))
+    # plan/backend la global nhung extract them 1 lan moi runner -> dedup theo key
     seen, deduped = set(), []
     for inc in out:
         if inc["key"] in seen:
@@ -312,9 +369,10 @@ def main(argv=None) -> int:
     if a.once:
         rep = poll_once(root, utcnow(), open_map, a.interval, tuple(a.runners), log_path,
                         notifier=notifier)
-        print(f"incidents CRITICAL dang mo: {len(rep['open'])}")
+        print(f"incidents dang mo: {len(rep['open'])}")
         for inc in rep["current"]:
-            print(f"  - {inc['key']}: {inc['detail']}")
+            print(f"  - [{inc.get('severity', 'critical')}] {inc['key']}: "
+                  f"{inc.get('title', '')} | {inc['detail']}")
         return 2 if rep["current"] else 0
     print(f"alert_watch: moi {a.every:g}s kiem tra {list(a.runners)} (Ctrl+C de dung)", flush=True)
     try:
