@@ -154,6 +154,20 @@ COMPARISON.md (bookmodel: FAIL — chưa upload Kaggle).
 - v425 gross cap on D13-D15 rows: D13BFG2 4.92/15.07, D14BFG2 5.05/15.55, D15BFG2 5.17/16.24 -> cap only binds at large kd; rejected.
 - v426 per-coin book brake: G2BRK 5.30/16.02 (full 15.61) vs G2 5.41/16.91 -> frontier move; rejected.
 
+
+## 2026-10-06 addendum 2 (book screens, v427 C2, bot testnet wiring)
+
+- Book screens (vectorised BOT book, v410 bear filter first): oc_expirybook PROMISING (book x0.5 in the 48 h before the monthly
+  Deribit expiry: DD not worse 4/5, P&L >= 98 % 4/5; 5y book maxDD 10.05 -> 9.05, P&L +0.016) -> full-engine post-hoc check
+  oc_expiry4p running (G2 4-phase); oc_expirycb (expiry + Coinbase premium) running. Closed: oc_cbpremium (P&L up 5/5 but DD
+  worse 3/5), oc_skewbook2, oc_basisbook, oc_breadthbook, oc_breadthdip (DD never worse but sum >= 95 % only 1/5).
+- v427 = book model C2 (rank-calibrated, pooled 77 coins as signal only) on Kaggle nguynchtrai/oc-c2-rank-calibrated. v1 failed
+  at start: script kernels upload ONLY code_file -> bundle helper modules into one self-extracting kaggle_entry.py (base64 zip),
+  as v2 does. Same fix is needed for C1 before its push. Evaluation: oc_bookmodel_evalprep (dev years only, 2025 sealed).
+- Bot: entries PostOnly (crossing -> postonly_reject, retried, never chased); risk_guard wired (ON in testnet/live, opt-in
+  --risk-guard in paper so paper stays engine-faithful). Running: oc_bookholdcap, oc_fomcbook (FOMC window x0.5), oc_blendsens,
+  oc_phasedisp, oc_capscale, bot_mockex (fake V5 exchange e2e), ops_paperday2.
+
 ## Honest status
 
 EXECUTABLE TRADE MODE (user rules 2026-09-28: one resting limit order, no fill in the first 5 minutes after the 4h close, in a
