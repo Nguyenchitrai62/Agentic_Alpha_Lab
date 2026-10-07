@@ -291,8 +291,18 @@ class PaperExchange:
         now_ms = int(pd.Timestamp(now or pd.Timestamp.now(tz="UTC")).floor("min").timestamp() * 1000)
         # bot_carry: dated quarterly symbols ride along (same 1m trade-through
         # fills as every other paper order).
-        extra = sorted({o["symbol"] for o in self.s["orders"].values()
-                        if o.get("symbol") not in self.symbols})
+        extra = {o["symbol"] for o in self.s["orders"].values()
+                 if o.get("symbol") not in self.symbols}
+        # ops_carrygap 2026-10-07: also poll symbols with an OPEN position (e.g. the dated carry short after its IOC entry filled):
+        # without a resting order they never got a kline, last_close stayed empty and equity_usdt() valued the short at 0.
+        for _k, _p in (self.s.get("pos") or {}).items():
+            try:
+                _sym = _k.split("|")[0]
+                if float(_p.get("qty") or 0) and _sym not in self.symbols:
+                    extra.add(_sym)
+            except (AttributeError, TypeError, ValueError):
+                continue
+        extra = sorted(extra)
         for sym in list(self.symbols) + extra:
             start = int(self.s.setdefault("last_ms", {}).setdefault(
                 sym, min(int(self.s["last_ms"].get(s, now_ms)) for s in self.symbols) if self.s.get("last_ms") else now_ms))
