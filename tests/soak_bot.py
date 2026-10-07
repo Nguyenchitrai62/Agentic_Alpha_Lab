@@ -38,6 +38,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
 from tests.mock_bybit_v5 import MockBybitV5  # noqa: E402
+from bot import mirror  # noqa: E402  (exit-completion invariant needs EXIT_INFLIGHT_MIN)
 
 SYMS = ["BTCUSDT", "ETHUSDT", "SOLUSDT", "BNBUSDT", "XRPUSDT"]
 BTC_PARQUET_DIR = ROOT / "data/raw/btc_intraday_20260924"
@@ -380,10 +381,182 @@ class FakeResponse:
 
 
 # ----------------------------------------------------------------------------
+# exit-completion invariant (BOT_SOAKINV_20261007, proposal P2 of BOT_EXITSOAK_20261007)
+#
+# The 24h soak exempted every piece with exit_sent < 2 min old, and the
+# exit-cancel bug re-sent the exit every 2 min, so an exiting piece was
+# perpetually exempt while its stop/TP stayed cancelled. This invariant tracks
+# market_exit sends per piece (from the runner's action log) and flags the
+# exact bug signature: qty > 0 with the first send of the current attempt
+# older than 3 x EXIT_INFLIGHT_MIN whose exit link neither rests on the
+# exchange nor filled, plus >3 sends without any fill.
+# ----------------------------------------------------------------------------
+EXIT_COMPLETION_FACTOR = 3.0
+EXIT_RESEND_LIMIT = 3
+_EXIT_OPS = ("market_exit", "dust_close", "unprotected_close")
+
+
+def _exit_stuck_min() -> float:
+    try:
+        return float(mirror.EXIT_INFLIGHT_MIN) * float(EXIT_COMPLETION_FACTOR)
+    except (TypeError, ValueError, AttributeError):
+        return 6.0
+
+
+def tail_exit_sends(runner, exit_sends: dict, log_pos: int):
+    """Append newly logged exit sends (market_exit/dust_close/unprotected_close).
+
+    Reads only the bytes appended to <runner.dir>/actions.jsonl since log_pos.
+    exit_sends maps piece -> [{"t": iso, "link": orderLinkId}]; entries for flat
+    pieces are pruned by the checker, not here. Returns (exit_sends, new_pos).
+    """
+    if exit_sends is None:
+        exit_sends = {}
+    if log_pos is None:
+        log_pos = 0
+    try:
+        alog = runner.dir / "actions.jsonl"
+    except (AttributeError, TypeError):
+        return exit_sends, log_pos
+    try:
+        if not alog.exists():
+            return exit_sends, log_pos
+        with open(alog, "r", encoding="utf-8") as f:
+            try:
+                f.seek(int(log_pos))
+            except (OSError, ValueError, OverflowError):
+                pass
+            for line in f:
+                try:
+                    rec = json.loads(line)
+                except (TypeError, ValueError):
+                    continue
+                try:
+                    if rec.get("op") not in _EXIT_OPS:
+                        continue
+                    pid = rec.get("piece")
+                    if not pid:
+                        continue
+                    pay = rec.get("payload") or {}
+                    link = pay.get("orderLinkId") or rec.get("link")
+                    t = rec.get("t")
+                except AttributeError:
+                    continue
+                if not link or not t:
+                    continue
+                # Only a send the exchange ACCEPTED counts: the runner logs
+                # the op before placing, and a rejected place (e.g. dust
+                # below the lot minimum) registers no state link and sets no
+                # exit marker. Counting rejected sends would flag pieces that
+                # never had a live exit (false positive; seen in the flush
+                # window where 444 dust_close places fail with `error`).
+                try:
+                    _links = (runner.state or {}).get("links") or {}
+                except (AttributeError, TypeError):
+                    _links = {}
+                if str(link) not in _links:
+                    continue
+                lst = exit_sends.setdefault(pid, [])
+                if any(e.get("link") == str(link) for e in lst):
+                    continue
+                lst.append({"t": str(t), "link": str(link)})
+            try:
+                log_pos = f.tell()
+            except OSError:
+                pass
+    except OSError:
+        pass
+    return exit_sends, log_pos
+
+
+def check_exit_completion(runner, mock: MockBybitV5, sim_now: pd.Timestamp,
+                          exit_sends: dict | None = None) -> list:
+    """Flag pieces whose market exit never completes (open + stuck + unfilled).
+
+    Reasons: "exit_stuck" (first send older than 3 x EXIT_INFLIGHT_MIN with
+    the exit link neither resting nor filled) or "exit_resend_overflow"
+    (>3 sends without any fill). A partial fill counts as progress (no flag).
+    Pure function of (ledger, resting, execs, send history); never raises.
+    """
+    viol: list = []
+    try:
+        ledger = (runner.state or {}).get("ledger") or {}
+    except (AttributeError, TypeError):
+        return viol
+    try:
+        resting = set((mock.orders or {}).keys())
+    except (AttributeError, TypeError):
+        resting = set()
+    try:
+        filled = {e.get("orderLinkId") for e in (getattr(mock, "execs", []) or [])}
+    except (AttributeError, TypeError):
+        filled = set()
+    stuck_min = _exit_stuck_min()
+    try:
+        items = list(ledger.items())
+    except AttributeError:
+        return viol
+    for pid, pc in items:
+        try:
+            if not isinstance(pc, dict):
+                continue
+            qty = float(pc.get("qty", 0.0) or 0.0)
+        except (TypeError, ValueError):
+            continue
+        if not qty > 0:
+            # flat piece: drop its history so a reused pid starts clean
+            try:
+                if isinstance(exit_sends, dict):
+                    exit_sends.pop(pid, None)
+            except (AttributeError, TypeError):
+                pass
+            continue
+        sends: list = []
+        try:
+            if isinstance(exit_sends, dict):
+                sends = list(exit_sends.get(pid, []) or [])
+        except (AttributeError, TypeError):
+            sends = []
+        if not sends:
+            # fallback: ledger marker alone (history not tailed yet)
+            try:
+                s = pc.get("exit_sent")
+                link = pc.get("exit_link")
+            except AttributeError:
+                s = link = None
+            if s and link:
+                sends = [{"t": str(s), "link": str(link)}]
+        if not sends:
+            continue
+        try:
+            first_t = pd.Timestamp(sends[0]["t"])
+            age_min = (pd.Timestamp(sim_now) - first_t).total_seconds() / 60.0
+        except (TypeError, ValueError, KeyError, AttributeError):
+            continue
+        try:
+            cur = pc.get("exit_link")
+        except AttributeError:
+            cur = None
+        cur_rest = bool(cur and cur in resting)
+        any_filled = any(e.get("link") in filled for e in sends)
+        if age_min > stuck_min and not cur_rest and not any_filled:
+            viol.append({"invariant": "exit_completion", "reason": "exit_stuck",
+                         "piece": pid, "symbol": pc.get("symbol"), "qty": qty,
+                         "age_min": round(float(age_min), 2),
+                         "sends": len(sends), "exit_link": cur})
+        elif len(sends) > EXIT_RESEND_LIMIT and not any_filled:
+            viol.append({"invariant": "exit_completion", "reason": "exit_resend_overflow",
+                         "piece": pid, "symbol": pc.get("symbol"), "qty": qty,
+                         "age_min": round(float(age_min), 2),
+                         "sends": len(sends), "exit_link": cur})
+    return viol
+
+
+# ----------------------------------------------------------------------------
 # invariants
 # ----------------------------------------------------------------------------
 def check_invariants(runner, mock: MockBybitV5, equity: float, first_seen: dict,
-                     sim_now: pd.Timestamp) -> list:
+                     sim_now: pd.Timestamp, exit_sends: dict | None = None) -> list:
     """Return list of violation dicts for this cycle (empty = clean)."""
     viol = []
     ledger = (runner.state or {}).get("ledger") or {}
@@ -499,6 +672,14 @@ def check_invariants(runner, mock: MockBybitV5, equity: float, first_seen: dict,
         if (sf != ff) and n > 2:
             viol.append({"invariant": "carry_unhedged", "coin": coin,
                          "cycles": n, "spot_filled": sf, "fut_filled": ff})
+    # 6. exit completion (BOT_SOAKINV_20261007 P2): an open piece whose market
+    # exit neither rests nor filled past 3 x EXIT_INFLIGHT_MIN, or >3 sends
+    # without a fill, is the exit-cancel bug's signature. Pure helper above;
+    # never raises out of the soak.
+    try:
+        viol.extend(check_exit_completion(runner, mock, sim_now, exit_sends))
+    except Exception:
+        pass
     return viol
 
 
@@ -508,8 +689,13 @@ def check_invariants(runner, mock: MockBybitV5, equity: float, first_seen: dict,
 def run_soak(hours: float = 24.0, step_s: float = 20.0, equity: float = 10000.0,
              workdir: str | Path | None = None, tag: str = "soak",
              window_start: pd.Timestamp | None = None,
-             plan_every_min: float = 60.0) -> dict:
-    """Run the accelerated soak; return a results dict (JSON-serialisable)."""
+             plan_every_min: float = 60.0, runmod=None) -> dict:
+    """Run the accelerated soak; return a results dict (JSON-serialisable).
+
+    runmod: optional pre-imported bot runner module (default: bot.run). The
+    soakinv regression passes the pre-fix copy so the same replay can prove
+    the new exit-completion invariant fires without the fix.
+    """
     tracemalloc.start()
     start_ts = pd.Timestamp(window_start) if window_start is not None else WINDOW_START
     replay = load_replay(start_ts, hours)
@@ -519,7 +705,8 @@ def run_soak(hours: float = 24.0, step_s: float = 20.0, equity: float = 10000.0,
     workdir = Path(workdir) if workdir else Path.cwd() / f"soak_{tag}"
     workdir.mkdir(parents=True, exist_ok=True)
 
-    import bot.run as runmod
+    if runmod is None:
+        import bot.run as runmod
 
     window_end = start_ts + pd.Timedelta(hours=hours)
     mock = ReplayMock(replay, start_ts, window_end, equity=equity)
@@ -554,6 +741,8 @@ def run_soak(hours: float = 24.0, step_s: float = 20.0, equity: float = 10000.0,
         runner._carry_quotes_override = {}
         cycle_times, violations = [], []
         first_seen: dict = {}
+        exit_sends: dict = {}
+        exit_log_pos: int = 0
         last_bar_idx = {s: 0 for s in SYMS}
         state_sizes, log_sizes, mem = [], [], []
         exc_count = 0
@@ -592,7 +781,11 @@ def run_soak(hours: float = 24.0, step_s: float = 20.0, equity: float = 10000.0,
             # synced at N start; bars replayed after the check create fills for
             # cycle N+1. Checking after process_bar would flag pieces whose
             # stop filled seconds ago but whose ledger syncs next cycle.
-            for v in check_invariants(runner, mock, eq, first_seen, sim_now):
+            try:
+                exit_sends, exit_log_pos = tail_exit_sends(runner, exit_sends, exit_log_pos)
+            except Exception:
+                pass
+            for v in check_invariants(runner, mock, eq, first_seen, sim_now, exit_sends):
                 violations.append({"cycle": i, "t": str(sim_now), **v})
             # fill newly closed 1m bars (trade-through, stop-first in mock)
             for s in SYMS:
@@ -685,6 +878,22 @@ def run_soak(hours: float = 24.0, step_s: float = 20.0, equity: float = 10000.0,
         import numpy as np
 
         ct = np.array(cycle_times, dtype=float) if cycle_times else np.array([0.0])
+        try:
+            _vcounts: dict = {}
+            for _v in violations:
+                try:
+                    _k = str((_v or {}).get("invariant", "?"))
+                except (AttributeError, TypeError):
+                    _k = "?"
+                _vcounts[_k] = _vcounts.get(_k, 0) + 1
+        except (AttributeError, TypeError):
+            _vcounts = {}
+        try:
+            _ec = [v for v in violations
+                   if isinstance(v, dict) and v.get("invariant") == "exit_completion"]
+            _ec_pieces = sorted({str(v.get("piece")) for v in _ec if v.get("piece")})
+        except (AttributeError, TypeError):
+            _ec, _ec_pieces = [], []
         res = {
             "window_start": str(start_ts), "window_end": str(start_ts + pd.Timedelta(hours=hours)),
             "hours": hours, "step_s": step_s, "cycles": len(cycle_times),
@@ -698,6 +907,10 @@ def run_soak(hours: float = 24.0, step_s: float = 20.0, equity: float = 10000.0,
             "ledger_pieces": len(runner.state.get("ledger") or {}),
             "exceptions": exc_count,
             "violations": violations,
+            "violation_counts": _vcounts,
+            "exit_completion": {"violations": len(_ec), "pieces": _ec_pieces,
+                                "sends_tracked": int(sum(len(v) for v in (exit_sends or {}).values()))
+                                if isinstance(exit_sends, dict) else 0},
             "cycle_ms": {"mean": round(float(ct.mean()), 2),
                          "p50": round(float(np.median(ct)), 2),
                          "p95": round(float(np.percentile(ct, 95)), 2),
