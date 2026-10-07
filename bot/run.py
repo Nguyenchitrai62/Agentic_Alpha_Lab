@@ -203,6 +203,32 @@ def _acts_without_carry_cancel(acts):
     return out
 
 
+def _acts_without_exit_cancel(acts, led):
+    """Never cancel a confirmed market exit of an open piece (leader fix 2026-10-07).
+
+    1c0469a registers the market-exit link in state["links"], so have() lists the exit while the exchange still
+    reports it open (paper fills a market order at the next 1m bar; live can report New / PartiallyFilled for a
+    moment). mirror.diff then cancelled it in the same cycle, so time exits and close5 stops never executed and the
+    piece stayed open without protection, re-sent every EXIT_INFLIGHT_MIN minutes (paper runners 2026-10-07 03:00 UTC).
+    """
+    try:
+        keep = {pc.get("exit_link") for pc in (led or {}).values()
+                if isinstance(pc, dict) and pc.get("exit_link") and float(pc.get("qty") or 0) > 0}
+    except (AttributeError, TypeError, ValueError):
+        return acts
+    if not keep:
+        return acts
+    out = []
+    for a in acts or []:
+        try:
+            if a.get("op") == "cancel" and a.get("link") in keep:
+                continue
+        except (AttributeError, TypeError):
+            pass
+        out.append(a)
+    return out
+
+
 # F2: categories polled for carry sync / open orders (spot + linear +
 # inverse as used). Book/dip symbols are linear perps; extra categories only
 # add carry legs and never change book/dip orders.
@@ -1322,6 +1348,7 @@ class Runner:
                 _t = _cycle_now()
                 acts = mirror.diff({k: o for k, (o, _) in rounded.items()}, _have_without_carry(have))
                 acts = _acts_without_carry_cancel(acts)
+                acts = _acts_without_exit_cancel(acts, led)
                 try:
                     acts = self._guard_phantom_cancels(acts, led, have, now)
                 except Exception:
@@ -1581,6 +1608,7 @@ class Runner:
         acts = mirror.diff({k: o for k, (o, _) in rounded.items()}, _have_without_carry(have_before),
                            amend_entry_qty=(self.corr or self.risk_mult != 1.0 or self.dip_mult != 1.0 or bool(getattr(self, "dip_gross_cap", 0.0))))
         acts = _acts_without_carry_cancel(acts)
+        acts = _acts_without_exit_cancel(acts, led)
         try:
             acts = self._guard_phantom_cancels(acts, led, have_before, now)
         except Exception:

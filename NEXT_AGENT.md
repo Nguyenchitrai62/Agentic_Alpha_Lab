@@ -1,5 +1,7 @@
 # Handoff for the next coding agent
 
+ROUND parallel-20260906-r2 (2026-10-07, NEWEST): deployment unchanged (G2 + carry f 0.25, paper only). New OpenCode wave on options (put-write, tail hedge, VRP straddle), Kronos post-release test, rip continuation, relative flush, strike-level Deribit data, idea/data scan, OOS week 2 - see the top paragraph of CONTINUOUS_RESEARCH.md; results land in research/tournament/oc_<tag>/REPORT.md. Paper runners died 03:24 UTC 2026-10-07 and were restarted 07:01 UTC (nohup from a foreground Bash).
+
 
 ROUND parallel-20260906-r2 (2026-10-06 ~14:30 UTC, LEADER STOPPED - quota): read docs/PLAN_NEXT_20261006.md first (final solution G2 + carry, running workers and where their reports land, ordered next steps, owner actions).
 ROUND parallel-20260906-r2 (2026-10-06 evening, after v428 - NEWEST): read docs/FINAL_REPORT_VI.md (consolidated), docs/CLOSED_DIRECTIONS.md (do not repeat closed screens) and the top of CONTINUOUS_RESEARCH.md. Deployed: G2 + quarterly carry f = 0.25; evidence now comes from prospective paper (paper_d17bfg2, paper_d17bfg2c; go-live needs >= 8 weeks + 4 gates, docs/DEPLOYMENT_PLAN_VI.md). Worker rules: docs/opencode/OPENCODE_VF_COMMON.md (git read-only, heavy jobs via scripts/heavy_slot.py). Book ideas -> 4-phase engine only; dip ideas -> replica + placebo gate +0.273.
