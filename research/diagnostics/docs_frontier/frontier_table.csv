@@ -1,0 +1,30 @@
+id,label,kind,adopted,R5y_pctpm,dev4_R,dev4_W,recent_R,max_yearly_DD,full_DD,audit,source
+G2,G2 v421 R2B1D17BFG2,signal,yes,5.41,,,4.648,16.91,16.82,v421 PASS; robust PASS,v421_audit
+D17BF,D17BF v411 R2B1D17BF,signal,no,5.425,,,5.06,18.33,16.9,v411 PASS; robust PASS,v411_audit
+D13BF,D13BF v424 R2B1D13BF,signal,no,4.971,,,4.723,14.98,14.86,v424 comparison PASS (no ROBUST.md),v424_audit+oc_kpi_d13
+G2K20,G2K20 v422,signal,no,5.874,,,4.716,17.79,17.69,v422 PASS; blind PASS; Y4 fold FAILED vs ref,v422_audit+oc_g2k20robust
+G2carry,G2+carry f0.25,overlay,no,5.634,,,4.698,16.75,16.66,"repro to digit; post-hoc, needs prospective",oc_carrycompound
+G2K20carry,G2K20+carry f0.25 base,overlay,no,6.097,,,4.766,17.64,17.54,cross-checks exact; post-hoc,oc_g2k20compound
+GV1,Governor GV1,dial,no,5.827,6.11,2.826,4.704,19.14,18.91,REJECT (recent<5),oc_governor
+GV2,Governor GV2,dial,no,5.872,6.158,2.828,4.736,19.32,19.05,REJECT (recent<5),oc_governor
+GV3,Governor GV3 pooled,dial,no,5.849,6.107,2.83,4.824,17.89,17.5,REJECT (recent<5); robust-pick nominal,oc_governor
+NO_GOV,Ablation NO_GOV,dial,no,5.907,6.18,2.83,4.824,20.04,19.6,diagnostic; breaches 20%,oc_ablation
+NO_VT,Ablation NO_VT,dial,no,6.119,6.459,2.393,4.772,17.93,18.39,diagnostic only,oc_ablation
+NO_BEAR,Ablation NO_BEAR,dial,no,5.415,5.597,2.119,4.689,16.91,16.81,diagnostic only,oc_ablation
+NO_CAP,Ablation NO_CAP,dial,no,5.425,5.517,2.831,5.06,18.33,16.9,diagnostic only,oc_ablation
+NO_B1,Ablation NO_B1,dial,no,5.142,5.434,1.571,3.986,23.65,20.2,diagnostic; breaches gate,oc_ablation
+TOUCH,Ablation TOUCH,dial,no,5.079,5.22,2.356,4.519,18.62,18.56,diagnostic only,oc_ablation
+A1,Amihud A1,signal,no,5.624,5.844,2.798,4.75,16.81,16.66,dev4-only selection; Y4 scored once,oc_lit_xs
+A1_S5,Amihud A1 S5 Bybit,signal,no,4.884,4.989,,,18.58,21.32,"strict FAIL (gap~0, DD>20)",oc_amihudrobust
+M1,MVRV M1,signal,no,5.881,6.192,2.588,4.648,16.26,16.22,robust but tie->not strict,oc_lit_position+oc_mvrvrobust
+A1M1,A1+M1 post-hoc,overlay,no,5.939,6.238,2.798,4.75,16.08,15.92,post-hoc compatibility only,oc_mvrvrobust
+K2,Kronos K2 (dev+Y4),signal,no,,5.772,2.469,4.801,16.2,16.09,"REJECT (Y4<5, upper bound)",oc_kronoshidden
+VRP,VRP straddle FULL f0.25,overlay,no,5.332,5.408,2.909,5.025,18.19,18.11,REJECT (mean-DD bar),oc_vrpstrike
+v399_R2B1,v399 R2B1,dial,no,4.55,,,4.405,13.88,,audited yes; no full-path logged,oc_frontier
+v409_D13,v409 R2B1D13,dial,no,4.957,,,4.704,15.0,16.36,audited yes; yearly frontier,oc_frontier
+v409_D15B08,v409 R2B1D15B08,dial,no,4.626,,,4.054,15.99,14.94,audited yes; lowest full-path DD,oc_frontier
+v423_X45,v423 R2B1D17BFX45,dial,no,5.118,,,4.643,15.92,15.81,audited yes; both frontiers,oc_frontier
+v422_F20K20,v422 G2F20K20,dial,no,5.346,,,4.613,16.2,16.02,audited yes; both frontiers,oc_frontier
+v415_S6,v415 R2B1D17BFS6,dial,no,5.565,,,5.167,18.37,16.71,audited yes; dominates deploy full-path,oc_frontier
+v422_G15K20,v422 G15K20,dial,no,5.731,,,4.34,16.96,16.76,audited yes; yearly frontier,oc_frontier
+v407_D20B11,v407 R2B1D20B11,dial,no,5.894,,,5.528,21.21,19.1,audited yes; highest R,oc_frontier
