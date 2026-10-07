@@ -1705,6 +1705,11 @@ class Runner:
                         continue
                     try:
                         _qq = round_step(_q, self.inst[_sym]["qty_step"])
+                        # bot_dustfix 2026-10-07: a float remainder just under one lot (e.g. 0.8999.. - TP 0.8 = 0.0999 SOL)
+                        # rounds to 0 and the close was rejected forever; send at least one lot reduce-only (the exchange /
+                        # paper caps a reduce-only order at the position, so it closes exactly the remainder, never flips).
+                        if float(_qq) < float(self.inst[_sym]["min_qty"]):
+                            _qq = str(self.inst[_sym]["min_qty"])
                     except (TypeError, ValueError, KeyError):
                         continue
                     _dlink = f"{pid}D{mirror.t36(now)}"
