@@ -1,0 +1,318 @@
+"""oc_breadthdip run: BASE (B1 verbatim) vs RULE (x0.8 when breadth == 1.0).
+
+One process, one coin's H/L in RAM at a time; all-five-coins 1m opens/closes
+held as float32 arrays; bar opens/sigmas precomputed per coin; breadth series
+precomputed once from hourly_ext (PLAN.md section 6). See PLAN.md.
+"""
+from __future__ import annotations
+
+import hashlib
+import json
+import sys
+from pathlib import Path
+
+HERE = Path(__file__).parent
+sys.path.insert(0, str(HERE))
+import numpy as np
+import pandas as pd
+
+import breadthdip as B
+
+START = pd.Timestamp("2020-08-01", tz="UTC")
+END = pd.Timestamp("2026-09-24 00:00", tz="UTC")
+TRADE_START = pd.Timestamp("2021-09-24 00:00", tz="UTC")
+YEAR_END = pd.Timestamp("2026-09-24 00:00", tz="UTC")
+MAJORS = ("BTCUSDT", "ETHUSDT", "SOLUSDT", "BNBUSDT", "XRPUSDT")
+ANCHORS = [pd.Timestamp(a, tz="UTC") for a in
+           ("2021-09-24", "2022-09-24", "2023-09-24", "2024-09-24", "2025-09-24")]
+SETTLE_HOURS = (0, 8, 16)
+W = B.LIVE_B - B.LIVE_A + 1  # 223 live minutes
+
+
+def load_oc(sym: str):
+    """Full-length 1m open + close as float32 (+ minute index)."""
+    if sym == "BTCUSDT":
+        files = sorted(Path("data/raw/btc_intraday_20260924").glob("klines_1m_20*.parquet"))
+    else:
+        files = sorted(Path("data/raw/majors_intraday_20260924").glob(f"{sym}_1m_20*.parquet"))
+    parts = [pd.read_parquet(f, columns=["open_time", "open", "close"]) for f in files]
+    m = pd.concat(parts, ignore_index=True)
+    m["open_time"] = pd.to_datetime(m["open_time"], utc=True)
+    m = m.drop_duplicates("open_time").sort_values("open_time")
+    m = m[(m["open_time"] >= START) & (m["open_time"] <= END)]
+    idx = pd.date_range(START, END, freq="1min")
+    m = m.set_index("open_time").reindex(idx)
+    O = m["open"].to_numpy(dtype=np.float32)
+    C = m["close"].to_numpy(dtype=np.float32)
+    del m, parts
+    return idx, O, C
+
+
+def load_hl(sym: str, idx):
+    if sym == "BTCUSDT":
+        files = sorted(Path("data/raw/btc_intraday_20260924").glob("klines_1m_20*.parquet"))
+    else:
+        files = sorted(Path("data/raw/majors_intraday_20260924").glob(f"{sym}_1m_20*.parquet"))
+    parts = [pd.read_parquet(f, columns=["open_time", "high", "low"]) for f in files]
+    m = pd.concat(parts, ignore_index=True)
+    m["open_time"] = pd.to_datetime(m["open_time"], utc=True)
+    m = m.drop_duplicates("open_time").sort_values("open_time")
+    m = m[(m["open_time"] >= START) & (m["open_time"] <= END)]
+    m = m.set_index("open_time").reindex(idx)
+    H = m["high"].to_numpy(dtype=np.float32)
+    L = m["low"].to_numpy(dtype=np.float32)
+    del m, parts
+    return H, L
+
+
+def build_breadth_on(t0) -> dict:
+    """breadth_on per 4h bar open T (PLAN.md section 6).
+
+    Daily close D_c(M) = hourly close at t = M - 1h; SMA200_c(M) = mean of
+    D_c over M-200d..M-1d (all 200 must be finite); coin-up = D > SMA200
+    strictly; breadth_on(T) iff all 5 majors up at M(T) = last midnight <= T.
+    Returns dict {Timestamp T: bool}.
+    """
+    h = pd.read_parquet("research/tournament/ext/hourly_ext.parquet",
+                        columns=["t", "close", "sym"])
+    h["t"] = pd.to_datetime(h["t"], utc=True)
+    h = h[h["sym"].isin(list(MAJORS))]
+    piv = h.pivot_table(index="t", columns="sym", values="close", aggfunc="last")
+    piv = piv.reindex(pd.date_range(pd.Timestamp("2020-08-01", tz="UTC"),
+                                    pd.Timestamp("2026-09-23 23:00", tz="UTC"),
+                                    freq="1h"))
+    for s in MAJORS:
+        if s not in piv.columns:
+            piv[s] = np.nan
+    piv = piv[list(MAJORS)].astype(float)
+    mids = pd.date_range(pd.Timestamp("2020-08-02", tz="UTC"), END, freq="1D")
+    daily = pd.DataFrame(index=mids, columns=list(MAJORS), dtype=float)
+    for s in MAJORS:
+        daily[s] = piv[s].reindex(mids - pd.Timedelta(hours=1)).to_numpy()
+    sma = daily.shift(1).rolling(200, min_periods=200).mean()
+    valid = daily.notna() & sma.notna()
+    up = (daily > sma) & valid
+    all_valid = valid.all(axis=1)
+    breadth = up.mean(axis=1).where(all_valid, np.nan)
+    on = (breadth == 1.0).fillna(False)
+    out = {}
+    for t in t0:
+        tt = pd.Timestamp(t).tz_convert("UTC")
+        m = pd.Timestamp(tt.date(), tz="UTC")
+        out[tt] = bool(on.get(m, False))
+    n_on = int(on.loc[on.index <= END].sum())
+    print(f"breadth: midnights={len(mids)} valid={int(all_valid.sum())} "
+          f"on={n_on} share={n_on/max(1,int(all_valid.sum())):.3f}", flush=True)
+    return out
+
+
+def year_of(t0):
+    for i in range(5):
+        lo = ANCHORS[i]
+        hi = ANCHORS[i + 1] if i < 4 else YEAR_END
+        if lo <= t0 < hi:
+            return i
+    return None
+
+
+def daily_path(recs):
+    """recs: list of (exit_date_iso, w_y). Returns (S, worst_day, maxDD, ndays)."""
+    if not recs:
+        return 0.0, 0.0, 0.0, 0
+    daily = {}
+    for d, v in recs:
+        daily[d] = daily.get(d, 0.0) + v
+    days = sorted(daily)
+    cum, peak, dd = 0.0, 0.0, 0.0
+    for d in days:
+        cum += daily[d]
+        peak = max(peak, cum)
+        dd = min(dd, cum - peak)
+    return float(sum(daily.values())), float(min(daily.values())), float(-dd), len(days)
+
+
+def main():
+    idx, O, C = {}, {}, {}
+    for sym in MAJORS:
+        ii, o, c = load_oc(sym)
+        idx[sym], O[sym], C[sym] = ii, o, c
+        print(f"loaded OC {sym}", flush=True)
+    base_idx = idx[MAJORS[0]]
+    n_all = len(base_idx)
+    nb = (n_all - 1) // 240
+    t0 = base_idx[:nb * 240:240]
+    traded_mask = np.array([(TRADE_START <= pd.Timestamp(t).tz_convert("UTC") < YEAR_END)
+                            for t in t0])
+    breadth_on = build_breadth_on([pd.Timestamp(t).tz_convert("UTC") for t in t0])
+    n_bars = int(traded_mask.sum())
+    n_bars_on = sum(1 for i, t in enumerate(t0)
+                    if traded_mask[i] and breadth_on[pd.Timestamp(t).tz_convert("UTC")])
+    print(f"traded bars={n_bars} breadth-on bars={n_bars_on} "
+          f"share={n_bars_on/max(1,n_bars):.4f}", flush=True)
+    opens_bar, sig_bar = {}, {}
+    for sym in MAJORS:
+        ob = O[sym][:nb * 240:240].astype(float)
+        sg = pd.Series(ob).pct_change().rolling(360, min_periods=120).std(ddof=1).shift(1).to_numpy()
+        opens_bar[sym], sig_bar[sym] = ob, sg
+    del ob, sg
+
+    rows = []
+    fills_raw = {"BASE": {s: 0 for s in MAJORS}, "RULE": {s: 0 for s in MAJORS}}
+    for ai, sym in enumerate(MAJORS):
+        H, L = load_hl(sym, base_idx)
+        Oa, Ca, La, Ha = O[sym], C[sym], L, H
+        others = [s for s in MAJORS if s != sym]
+        n_bar = 0
+        for j in range(nb):
+            bt = pd.Timestamp(t0[j]).tz_convert("UTC")
+            if not (TRADE_START <= bt < YEAR_END):
+                continue
+            o1, sg = float(opens_bar[sym][j]), float(sig_bar[sym][j])
+            if not (np.isfinite(o1) and np.isfinite(sg)) or o1 <= 0 or sg <= 0:
+                continue
+            base = j * 240
+            if base + 240 >= n_all:
+                continue
+            o2m = Oa[base + 240]
+            o2 = float(o2m) if np.isfinite(o2m) else np.nan
+            settle = (bt + pd.Timedelta(hours=4)).hour in SETTLE_HOURS
+            yi = year_of(bt)
+            bon = breadth_on[bt]
+            low_win = La[base + B.LIVE_A:base + B.LIVE_B + 1].astype(float)
+            cmat = np.stack([C[b][base + B.LIVE_A - 1:base + B.LIVE_B].astype(float)
+                             for b in others])  # (4, W) closes at T+m-1
+            oo = np.array([opens_bar[b][j] for b in others], dtype=float)
+            ss = np.array([sig_bar[b][j] for b in others], dtype=float)
+            nvec = B.n_vector(cmat, oo, ss)
+            Ha_b = Ha[base:base + 240].astype(float)
+            La_b = La[base:base + 240].astype(float)
+            Ca_b = Ca[base:base + 240].astype(float)
+            Oa_b = Oa[base:base + 240].astype(float)
+            for k in B.RUNGS:
+                lv = o1 * (1 - k * sg)
+                if not np.isfinite(lv) or lv <= 0:
+                    continue
+                ib = B.find_fill(low_win, np.full(W, lv))
+                if ib is None:
+                    continue
+                f = B.LIVE_A + ib
+                nf = int(nvec[ib])
+                ret, x, _ = B.outcome_from_fill(Ha_b, La_b, Ca_b, Oa_b, f, lv, sg, o2, settle)
+                if not np.isfinite(ret):
+                    continue
+                xd = (bt + pd.Timedelta(minutes=int(x))).date().isoformat() if int(x) < 240 else \
+                    (bt + pd.Timedelta(hours=4)).date().isoformat()
+                wb = float(B.size_mult(nf))
+                wr = B.rule_weight(wb, bon)
+                rows.append(dict(sym=sym, y=yi, k=k, arm="BASE", f=int(f),
+                                 n=int(nf), w=wb, ret=float(ret), x=int(x), xd=xd,
+                                 fill=float(lv), t_bar=bt, b=int(bon)))
+                rows.append(dict(sym=sym, y=yi, k=k, arm="RULE", f=int(f),
+                                 n=int(nf), w=wr, ret=float(ret), x=int(x), xd=xd,
+                                 fill=float(lv), t_bar=bt, b=int(bon)))
+                fills_raw["BASE"][sym] += 1
+                fills_raw["RULE"][sym] += 1
+            n_bar += 1
+        print(f"{sym}: bars={n_bar} fills BASE={fills_raw['BASE'][sym]}", flush=True)
+        del H, L, Ha, La, Oa_b, Ca_b, La_b, Ha_b
+
+    df = pd.DataFrame(rows)
+    per_year, full, bon_share = {}, {}, {}
+    for arm in ("BASE", "RULE"):
+        per_year[arm] = []
+        for yi in range(5):
+            sub = df[(df["arm"] == arm) & (df["y"] == yi)]
+            n = len(sub)
+            if n:
+                wy = sub["w"].to_numpy(float) * sub["ret"].to_numpy(float)
+                recs = list(zip(sub["xd"].tolist(), wy.tolist()))
+                S, Wd, DD, nd = daily_path(recs)
+                win = float((sub["ret"].to_numpy(float) > 0).mean())
+                mean = float(sub["ret"].to_numpy(float).mean())
+                s_raw = float(wy.sum())
+            else:
+                S, Wd, DD, nd, win, mean, s_raw = 0.0, 0.0, 0.0, 0, 0.0, 0.0, 0.0
+            per_year[arm].append({"year": ANCHORS[yi].date().isoformat(), "n": int(n),
+                                  "mean": mean, "win_rate": win, "sum": S,
+                                  "worst_day": Wd, "max_dd": DD, "ndays": nd})
+        sub = df[df["arm"] == arm]
+        n = len(sub)
+        if n:
+            wy = sub["w"].to_numpy(float) * sub["ret"].to_numpy(float)
+            recs = list(zip(sub["xd"].tolist(), wy.tolist()))
+            S, Wd, DD, nd = daily_path(recs)
+            full[arm] = {"n": int(n), "mean": float(sub["ret"].mean()),
+                         "win_rate": float((sub["ret"].to_numpy(float) > 0).mean()),
+                         "sum": S, "worst_day": Wd, "max_dd": DD, "ndays": nd}
+        else:
+            full[arm] = {"n": 0, "mean": 0.0, "win_rate": 0.0, "sum": 0.0,
+                         "worst_day": 0.0, "max_dd": 0.0, "ndays": 0}
+    for yi in range(5):
+        sub = df[(df["arm"] == "BASE") & (df["y"] == yi)]
+        n = len(sub)
+        if n:
+            wb = sub["w"].to_numpy(float)
+            mask = sub["b"].to_numpy(int) == 1
+            bon_share[ANCHORS[yi].date().isoformat()] = {
+                "fill_share": float(mask.mean()),
+                "weight_share": float(wb[mask].sum() / wb.sum()) if wb.sum() else 0.0,
+                "n_on": int(mask.sum()), "n": int(n)}
+        else:
+            bon_share[ANCHORS[yi].date().isoformat()] = {
+                "fill_share": 0.0, "weight_share": 0.0, "n_on": 0, "n": 0}
+    sub = df[df["arm"] == "BASE"]
+    wb = sub["w"].to_numpy(float)
+    mask = sub["b"].to_numpy(int) == 1
+    bon_full = {"fill_share": float(mask.mean()) if len(sub) else 0.0,
+                "weight_share": float(wb[mask].sum() / wb.sum()) if len(sub) and wb.sum() else 0.0,
+                "n_on": int(mask.sum()), "n": int(len(sub)),
+                "bar_share": n_bars_on / max(1, n_bars),
+                "bars_on": int(n_bars_on), "bars": int(n_bars)}
+
+    dd_pass, sum_pass = 0, 0
+    for yi in range(5):
+        sb, sr = per_year["BASE"][yi]["sum"], per_year["RULE"][yi]["sum"]
+        db, dr = per_year["BASE"][yi]["max_dd"], per_year["RULE"][yi]["max_dd"]
+        if np.isfinite(db) and np.isfinite(dr) and dr <= db:
+            dd_pass += 1
+        if np.isfinite(sb) and np.isfinite(sr):
+            if sb > 0 and sr >= 0.95 * sb:
+                sum_pass += 1
+            elif sb <= 0 and sr >= sb:
+                sum_pass += 1
+    decision = {"years_dd_not_worse": int(dd_pass),
+                "years_sum_ge95": int(sum_pass),
+                "promising": bool(dd_pass >= 4 and sum_pass >= 4)}
+    chk = hashlib.sha256(
+        np.round(df[["ret", "w", "fill"]].to_numpy(), 9).tobytes()).hexdigest()[:16] if len(df) else "empty"
+    out = {"config": {"coins": list(MAJORS), "rungs": list(B.RUNGS),
+                       "bars": "open in [2021-09-24, 2026-09-24)",
+                       "grid": "4h from 2020-08-01 00:00 UTC",
+                       "live": [B.LIVE_A, B.LIVE_B],
+                       "maker": B.MAKER, "taker": B.TAKER, "fund_long": 0.0001,
+                       "settle_hours": list(SETTLE_HOURS),
+                       "n": "other majors C(T+m-1) <= O(T)*(1-2.5*sg(T)), oc_b1deeper-exact",
+                       "base": "B1 verbatim: static lv, size 1/(1+n_fill), D0 exits from fill px",
+                       "rule": "same fills/nets as BASE; w_rule = w_base*0.8 iff breadth_on else w_base",
+                       "breadth": "M(T)=last midnight<=T; D(M)=hourly close at M-1h; "
+                                  "SMA200(M)=mean D over M-200d..M-1d (all 200 finite); "
+                                  "coin-up = D>SMA200 strictly; breadth_on iff all 5 up; NaN->OFF",
+                       "daily": "exit-date UTC sums, NO renormalisation; maxDD of cumulative daily-sum path from 0",
+                       "year_key": "bar-open year; daily sums from that year's fills' exit dates",
+                       "decision_rule": "PROMISING iff DD_rule<=DD_base in >=4/5 AND "
+                                        "S_rule>=95%*S_base (S_base>0) in >=4/5",
+                       "note": "fills with non-finite exit nets dropped (both arms identically)"},
+           "fills_per_coin_raw": fills_raw,
+           "n_fills": int(len(df)),
+           "ledger_checksum": chk,
+           "breadth_on_share": {"per_year": bon_share, "full": bon_full},
+           "per_year": per_year, "full": full, "decision": decision}
+    (HERE / "results.json").write_text(json.dumps(out, indent=1, default=str))
+    df.to_parquet(HERE / "fills.parquet", index=False)
+    print("n_rows", len(df), "checksum", chk, flush=True)
+    print(json.dumps(decision, indent=1))
+    print(json.dumps(bon_full, indent=1))
+
+
+if __name__ == "__main__":
+    main()

@@ -78,3 +78,37 @@ research/parallel/rounds/**/prereg_sha256.txt
 research/**/*.pkl
 research/**/*.parquet
 research/**/*.jsonl
+
+# Worker experiments: source and Markdown docs stay in Git; generated results stay local
+research/tournament/**/*.json
+research/tournament/**/*.csv
+research/tournament/**/*.txt
+research/tournament/**/tmp/
+research/tournament/**/tables/
+research/tournament/**/model/
+research/tournament/**/kpack_*/
+research/parallel/rounds/**/*_result_*.json
+research/parallel/rounds/**/*_final*.json
+research/parallel/rounds/**/gp_formulas.json
+research/parallel/rounds/**/*sha256*.txt
+research/parallel/rounds/**/process_note.txt
+research/data_fetch/**/coverage.json
+research/data_fetch/**/inventory.json
+research/data_fetch/**/results_*.json
+# stray scratch files written by workers at the repo root (Windows temp paths mangled into file names)
+/C*UserstraitAppDataLocalTemp*
+/UserstraitAppDataLocalTemp*
+research/tournament/**/raw/
+research/tournament/**/*.png
+research/tournament/**/*.htm
+research/tournament/**/*.html
+research/data_fetch/**/MANIFEST.json
+
+# Preserve reproducible configuration and dependency files in experiment folders
+!research/tournament/**/config*.json
+!research/tournament/**/params*.json
+!research/tournament/**/requirements.txt
+
+# Worker scratch directories with mangled Windows paths at the repository root
+/researchtournament*/
+/artifactskaggle_stageengine_kerneljobs/
