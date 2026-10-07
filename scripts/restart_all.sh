@@ -7,7 +7,9 @@
 # (3) the paper runners (paper, d17bf, d13bf, d17bfg2, g2k20, d17bfg2c, g2k20c),
 # each only if its runner.lock is free (live process check); state.json is
 # backed up first (state.json.bak_<ts>) and validated as JSON; (4) the hourly
-# carry ledger loop once (every 3600s); (5) bot_health for every runner +
+# carry ledger loop once (every 3600s) plus the straddle paper loop (carry scope:
+# register_keepalive.ps1 calls restart_all.ps1 -Only bots and -Only carry, so no
+# new -Only straddle scope); (5) bot_health for every runner +
 # daily_status summary.
 #
 # Incident 2026-10-06: runners started with nohup from a time-limited shell died
@@ -56,6 +58,8 @@ case "$ONLY" in all|bots|backend|carry) ;; *) echo "bad --only: $ONLY (bots|back
 BACKEND_CMD='.venv/Scripts/python.exe -m uvicorn backend.server:app --host 127.0.0.1 --port 8724 --timeout-keep-alive 30 --no-access-log'
 LOOP_CMD='bash artifacts/research/advisor_shadow/loop.sh'
 CARRY_CMD='.venv/Scripts/python.exe scripts/carry_paper.py --once --equity 5000 --f 0.5 --tag carry'
+STRADDLE_CMD='.venv/Scripts/python.exe scripts/straddle_paper.py --equity 20000 --f 0.25 --tag straddle --interval 600'
+# straddle skip-if-running match (checked in restart_all.ps1): straddle_paper.*--tag straddle
 # tag|state_dir|bot args (paper = R2-4P, no tag; d13bf/d17bf/d17bfg2/g2k20 as observed 2026-10-06 incl. --interval 25)
 BOTS="
 paper|artifacts/bot/paper|-m bot.run --mode paper --equity 5000 --interval 25
@@ -88,6 +92,7 @@ if [ $DRY_RUN -eq 1 ]; then
     ;;
   esac
   case "$ONLY" in all|carry) plan_line "start carry loop once: $CARRY_CMD every 3600s (skip if running; skip when already running)" ;; esac
+  case "$ONLY" in all|carry) plan_line "start straddle loop: $STRADDLE_CMD every 600s (skip if running; carry scope)" ;; esac
   plan_line "print health: scripts/bot_health.py for all runners (paper, d17bf, d13bf, d17bfg2, g2k20, d17bfg2c, g2k20c) + scripts/daily_status.py summary"
   log "dry-run: plan only, started nothing (real starts delegate to restart_all.ps1 via WMI Win32_Process)"
   exit 0

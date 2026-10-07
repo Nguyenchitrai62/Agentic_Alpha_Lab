@@ -5,7 +5,9 @@
 # shadow loop.sh exactly once (skip if running); (3) the six paper runners
 # (paper, d17bf, d13bf, d17bfg2, g2k20, d17bfg2c),
 # each only if its runner.lock is free (live process check); state.json is
-# backed up first and validated as JSON; (4) the hourly carry ledger loop once;
+# backed up first and validated as JSON; (4) the hourly carry ledger loop once
+# plus the straddle paper loop (carry scope: register_keepalive.ps1 calls
+# -Only bots and -Only carry, so the straddle loop starts in the carry scope);
 # (5) bot_health for every runner + daily_status summary.
 #
 # Idempotent: running twice starts nothing new. -DryRun prints the plan only
@@ -30,6 +32,8 @@ $backendArgs = @("-m", "uvicorn", "backend.server:app", "--host", "127.0.0.1", "
 $backendCmdLine = ".venv/Scripts/python.exe -m uvicorn backend.server:app --host 127.0.0.1 --port 8724 --timeout-keep-alive 30 --no-access-log"
 $loopCmdLine = "bash artifacts/research/advisor_shadow/loop.sh"
 $carryCmdLine = ".venv/Scripts/python.exe scripts/carry_paper.py --once --equity 5000 --f 0.5 --tag carry"
+$straddleCmdLine = ".venv/Scripts/python.exe scripts/straddle_paper.py --equity 20000 --f 0.25 --tag straddle --interval 600"
+$straddleArgs = @("scripts/straddle_paper.py", "--equity", "20000", "--f", "0.25", "--tag", "straddle", "--interval", "600")
 # tag | state dir | bot args (paper = R2-4P, no tag; --interval 25 as observed 2026-10-06)
 $bots = @(
   @{ tag = "paper"; dir = "artifacts/bot/paper"; args = @("-m", "bot.run", "--mode", "paper", "--equity", "5000", "--interval", "25") },
@@ -115,7 +119,7 @@ if ($doBots) {
       # paper has no --tag: a live untagged paper runner (exclude the tagged ones)
       @(Find-Procs 'bot\.run' | Where-Object { $_.CommandLine -match '--mode paper' -and $_.CommandLine -notmatch '--tag' })
     } else {
-      Find-Procs ('bot\.run.*--tag ' + $b.tag + '( |$|")')
+      @(Find-Procs ('bot\.run.*--tag ' + $b.tag + '( |$|")'))
     }
     if ($procs.Count -gt 0) { Log "bot $($b.tag) already running (runner.lock held) -> skip"; continue }
     if ($DryRun) { Plan "start paper bot $($b.tag): .venv/Scripts/python.exe $($b.args -join ' ') (only if runner.lock free; backup+validate state.json)"; continue }
@@ -126,9 +130,9 @@ if ($doBots) {
   }
 }
 
-# ---------- (4) carry ledger loop ----------
+# ---------- (4) carry ledger loop + straddle paper loop (both in carry scope) ----------
 if ($doCarry) {
-  $c = Find-Procs 'carry_paper.*--tag carry'
+  $c = @(Find-Procs 'carry_paper.*--tag carry')  # @() : a single CimInstance has no usable .Count in PS 5.1
   if ($c.Count -gt 0) {
     Log "carry loop already running -> skip"
   } elseif ($DryRun) {
@@ -138,6 +142,18 @@ if ($doCarry) {
     New-Item -ItemType Directory -Force (Join-Path $root "artifacts\bot\paper_carry") | Out-Null
     $loopBody = "while (1) { & `"$py`" scripts/carry_paper.py --once --equity 5000 --f 0.5 --tag carry; Start-Sleep -Seconds 3600 }"
     Start-Process powershell.exe -WindowStyle Hidden -ArgumentList @("-NoProfile", "-Command", $loopBody) -RedirectStandardOutput (Join-Path $root "artifacts\bot\paper_carry\stdout.log") | Out-Null
+  }
+  # straddle paper loop lives in the carry scope (register_keepalive.ps1 calls
+  # restart_all.ps1 -Only bots and -Only carry, so no new -Only straddle scope).
+  $s = @(Find-Procs 'straddle_paper.*--tag straddle')
+  if ($s.Count -gt 0) {
+    Log "straddle loop already running -> skip"
+  } elseif ($DryRun) {
+    Plan "start straddle loop: $straddleCmdLine every 600s (skip if running; carry scope)"
+  } else {
+    Log "starting straddle paper loop"
+    New-Item -ItemType Directory -Force (Join-Path $root "artifacts\bot\paper_straddle") | Out-Null
+    Start-Detached $py $straddleArgs "artifacts/bot/paper_straddle/stdout.log"
   }
 }
 
