@@ -29,7 +29,8 @@ def test_names_and_thresholds_match_d17bf_bar():
     for needle in ("DD>20%", "10%", "pct<5", "8w"):
         assert needle in sc.STOP_RULE
     keys = [k for k, _ in sc.BOT_DIRS]
-    assert keys == ["bot_paper", "bot_paper_d17bf", "bot_paper_d17bfg2", "bot_paper_g2k20"]
+    assert keys[:4] == ["bot_paper", "bot_paper_d17bf", "bot_paper_d17bfg2", "bot_paper_g2k20"]
+    assert set(keys[4:]) == {"bot_paper_d17bfg2c", "bot_paper_g2k20c"}  # G2 + carry runners (ops_scorecardfix 2026-10-07)
     assert keys[:2] == ["bot_paper", "bot_paper_d17bf"]  # existing order unchanged
 
 

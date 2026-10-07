@@ -30,6 +30,72 @@ def parse_ts(x):
     return t
 
 
+DEFAULT_CORRECTIONS = Path(__file__).resolve().parents[1] / "artifacts/research/advisor_shadow/paper_corrections.json"
+
+
+def load_corrections(path=None):
+    """Load correction windows; missing/unreadable file -> [] (output unchanged)."""
+    p = Path(path) if path is not None else DEFAULT_CORRECTIONS
+    try:
+        data = json.loads(p.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return []
+    return data if isinstance(data, list) else []
+
+
+def windows_for_dir(corrections, dirname):
+    """Return [(start, end)] datetime windows applying to this bot dir."""
+    pipeline = f"bot_{dirname}" if dirname.startswith("paper") else dirname
+    short = pipeline[4:] if pipeline.startswith("bot_") else pipeline
+    out = []
+    for w in corrections or []:
+        try:
+            s, e = parse_ts(w["start"]), parse_ts(w["end"])
+        except (KeyError, TypeError):
+            continue
+        if s is None or e is None or e <= s:
+            continue
+        runners = w.get("runners", "all")
+        if runners == "all":
+            hit = pipeline.startswith("bot_paper")
+        elif isinstance(runners, list):
+            hit = pipeline in runners or short in runners
+        else:
+            hit = False
+        if hit:
+            out.append((s, e))
+    return out
+
+
+def corrected_return(curve, windows):
+    """Chain equity-curve step returns outside windows (window-crossing steps -> 0).
+
+    Returns (raw_pct, corrected_pct, excluded_days).
+    """
+    pts = []
+    for row in curve or []:
+        try:
+            pts.append((parse_ts(row[0]), float(row[1])))
+        except (TypeError, ValueError, IndexError):
+            continue
+    pts = [(t, v) for t, v in pts if t is not None]
+    if len(pts) < 2 or not pts[0][1]:
+        return None, None, 0.0
+    raw = 100.0 * (pts[-1][1] - pts[0][1]) / pts[0][1]
+    growth = 1.0
+    for (t0, e0), (t1, e1) in zip(pts[:-1], pts[1:]):
+        r = (e1 / e0 - 1.0) if e0 else 0.0
+        if any((t0 < we) and (t1 > ws) for ws, we in windows):
+            r = 0.0
+        growth *= (1.0 + r)
+    excl = 0.0
+    for ws, we in windows:
+        lo, hi = max(pts[0][0], ws), min(pts[-1][0], we)
+        if hi > lo:
+            excl += (hi - lo).total_seconds() / 86400
+    return raw, 100.0 * (growth - 1.0), excl
+
+
 def load_json(path: Path):
     try:
         return json.loads(path.read_text(encoding="utf-8"))
@@ -338,9 +404,25 @@ def main(argv=None) -> int:
     ap.add_argument("--md", default=None, help="write Markdown table to PATH")
     ap.add_argument("--json", nargs="?", const="-", default=None,
                     help="write JSON to PATH (bare --json prints to stdout)")
+    ap.add_argument("--corrections", default=None,
+                    help="correction windows JSON (default: artifacts/research/advisor_shadow/paper_corrections.json if it exists)")
     a = ap.parse_args(argv)
     reps = [summarize_dir(Path(d)) for d in a.dirs]
     print(format_text(reps))
+    cpath = Path(a.corrections) if a.corrections else DEFAULT_CORRECTIONS
+    corrections = load_corrections(cpath) if cpath.exists() else []
+    if corrections:
+        for d, r in zip(a.dirs, reps):
+            wins = windows_for_dir(corrections, Path(d).name)
+            if not wins:
+                continue
+            curve = (load_json(Path(d) / "exchange.json") or {}).get("equity_curve") or []
+            raw, corr, excl = corrected_return(curve, wins)
+            win_s = ", ".join(f"{s.isoformat()}..{e.isoformat()}" for s, e in wins)
+            if raw is None:
+                print(f"{r['name']}: excluded {win_s} (no equity curve)")
+            else:
+                print(f"{r['name']}: excluded {win_s} raw {raw:.3f}% -> corrected {corr:.3f}% (excluded {excl:.2f}d)")
     if a.md:
         Path(a.md).write_text(format_markdown(reps) + "\n", encoding="utf-8")
         print(f"saved {a.md}")

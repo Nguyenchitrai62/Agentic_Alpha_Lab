@@ -1,0 +1,24 @@
+# SCORECARDFIX 2026-10-07: correction window + 2 carry runners
+- Window 2026-10-06T20:10 .. 2026-10-07T07:35 UTC, runners=all
+- Source: docs/opencode/PAPERFIX_20261007.md (bug cb14cb7 + outage)
+- Overstatement USDT: paper 7.89, d17bf 15.06, d13bf 11.54,
+- d17bfg2 15.06, g2k20 17.57, d17bfg2c 14.05, g2k20c 14.45
+- Method: zero equity-curve steps overlapping the window, chain rest;
+- days = live days - 0.45 excluded; raw kept as raw_live_pct/raw_days.
+- New runners: bot_paper_d17bfg2c "G2 + carry f 0.25 (paper)"
+- expect 5.634/16.75 (oc_carrycompound REPORT 5y row 5.634/16.75);
+- bot_paper_g2k20c "G2K20 + carry f 0.25 (paper)" expect 6.097/17.64
+- (oc_g2k20compound REPORT base f=0.25 row 6.097/17.64).
+- Files: scripts/prospective_scorecard.py, scripts/paper_report.py
+- (--corrections, default file if exists; no file -> unchanged),
+- artifacts/research/advisor_shadow/paper_corrections.json,
+- tests/test_ops_scorecardfix.py (3 tests pass).
+- paper_report raw->corrected: paper 0.149->-0.037,
+- d17bf 0.637->-0.027, d17bfg2 0.637->-0.027, g2k20 0.709->-0.027,
+- d17bfg2c -0.645->-0.342, g2k20c -0.695->-0.469.
+- scorecard MAIN days/live now: paper 1.67/-0.037, d17bf 1.30/-0.027,
+- d17bfg2 1.13/-0.027, g2k20 1.13/-0.027, d17bfg2c 0.55/-0.342,
+- g2k20c 0.26/-0.469 (raw_* side fields kept).
+- Note: tests/test_prospective_scorecard.py::test_names... expects 4
+- BOT_DIRS keys; now 6 per assignment, so it fails until the leader
+- updates that list. All other scorecard/paper_report tests pass (12/13).
