@@ -11,6 +11,7 @@ artifacts/bot/<mode>/actions.jsonl. Safety: a plan older than 2 hours blocks NEW
 from __future__ import annotations
 
 import argparse
+import copy
 import json
 import os
 import sys
@@ -48,6 +49,141 @@ MAINT_PRE_MIN = 30.0
 # match the assignment: slow_cycle > 60 s, lock_wait > 10 s (cache-lock wait).
 SLOW_CYCLE_S = 60.0
 LOCK_WAIT_WARN_S = float(KLINE_CACHE_LOCK_WARN_S)
+
+# bot_k2flag (2026-10-07): optional Kronos K2 dip-size tilt, default OFF.
+# Parquet rows: sym (e.g. BTCUSDT), shift (0..3 clock shift = plan phase),
+# T (holding-bar open), k2_mult, mode in {prospective, late, backfill}.
+K2_ALLOWED_MODES = ("prospective", "late")
+K2_DIP_BAR_OFFSET = pd.Timedelta(minutes=16)
+
+
+def _k2_norm_sym(coin) -> str:
+    """Parquet sym for a plan coin key: BTC -> BTCUSDT, BTCUSDT -> BTCUSDT."""
+    try:
+        s = str(coin or "").strip().upper()
+    except Exception:
+        return ""
+    return s if s.endswith("USDT") else (s + "USDT" if s else "")
+
+
+def _k2_norm_T(t):
+    """Holding-bar open as a UTC Timestamp (None when unparseable)."""
+    if t is None:
+        return None
+    try:
+        ts = pd.Timestamp(t)
+    except (TypeError, ValueError, AttributeError):
+        return None
+    try:
+        if pd.isna(ts):
+            return None
+    except (TypeError, ValueError):
+        return None
+    try:
+        if ts.tzinfo is None:
+            ts = ts.tz_localize("UTC")
+        else:
+            ts = ts.tz_convert("UTC")
+    except (TypeError, ValueError, AttributeError):
+        pass
+    try:
+        if pd.isna(ts):
+            return None
+    except (TypeError, ValueError):
+        return None
+    return ts
+
+
+def _k2_bar_of_dip(d):
+    """Holding-bar open T for a plan dip row: active_from - 16 min (None when missing)."""
+    try:
+        a0 = d.get("active_from")
+    except (AttributeError, TypeError):
+        return None
+    ts = _k2_norm_T(a0)
+    if ts is None:
+        return None
+    try:
+        return ts - K2_DIP_BAR_OFFSET
+    except (TypeError, ValueError):
+        return None
+
+
+def _k2_load_map(path):
+    """Read the K2 parquet once into {(sym, shift, T_ns): (mult, mode)}.
+
+    Raises on missing / locked / unreadable files (caller logs k2_missing).
+    Row-level problems never raise: that row simply maps to (1.0, mode).
+    """
+    df = pd.read_parquet(path, columns=["sym", "shift", "T", "k2_mult", "mode"])
+    out: dict = {}
+    try:
+        syms = list(df["sym"])
+        shifts = list(df["shift"])
+        ts = list(df["T"])
+        mults = list(df["k2_mult"])
+        modes = list(df["mode"])
+    except (KeyError, TypeError, AttributeError):
+        return out
+    for s, sh, t, m, mo in zip(syms, shifts, ts, mults, modes):
+        try:
+            sym = str(s).strip().upper()
+        except Exception:
+            continue
+        try:
+            shift = int(sh)
+        except (TypeError, ValueError):
+            continue
+        tn = _k2_norm_T(t)
+        if tn is None:
+            continue
+        try:
+            key = (sym, shift, int(tn.value))
+        except (TypeError, ValueError, AttributeError):
+            continue
+        try:
+            mf = float(m)
+        except (TypeError, ValueError):
+            mf = 1.0
+        try:
+            mode = str(mo).strip().lower() if mo is not None else ""
+        except Exception:
+            mode = ""
+        out[key] = (mf, mode)
+    return out
+
+
+def _k2_mult_for(coin, phase, bar, k2map) -> tuple:
+    """(multiplier, mode_str) for one (coin, phase, bar); missing/backfill -> (1.0, mode)."""
+    if bar is None or not isinstance(k2map, dict):
+        return 1.0, "missing"
+    try:
+        sym = _k2_norm_sym(coin)
+        shift = int(phase)
+        key = (sym, shift, int(bar.value))
+    except (TypeError, ValueError, AttributeError):
+        return 1.0, "missing"
+    hit = k2map.get(key)
+    if hit is None:
+        return 1.0, "missing"
+    try:
+        mult, mode = hit
+    except (TypeError, ValueError):
+        return 1.0, "missing"
+    try:
+        mode_s = str(mode).strip().lower()
+    except Exception:
+        mode_s = ""
+    if mode_s not in K2_ALLOWED_MODES:
+        return 1.0, mode_s or "missing"
+    try:
+        mf = float(mult)
+    except (TypeError, ValueError):
+        return 1.0, mode_s
+    import math as _math
+    if not (_math.isfinite(mf) and mf > 0):
+        return 1.0, mode_s
+    return mf, mode_s
 
 
 def _cycle_now() -> float:
@@ -327,7 +463,7 @@ class Runner:
                  tag: str | None = None, dip_mult: float = 1.0, bear_book: bool = False,
                  dip_cooldown_h: float = 0.0, dip_sl_coin: dict | None = None, dip_gross_cap: float | None = None,
                  adopt_fresh: bool = False, no_risk_guard: bool = False, carry_f: float = 0.0,
-                 maint_start=None, maint_end=None):
+                 maint_start=None, maint_end=None, k2_tilt=None):
         self.mode, self.plan_path = mode, plan_path
         self.risk_mult, self.corr, self.tag, self.dip_mult = float(risk_mult), bool(corr), tag or None, float(dip_mult)
         self.bear_book = bool(bear_book)
@@ -352,6 +488,13 @@ class Runner:
         self.maint_start = _parse_maint_ts(maint_start)
         self.maint_end = _parse_maint_ts(maint_end)
         self._maint_active = False
+        # bot_k2flag (default OFF = None -> bit-identical behaviour, no extra logs).
+        try:
+            self.k2_tilt = Path(k2_tilt) if k2_tilt else None
+        except (TypeError, ValueError):
+            self.k2_tilt = None
+        self._k2_logged: set = set()
+        self._k2_missing_logged: set = set()
         self._kline_cache_dir_override = None
         self.dir = ROOT / "artifacts/bot" / (mode if not self.tag else f"{mode}_{self.tag}")
         self.dir.mkdir(parents=True, exist_ok=True)
@@ -453,6 +596,113 @@ class Runner:
             if kind == "entry":
                 out.append(link)
         return out
+
+    def _k2_scaled_plan(self, plan, now, led):
+        """Scaled plan copy with the K2 dip tilt applied (bot_k2flag, default OFF).
+
+        For every NEW dip rung (active now, piece not in the ledger) of phase s
+        for coin c whose holding bar opens at T = active_from - 16 min, look up
+        (sym = c[+USDT], shift = s, T) in the --k2-tilt parquet (read at most
+        once per cycle here) and multiply that rung's size_frac by k2_mult
+        BEFORE mirror.desired()'s budget / gross-cap logic (so caps still
+        bind) and before the runner's dust / guard / lot rounding (so minima
+        still bind). Book, carry, exits and protection paths are untouched.
+
+        Uses k2_mult only when the row exists and mode is 'prospective' or
+        'late' (both computed from bars closed <= T); else 1.0. A missing /
+        locked parquet means 1.0 for every rung (op=k2_missing once per bar).
+        Logs op=k2_mult once per (coin, phase, bar) with the multiplier used.
+        When the flag is absent the caller never calls this (bit-identical).
+        """
+        try:
+            tilt = getattr(self, "k2_tilt", None)
+        except Exception:
+            tilt = None
+        if not tilt:
+            return plan
+        try:
+            now_ts = pd.Timestamp(now)
+        except (TypeError, ValueError):
+            return plan
+        try:
+            k2map = _k2_load_map(tilt)
+            file_ok = True
+        except Exception as e:
+            try:
+                bar_key = self._skip_bar(now_ts)
+            except Exception:
+                bar_key = str(now_ts)
+            try:
+                if bar_key not in self._k2_missing_logged:
+                    self._k2_missing_logged.add(bar_key)
+                    self.log(dict(op="k2_missing", bar=bar_key,
+                                  note=f"{type(e).__name__}: {e}"[:200]))
+            except Exception:
+                pass
+            return plan
+        try:
+            scaled = copy.deepcopy(plan)
+        except Exception:
+            return plan
+        try:
+            coins = (scaled.get("coins") or {})
+        except (AttributeError, TypeError):
+            return plan
+        seen: dict = {}
+        for coin, c in list(coins.items()):
+            if not isinstance(c, dict):
+                continue
+            for d in (c.get("dips") or []):
+                if not isinstance(d, dict):
+                    continue
+                try:
+                    a0 = pd.Timestamp(d.get("active_from"))
+                    a1 = pd.Timestamp(d.get("active_until"))
+                except (TypeError, ValueError, AttributeError):
+                    continue
+                try:
+                    if not (a0 <= now_ts < a1 + pd.Timedelta(minutes=1)):
+                        continue
+                except (TypeError, ValueError):
+                    continue
+                try:
+                    ph = d.get("phase")
+                    rung = d.get("rung")
+                    bar = _k2_bar_of_dip(d)
+                    if bar is None:
+                        continue
+                    pid = mirror.dip_pid(int(ph), _k2_norm_sym(coin), rung, bar)
+                    if isinstance(led, dict) and pid in led:
+                        continue  # already open: not a NEW entry, leave untouched
+                except Exception:
+                    continue
+                mult, mode = _k2_mult_for(coin, ph, bar, k2map)
+                try:
+                    key = (str(coin), int(ph), str(bar))
+                except (TypeError, ValueError):
+                    continue
+                if key not in seen:
+                    seen[key] = (mult, mode, coin, ph, bar)
+                try:
+                    d["size_frac"] = float(d.get("size_frac")) * float(mult)
+                except (TypeError, ValueError, KeyError, AttributeError):
+                    continue
+        try:
+            logged = getattr(self, "_k2_logged", None)
+            if not isinstance(logged, set):
+                logged = self._k2_logged = set()
+        except Exception:
+            logged = set()
+        for key, (mult, mode, coin, ph, bar) in seen.items():
+            if key in logged:
+                continue
+            logged.add(key)
+            try:
+                self.log(dict(op="k2_mult", coin=str(coin), sym=_k2_norm_sym(coin),
+                              phase=int(ph), bar=str(bar), mult=float(mult), k2_mode=str(mode)))
+            except Exception:
+                pass
+        return scaled
 
     def _startup_protection_check(self):
         """Startup check after every restart: list each open piece and verify its
@@ -1473,6 +1723,16 @@ class Runner:
             except Exception:
                 pass
 
+        # bot_k2flag: optional dip-size tilt (default OFF -> plan unchanged).
+        # Scaling happens on a plan copy BEFORE desired() so the dip budget,
+        # the dip gross-cap, the dust guard, the risk guard and lot rounding
+        # all still bind the scaled size. Book / carry / exits untouched.
+        try:
+            if getattr(self, "k2_tilt", None):
+                plan = self._k2_scaled_plan(plan, now, led)
+        except Exception:
+            pass
+
         try:
             want = mirror.desired(plan, now, equity, led, risk_mult=self.risk_mult, corr=self.corr,
                                   last_close=lc, dip_mult=self.dip_mult,
@@ -1839,6 +2099,7 @@ def main():
     ap.add_argument("--carry-f", type=float, default=0.0, metavar="F", help="cash-and-carry sleeve fraction per leg per coin (default 0 = off, orders bit-for-bit unchanged)")
     ap.add_argument("--maint-start", default=None, metavar="ISO", help="opt-in maintenance window start, UTC ISO (default off; suppression runs from start-30min until --maint-end)")
     ap.add_argument("--maint-end", default=None, metavar="ISO", help="opt-in maintenance window end, UTC ISO (default off; or use <state dir>/maintenance.json, read each cycle)")
+    ap.add_argument("--k2-tilt", default=None, metavar="PATH", help="opt-in Kronos K2 dip-size tilt parquet (default off = unchanged; e.g. artifacts/research/kronos_shadow/kronos_features_live.parquet)")
     a = ap.parse_args()
     if a.mode == "live" and os.environ.get("BOT_ALLOW_LIVE") != "yes-real-money":
         sys.exit("live trading is locked: the account owner must set BOT_ALLOW_LIVE=yes-real-money")
@@ -1849,7 +2110,7 @@ def main():
              bear_book=a.bear_book, dip_cooldown_h=a.dip_cooldown_h, dip_sl_coin=parse_dip_sl_coin(a.dip_sl_coin),
              dip_gross_cap=a.dip_gross_cap, adopt_fresh=a.adopt_fresh,
              no_risk_guard=a.no_risk_guard or (a.mode in ("paper", "dry") and not a.risk_guard),
-             carry_f=a.carry_f, maint_start=a.maint_start, maint_end=a.maint_end)
+             carry_f=a.carry_f, maint_start=a.maint_start, maint_end=a.maint_end, k2_tilt=a.k2_tilt)
     while True:
         try:
             r.cycle()
