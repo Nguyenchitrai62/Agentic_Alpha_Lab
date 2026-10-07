@@ -29,6 +29,8 @@ while :; do
     if grep -q "auto-rejecting" "$D/$RUN.stderr.log" 2>/dev/null; then early=1; fi
     if tail -n 3 "$D/$RUN.events.jsonl" 2>/dev/null | grep -q '"type":"error"'; then early=1; fi
   fi
+  # an OpenCode server/DB error ends the session at any time: retry it too (late deaths included)
+  if tail -n 3 "$D/$RUN.events.jsonl" 2>/dev/null | grep -q 'Failed to execute statement\|Unexpected server error\|database is locked'; then early=1; fi
   echo "[retry] $RUN minutes=$mins early=$early attempt=$attempt"
   if [ "$early" -eq 0 ] || [ "$attempt" -ge "$RETRIES" ]; then break; fi
   attempt=$((attempt + 1))
