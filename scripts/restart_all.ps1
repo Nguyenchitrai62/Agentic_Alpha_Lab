@@ -3,10 +3,10 @@
 # Order: (1) backend uvicorn on 127.0.0.1:8724 (local only, NEVER the public
 # tunnel/cloudflared), wait for /health + fresh plan (<1h15m); (2) advisor
 # shadow loop.sh exactly once (skip if running); (3) the six paper runners
-# (paper, d17bf, d13bf, d17bfg2, g2k20, d17bfg2c),
+# (paper, d17bf, d13bf, d17bfg2, g2k20, d17bfg2c, g2k20c, d17bfg2k2, d17bfg2ch),
 # each only if its runner.lock is free (live process check); state.json is
 # backed up first and validated as JSON; (4) the hourly carry ledger loop once
-# plus the straddle paper loop (carry scope: register_keepalive.ps1 calls
+# plus the straddle paper loop and the Kronos / Chronos shadow loops (carry scope: register_keepalive.ps1 calls
 # -Only bots and -Only carry, so the straddle loop starts in the carry scope);
 # (5) bot_health for every runner + daily_status summary.
 #
@@ -43,6 +43,14 @@ $bots = @(
   @{ tag = "g2k20"; dir = "artifacts/bot/paper_g2k20"; args = @("-m", "bot.run", "--mode", "paper", "--equity", "5000", "--corr-size", "--dip-mult", "2.0", "--dip-gross-cap", "2.0", "--bear-book", "--adopt-fresh", "--interval", "25", "--tag", "g2k20") }
   @{ tag = "d17bfg2c"; dir = "artifacts/bot/paper_d17bfg2c"; args = @("-m", "bot.run", "--mode", "paper", "--equity", "5000", "--corr-size", "--dip-mult", "1.7", "--dip-gross-cap", "2.0", "--bear-book", "--adopt-fresh", "--carry-f", "0.25", "--interval", "25", "--tag", "d17bfg2c") }
   @{ tag = "g2k20c"; dir = "artifacts/bot/paper_g2k20c"; args = @("-m", "bot.run", "--mode", "paper", "--equity", "5000", "--corr-size", "--dip-mult", "2.0", "--dip-gross-cap", "2.0", "--bear-book", "--adopt-fresh", "--carry-f", "0.25", "--interval", "25", "--tag", "g2k20c") }
+  # 2026-10-08: G2 + Kronos K2 dip tilt and G2 + Chronos C2 dip tilt (prospective evidence; feeds = the shadow loops below)
+  @{ tag = "d17bfg2k2"; dir = "artifacts/bot/paper_d17bfg2k2"; args = @("-m", "bot.run", "--mode", "paper", "--equity", "5000", "--corr-size", "--dip-mult", "1.7", "--dip-gross-cap", "2.0", "--bear-book", "--adopt-fresh", "--interval", "25", "--k2-tilt", "artifacts/research/kronos_shadow/kronos_features_live.parquet", "--tag", "d17bfg2k2") }
+  @{ tag = "d17bfg2ch"; dir = "artifacts/bot/paper_d17bfg2ch"; args = @("-m", "bot.run", "--mode", "paper", "--equity", "5000", "--corr-size", "--dip-mult", "1.7", "--dip-gross-cap", "2.0", "--bear-book", "--adopt-fresh", "--interval", "25", "--k2-tilt", "artifacts/research/chronos_shadow/chronos_features_live.parquet", "--tag", "d17bfg2ch") }
+)
+# prospective foundation-model feature loops (public Binance klines only; every 600 s; idempotent per bar)
+$shadowLoops = @(
+  @{ name = "kronos"; pattern = 'kronos_shadow\.py'; script = "scripts/kronos_shadow.py"; log = "artifactsesearch\kronos_shadow\loop.log" },
+  @{ name = "chronos"; pattern = 'chronos_shadow\.py'; script = "scripts/chronos_shadow.py"; log = "artifactsesearch\chronos_shadow\loop.log" }
 )
 
 function Log([string]$m) { Write-Host "[restart_all] $m" }
@@ -155,6 +163,20 @@ if ($doCarry) {
     New-Item -ItemType Directory -Force (Join-Path $root "artifacts\bot\paper_straddle") | Out-Null
     Start-Detached $py $straddleArgs "artifacts/bot/paper_straddle/stdout.log"
   }
+  # Kronos / Chronos shadow feature loops (carry scope, like the straddle loop)
+  foreach ($l in $shadowLoops) {
+    $f = @(Find-Procs $l.pattern)
+    if ($f.Count -gt 0) {
+      Log "$($l.name) shadow loop already running -> skip"
+    } elseif ($DryRun) {
+      Plan "start $($l.name) shadow loop: $($l.script) --once every 600s (skip if running; carry scope)"
+    } else {
+      Log "starting $($l.name) shadow loop"
+      New-Item -ItemType Directory -Force (Split-Path (Join-Path $root $l.log)) | Out-Null
+      $loopBody = "Set-Location `"$root`"; while (1) { & `"$py`" $($l.script) --once; Start-Sleep -Seconds 600 }"
+      Start-Process powershell.exe -WindowStyle Hidden -ArgumentList @("-NoProfile", "-Command", $loopBody) -RedirectStandardOutput (Join-Path $root $l.log) | Out-Null
+    }
+  }
 }
 
 # ---------- (5) health summary ----------
@@ -163,6 +185,6 @@ if ($DryRun) {
   Log "dry-run: plan only, started nothing"
   exit 0
 }
-if ($doBots) { & $py "scripts/bot_health.py" "artifacts/bot/paper" "artifacts/bot/paper_d17bf" "artifacts/bot/paper_d13bf" "artifacts/bot/paper_d17bfg2" "artifacts/bot/paper_g2k20" "artifacts/bot/paper_d17bfg2c" "artifacts/bot/paper_g2k20c"; }
+if ($doBots) { & $py "scripts/bot_health.py" "artifacts/bot/paper" "artifacts/bot/paper_d17bf" "artifacts/bot/paper_d13bf" "artifacts/bot/paper_d17bfg2" "artifacts/bot/paper_g2k20" "artifacts/bot/paper_d17bfg2c" "artifacts/bot/paper_g2k20c" "artifacts/bot/paper_d17bfg2k2" "artifacts/bot/paper_d17bfg2ch"; }
 & $py "scripts/daily_status.py"
 Log "done (idempotent: a second run starts nothing new)"
