@@ -159,6 +159,7 @@ def test_route_returns_ledger_to_viewer_and_rejects_anonymous(web_client, tmp_pa
     p.write_text(json.dumps(_fake_state(with_settled=True)), encoding="utf-8")
     raw = p.read_text(encoding="utf-8")
     monkeypatch.setattr(carry_view, "default_state_path", lambda: p)
+    monkeypatch.setattr(carry_view, "deployed_state_path", lambda: tmp_path / "no_runner.json")  # isolate from the live runner
     server.clear_cache()
 
     assert client.get("/api/carry").status_code == 401
@@ -178,6 +179,7 @@ def test_route_returns_ledger_to_viewer_and_rejects_anonymous(web_client, tmp_pa
 def test_route_empty_ledger_when_no_state_file(web_client, tmp_path, monkeypatch):
     client, server, (_, _, auth, carry_view) = web_client
     monkeypatch.setattr(carry_view, "default_state_path", lambda: tmp_path / "missing.json")
+    monkeypatch.setattr(carry_view, "deployed_state_path", lambda: tmp_path / "no_runner.json")  # isolate from the live runner
     server.clear_cache()
     body = client.get("/api/carry", headers=_bearer(auth, "viewer@example.com")).json()
     assert body["open_pairs"] == [] and body["has_data"] is False and body["stale"] is True

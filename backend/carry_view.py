@@ -21,6 +21,45 @@ def default_state_path() -> Path:
     return ROOT / "artifacts" / "bot" / "paper_carry" / "state.json"
 
 
+def deployed_state_path() -> Path:
+    """Deployed BOT runner carry: artifacts/bot/paper_d17bfg2c/state.json (carry positions, f=0.25). Read-only."""
+    from .config import ROOT
+
+    return ROOT / "artifacts" / "bot" / "paper_d17bfg2c" / "state.json"
+
+
+def _ledger_from_runner(runner: dict, mtime_iso: str | None) -> dict | None:
+    """Convert the deployed runner state (top-level 'carry' dict) to the paper_carry ledger shape (read-only)."""
+    if not isinstance(runner, dict):
+        return None
+    carry = runner.get("carry")
+    if not isinstance(carry, dict):
+        return None
+    positions = carry.get("positions")
+    if not isinstance(positions, dict) or not positions:
+        return None
+    history = carry.get("history")
+    if not isinstance(history, list):
+        history = []
+    entered = carry.get("entered")
+    skipped = carry.get("skip_logged")
+    coins = sorted(positions)
+    return {
+        "tag": "carry",
+        "rule": {"coins": coins, "basis_threshold": 0.04, "f": 0.25},
+        "rule_sha256": None,
+        "positions": positions,
+        "history": history,
+        "totals": {
+            "n_entered": len(entered) if isinstance(entered, list) else len(positions) + len(history),
+            "n_skipped": len(skipped) if isinstance(skipped, dict) else 0,
+            "realised_pnl": 0.0,
+            "fees_paid": 0.0,
+        },
+        "updated_at": mtime_iso,
+    }
+
+
 def _parse_time(value) -> datetime | None:
     if not isinstance(value, str) or not value:
         return None
@@ -145,5 +184,33 @@ def summarize(state: dict | None, now: datetime | None = None) -> dict:
 
 
 def get_carry_view(state_path: Path | str | None = None, now: datetime | None = None) -> dict:
-    """Read the ledger file and return the endpoint payload (read-only)."""
-    return summarize(load_raw(state_path), now=now)
+    """Read the ledger file and return the endpoint payload (read-only).
+
+    Default (state_path None): prefer the deployed runner's carry
+    (artifacts/bot/paper_d17bfg2c/state.json, f=0.25) when available,
+    falling back to paper_carry; the payload labels which source is shown.
+    An explicit state_path keeps the legacy behavior (that file only).
+    """
+    if state_path is not None:
+        view = summarize(load_raw(state_path), now=now)
+        view["source"] = "paper_carry"
+        return view
+    try:
+        dpath = deployed_state_path()
+        draw = load_raw(dpath)
+    except Exception:  # noqa: BLE001 - read-only view never raises
+        draw = None
+    if isinstance(draw, dict):
+        try:
+            mtime = datetime.fromtimestamp(dpath.stat().st_mtime, tz=timezone.utc).isoformat()
+        except OSError:
+            mtime = None
+        ledger = _ledger_from_runner(draw, mtime)
+        if ledger is not None:
+            view = summarize(ledger, now=now)
+            view["source"] = "paper_d17bfg2c"
+            view["f"] = 0.25
+            return view
+    view = summarize(load_raw(), now=now)
+    view["source"] = "paper_carry"
+    return view

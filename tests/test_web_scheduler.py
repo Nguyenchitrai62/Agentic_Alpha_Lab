@@ -184,9 +184,9 @@ def test_stale_or_unstored_plan_does_not_complete_but_other_four_run(backend, tm
                         or db_.kv_set("plan_status_v376", {"completed_slot": slot, "completed_at": db_.now_ms()}) or "ok")
     with pytest.raises(RuntimeError, match="v301"):
         pipe.job_trade_plan()
-    assert len(calls) == len(pipe.catalog.PIPELINES)
+    assert len(calls) == len(pipe.catalog.plan_pipes())
     assert not db.kv_get("plan_status_v301") and not db.kv_get("trade_plan_v301")
-    assert all(db.kv_get(f"plan_status_{p}")["completed_slot"] == slot for p in pipe.catalog.PIPELINES if p != "v301")
+    assert all(db.kv_get(f"plan_status_{p}")["completed_slot"] == slot for p in pipe.catalog.plan_pipes() if p != "v301")
     assert pipe.plan_order(slot)[0] == "v301"
 
 
@@ -620,7 +620,7 @@ def test_old_plan_decision_bar_is_stale(backend, tmp_path, monkeypatch):
     db.kv_set("trade_plan_v340", {"decision_bar": old})
     assert pipe.stale_plans(now_ms) == {"v340": "plan older than the last closed 4h bar"}
     # the next bar makes every plan stale
-    assert set(pipe.stale_plans(now_ms + pipe.H4_MS)) == set(pipe.catalog.PIPELINES)
+    assert set(pipe.stale_plans(now_ms + pipe.H4_MS)) == set(pipe.catalog.plan_pipes())
 
 
 def test_failed_replay_build_is_not_retried_every_refresh(backend, monkeypatch):
@@ -673,7 +673,7 @@ def test_cycle_checks_first_then_plans_best_first_then_missing_replays(backend, 
                         or db_.kv_set("plan_status_v376", {"completed_slot": slot, "completed_at": db_.now_ms()}) or "ok")
     monkeypatch.setattr(history, "build", lambda p, db: calls.append("build " + p) or f"tm_{p}: ok")
     msg = pipe.job_cycle()
-    candidates = [pipe.catalog.PIPELINES[p]["candidate"] for p in pipe.catalog.ranked()]
+    candidates = [pipe.catalog.PIPELINES[p]["candidate"] for p in pipe.catalog.plan_pipes()]
     assert candidates[0] == "v362_M4"
     # the check repaired the candle (so the candle step does not fetch again), then the inputs, the plans best first,
     # the missing replay, and the scorecard

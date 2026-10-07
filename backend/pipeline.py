@@ -264,13 +264,13 @@ def job_forward() -> str:
 
 # ---------------------------------------------------------------- executable trade plan (trade mode)
 PLAN_PIPELINES = tuple((v["candidate"], f"trade_plan_{p}", f"trade_plan_{p}.json")
-                       for p, v in catalog.PIPELINES.items())
+                       for p, v in catalog.PIPELINES.items() if p not in catalog.PLAN_ALIASES)
 H4_MS = 4 * 3600_000
 
 
 def plan_order(slot: int) -> list[str]:
     """Unfinished plans for this 4h cycle first; configured pipeline priority within each group."""
-    rank = catalog.ranked()
+    rank = catalog.plan_pipes()
     return sorted(rank, key=lambda p: (
         (db.kv_get(f"plan_status_{p}", {}) or {}).get("completed_slot") == slot,
         rank.index(p)))
@@ -374,7 +374,7 @@ def stale_plans(now_ms: int | None = None) -> dict[str, str]:
     slot = due_slot(now_ms)
     code_ms = plan_code_mtime_ms()
     out = {}
-    for pipe in catalog.ranked():
+    for pipe in catalog.plan_pipes():
         plan = db.kv_get(f"trade_plan_{pipe}")
         done = (db.kv_get(f"plan_status_{pipe}", {}) or {}).get("completed_slot")
         reason = None
@@ -404,7 +404,7 @@ def stale_plans(now_ms: int | None = None) -> dict[str, str]:
 
 def missing_summaries() -> list[str]:
     """Catalog pipelines (best first) without a walk-forward replay: summary_tm_<p> missing or no tm_<p> equity rows."""
-    return [p for p in catalog.ranked()
+    return [p for p in catalog.plan_pipes()
             if not db.kv_get(f"summary_tm_{p}")
             or not db.one("SELECT 1 AS x FROM equity WHERE source = ? LIMIT 1", (f"tm_{p}",))]
 

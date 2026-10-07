@@ -228,7 +228,10 @@ def overview(request: Request, pipeline: str | None = None, user: dict = Depends
     """pipeline=v205/v233/v236/v240: the walk-forward summary of that executable trade-mode pipeline (history_tm)."""
     pipeline = pipeline or catalog.default_pipeline(user)
     catalog.require_pipeline(user, pipeline)
-    if pipeline in ("v205", "v233", "v236", "v240", "v266", "v269", "v285", "v295", "v301", "v321", "v315", "v340", "v342", "v362", "v367"):
+    if pipeline in ("v205", "v233", "v236", "v240", "v266", "v269", "v285", "v295", "v301", "v321", "v315", "v340", "v342", "v362", "v367", "v376", "g2c"):
+        if pipeline == "g2c":  # deployed BOT "G2 + carry": same plan file as v376, own walkforward summary
+            return cached(request, "overview:g2c", 60, lambda: {"walkforward": db.kv_get("summary_tm_g2c", {}),
+                                                               "plan": db.kv_get("trade_plan_v376", {})})
         return cached(request, f"overview:{pipeline}", 60, lambda: {"walkforward": db.kv_get(f"summary_tm_{pipeline}", {}),
                                                                    "plan": db.kv_get({"v205": "trade_plan"}.get(pipeline, f"trade_plan_{pipeline}"), {})})
 
@@ -263,7 +266,8 @@ def pipelines_summary(request: Request, user: dict = Depends(auth.require_viewer
             # Historical evaluation remains public to approved viewers; never serialize plans/signals here.
             summary = {k: raw.get(k, catalog.PIPELINES[p].get(k)) for k in catalog.SUMMARY_FIELDS}
             locked = p not in permitted
-            plan = (db.kv_get(f"trade_plan_{p}", {}) or {}) if not locked else {}
+            # g2c shares the v376 plan file (same live signals); paper result shown from v376's plan.
+            plan = (db.kv_get(f"trade_plan_{'v376' if p == 'g2c' else p}", {}) or {}) if not locked else {}
             out[p] = {"rank": i, "locked": locked, "locked_for_viewers": settings["locked"][p],
                       "automatic_order": settings["automatic"], "walkforward": summary,
                       "paper_net_pct": plan.get("net_return_pct"), "freeze": plan.get("freeze"),
@@ -284,7 +288,8 @@ def trade_plan(request: Request, pipeline: str | None = None, user: dict = Depen
     catalog.require_pipeline(user, pipeline)
     if pipeline not in catalog.PIPELINES and pipeline not in ("v205", "v233", "v236", "v240"):
         raise HTTPException(400, "Unknown pipeline.")
-    key = {"v233": "trade_plan_v233", "v236": "trade_plan_v236", "v240": "trade_plan_v240", "v266": "trade_plan_v266", "v269": "trade_plan_v269", "v285": "trade_plan_v285", "v295": "trade_plan_v295", "v301": "trade_plan_v301", "v321": "trade_plan_v321", "v315": "trade_plan_v315", "v340": "trade_plan_v340", "v342": "trade_plan_v342", "v362": "trade_plan_v362", "v367": "trade_plan_v367", "v376": "trade_plan_v376"}.get(pipeline, "trade_plan")
+    # g2c (deployed "G2 + carry") uses the v376 plan file (same trade_plan_v376.json).
+    key = {"v233": "trade_plan_v233", "v236": "trade_plan_v236", "v240": "trade_plan_v240", "v266": "trade_plan_v266", "v269": "trade_plan_v269", "v285": "trade_plan_v285", "v295": "trade_plan_v295", "v301": "trade_plan_v301", "v321": "trade_plan_v321", "v315": "trade_plan_v315", "v340": "trade_plan_v340", "v342": "trade_plan_v342", "v362": "trade_plan_v362", "v367": "trade_plan_v367", "v376": "trade_plan_v376", "g2c": "trade_plan_v376"}.get(pipeline, "trade_plan")
     return cached(request, key, 20, lambda: db.kv_get(key, {}))
 
 
@@ -546,8 +551,9 @@ def _due_slot(now_ms: int) -> int:
 
 def _cycle_incomplete(now_ms: int) -> bool:
     slot = _due_slot(now_ms)
-    return any((db.kv_get(f"plan_status_{p}", {}) or {}).get("completed_slot", 0) < slot
-               or not db.kv_get(f"trade_plan_{p}") for p in catalog.PIPELINES)
+    # g2c shares the v376 plan file: check v376's plan/status for it (no separate trade_plan_g2c).
+    return any((db.kv_get(f"plan_status_{'v376' if p == 'g2c' else p}", {}) or {}).get("completed_slot", 0) < slot
+               or not db.kv_get(f"trade_plan_{'v376' if p == 'g2c' else p}") for p in catalog.PIPELINES)
 
 
 def _startup_check():

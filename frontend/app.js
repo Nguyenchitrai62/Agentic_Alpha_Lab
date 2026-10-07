@@ -488,21 +488,22 @@
     { v: "v342", nm: "M3", tag: "Lệnh xu hướng + 2 lệnh bắt đáy mỗi coin", product: "manual", ds: "Book ×0.75 (SL/TP 4σ/8σ) + 2 lệnh limit bắt đáy 3σ / 4σ kèm TP và SL sàn 8σ" },
     { v: "v340", nm: "M2", tag: "Lệnh xu hướng + 1 lệnh bắt đáy mỗi coin; DD thấp nhất", product: "manual", ds: "Book ×0.75 (SL/TP 4σ/8σ) + 1 lệnh limit bắt đáy 3σ kèm TP và SL sàn 8σ" },
     { v: "v315", nm: "M1", tag: "Chỉ lệnh theo xu hướng, ít lệnh, dễ theo nhất", product: "manual", ds: "Chỉ lệnh book (không bắt đáy), vào bằng limit hồi giá 0.75σ" },
-    { v: "v321", nm: "R2", tag: "Thang 5 lệnh bắt đáy mỗi coin, AI chọn khối lượng và chốt lời", product: "bot", ds: "Book CB + thang bắt đáy 2.5–5σ (SL bot theo nến 5m + SL sàn 8σ), agent RL chọn khối lượng & chốt lời" },
-    { v: "v376", nm: "R2·4P", tag: "R2 chạy song song 4 khung giờ, mỗi khung 1/4 vốn - DD thấp hơn", product: "bot", ds: "R2 (book CB + thang bắt đáy 2.5–5σ, agent chọn khối lượng & chốt lời) chạy trên 4 khung 4h lệch 0/1/2/3 giờ (nến bắt đầu 00/04/08.., 01/05/.., 02/06/.., 03/07/.. UTC), mỗi khung 1/4 vốn, không cân bằng lại" },
-    { v: "v301", nm: "G2", tag: "Thang 4 lệnh bắt đáy mỗi coin, AI chọn khối lượng và chốt lời", product: "bot", ds: "Như R2 nhưng thang 2.5–4σ, agent học từ 4 độ sâu" },
-    { v: "v295", nm: "CS", tag: "Thang 4 lệnh bắt đáy mỗi coin, AI chọn khối lượng", product: "bot", ds: "Book CB + thang bắt đáy 2.5–4σ, agent RL chỉ chọn khối lượng (học từ 35 coin)" },
+    { v: "g2c", nm: "G2+carry", tag: "Triển khai BOT: G2 + carry quý f=0,25 — khuyên dùng", product: "bot", ds: "G2 (book CB + thang bắt đáy 2.5–4σ, agent chọn khối lượng & chốt lời) + carry quý f=0,25 chung một UTA; dùng chung plan v376. Nghiên cứu 5 năm 5,63 %/tháng, năm tệ nhất 2,78, kỳ vọng live ~5,2–5,4, DD năm 16,75 / toàn đường 16,66, win mọi lệnh ~65% (nguồn docs/FINAL_REPORT_VI.md, docs/SUMMARY_FOR_OWNER_20261007_VI.md). Bot chạy --corr-size --dip-mult 1.7 --dip-gross-cap 2.0 --bear-book --carry-f 0.25" },
+    { v: "v321", nm: "R2", tag: "Thang 5 lệnh bắt đáy mỗi coin, AI chọn khối lượng và chốt lời (cũ — tham khảo)", product: "bot", ds: "Book CB + thang bắt đáy 2.5–5σ (SL bot theo nến 5m + SL sàn 8σ), agent RL chọn khối lượng & chốt lời" },
+    { v: "v376", nm: "R2·4P", tag: "R2 chạy song song 4 khung giờ, mỗi khung 1/4 vốn - DD thấp hơn (cũ — tham khảo; plan dùng chung với G2+carry)", product: "bot", ds: "R2 (book CB + thang bắt đáy 2.5–5σ, agent chọn khối lượng & chốt lời) chạy trên 4 khung 4h lệch 0/1/2/3 giờ (nến bắt đầu 00/04/08.., 01/05/.., 02/06/.., 03/07/.. UTC), mỗi khung 1/4 vốn, không cân bằng lại" },
+    { v: "v301", nm: "G2", tag: "Thang 4 lệnh bắt đáy mỗi coin, AI chọn khối lượng và chốt lời (cũ — tham khảo)", product: "bot", ds: "Như R2 nhưng thang 2.5–4σ, agent học từ 4 độ sâu" },
+    { v: "v295", nm: "CS", tag: "Thang 4 lệnh bắt đáy mỗi coin, AI chọn khối lượng (cũ — tham khảo)", product: "bot", ds: "Book CB + thang bắt đáy 2.5–4σ, agent RL chỉ chọn khối lượng (học từ 35 coin)" },
   ];
   const PRODUCTS = {
     manual: { label: "Giao dịch thủ công (MANUAL)", rec: "v367", winKey: "book",
-      note: "Bạn tự đặt lệnh: mỗi 4h vài lệnh limit có sẵn SL/TP trên sàn. Bật Hedge mode để lệnh bắt đáy không bù trừ lệnh SHORT.",
+      note: "Bạn tự đặt lệnh: mỗi 4h vài lệnh limit có sẵn SL/TP trên sàn. Bật Hedge mode để lệnh bắt đáy không bù trừ lệnh SHORT. Ước tính trung thực MANUAL tốt nhất chỉ ~3,7–4,0 %/tháng (dưới sàn 5 %/tháng; nguồn docs/FINAL_REPORT_VI.md); các số single-clock cũ cao hơn chưa phản ánh đầy đủ chi phí tay người.",
       goals: [
         { name: "Mục tiêu 1 (bắt buộc)", items: [["monthly_5y", "5 năm", ">=", 5, "%/th"], ["monthly_last_year", "Năm Test", ">=", 5, "%/th"],
           ["gate_dd", "DD", "<", 20, "%"], ["win_hidden", "Win lệnh book (Test)", ">=", 0.55, "win"], ["losing_years", "Năm thua lỗ", "==", 0, ""]] },
         { name: "Mục tiêu 2", items: [["monthly_5y", "5 năm", ">=", 8, "%/th"], ["gate_dd", "DD", "<", 15, "%"], ["win_hidden", "Win lệnh book (Test)", ">=", 0.60, "win"]] },
       ] },
-    bot: { label: "Bot tự động (BOT)", rec: "v321", winKey: "all",
-      note: "Cần bot chạy 24/7: đặt lại thang lệnh bắt đáy mỗi 4h và theo dõi SL trên nến 5m.",
+    bot: { label: "Bot tự động (BOT)", rec: "g2c", winKey: "all",
+      note: "Cần bot chạy 24/7: đặt lại thang lệnh bắt đáy mỗi 4h và theo dõi SL trên nến 5m. Triển khai G2+carry (f=0,25) dùng chung plan v376.",
       goals: [
         { name: "Mục tiêu BOT", items: [["monthly_5y", "5 năm", ">=", 8, "%/th"], ["monthly_last_year", "Năm Test", ">=", 8, "%/th"], ["gate_dd", "DD", "<", 15, "%"],
           ["win_all_hidden", "Win mọi lệnh (Test)", ">", 0.65, "win"], ["losing_years", "Năm thua lỗ", "==", 0, ""]] },
@@ -559,6 +560,13 @@
     const bn = $("botNote"); if (!bn) return;
     const cur = pipeOf(planPipe());
     bn.hidden = !(product() === "bot" && cur?.product === "bot");
+    if (bn.hidden) return;
+    if (cur.v === "g2c") {
+      bn.innerHTML = `<b>Vận hành bot · ${esc(cur.nm)}</b><span>Mỗi nến 4h đặt lại toàn bộ lệnh bắt đáy (từ phút 16 đến hết nến); cỡ lệnh dip = plan × 1,7 (--dip-mult 1.7).</span>
+        <span>Bot giảm cỡ khi nhiều coin cùng flush (--corr-size) và giới hạn tổng dip gross ≤ 2× vốn (--dip-gross-cap 2.0); thị trường gấu giảm một nửa lệnh book LONG mới (--bear-book).</span>
+        <span>SL bắt đáy kích hoạt khi nến 5m đóng dưới mức SL; luôn có SL sàn 8σ phòng mất kết nối.</span><span>Lệnh bắt đáy còn mở cuối nến: đóng ở giá mở nến sau. Carry quý f=0,25 chung một UTA (xem sổ carry bên dưới).</span>`;
+      return;
+    }
     if (!bn.hidden) bn.innerHTML = `<b>Vận hành bot · ${esc(cur.nm)}</b><span>Mỗi nến 4h đặt lại toàn bộ lệnh bắt đáy (từ phút 16 đến hết nến).</span>
       <span>SL bắt đáy kích hoạt khi nến 5m đóng dưới mức SL; luôn có SL sàn 8σ phòng mất kết nối.</span><span>Lệnh bắt đáy còn mở cuối nến: đóng ở giá mở nến sau.</span>`;
   }
@@ -572,7 +580,10 @@
       const done = Array.isArray(v.settled_pairs) ? v.settled_pairs : [];
       const t = v.totals || {};
       const upd = v.updated_at ? dt(Date.parse(v.updated_at)) : "—";
-      if (meta) meta.innerHTML = `Cập nhật sổ: <b>${esc(upd)}</b>${v.stale ? ' · <span class="down">sổ đã cũ (hơn 2 giờ chưa chạy)</span>' : ""}`;
+      const src = v.source === "paper_d17bfg2c"
+        ? `Nguồn: bot đang chạy <b>paper_d17bfg2c</b> (f=0,25)`
+        : v.source ? `Nguồn: sổ <b>${esc(v.source)}</b>` : `Nguồn: sổ <b>paper_carry</b>`;
+      if (meta) meta.innerHTML = `${src} · Cập nhật sổ: <b>${esc(upd)}</b>${v.stale ? ' · <span class="down">sổ đã cũ (hơn 2 giờ chưa chạy)</span>' : ""}`;
       const rule = v.rule || {};
       const ruleLine = (rule.basis_threshold != null || v.rule_sha256)
         ? `<p class="muted small">Quy tắc đông lạnh: vào lệnh khi basis ≥ ${(((rule.basis_threshold ?? 0.04) * 100)).toFixed(0)}%/năm · giữ tới đáo hạn · sha <span class="mono">${esc((v.rule_sha256 || "").slice(0, 12))}</span></p>`
@@ -704,24 +715,30 @@
   function dipBlock(sym) {  // the dip ladder resting in the bar in progress (from the plan): what to have on the exchange now
     const c = planOf(sym), px = state.live.prices[sym]?.c, d = sortedDips(c?.dips || []), multi = isMulti();
     if (!d.length) return "";
+    // g2c (deployed BOT): the bot scales every dip rung x1.7 (--dip-mult 1.7); the plan stores the base size.
+    const dipMult = planPipe() === "g2c" ? 1.7 : 1.0;
     const now = Date.now(), stOf = (r) => {
       const from = Date.parse(r.active_from), until = Date.parse(r.active_until);
       return now < from ? `đặt lúc ${dt(from)}` : now > until ? "đã hết hạn" : `đang chờ tới ${dt(until)}`;
     };
     const status = multi ? "mỗi khung giờ một thang riêng" : stOf(d[0]);  // multi-phase: each sub-book's ladder has its own window
     const rows = d.map((r) => {
-      const q = qty(sym, r.size_frac, r.buy_limit);
+      const q = qty(sym, r.size_frac * dipMult, r.buy_limit);
       const ag = [r.agent_size !== 1 ? `<span class="${r.agent_size > 1 ? "up" : "down"}">agent ×${r.agent_size}</span>` : "",
                   r.agent_tp !== 1 ? `TP ${r.agent_tp}σ` : ""].filter(Boolean).join(" · ");
       return `<tr class="${r.filled ? "dip-filled" : ""}"><td>${r.rung}σ${r.filled ? ' <span class="up" title="đã khớp">✓</span>' : ""}${multi ? `<span class="note">${phTag(r)} ${stOf(r)}</span>` : ""}</td>
         <td>${fmtPx(r.buy_limit)}${px ? `<span class="note">${((r.buy_limit / px - 1) * 100).toFixed(1)}%</span>` : ""}</td>
         <td class="up">${fmtPx(r.tp)}</td>
         <td class="down">${fmtPx(r.stop)}<span class="note">${r.stop_kind === "close5" ? "bot · nến 5m đóng" : "chạm"}${r.backstop ? ` · sàn ${fmtPx(r.backstop)}` : ""}</span></td>
-        <td>${q}<span class="note">≈ ${usdt(r.size_frac)} USDT${ag ? " · " + ag : ""}</span></td></tr>`;
+        <td>${q}<span class="note">≈ ${usdt(r.size_frac * dipMult)} USDT${dipMult !== 1 ? " · plan ×1,7" : ""}${ag ? " · " + ag : ""}</span></td></tr>`;
     }).join("");
+    const g2cNote = dipMult !== 1
+      ? `<div class="muted small">G2+carry: cỡ lệnh dip = plan × 1,7 (bot --dip-mult 1.7). Bot giảm cỡ khi nhiều coin cùng flush (--corr-size) và giới hạn tổng dip gross ≤ 2× vốn; thị trường gấu giảm một nửa lệnh book LONG mới (--bear-book).</div>`
+      : "";
     return `<details class="dip-d" open><summary>Lệnh chờ bắt đáy nến này <span class="muted small">(${status})</span></summary>
       <div class="tbl-scroll"><table class="tbl compact dip-tbl"><thead><tr><th>Bậc</th><th>Mua limit</th><th>TP</th><th>SL</th><th>Khối lượng</th></tr></thead>
       <tbody>${rows}</tbody></table></div>
+      ${g2cNote}
       <div class="muted small">${d.some((r) => r.stop_kind === "close5")
         ? 'Mỗi bậc: 1 lệnh limit mua riêng, kèm TP limit + SL sàn đặt sẵn; bot đóng lệnh nếu nến 5m đóng dưới "SL bot"; lệnh còn mở tới cuối nến thì đóng ở giá mở nến sau.'
         : "Mỗi bậc: 1 lệnh limit mua riêng (chế độ hedge / tài khoản phụ), gắn sẵn TP limit + SL chạm trên sàn; lệnh còn mở tới cuối nến thì đóng (market) ở lần kiểm tra kế tiếp."}</div></details>`;
@@ -779,8 +796,10 @@
       .concat(dipOrders(sortedDips(c.dips || [])).map((o) => ({ ...o, ph: o.dip })));
   }
   function dipOrders(dips) {
-    return (dips || []).filter((d) => !d.filled).map((d) => ({ kind: `Bắt đáy ${d.rung}σ`, side: "BUY", price: d.buy_limit, sl: d.stop, tp: d.tp,
-      w: d.size_frac, until: d.active_until, dip: d }));
+    // g2c (deployed BOT): the bot scales every dip rung x1.7 (--dip-mult 1.7); the plan stores the base size.
+    const m = planPipe() === "g2c" ? 1.7 : 1.0;
+    return (dips || []).filter((d) => !d.filled).map((d) => ({ kind: `Bắt đáy ${d.rung}σ${m !== 1 ? " (plan ×1,7)" : ""}`, side: "BUY", price: d.buy_limit, sl: d.stop, tp: d.tp,
+      w: d.size_frac * m, until: d.active_until, dip: d }));
   }
   function bookOrders(s, c) {  // one book (the single plan, or one sub-book): entry / add / reduce / close / stop move
     const out = [];
@@ -1051,10 +1070,13 @@
     const sym = state.live.symbol;
     const rows = (state.live.latest?.sleeve || []).filter((r) => r.symbol === sym);
     // C4 / C5: the dip stop fires on a 5m CLOSE (bot) at 4 / 5 sigma, plus a native 8-sigma touch stop on the exchange
-    const closeK = { v321: 4, v376: 4, v301: 4, v295: 4, v285: 4, v269: 4, v266: 5 }[planPipe()];
-    const dsz = ["v295", "v301", "v321", "v376", "v340", "v342", "v362", "v367"].includes(planPipe()) ? (planOf(sym)?.dip_size || {}) : null;  // CS / G2: the agents' decision per rung
+    // g2c shares the v376 plan (same R2·4P ladder, closeK 4); the bot scales every rung x1.7 (--dip-mult 1.7).
+    const isG2c = planPipe() === "g2c";
+    const closeK = { v321: 4, v376: 4, g2c: 4, v301: 4, v295: 4, v285: 4, v269: 4, v266: 5 }[planPipe()];
+    const dsz = ["v295", "v301", "v321", "v376", "g2c", "v340", "v342", "v362", "v367"].includes(planPipe()) ? (planOf(sym)?.dip_size || {}) : null;  // CS / G2: the agents' decision per rung
+    const dipMult = isG2c ? 1.7 : 1.0;
     const decOf = (r) => { if (!dsz) return null; const k = Object.keys(dsz).find((x) => Number(x) === Number(r.rung)); return k ? dsz[k] : null; };
-    const mulOf = (r) => { const d = decOf(r); return d == null ? 1 : Number(typeof d === "object" ? d.size : d); };
+    const mulOf = (r) => { const d = decOf(r); return (d == null ? 1 : Number(typeof d === "object" ? d.size : d)) * dipMult; };
     const tpOf = (r) => { const d = decOf(r); return d && typeof d === "object" ? Number(d.tp) : 1; };
     if (closeK) {
       const head = ["Bậc", "Mua limit", "TP", "SL nến 5m đóng", "SL sàn (đặt sẵn)", "Vốn"].concat(dsz ? ["Agent"] : []);
@@ -1063,16 +1085,19 @@
         const m = mulOf(r), tk = tpOf(r);
         const tpPx = tk !== 1 && s > 0 ? r.buy_limit * (1 + tk * s) : r.tp;  // G2: the take-profit agent's multiple of sigma
         return `<tr><td>${r.rung}σ</td><td>${fmtPx(r.buy_limit)}</td><td class="up">${fmtPx(tpPx)}${tk !== 1 ? ` <span class="muted small">(${tk}σ)</span>` : ""}</td>
-        <td class="down">${fmtPx(r.buy_limit * (1 - closeK * s))}</td><td class="down">${fmtPx(r.buy_limit * (1 - 8 * s))}</td><td>${pct(r.size_frac * m)}</td>${
-          dsz ? `<td class="${m > 1 ? "up" : m < 1 ? "down" : "muted"}">×${m}</td>` : ""}</tr>`;
+        <td class="down">${fmtPx(r.buy_limit * (1 - closeK * s))}</td><td class="down">${fmtPx(r.buy_limit * (1 - 8 * s))}</td><td>${pct(r.size_frac * m)}${isG2c ? ' <span class="muted small">(×1,7)</span>' : ""}</td>${
+          dsz ? `<td class="${m > 1 ? "up" : m < 1 ? "down" : "muted"}">×${typeof m === "number" ? (Math.round(m * 100) / 100) : m}</td>` : ""}</tr>`;
       }), "Không có lệnh chờ");
     } else {
       table($("dipTbl"), ["Bậc", "Mua limit", "TP", "SL", "Vốn"], rows.map((r) => `<tr><td>${r.rung}σ</td><td>${fmtPx(r.buy_limit)}</td>
-      <td class="up">${fmtPx(r.tp)}</td><td class="down">${fmtPx(r.sl)}</td><td>${pct(r.size_frac)}</td></tr>`), "Không có lệnh chờ");
+      <td class="up">${fmtPx(r.tp)}</td><td class="down">${fmtPx(r.sl)}</td><td>${pct(r.size_frac * dipMult)}</td></tr>`), "Không có lệnh chờ");
     }
     const d = state.live.conf?.levels?.DIP;
     const note = $("dipNote") || Object.assign(document.createElement("div"), { id: "dipNote", className: "muted small" });
-    note.innerHTML = d ? `Lịch sử lệnh dip: Win rate Train <b>${(100 * d.dev.win_rate).toFixed(0)}%</b> (${d.dev.n} lệnh, 4 năm) · Test <b>${(100 * d.hidden.win_rate).toFixed(0)}%</b> (${d.hidden.n} lệnh, 1 năm) · TB thắng +${d.dev.avg_win_pct.toFixed(2)}% / thua ${d.dev.avg_loss_pct.toFixed(2)}%` : "";
+    const g2cDipNote = isG2c
+      ? `<div>G2+carry: cỡ lệnh dip = plan × 1,7 (bot --dip-mult 1.7). Bot giảm cỡ khi nhiều coin cùng flush (--corr-size) và giới hạn tổng dip gross ≤ 2× vốn (--dip-gross-cap 2.0); thị trường gấu giảm một nửa lệnh book LONG mới (--bear-book).</div>`
+      : "";
+    note.innerHTML = (d ? `Lịch sử lệnh dip: Win rate Train <b>${(100 * d.dev.win_rate).toFixed(0)}%</b> (${d.dev.n} lệnh, 4 năm) · Test <b>${(100 * d.hidden.win_rate).toFixed(0)}%</b> (${d.hidden.n} lệnh, 1 năm) · TB thắng +${d.dev.avg_win_pct.toFixed(2)}% / thua ${d.dev.avg_loss_pct.toFixed(2)}%` : "") + g2cDipNote;
     $("dipTbl").after(note);
   }
 
