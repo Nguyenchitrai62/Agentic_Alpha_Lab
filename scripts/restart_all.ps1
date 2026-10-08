@@ -46,11 +46,15 @@ $bots = @(
   # 2026-10-08: G2 + Kronos K2 dip tilt and G2 + Chronos C2 dip tilt (prospective evidence; feeds = the shadow loops below)
   @{ tag = "d17bfg2k2"; dir = "artifacts/bot/paper_d17bfg2k2"; args = @("-m", "bot.run", "--mode", "paper", "--equity", "5000", "--corr-size", "--dip-mult", "1.7", "--dip-gross-cap", "2.0", "--bear-book", "--adopt-fresh", "--interval", "25", "--k2-tilt", "artifacts/research/kronos_shadow/kronos_features_live.parquet", "--tag", "d17bfg2k2") }
   @{ tag = "d17bfg2ch"; dir = "artifacts/bot/paper_d17bfg2ch"; args = @("-m", "bot.run", "--mode", "paper", "--equity", "5000", "--corr-size", "--dip-mult", "1.7", "--dip-gross-cap", "2.0", "--bear-book", "--adopt-fresh", "--interval", "25", "--k2-tilt", "artifacts/research/chronos_shadow/chronos_features_live.parquet", "--tag", "d17bfg2ch") }
+  # 2026-10-08: G2 + cascade boost B7 and G2 + B7 x C2 (prospective evidence; feeds = scripts/cascade_shadow.py loop)
+  @{ tag = "d17bfg2b7"; dir = "artifacts/bot/paper_d17bfg2b7"; args = @("-m", "bot.run", "--mode", "paper", "--equity", "5000", "--corr-size", "--dip-mult", "1.7", "--dip-gross-cap", "2.0", "--bear-book", "--adopt-fresh", "--interval", "25", "--k2-tilt", "artifacts/research/cascade_shadow/b7_live.parquet", "--tag", "d17bfg2b7") }
+  @{ tag = "d17bfg2b7c2"; dir = "artifacts/bot/paper_d17bfg2b7c2"; args = @("-m", "bot.run", "--mode", "paper", "--equity", "5000", "--corr-size", "--dip-mult", "1.7", "--dip-gross-cap", "2.0", "--bear-book", "--adopt-fresh", "--interval", "25", "--k2-tilt", "artifacts/research/cascade_shadow/b7c2_live.parquet", "--tag", "d17bfg2b7c2") }
 )
 # prospective foundation-model feature loops (public Binance klines only; every 600 s; idempotent per bar)
 $shadowLoops = @(
-  @{ name = "kronos"; pattern = 'kronos_shadow\.py'; script = "scripts/kronos_shadow.py"; log = "artifactsesearch\kronos_shadow\loop.log" },
-  @{ name = "chronos"; pattern = 'chronos_shadow\.py'; script = "scripts/chronos_shadow.py"; log = "artifactsesearch\chronos_shadow\loop.log" }
+  @{ name = "kronos"; pattern = 'kronos_shadow\.py'; script = "scripts/kronos_shadow.py"; log = "artifacts\research\kronos_shadow\loop.log" },
+  @{ name = "chronos"; pattern = 'chronos_shadow\.py'; script = "scripts/chronos_shadow.py"; log = "artifacts\research\chronos_shadow\loop.log" },
+  @{ name = "cascade"; pattern = 'cascade_shadow\.py'; script = "scripts/cascade_shadow.py"; log = "artifacts\research\cascade_shadow\loop.log" }
 )
 
 function Log([string]$m) { Write-Host "[restart_all] $m" }
@@ -185,6 +189,6 @@ if ($DryRun) {
   Log "dry-run: plan only, started nothing"
   exit 0
 }
-if ($doBots) { & $py "scripts/bot_health.py" "artifacts/bot/paper" "artifacts/bot/paper_d17bf" "artifacts/bot/paper_d13bf" "artifacts/bot/paper_d17bfg2" "artifacts/bot/paper_g2k20" "artifacts/bot/paper_d17bfg2c" "artifacts/bot/paper_g2k20c" "artifacts/bot/paper_d17bfg2k2" "artifacts/bot/paper_d17bfg2ch"; }
+if ($doBots) { & $py "scripts/bot_health.py" "artifacts/bot/paper" "artifacts/bot/paper_d17bf" "artifacts/bot/paper_d13bf" "artifacts/bot/paper_d17bfg2" "artifacts/bot/paper_g2k20" "artifacts/bot/paper_d17bfg2c" "artifacts/bot/paper_g2k20c" "artifacts/bot/paper_d17bfg2k2" "artifacts/bot/paper_d17bfg2ch" "artifacts/bot/paper_d17bfg2b7" "artifacts/bot/paper_d17bfg2b7c2"; }
 & $py "scripts/daily_status.py"
 Log "done (idempotent: a second run starts nothing new)"
