@@ -1,20 +1,29 @@
-"""Weekly prospective FM evaluation: K2 (Kronos) / C2 (Chronos) dip tilt vs untitled twin.
+"""Weekly prospective FM evaluation: K2 (Kronos) / C2 (Chronos) / B7 / B7xC2 dip tilt vs untitled twin.
 
 Generalises scripts/k2_paper_eval.py (parsing for closed dip pieces is reused
-from it verbatim via import; its CLI is untouched) to both feeds behind
-``--feed {kronos, chronos}``:
+from it verbatim via import; its CLI is untouched) to the feeds behind
+``--feed {kronos, chronos, b7, b7c2}``:
 
   kronos : runner paper_d17bfg2k2, feed kronos_shadow, mult column k2_mult
   chronos: runner paper_d17bfg2ch, feed chronos_shadow, mult column c2_mult
            (chronos_shadow writes k2_mult as an exact copy of c2_mult so the
            bot flag works unchanged; the evaluator prefers c2_mult and falls
            back to k2_mult when c2_mult is absent)
+  b7     : runner paper_d17bfg2b7, feed cascade_shadow/b7_live.parquet,
+           mult column b7_mult (bot-effective k2_mult is an exact copy;
+           the evaluator prefers b7_mult and falls back to k2_mult)
+  b7c2   : runner paper_d17bfg2b7c2, feed cascade_shadow/b7c2_live.parquet,
+           mult column b7c2_mult (bot-effective k2_mult is an exact copy;
+           the evaluator prefers b7c2_mult and falls back to k2_mult)
 
 For the tilt runner and its twin paper_d17bfg2 (no tilt) it reports:
 
-(1) realised prospective comparison over COMMON uptime only (intersection of
-    the two hourly equity curves): return %, max DD %, dip/book entry fills
-    and closed-piece win rates restricted to that window;
+(1) realised prospective comparison over COMMON post-restart uptime only
+    (intersection of the two hourly equity curves, floored at the latest
+    leader_note restart marker in either runner's stdout.log -- e.g. the
+    2026-10-08 04:50 UTC restart on bot fix 83a466a: compare only after it):
+    return %, max DD %, dip/book entry fills and closed-piece win rates
+    restricted to that window;
 (2) the counterfactual on the TWIN's own closed dip fills:
     sum(mult x piece net P&L) / mean(mult) vs sum(piece net P&L), joining on
     (sym, shift=phase, T) and using ONLY feed rows with
@@ -30,6 +39,9 @@ Read-only: never touches processes, never writes into artifacts/.
 Usage:
   python scripts/fm_paper_eval.py --feed kronos [--json out.json]
   python scripts/fm_paper_eval.py --feed chronos [--json out.json]
+  python scripts/fm_paper_eval.py --feed b7 [--json out.json]
+  python scripts/fm_paper_eval.py --feed b7c2 [--json out.json]
+  python scripts/fm_paper_eval.py --all [--json out.json]
 """
 from __future__ import annotations
 
@@ -76,8 +88,22 @@ FEEDS = {
         "feed_rel": Path("artifacts/research/chronos_shadow/chronos_features_live.parquet"),
         "mult_col": "c2_mult",
     },
+    "b7": {
+        "runner": "paper_d17bfg2b7",
+        "feed_rel": Path("artifacts/research/cascade_shadow/b7_live.parquet"),
+        "mult_col": "b7_mult",
+    },
+    "b7c2": {
+        "runner": "paper_d17bfg2b7c2",
+        "feed_rel": Path("artifacts/research/cascade_shadow/b7c2_live.parquet"),
+        "mult_col": "b7c2_mult",
+    },
 }
 TWIN_DEFAULT = "paper_d17bfg2"
+# Fallback order when the requested mult column is absent: k2_mult first
+# (bot-effective copy, preserves the pre-existing kronos/chronos behaviour),
+# then the other known tilt columns.
+KNOWN_MULT_COLS = ("k2_mult", "c2_mult", "b7_mult", "b7c2_mult")
 
 
 def resolve_config(feed: str, runner=None, twin=None, feed_path=None,
@@ -104,9 +130,14 @@ def load_feed(path: Path, mult_col: str) -> tuple[dict, dict]:
     """
     df = pd.read_parquet(path)
     cols = set(df.columns)
-    mcol = mult_col if mult_col in cols else (
-        "k2_mult" if "k2_mult" in cols else
-        ("c2_mult" if "c2_mult" in cols else mult_col))
+    if mult_col in cols:
+        mcol = mult_col
+    else:
+        mcol = mult_col
+        for cand in KNOWN_MULT_COLS:
+            if cand in cols:
+                mcol = cand
+                break
     if mcol not in cols:
         if len(df) == 0:
             # empty feed (tilt not started yet): no keys, nothing joins.
@@ -179,6 +210,48 @@ def common_window(a: list, b: list):
 
 def restrict(pts: list, lo, hi) -> list:
     return [(t, v) for t, v in pts if lo <= t <= hi]
+
+
+def parse_leader_restart(runner) -> object:
+    """Latest leader_note timestamp in <runner>/stdout.log, or None.
+
+    Read-only scan of the runner's stdout.log (never touches processes).
+    Every JSON line with op == "leader_note" is a controlled restart/start
+    marker (e.g. the 2026-10-08 04:50 UTC restart on bot fix 83a466a).
+    Missing/unreadable log -> None so synthetic fixtures are unaffected.
+    """
+    try:
+        text = (Path(runner) / "stdout.log").read_text(
+            encoding="utf-8", errors="replace")
+    except OSError:
+        return None
+    latest = None
+    for line in text.splitlines():
+        if "leader_note" not in line:
+            continue
+        t = None
+        try:
+            rec = json.loads(line[line.index("{"):])
+            if isinstance(rec, dict) and rec.get("op") == "leader_note":
+                t = paper_report.parse_ts(rec.get("t"))
+        except (ValueError, IndexError, AttributeError):
+            t = None
+        if t is None:
+            continue
+        if latest is None or t > latest:
+            latest = t
+    return latest
+
+
+def restart_floors(runner, twin) -> dict:
+    """Per-runner restart floors and the applied max floor (or None)."""
+    fr = parse_leader_restart(runner)
+    ft = parse_leader_restart(twin)
+    applied = None
+    for cand in (fr, ft):
+        if cand is not None and (applied is None or cand > applied):
+            applied = cand
+    return {"runner": fr, "twin": ft, "applied": applied}
 
 
 def count_entry_fills(runner: Path, lo, hi) -> dict:
@@ -458,17 +531,33 @@ def evaluate(feed, runner=None, twin=None, feed_path=None,
 
     rc, tc = read_curve(runner_p), read_curve(twin_p)
     window = common_window(rc, tc)
+    rf = restart_floors(runner_p, twin_p)
+    rf_applied = rf["applied"]
     if window is None:
         realised = {"status": "n/a (no overlapping equity-curve uptime)",
                     "runner": None, "twin": None}
         common = None
     else:
         lo, hi = window
-        common = {"start": lo.isoformat(), "end": hi.isoformat(),
-                  "hours": (hi - lo).total_seconds() / 3600}
-        realised = {"status": "ok",
-                    "runner": realised_stats(runner_p, lo, hi, corrections),
-                    "twin": realised_stats(twin_p, lo, hi, corrections)}
+        pre_floor = lo
+        if rf_applied is not None and rf_applied > lo:
+            lo = rf_applied
+        if hi <= lo:
+            realised = {"status": "n/a (no overlapping post-restart uptime)",
+                        "runner": None, "twin": None}
+            common = {"start": lo.isoformat(), "end": hi.isoformat(),
+                      "hours": 0.0,
+                      "restart_floor": rf_applied.isoformat(),
+                      "pre_floor_start": pre_floor.isoformat()}
+        else:
+            common = {"start": lo.isoformat(), "end": hi.isoformat(),
+                      "hours": (hi - lo).total_seconds() / 3600,
+                      "restart_floor": (rf_applied.isoformat()
+                                        if rf_applied is not None else None),
+                      "pre_floor_start": pre_floor.isoformat()}
+            realised = {"status": "ok",
+                        "runner": realised_stats(runner_p, lo, hi, corrections),
+                        "twin": realised_stats(twin_p, lo, hi, corrections)}
 
     cf = counterfactual(twin_p, feedmap, corrections)
     # rebuild week pools from the joined set (exact piece-level mapping)
@@ -522,6 +611,11 @@ def evaluate(feed, runner=None, twin=None, feed_path=None,
         "feed_path": str(feed_p),
         "feed_rows": feedmeta["n_rows"], "feed_qualified_keys": feedmeta["n_qualified"],
         "feed_coverage": feed_cov,
+        "restart_floor": {
+            "runner": rf["runner"].isoformat() if rf["runner"] is not None else None,
+            "twin": rf["twin"].isoformat() if rf["twin"] is not None else None,
+            "applied": rf_applied.isoformat() if rf_applied is not None else None,
+        },
         "common_uptime": common,
         "realised": realised,
         "counterfactual": cf,
@@ -529,6 +623,19 @@ def evaluate(feed, runner=None, twin=None, feed_path=None,
         "quality": {"runner": quality_counters(runner_p, rc),
                     "twin": quality_counters(twin_p, tc)},
     }
+
+
+def evaluate_all(corrections_path=None, boot: int = 2000,
+                 seed: int = 0) -> dict:
+    """Evaluate every feed in FEEDS with default paths. Read-only."""
+    out = {}
+    for feed in sorted(FEEDS):
+        try:
+            out[feed] = evaluate(feed, None, None, None, corrections_path,
+                                 boot, seed, None)
+        except (OSError, ValueError, KeyError) as e:
+            out[feed] = {"feed": feed, "status": f"error: {e}"}
+    return out
 
 
 def _f2(v):
@@ -550,6 +657,13 @@ def format_text(res: dict) -> str:
     L = [f"feed: {res['feed']} (mult col {res['mult_col']})",
          f"runner: {res['runner']}",
          f"twin:   {res['twin']}"]
+    rf = res.get("restart_floor") or {}
+    if rf.get("applied"):
+        L.append(f"restart floor: {rf['applied']} "
+                 f"(runner {rf.get('runner')}, twin {rf.get('twin')})")
+    else:
+        L.append(f"restart floor: n/a "
+                 f"(runner {rf.get('runner')}, twin {rf.get('twin')})")
     cu = res["common_uptime"]
     if cu is None:
         L.append("common uptime: n/a (no overlapping equity curves)")
@@ -595,9 +709,49 @@ def format_text(res: dict) -> str:
     return "\n".join(L)
 
 
+def format_summary(res: dict) -> str:
+    """One summary line per feed for --all (deterministic, never crashes)."""
+    try:
+        feed = res.get("feed", "?")
+        cu = res.get("common_uptime")
+        if cu is None:
+            common_s = "common n/a"
+        else:
+            common_s = f"common {cu.get('hours', 0.0):.1f}h"
+        real = res.get("realised") or {}
+        if real.get("status") == "ok":
+            r, t = real["runner"], real["twin"]
+            real_s = (f"runner {_fp(r['return_pct'])} DD {_fp(r['max_dd_pct'])} "
+                      f"fills {r['dip_fills']}/{r['book_fills']} | "
+                      f"twin {_fp(t['return_pct'])} DD {_fp(t['max_dd_pct'])}")
+        else:
+            real_s = f"realised {real.get('status', 'n/a')}"
+        cf = res.get("counterfactual") or {}
+        if cf.get("n_joined"):
+            cf_s = (f"joined {cf['n_joined']} diff {cf['diff']:+.2f}")
+        else:
+            cf_s = (f"joined {cf.get('n_joined', 0)} "
+                    f"(missing {cf.get('n_missing_feed_row', 0)}, "
+                    f"nonqual {cf.get('n_nonqualifying_feed_row', 0)})")
+        b = res.get("bootstrap") or {}
+        if b.get("status") == "ok":
+            b_s = (f"boot mean {b['mean']:+.2f} "
+                   f"CI [{b['ci_lo']:+.2f},{b['ci_hi']:+.2f}] "
+                   f"P>0 {b['p_pos']:.2f} ({b['n_weeks']}w)")
+        else:
+            b_s = f"boot {b.get('status', 'n/a')}"
+        rf = (res.get("restart_floor") or {}).get("applied")
+        return (f"{feed}: {common_s} | {real_s} | {cf_s} | {b_s} | "
+                f"restart {rf or 'n/a'}")
+    except Exception as e:  # never break --all over one bad feed
+        return f"{res.get('feed', '?')}: error summarising ({e})"
+
+
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description="FM dip-tilt prospective evaluator.")
     ap.add_argument("--feed", choices=sorted(FEEDS), default="kronos")
+    ap.add_argument("--all", action="store_true",
+                    help="evaluate every feed and print one summary line per feed")
     ap.add_argument("--runner", default=None)
     ap.add_argument("--twin", default=None)
     ap.add_argument("--feed-path", default=None)
@@ -609,6 +763,18 @@ def main(argv=None) -> int:
     ap.add_argument("--json", nargs="?", const="-", default=None,
                     help="write JSON to PATH (bare --json prints to stdout)")
     a = ap.parse_args(argv)
+    if a.all:
+        results = evaluate_all(a.corrections, a.boot, a.seed)
+        for feed in sorted(results):
+            print(format_summary(results[feed]))
+        if a.json is not None:
+            payload = json.dumps(results, indent=1, default=str)
+            if a.json == "-":
+                print(payload)
+            else:
+                Path(a.json).write_text(payload + "\n", encoding="utf-8")
+                print(f"saved {a.json}")
+        return 0
     res = evaluate(a.feed, a.runner, a.twin, a.feed_path, a.corrections,
                    a.boot, a.seed, a.mult_col)
     print(format_text(res))

@@ -174,3 +174,12 @@ REM Liệt kê nội dung một bản (không ghi gì):
 
 - Đọc kết quả: chưa có common uptime (runner ch mới 1 điểm equity) hay `joined` = 0 (29/29 fill dip của twin rơi vào cửa sổ correction 06-10) là bình thường khi runner còn non trẻ — đợi thêm, không sửa ngưỡng; bootstrap cần >= 2 tuần có fill mới có CI.
 - Script gốc `scripts/k2_paper_eval.py` giữ nguyên CLI (không xóa/không đổi); kiểm thử: `.venv\Scripts\python.exe -m pytest tests/test_fm_paper_eval.py -q`.
+
+## 11b. So sánh B7 / B7xC2 / C2 hàng tuần (fm_paper_eval --all, 2026-10-08)
+- Chạy mỗi sáng thứ Hai: `.venv\Scripts\python.exe scripts/fm_paper_eval.py --all --boot 2000` (chỉ đọc file, so mọi tilt với twin `paper_d17bfg2` trên giờ chạy chung SAU restart 04:50 UTC 08-10).
+```bat
+.venv\Scripts\python.exe scripts/fm_paper_eval.py --all --boot 2000
+```
+- Chưa vội đổi khi `joined` = 0 hay bootstrap `n/a` (runner non trẻ) — đợi >= 2 tuần có fill.
+- Chỉ xem xét chuyển tilt khi một feed thắng twin cả realised lẫn counterfactual, bootstrap P(diff>0) >= 0,9 qua >= 4 tuần và DD không tệ hơn.
+- Mọi ngưỡng đổi tilt phải đăng ký trước, không sửa sau khi thấy số paper.

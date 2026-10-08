@@ -283,3 +283,121 @@ def test_cli_smoke(tmp_path, capsys):
     assert rc == 0
     assert json.loads(out.read_text(encoding="utf-8"))["feed"] == "kronos"
     assert "common uptime" in capsys.readouterr().out
+
+
+def test_b7_b7c2_resolve():
+    b = fm.resolve_config("b7")
+    assert b["runner"].name == "paper_d17bfg2b7"
+    assert b["feed_path"].name == "b7_live.parquet"
+    assert b["mult_col"] == "b7_mult"
+    assert b["twin"].name == "paper_d17bfg2"
+    c = fm.resolve_config("b7c2")
+    assert c["runner"].name == "paper_d17bfg2b7c2"
+    assert c["feed_path"].name == "b7c2_live.parquet"
+    assert c["mult_col"] == "b7c2_mult"
+
+
+def test_b7_counterfactual_hand_checked(tmp_path):
+    T = "2026-10-07 10:00:00+00:00"
+    pa, pb = dip_pid(2, "BTCUSDT", 2.5, T), dip_pid(2, "ETHUSDT", 2.5, T)
+    ledger = {pa: {"symbol": "BTCUSDT", "side": 1, "qty": 0.0, "kind": "dip", "phase": 2},
+              pb: {"symbol": "ETHUSDT", "side": 1, "qty": 0.0, "kind": "dip", "phase": 2}}
+    links = {**dip_links(pa, "BTCUSDT"), **dip_links(pb, "ETHUSDT")}
+    t0, t1 = "2026-10-07 10:05:00+00:00", "2026-10-07 11:00:00+00:00"
+    execs = [mk_exec(pa + "E", 1.0, 100.0, t0), mk_exec(pa + "T", 1.0, 110.0, t1),
+             mk_exec(pb + "E", 1.0, 100.0, t0), mk_exec(pb + "T", 1.0, 120.0, t1)]
+    curve = [("2026-10-07 10:00:00+00:00", 5000.0), ("2026-10-07 11:00:00+00:00", 5010.0)]
+    twin = write_runner(tmp_path, "paper_d17bfg2", ledger, links, execs, curve=curve)
+    run = write_runner(tmp_path, "paper_d17bfg2b7", {}, {}, [], curve=curve)
+    fp = tmp_path / "b7.parquet"
+    write_feed(fp, [
+        {"sym": "BTCUSDT", "shift": 2, "T": pd.Timestamp(T, tz="UTC"),
+         "b7_mult": 0.75, "k2_mult": 0.75,
+         "mode": "prospective", "is_prospective": True},
+        {"sym": "ETHUSDT", "shift": 2, "T": pd.Timestamp(T, tz="UTC"),
+         "b7_mult": 1.25, "k2_mult": 1.25,
+         "mode": "prospective", "is_prospective": True}])
+    res = fm.evaluate("b7", run, twin, fp, nocorr(tmp_path), boot=50, seed=0)
+    assert res["mult_col"] == "b7_mult"
+    cf = res["counterfactual"]
+    assert cf["mean_mult"] == 1.0
+    pa_net = 10.0 - (100.0 * 0.0002 + 110.0 * 0.0002)
+    pb_net = 20.0 - (100.0 * 0.0002 + 120.0 * 0.0002)
+    assert cf["sum_tilt_pnl"] == pa_net * 0.75 + pb_net * 1.25
+
+
+def test_b7c2_prefers_b7c2_and_falls_back_to_k2(tmp_path):
+    T = "2026-10-07 10:00:00+00:00"
+    p = dip_pid(2, "BTCUSDT", 2.5, T)
+    ledger = {p: {"symbol": "BTCUSDT", "side": 1, "qty": 0.0, "kind": "dip", "phase": 2}}
+    links = dip_links(p, "BTCUSDT")
+    t0, t1 = "2026-10-07 10:05:00+00:00", "2026-10-07 11:00:00+00:00"
+    execs = [mk_exec(p + "E", 1.0, 100.0, t0), mk_exec(p + "T", 1.0, 110.0, t1)]
+    curve = [("2026-10-07 10:00:00+00:00", 5000.0), ("2026-10-07 11:00:00+00:00", 5010.0)]
+    twin = write_runner(tmp_path, "paper_d17bfg2", ledger, links, execs, curve=curve)
+    run = write_runner(tmp_path, "paper_d17bfg2b7c2", {}, {}, [], curve=curve)
+    fp = tmp_path / "b7c2.parquet"
+    write_feed(fp, [{"sym": "BTCUSDT", "shift": 2, "T": pd.Timestamp(T, tz="UTC"),
+                     "b7c2_mult": 0.5, "k2_mult": 2.0,
+                     "mode": "prospective", "is_prospective": True}])
+    res = fm.evaluate("b7c2", run, twin, fp, nocorr(tmp_path), boot=50, seed=0)
+    assert res["mult_col"] == "b7c2_mult"
+    assert res["counterfactual"]["mean_mult"] == 0.5
+    # native column absent -> falls back to the bot-effective k2_mult copy
+    fp2 = tmp_path / "b7c2k2.parquet"
+    write_feed(fp2, [{"sym": "BTCUSDT", "shift": 2, "T": pd.Timestamp(T, tz="UTC"),
+                      "k2_mult": 1.5,
+                      "mode": "prospective", "is_prospective": True}])
+    res2 = fm.evaluate("b7c2", run, twin, fp2, nocorr(tmp_path), boot=50, seed=0)
+    assert res2["mult_col"] == "k2_mult"
+    assert res2["counterfactual"]["mean_mult"] == 1.5
+
+
+def test_restart_floor_restricts_realised(tmp_path):
+    # Equity overlap Oct 7->8 but both runners restarted Oct 7 12:00 UTC on the
+    # bot fix: realised stats must cover only the post-restart window.
+    curve_twin = [("2026-10-07 10:00:00+00:00", 5000.0),
+                  ("2026-10-07 12:00:00+00:00", 4990.0),
+                  ("2026-10-08 10:00:00+00:00", 5020.0)]
+    curve_run = [("2026-10-07 10:00:00+00:00", 5000.0),
+                 ("2026-10-07 12:00:00+00:00", 5000.0),
+                 ("2026-10-08 10:00:00+00:00", 5010.0)]
+    twin = write_runner(tmp_path, "paper_d17bfg2", {}, {}, [], curve=curve_twin)
+    run = write_runner(tmp_path, "paper_d17bfg2b7", {}, {}, [], curve=curve_run)
+    for d in (twin, run):
+        (d / "stdout.log").write_text(
+            '{"t": "2026-10-07T12:00:00Z", "op": "leader_note", '
+            '"note": "restart on bot fix 83a466a (exit resend livelock)"}\n',
+            encoding="utf-8")
+    fp = tmp_path / "f.parquet"
+    write_feed(fp, [])
+    res = fm.evaluate("b7", run, twin, fp, nocorr(tmp_path), boot=20, seed=0)
+    assert res["restart_floor"]["applied"] == "2026-10-07T12:00:00+00:00"
+    assert res["common_uptime"]["start"] == "2026-10-07T12:00:00+00:00"
+    assert res["common_uptime"]["pre_floor_start"] == "2026-10-07T10:00:00+00:00"
+    # twin return over the post-restart window only: 4990 -> 5020
+    assert res["realised"]["twin"]["return_pct"] == 100.0 * (5020.0 - 4990.0) / 4990.0
+    # no stdout.log -> no floor, legacy behaviour unchanged
+    run2 = write_runner(tmp_path, "r2", {}, {}, [], curve=curve_run)
+    twin2 = write_runner(tmp_path, "t2", {}, {}, [], curve=curve_twin)
+    res2 = fm.evaluate("b7", run2, twin2, fp, nocorr(tmp_path), boot=20, seed=0)
+    assert res2["restart_floor"]["applied"] is None
+    assert res2["common_uptime"]["start"] == "2026-10-07T10:00:00+00:00"
+
+
+def test_summary_line_per_feed(tmp_path, capsys):
+    curve = [("2026-10-07 10:00:00+00:00", 5000.0), ("2026-10-07 11:00:00+00:00", 5000.0)]
+    run = write_runner(tmp_path, "paper_d17bfg2b7", {}, {}, [], curve=curve)
+    twin = write_runner(tmp_path, "paper_d17bfg2", {}, {}, [], curve=curve)
+    fp = tmp_path / "f.parquet"
+    write_feed(fp, [])
+    res = fm.evaluate("b7", run, twin, fp, nocorr(tmp_path), boot=20, seed=0)
+    line = fm.format_summary(res)
+    assert line.startswith("b7: ")
+    assert "common" in line and "restart" in line
+    # --all prints one summary line per feed (smoke on real defaults: must not crash)
+    rc = fm.main(["--all", "--boot", "5", "--corrections", str(nocorr(tmp_path))])
+    assert rc == 0
+    out = capsys.readouterr().out.splitlines()
+    feeds = [ln.split(":")[0] for ln in out if ": common" in ln or ": error" in ln]
+    assert feeds == sorted(feeds) and set(feeds) >= {"b7", "b7c2", "chronos", "kronos"}
