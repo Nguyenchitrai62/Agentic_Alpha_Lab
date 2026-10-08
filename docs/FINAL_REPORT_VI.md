@@ -1,5 +1,16 @@
 # Báo cáo cuối cùng (VI) — 2026-10-06 (hợp nhất)
 
+## 0. Bổ sung 2026-10-09 (đọc trước; nội dung cũ bên dưới giữ nguyên)
+
+Phạm vi và nguồn số như §1 cũ (walk-forward 5 năm, reset 1/4 vốn mỗi anchor, gate Bybit maker 0.02%/taker 0.055%, long trả 0.01%/8h). Mọi số dưới copy nguyên văn từ docs/CLOSED_DIRECTIONS.md (hàng 2026-10-08) và REPORT.md/COMPARISON.md được dẫn ở đó; không có số mới. Chi tiết ở docs/SUMMARY_FOR_OWNER_20261009_VI.md. Bốn hàng kiểm chứng B7 đã về đủ trong ngày (đợi ~1h, check mỗi 15 phút) nên không còn mục "đang chạy".
+
+- Triển khai không đổi: G2 + carry quý f=0.25 (paper only). Kỳ vọng trung thực Bybit (oc_c2carry): G2+carry 5.111/full-DD 17.93; K2+carry 5.199/17.26; C2+carry 5.342/16.35; năm gần nhất có carry 4.493/4.602/4.607 (cả 3 < 5) — mốc 5%/tháng chỉ còn trên giá Binance (G2+carry 5.634/16.66).
+- Họ tilt FM/vol là vol-timing theo regime, gãy ở nhịp crash: C2 đều nhất 7/9 năm presample (chỉ thua 2020p −0.159 và 2021 −0.018), Bybit 5y 5.115 vs 4.883 (full DD 16.50 vs 18.09), audit_c2 PASS-WITH-NOTES; live feed C2 + runner d17bfg2ch từ 2026-10-07 23:11 UTC; beargate/tiltgate/crashgate ĐÓNG; chỉ prospective (scripts/fm_paper_eval.py) mới cho chuyển.
+- Cascade boost B7: dev4 6.74/W 2.96/DD 17.92, 5y 6.36, năm labelled 4.88 — nhãn CONTAMINATED; kiểm chứng đủ: exposure giải thích 74%/67% (timing ~0.3) [oc_cboostctrl], unseen 2017–2020 giúp 3/4 (gãy COVID) [oc_cboostpre], ma sát Bybit +1.023 nhưng full DD 20.31 > 20 [oc_cboostbybit], audit PASS exact 53,877/53,877 [audit_cboost], MANUAL CLOSED (KM_B7 5y 3.817, full 22.99) [oc_cboostmanual]; dạng deploy được là B7C2 (Bybit 5.685/17.43); còn thiếu paper prospective.
+- Đóng trong ngày: IDEAS5 cả 10 (kể cả D1 pick dev4 5.776/W 2.921 nhưng rho train ~0 đảo dấu → sign luck, không runner), IDEAS6 cả 8, IDEAS7 quanh B7 cả 6 (giữ B7 phẳng), dip1h, shortmember, horizonfix (leak thước IC cũ, book đứng yên), kronosfeat, fmbookic, bybitfill, c2frontier/k2carry/k2parity/c2manual/k2manual.
+- Ops: bot_exitstuck FIXED (have() poll trước vòng exits, không hủy market resting; soak 3532→0); oc_paperrecon khớp entry/bảo vệ (1043 episode, 34 fill hai phía, diff 0.0000) nhưng 20 dip exit gửi 420 lần rồi cancel ~25ms (+9.23 USDT may) nên timing exit chưa phải bằng chứng; outage backend 2026-10-07 xem PAPERFIX_20261007 + keepalive KEEPALIVE_20261007 (OWNER đăng ký); DB giữ snapshot=false.
+- Chủ tài khoản theo thứ tự: (1) OWNER đăng ký keepalive; (2) review fix exitstuck rồi restart runner; (3) nuôi prospective 26 tuần, chấm bằng scripts/fm_paper_eval.py.
+
 ## 0. Bổ sung 2026-10-08 (đọc trước; nội dung cũ bên dưới giữ nguyên)
 
 Phạm vi và nguồn số như §1 cũ (walk-forward 5 năm, reset 1/4 vốn mỗi anchor, gate Bybit maker 0.02%/taker 0.055%, long trả 0.01%/8h). Mọi số dưới copy nguyên văn từ docs/CLOSED_DIRECTIONS.md §11+, docs/FRONTIER_MAP_VI.md và REPORT.md/COMPARISON.md được dẫn ở đó; không có số mới. Chi tiết ngắn ở docs/SUMMARY_FOR_OWNER_20261008_VI.md.
