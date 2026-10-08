@@ -162,3 +162,15 @@ REM Liệt kê nội dung một bản (không ghi gì):
 - Tuỳ chọn của chủ tài khoản (quyết định riêng, chưa bật mặc định): enable Task Scheduler `AlphaLabBackendWatchdog` / `run_backend.ps1 -Ensure` để tự dựng lại backend sau reboot/chết; cân nhắc chạy `alert_watch` thường trực (sự cố 4 giờ không ai biết). Chi tiết chẩn đoán: `docs/opencode/BACKEND_INCIDENT_20261006.md`, `docs/opencode/PAPER_DAY5_20261006.md`.
 
 <!-- consistfix 2026-10-06: §8 appended account-realistic G2+carry f=0.25 expectation 5.634/2.778/16.75/16.66 compound [oc_carrycompound] with +0.12pp/5.533 labelled conservative year-start [oc_carryfric], plus fric2 compounded friction row (base 5.634, S1 4.780, S2 5.438, S3 4.806, S4 5.125, S5 5.111, no losing year). Sources re-checked: oc_carrycompound REPORT (5.634/+0.224), oc_carryfric REPORT (5.533/+0.12), oc_carryfric2 REPORT (S-table). -->
+
+## 11. Đánh giá FM paper K2/C2 hàng tuần (fm_paper_eval, 2026-10-08)
+
+- So tilt runner (`paper_d17bfg2k2` K2 / `paper_d17bfg2ch` C2) với twin không tilt (`paper_d17bfg2`) trên giờ chạy chung (return/DD/fills/win rate) + counterfactual tilt trên fill dip thật của twin (chỉ hàng feed prospective/late và is_prospective; hàng backfill không bao giờ khớp) + bootstrap CI theo tuần + đếm k2_missing/outage gap/stale_plan. Chỉ đọc file, không chạm process đang chạy.
+
+```bat
+.venv\Scripts\python.exe scripts/fm_paper_eval.py --feed kronos --boot 2000
+.venv\Scripts\python.exe scripts/fm_paper_eval.py --feed chronos --boot 2000
+```
+
+- Đọc kết quả: chưa có common uptime (runner ch mới 1 điểm equity) hay `joined` = 0 (29/29 fill dip của twin rơi vào cửa sổ correction 06-10) là bình thường khi runner còn non trẻ — đợi thêm, không sửa ngưỡng; bootstrap cần >= 2 tuần có fill mới có CI.
+- Script gốc `scripts/k2_paper_eval.py` giữ nguyên CLI (không xóa/không đổi); kiểm thử: `.venv\Scripts\python.exe -m pytest tests/test_fm_paper_eval.py -q`.
