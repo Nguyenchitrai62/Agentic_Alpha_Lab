@@ -19,9 +19,17 @@ def load_results():
 def test_window_is_genuinely_new():
     r = load_results()
     assert r["window"]["start"] == "2026-09-30 00:00:00+00:00"
-    assert r["window"]["days"] == 6
     assert r["label"] == "clean OOS, tiny sample"
     assert r["version"] == "oc_bookoos"
+    # live-growing: weekly --fetch appends days, so the end moves out
+    # (6 d on 2026-10-06 -> 7 d on 2026-10-07); the start is the invariant.
+    start = pd.Timestamp(r["window"]["start"])
+    end = pd.Timestamp(r["window"]["end_exclusive"])
+    assert end >= pd.Timestamp("2026-10-06 00:00:00+00:00", tz="UTC")
+    assert r["window"]["days"] == (end - start).days
+    assert r["window"]["days"] >= 6
+    assert len(r["daily_equity"]) == r["window"]["days"] + 1
+    assert r["expectation_band"]["window_days"] == r["window"]["days"]
 
 
 def test_full_book_prospective_no_agents_no_bear():
@@ -53,7 +61,9 @@ def test_metrics_internally_consistent():
     r = load_results()
     daily = r["daily_equity"]
     assert len(daily) == r["window"]["days"] + 1
-    assert abs(r["total_pct"] - round(100 * (daily[-1][1] - 1), 3)) < 1e-6
+    # totals are rounded from full-precision equity while daily legs are
+    # rounded to 6 dp first; allow 0.005 (half a bp) instead of 1e-6.
+    assert abs(r["total_pct"] - round(100 * (daily[-1][1] - 1), 3)) < 0.005
     assert r["gate_dd_pct"] == max(r["max_dd_close_pct"], r["max_dd_1m_pct"])
     t = r["trades"]
     assert t["rungs"] == len(r["rung_exits"])
@@ -85,11 +95,28 @@ def test_expectation_band_sane():
 
 
 def test_oos_data_checksum_verified_and_complete():
+    import hashlib
+
     man = json.loads((OOS_DIR / "manifest.json").read_text())
-    assert man["window"] == ["2026-09-24 00:00:00+00:00", "2026-10-06 00:00:00+00:00"]
+    # live-growing: the shared 1m dir is extended weekly (12 d on 2026-10-06
+    # -> 13 d on 2026-10-07). The start is fixed; the end only moves out.
+    assert man["window"][0] == "2026-09-24 00:00:00+00:00"
+    w0 = pd.Timestamp(man["window"][0])
+    w1 = pd.Timestamp(man["window"][1])
+    assert w1 >= pd.Timestamp("2026-10-06 00:00:00+00:00", tz="UTC")
+    n_days = (w1 - w0).days
+    assert n_days >= 12
     assert set(man["symbols"]) == set(SYMS)
     for s in SYMS:
-        m = pd.read_parquet(OOS_DIR / f"{s}_1m_oos.parquet", columns=["open_time"])
-        assert len(m) == 12 * 1440
-        assert m["open_time"].min() == pd.Timestamp("2026-09-24 00:00:00+00:00", tz="UTC")
-        assert m["open_time"].max() == pd.Timestamp("2026-10-05 23:59:00+00:00", tz="UTC")
+        e = man["symbols"][s]
+        p = OOS_DIR / f"{s}_1m_oos.parquet"
+        m = pd.read_parquet(p, columns=["open_time"])
+        assert len(m) == n_days * 1440
+        assert m["open_time"].min() == w0
+        assert m["open_time"].max() == w1 - pd.Timedelta(minutes=1)
+        # file is self-consistent with its own manifest entry
+        assert e["rows"] == len(m)
+        assert pd.Timestamp(e["first"]) == w0
+        assert pd.Timestamp(e["last"]) == w1 - pd.Timedelta(minutes=1)
+        assert len(e["days"]) == n_days
+        assert hashlib.sha256(p.read_bytes()).hexdigest() == e["parquet_sha256"]

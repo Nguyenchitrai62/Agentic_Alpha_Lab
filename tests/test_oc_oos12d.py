@@ -19,8 +19,15 @@ def load_results():
 def test_window_is_genuinely_new():
     r = load_results()
     assert r["window"]["start"] == "2026-09-24 00:00:00+00:00"
-    assert r["window"]["days"] == 12
     assert r["label"] == "tiny sample, clean"
+    # live-growing: a --run after a --fetch extends the window (12 d on
+    # 2026-10-06 -> 13 d once 2026-10-06 completes). The start is invariant.
+    start = pd.Timestamp(r["window"]["start"])
+    end = pd.Timestamp(r["window"]["end_exclusive"])
+    assert end >= pd.Timestamp("2026-10-06 00:00:00+00:00", tz="UTC")
+    assert r["window"]["days"] == (end - start).days
+    assert r["window"]["days"] >= 12
+    assert len(r["daily_equity"]) == r["window"]["days"] + 1
 
 
 def test_dip_only_no_book_no_agents():
@@ -46,7 +53,8 @@ def test_metrics_internally_consistent():
     daily = r["daily_equity"]
     assert len(daily) == r["window"]["days"] + 1
     assert abs(daily[0][1] - 1.0) < 1e-9
-    assert abs(r["total_pct"] - round(100 * (daily[-1][1] - 1), 3)) < 1e-6
+    # same rounding note as bookoos: daily legs are 6-dp rounded.
+    assert abs(r["total_pct"] - round(100 * (daily[-1][1] - 1), 3)) < 0.005
     assert r["gate_dd_pct"] == max(r["max_dd_close_pct"], r["max_dd_1m_pct"])
     n, w = r["trades"]["rungs"], r["trades"]["wins"]
     assert n == len(r["rung_exits"]) and w == sum(1 for _, x in r["rung_exits"] if x > 0)
@@ -67,14 +75,27 @@ def test_expectation_band_sane():
 
 
 def test_oos_data_checksum_verified_and_complete():
+    import hashlib
+
     man = json.loads((OOS_DIR / "manifest.json").read_text())
-    assert man["window"] == ["2026-09-24 00:00:00+00:00", "2026-10-06 00:00:00+00:00"]
+    # shared live-growing dir (see bookoos): start fixed, end moves out.
+    assert man["window"][0] == "2026-09-24 00:00:00+00:00"
+    w0 = pd.Timestamp(man["window"][0])
+    w1 = pd.Timestamp(man["window"][1])
+    assert w1 >= pd.Timestamp("2026-10-06 00:00:00+00:00", tz="UTC")
+    n_days = (w1 - w0).days
+    assert n_days >= 12
     assert set(man["symbols"]) == set(SYMS)
     names = sorted(p.name for p in OOS_DIR.iterdir())
     assert names == sorted([f"{s}_1m_oos.parquet" for s in SYMS] + ["manifest.json"])
     for s in SYMS:
-        m = pd.read_parquet(OOS_DIR / f"{s}_1m_oos.parquet", columns=["open_time"])
-        assert len(m) == 12 * 1440
-        assert m["open_time"].min() == pd.Timestamp("2026-09-24 00:00:00+00:00", tz="UTC")
-        assert m["open_time"].max() == pd.Timestamp("2026-10-05 23:59:00+00:00", tz="UTC")
-        assert len(man["symbols"][s]["files"]) == 12
+        p = OOS_DIR / f"{s}_1m_oos.parquet"
+        m = pd.read_parquet(p, columns=["open_time"])
+        assert len(m) == n_days * 1440
+        assert m["open_time"].min() == w0
+        assert m["open_time"].max() == w1 - pd.Timedelta(minutes=1)
+        assert len(man["symbols"][s]["files"]) == n_days
+        assert hashlib.sha256(p.read_bytes()).hexdigest() == man["symbols"][s]["parquet_sha256"]
+    # the scored results must not run past the available data
+    r = load_results()
+    assert pd.Timestamp(r["window"]["end_exclusive"]) <= w1

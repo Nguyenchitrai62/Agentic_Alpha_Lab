@@ -130,7 +130,13 @@ def test_kpack_bundles_clean_and_in_sync():
                         ("kpack_C2", ("c2_rank_calibrated.py", "common_impl.py"))):
         kd = IMPL / cand
         for f in files:
-            assert filecmp.cmp(IMPL / f, kd / f, shallow=False), (cand, f)
+            # normalized-text sync: the kpack copies were written with CRLF
+            # line endings (bulk copy 2026-10-06 14:03) while the sources are
+            # LF, so byte-exact filecmp false-fails; any logic change still
+            # fails this comparison. See ops_snapshottests/REPORT.md.
+            a = (IMPL / f).read_text(encoding="utf-8").splitlines()
+            b = (kd / f).read_text(encoding="utf-8").splitlines()
+            assert a == b, (cand, f)
         names = {p.name for p in kd.iterdir()}
         assert not any(n.endswith((".parquet", ".csv", ".pkl", ".npz")) for n in names), names
         blob = "\n".join((kd / f).read_text() for f in kd.iterdir() if f.is_file())
