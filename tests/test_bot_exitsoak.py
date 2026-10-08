@@ -402,32 +402,23 @@ def test_exits_never_complete_without_fix(tmp_path):
     assert any(_protection_snapshot(r, ex, pid) == "BARE" for pid in ("dA", "dB", "bC"))
 
 
-def test_identity_patch_matches_nofix_module(tmp_path, monkeypatch):
-    # cb14cb7 is purely additive, so the current tree with the filter patched to
-    # identity must behave exactly like the tmp/run_nofix.py module copy.
-    monkeypatch.setattr(run_fix, "_acts_without_exit_cancel", lambda acts, led: acts)
+def test_current_tree_differs_from_nofix_by_design(tmp_path, monkeypatch):
+    # bot_exitstuck (2026-10-08): the fix is no longer a purely additive
+    # cancel filter, so an identity patch can NOT reproduce the nofix module.
+    # the fixed tree polls have() BEFORE the exits loop and waits for a
+    # resting exit (exit_wait) instead of re-sending + cancelling it -- that
+    # resend loop starved fills in the 24 h soak (3532 exit_resend_overflow).
     r1, ex1 = _seed(run_fix, tmp_path, "patched")
     r1.cycle()
+    sent1 = _exit_links(r1)
+    assert len(sent1) == 3
+    assert all(link in ex1.orders for link in sent1)
     r2, ex2 = _seed(nofix_mod(), tmp_path, "copymod")
     r2.cycle()
-    got1 = sorted((rec.get("op"), rec.get("link")) for rec in r1.logs
-                  if rec.get("op") in ("cancel", "place"))
-    got2 = sorted((rec.get("op"), rec.get("link")) for rec in r2.logs
-                  if rec.get("op") in ("cancel", "place"))
-
-    def _norm(rows):
-        # exit links embed t36(now-minute); both runs share the wall-clock minute
-        # in practice, but normalise defensively to (op, class) for exits.
-        out = []
-        for op, link in rows:
-            if link and ("X" in str(link)):
-                out.append((op, "EXIT"))
-            else:
-                out.append((op, link))
-        return sorted(out)
-
-    assert _norm(got1) == _norm(got2), (got1, got2)
-    assert _exit_links(r1) and _exit_links(r2)
+    sent2 = _exit_links(r2)
+    assert len(sent2) == 3
+    assert not any(link in ex2.orders for link in sent2), \
+        "nofix cancels exits the same cycle they are sent"
 
 
 # ----------------------------------------------------------------------------
@@ -513,10 +504,12 @@ def test_stale_exit_resends_after_inflight(tmp_path):
     assert float(r.state["ledger"]["dA"]["qty"]) == 0.0
 
 
-def test_resend_replaces_stale_resting_exit(tmp_path):
-    # stale exit still resting + inflight marker expired -> the cycle sends a new
-    # link; diff cancels the replaced (now-unreferenced) old link, so at most
-    # one market exit rests per piece after the re-send cycle.
+def test_stale_resting_exit_waits_for_fill(tmp_path):
+    # bot_exitstuck (2026-10-08): a stale exit that still rests on the exchange
+    # must NOT be re-sent nor cancelled -- cancelling a market that may already
+    # be filled is unsafe on the real exchange, and the re-send loop starved
+    # fills in the 24 h soak. The runner waits (exit_wait) and the old exit
+    # fills on the next bar.
     r, ex = _seed(run_fix, tmp_path, "s2", pieces=("dA",), rest_protection=False)
     r.cycle()
     (link,) = _exit_links(r)
@@ -531,11 +524,11 @@ def test_resend_replaces_stale_resting_exit(tmp_path):
     r.state["ledger"]["dA"]["exit_sent"] = str(
         pd.Timestamp.now(tz="UTC") - pd.Timedelta(minutes=5))
     n0 = len(_exit_links(r))
-    r.cycle()
-    new = _new_exits(r, n0)
-    assert len(new) == 1
-    assert renamed not in ex.orders, "replaced exit must be cancelled on re-send"
-    assert new[0] in ex.orders
+    acts = r.cycle()
+    assert _exit_links(r)[n0:] == [], "no duplicate exit while one rests"
+    assert renamed in ex.orders, "resting exit must not be cancelled"
+    assert not [a for a in acts
+                if a.get("op") == "cancel" and a.get("link") == renamed]
     _calm_bar(ex)
     r.cycle()
     assert float(r.state["ledger"]["dA"]["qty"]) == 0.0

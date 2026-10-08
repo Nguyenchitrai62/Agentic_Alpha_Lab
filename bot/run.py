@@ -339,19 +339,70 @@ def _acts_without_carry_cancel(acts):
     return out
 
 
-def _acts_without_exit_cancel(acts, led):
-    """Never cancel a confirmed market exit of an open piece (leader fix 2026-10-07).
+def _exit_resting(pc, have) -> str | None:
+    """Live exit link of this piece still resting on the exchange (bot_exitstuck 2026-10-08).
+
+    A resting market exit (X/D/U link) must never be cancelled nor duplicated:
+    on the real exchange a market order fills immediately or is rejected (it
+    never rests); on paper/mock it fills at the next 1m bar. Returns the link,
+    else None.
+    """
+    try:
+        link = pc.get("exit_link") if isinstance(pc, dict) else None
+    except (AttributeError, TypeError):
+        return None
+    if not link:
+        return None
+    try:
+        if link in (have or {}):
+            return link
+    except TypeError:
+        pass
+    return None
+
+
+def _acts_without_exit_cancel(acts, led, links=None):
+    """Never cancel a market exit of an open piece (leader fix 2026-10-07, extended bot_exitstuck 2026-10-08).
 
     1c0469a registers the market-exit link in state["links"], so have() lists the exit while the exchange still
     reports it open (paper fills a market order at the next 1m bar; live can report New / PartiallyFilled for a
     moment). mirror.diff then cancelled it in the same cycle, so time exits and close5 stops never executed and the
     piece stayed open without protection, re-sent every EXIT_INFLIGHT_MIN minutes (paper runners 2026-10-07 03:00 UTC).
+    The extension also keeps every older state-known reduce (X/D/U) link of an open piece: after a restart with
+    pre-fix state several exit links may rest, and cancelling any of them risks killing an exit that already filled.
     """
     try:
-        keep = {pc.get("exit_link") for pc in (led or {}).values()
-                if isinstance(pc, dict) and pc.get("exit_link") and float(pc.get("qty") or 0) > 0}
-    except (AttributeError, TypeError, ValueError):
+        items = list((led or {}).items())
+    except (AttributeError, TypeError):
         return acts
+    open_pieces, keep = set(), set()
+    for pid, pc in items:
+        try:
+            if not isinstance(pc, dict):
+                continue
+            if not float(pc.get("qty") or 0) > 0:
+                continue
+        except (TypeError, ValueError):
+            continue
+        open_pieces.add(pid)
+        try:
+            link = pc.get("exit_link")
+        except (AttributeError, TypeError):
+            link = None
+        if link:
+            keep.add(link)
+    if links:
+        try:
+            link_items = list((links or {}).items())
+        except (AttributeError, TypeError):
+            link_items = []
+        for link, meta in link_items:
+            try:
+                o = (meta or {}).get("order") or {}
+                if o.get("kind") == "reduce" and o.get("piece") in open_pieces:
+                    keep.add(link)
+            except (AttributeError, TypeError):
+                continue
     if not keep:
         return acts
     out = []
@@ -1546,6 +1597,12 @@ class Runner:
                     last5 = {}
                 _stages["kline_ms"] += (_cycle_now() - _t) * 1000.0
                 _t = _cycle_now()
+                try:
+                    have = self.have()
+                except Exception:
+                    have = {}
+                _stages["sync_ms"] += (_cycle_now() - _t) * 1000.0
+                _t = _cycle_now()
                 for pid, why in mirror.exits({"phases": [], "coins": {}}, now, led, last5):
                     if why == "plan_closed_divergence":
                         continue
@@ -1553,6 +1610,15 @@ class Runner:
                     try:
                         if mirror._market_inflight(pc, now):
                             continue  # confirmed market exit in flight; wait for its fill
+                    except Exception:
+                        pass
+                    try:
+                        if _exit_resting(pc, have):
+                            # bot_exitstuck: the previous market exit still rests on the
+                            # exchange (paper/mock fills it at the next 1m bar). Wait for
+                            # its fill instead of re-sending + cancelling (livelock).
+                            self.log(dict(op="exit_wait", piece=pid, link=pc.get("exit_link"), reason=why))
+                            continue
                     except Exception:
                         pass
                     link = f"{pid}X{mirror.t36(now)}"
@@ -1590,15 +1656,13 @@ class Runner:
                         rounded[k] = (o, p)
                 _stages["decide_ms"] += (_cycle_now() - _t) * 1000.0
                 _t = _cycle_now()
-                try:
-                    have = self.have()
-                except Exception:
-                    have = {}
+                # `have` was polled before the exits loop above (so the just-placed
+                # market exits are not in it and diff cannot cancel them); reuse it.
                 _stages["sync_ms"] += (_cycle_now() - _t) * 1000.0
                 _t = _cycle_now()
                 acts = mirror.diff({k: o for k, (o, _) in rounded.items()}, _have_without_carry(have))
                 acts = _acts_without_carry_cancel(acts)
-                acts = _acts_without_exit_cancel(acts, led)
+                acts = _acts_without_exit_cancel(acts, led, (self.state or {}).get("links"))
                 try:
                     acts = self._guard_phantom_cancels(acts, led, have, now)
                 except Exception:
@@ -1680,11 +1744,37 @@ class Runner:
             _last5_for_cycle = {}
         _stages["kline_ms"] += (_cycle_now() - _t) * 1000.0
         _t = _cycle_now()
+        try:
+            have_before = self.have()
+        except Exception as e:
+            # F3: one open_orders blip must not abort protection: fall back
+            # to empty `have` (all wanted orders place/amend), log locally.
+            # Polled BEFORE the exits loop so the just-placed market exits are
+            # not in it and diff() below cannot cancel them (bot_exitstuck).
+            try:
+                self.log(dict(op="cycle_error", call="open_orders", note=f"{type(e).__name__}: {e}"[:200]))
+            except Exception:
+                pass
+            have_before = {}
+        _stages["sync_ms"] += (_cycle_now() - _t) * 1000.0
+        _t = _cycle_now()
         for pid, why in mirror.exits(plan, now, led, _last5_for_cycle):
             pc = led[pid]
             try:
                 if mirror._market_inflight(pc, now):
                     continue  # a confirmed market exit is in flight; wait for its fill before sending another
+            except Exception:
+                pass
+            try:
+                if _exit_resting(pc, have_before):
+                    # bot_exitstuck: the previous market exit still rests on the
+                    # exchange (paper/mock fills it at the next 1m bar; real fills
+                    # immediately). Wait for its fill: re-sending now would cancel a
+                    # live exit that may already be filled, and cancelling +
+                    # re-sending every 2 min livelocks (soak 3532 violations, paper
+                    # 27 sends). Never cancel it either (guard below).
+                    self.log(dict(op="exit_wait", piece=pid, link=pc.get("exit_link"), reason=why))
+                    continue
             except Exception:
                 pass
             if why == "close5_stop" and pc.get("kind") == "dip":
@@ -1825,16 +1915,9 @@ class Runner:
             want = self._apply_risk_guard(want, equity, self._guard_prices(lc, _last5_for_cycle, plan))
         _stages["decide_ms"] += (_cycle_now() - _t) * 1000.0
         _t = _cycle_now()
-        try:
-            have_before = self.have()
-        except Exception as e:
-            # F3: one open_orders blip must not abort protection: fall back
-            # to empty `have` (all wanted orders place/amend), log locally.
-            try:
-                self.log(dict(op="cycle_error", call="open_orders", note=f"{type(e).__name__}: {e}"[:200]))
-            except Exception:
-                pass
-            have_before = {}
+        # `have_before` was polled before the exits loop above (so the just-placed
+        # market exits are not in it and diff() cannot cancel them); reuse it here
+        # (bot_exitstuck). The F3 open_orders fallback lives at that poll.
         _stages["sync_ms"] += (_cycle_now() - _t) * 1000.0
         if _maint_on:
             # bot_maint marker: which new entries were blocked and which resting
@@ -1868,7 +1951,7 @@ class Runner:
         acts = mirror.diff({k: o for k, (o, _) in rounded.items()}, _have_without_carry(have_before),
                            amend_entry_qty=(self.corr or self.risk_mult != 1.0 or self.dip_mult != 1.0 or bool(getattr(self, "dip_gross_cap", 0.0))))
         acts = _acts_without_carry_cancel(acts)
-        acts = _acts_without_exit_cancel(acts, led)
+        acts = _acts_without_exit_cancel(acts, led, (self.state or {}).get("links"))
         try:
             acts = self._guard_phantom_cancels(acts, led, have_before, now)
         except Exception:
