@@ -15,6 +15,7 @@ import copy
 import json
 import os
 import sys
+import threading
 import time
 from dataclasses import asdict, replace
 from pathlib import Path
@@ -49,6 +50,16 @@ MAINT_PRE_MIN = 30.0
 # match the assignment: slow_cycle > 60 s, lock_wait > 10 s (cache-lock wait).
 SLOW_CYCLE_S = 60.0
 LOCK_WAIT_WARN_S = float(KLINE_CACHE_LOCK_WARN_S)
+# Cycle watchdog (bot_hang 2026-10-08): a paper runner hung 14 min with 0 CPU
+# (paper_d17bf, last line 11:16:01 UTC = dip placements, restarted 11:29). No
+# single unbounded wait remains (kline locks bound 30 s, HTTP timeout 10 s),
+# but N sequential bounded waits can stall one cycle for minutes with no
+# output. If one cycle exceeds N minutes (N = 10, frozen), log op=cycle_stall
+# and exit non-zero so keepalive / restart_all restarts it. State (state.json
+# + paper exchange.json) is persisted at every cycle end, so at most the
+# in-flight cycle is lost - same as any crash; last_ms / last_exec_ms cursors
+# replay it on restart.
+CYCLE_WATCHDOG_S = 600.0
 
 # bot_k2flag (2026-10-07): optional Kronos K2 dip-size tilt, default OFF.
 # Parquet rows: sym (e.g. BTCUSDT), shift (0..3 clock shift = plan phase),
@@ -189,6 +200,45 @@ def _k2_mult_for(coin, phase, bar, k2map) -> tuple:
 def _cycle_now() -> float:
     """Monotonic clock for cycle timing (patched with fake clocks in tests)."""
     return time.perf_counter()
+
+
+def _arm_cycle_watchdog(log, timeout_s=CYCLE_WATCHDOG_S, exit_fn=None):
+    """Watchdog for one paper cycle; returns cancel() (call it when the cycle ends).
+
+    If not cancelled within timeout_s, logs op=cycle_stall and exits the
+    process non-zero (os._exit) so the owner's keepalive / restart_all
+    restarts it. log(rec) is the runner log (actions.jsonl + stdout);
+    exit_fn() is a test seam (default: os._exit(2)). The watcher thread is a
+    daemon: a normally finishing cycle cancels it, --once exits cleanly.
+    """
+    try:
+        timeout_s = float(timeout_s)
+    except (TypeError, ValueError):
+        timeout_s = CYCLE_WATCHDOG_S
+    done = threading.Event()
+
+    def _fire():
+        try:
+            if done.wait(max(0.0, timeout_s)):
+                return
+        except Exception:
+            return
+        try:
+            log(dict(op="cycle_stall", timeout_s=float(timeout_s)))
+        except Exception:
+            pass
+        try:
+            fn = exit_fn if exit_fn is not None else (lambda: os._exit(2))
+            fn()
+        except Exception:
+            try:
+                os._exit(2)
+            except Exception:
+                pass
+
+    t = threading.Thread(target=_fire, name="cycle-watchdog", daemon=True)
+    t.start()
+    return done.set
 
 
 def _parse_maint_ts(x):
@@ -1541,6 +1591,13 @@ class Runner:
                 self.log(dict(op="lock_wait", lock_wait_ms=round(float(wait_s) * 1000.0, 1),
                               timeouts=int(timeouts), total_ms=round(float(total_ms), 1),
                               stages={k: round(float(v), 1) for k, v in stages.items()}))
+            if int(timeouts) > 0:
+                # bot_hang: a bounded lock acquisition timed out this cycle (the
+                # refresh was skipped, the cycle continued with the last good
+                # data). Logged even when the cycle stayed fast overall.
+                self.log(dict(op="lock_timeout", timeouts=int(timeouts),
+                              lock_wait_ms=round(float(wait_s) * 1000.0, 1),
+                              total_ms=round(float(total_ms), 1)))
         except Exception:
             pass
         return total_ms
@@ -2195,10 +2252,19 @@ def main():
              no_risk_guard=a.no_risk_guard or (a.mode in ("paper", "dry") and not a.risk_guard),
              carry_f=a.carry_f, maint_start=a.maint_start, maint_end=a.maint_end, k2_tilt=a.k2_tilt)
     while True:
+        # bot_hang: cycle watchdog (10 min, frozen). A cycle that never
+        # returns (blocked wait deep in a refresh) is logged op=cycle_stall
+        # and the process exits non-zero for keepalive / restart_all.
+        cancel_watchdog = _arm_cycle_watchdog(r.log)
         try:
             r.cycle()
         except Exception as e:  # keep the loop alive; resting exchange-native stops / take-profits protect open pieces
             r.log(dict(op="cycle_error", note=repr(e)))
+        finally:
+            try:
+                cancel_watchdog()
+            except Exception:
+                pass
         if a.once:
             break
         time.sleep(a.interval)
