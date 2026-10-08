@@ -1,5 +1,22 @@
 # Tóm tắt cho chủ tài khoản — 2026-10-09 (VI)
 
+## Cập nhật chiều 2026-10-08 (số copy nguyên văn CLOSED_DIRECTIONS 2026-10-08 + REPORT, không số mới)
+- Bảng quyết định Bybit+carry f=0.25 (oc_levfrontier, 5y/full-DD/năm gần nhất): G2 5.111/17.93/4.493; G2+C2 5.342/16.35/4.607; G2K20 5.567/19.02/4.544; G2K20+C2 5.593/17.78/4.619 (robust pick dev4, worst 2.539 cao nhất); G2+B7 6.127/19.72/4.719; G2+B7xC2 5.910/17.28/4.707; G2K20+B7xC2 6.144/18.48/4.787; G2K20+B7 6.345/23.72 (vỡ DD).
+- Kết luận bảng: KHÔNG hàng nào đạt 5%/tháng ở năm gần nhất trên Bybit (cao nhất 4.787); giữ G2 đang chạy, robust pick là G2K20+C2, muốn số to thì G2+B7xC2 (DD 17.28) — tất cả chờ paper.
+- Sự thật B7: CTRL_C 6.441/2.940/18.33 và CTRL_R mean 6.359 (p5 6.16/p95 6.49) so với B7 6.738/2.955/17.92 — exposure giải thích 74%/67% gain, timing chỉ ~0.3%/tháng; cửa sổ cascade active ~60% thời gian (oc_cboostctrl).
+- B7 nằm trong plateau rộng (oc_b7thresh): replica dSum +1.70..+3.14 mọi ô, engine 4 góc dev4 6.28–6.90 (B7 6.74), 5y 6.00–6.42, full DD 17.38–18.52; clean tốt nhất k4.5/W10 (4/4, COVID +0.109), B7 chỉ 3/4 — giữ nguyên B7, không chỉnh.
+- B7xC2 pre-sample (oc_b7c2pre): hơn không-tilt +0.063/+0.076/+0.138/−0.225, hơn B7 +0.017/−0.002/+0.027/−0.155; chân COVID stop +1.75 so với B7 +1.55pp — C2 không đỡ crash, cả hai chỉ paper.
+- 6 biến thể IDEAS7 đều thua B7 phẳng nên đóng: taper, deep, first, breaker, btceth, patient (patient replica +1.285 nhưng engine DD 23.14).
+- Pre-sample G2 (oc_presampleg2): dip đứng một mình xanh mọi năm; book mất 2018 (−0.11) và 2019 (−1.38%/tháng), kéo cả hệ thống âm 2019 (−0.89), DD 2020p mean 30.8/pha tệ 39.3 — edge robust là thang dip, skill của book trông như từ 2021+ (thiếu họ A).
+- IDEAS8 book (đóng cả 8): btcresid V1 −0.18/DD 43.84 V2 +0.25/42.39; clockagree 5.578/2.591, sạch 4.622; decayexit V2 5.607/clean 4.728 (+0.08); horizondecay ~4.5–4.6 DD>22; memberagree V1 5.686/clean 4.566; volvolbrake 5.435/5.471; convttl 5.615/clean 4.678; costlabel CV1 5.086/DD 20.68 CV2 5.104/20.39 (win tăng nhưng lời giảm).
+- Booktrim/bookband đóng: trim x0.8/x0.6 còn 5.243/4.805 (Bybit 4.556/4.192), dip mất 17 fill — book không thừa; band NB10 5.447/clean 4.679, phí tiết kiệm chỉ 0.0066/5y — turnover không phải vấn đề.
+- IDEAS9 MANUAL (đóng cả 6): btceth 1.495/2.226; conflict V1 3.860/clean 3.522/5y 3.792; settleskip V1 lỗ 2021 (−0.302)/5y 2.019, V2 suy biến; weeklyvol 3.668 (−0.06, con người dùng bảng tuần chỉ mất ~0.06); breakeven 3.360/3.261 (win .648→.408/.314); top2 1.752/2.719 (mất đa dạng) — MANUAL vẫn M5_human.
+- IDEAS10/11 + dip: weeklybook 5.410/5y 5.272 (Bybit 4.622); stopentry 5.684 nhưng Bybit DD 21.07; sleevealloc V2 1.667 (lợi nhuận nằm ở engine chung); spotlongs lần đầu sai phí (5.859), chạy lại phí thật SPOT_F10 5.675/SPOT_F06 5.730 — funding tiết kiệm 0.0257/năm ≈ phí thêm 0.0255/năm, hòa; carryhurdle V1==V2==REF (5.634/5.111, ngưỡng 0.04 >> hurdle); dipdaily G2+D05 dev4 6.19/W 3.26/DD 16.33 nhưng sạch −0.43pp +5pp DD — không theo.
+- Kronos-base (oc_kronosbase) đóng: KB2 5.834/W 2.524, sạch 4.826 (+0.025 hơn K2), 5y 5.632 — model to hơn không thêm gì, cùng họ vol-timing.
+- Bài học confirmgate: cổng 2 chân (Bybit + pre-sample) không tách được (D1 qua Bybit nhưng rớt năm sạch; K2 rớt worst nhưng chuyển); cổng 3 chân đề xuất thêm FIT-CREDIBILITY thì chỉ C2 (và K2 kèm caveat) sống.
+- Vận hành: 11 runner C2/B7/B7xC2 trên fix bot 83a466a PASS (C2 mult 0.75 đúng 5 rung XRP; B7 toàn 1.0 vì chưa có cascade; zero market_exit/exit_wait/dust/protection; feed chronos 55/55, cascade 25/30+5 trễ); ramp live docs/LIVE_RAMP_VI.md (5%→25%→100% tuần 0/4/8; dừng nếu lệch live-vs-replay >0.5%/tháng hoặc DD 28 ngày >17.0%; V2 giảm nửa khi DD 90 ngày >19%); chấm hàng tuần scripts/fm_paper_eval.py --all.
+- Việc chủ làm (thứ tự cũ + ramp): 1) đăng ký keepalive+watchdog; 2) review fix bot_exitstuck rồi restart runner; 3) nuôi prospective đủ 26 tuần rồi mới deploy (K2/C2/B7); 4) theo ramp live từng nấc khi tới live.
+
 Phạm vi: BOT = book + thang dip G2; mọi số walk-forward 5 năm, reset 1/4 vốn mỗi anchor, chi phí gate Bybit (maker 0.02%/taker 0.055%, long trả 0.01%/8h). Mọi số dưới copy nguyên văn từ docs/CLOSED_DIRECTIONS.md (hàng 2026-10-08) và REPORT.md/COMPARISON.md được dẫn ở đó; không có số mới. Bốn hàng kiểm chứng B7 (oc_cboostctrl, oc_cboostbybit, audit_cboost, oc_cboostmanual) đã về đủ trong ngày nên báo cáo này chốt luôn, không còn mục "đang chạy".
 
 ## 1. Đang chạy: giữ nguyên G2 + carry f=0.25 (paper only) — kỳ vọng thật theo giá Bybit
