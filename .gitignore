@@ -87,6 +87,8 @@ research/tournament/**/tmp/
 research/tournament/**/tables/
 research/tournament/**/model/
 research/tournament/**/kpack_*/
+# worker-local pip installs (pip install --target pylib) stay local
+research/**/pylib/
 research/parallel/rounds/**/*_result_*.json
 research/parallel/rounds/**/*_final*.json
 research/parallel/rounds/**/gp_formulas.json

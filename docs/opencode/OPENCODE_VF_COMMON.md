@@ -30,3 +30,6 @@ NEXT_AGENT.md, ../Kronos, or git state.
   `git restore`, `git clean`, `git rm`, `git commit`, `git switch`, `git rebase`, `git merge` or anything that changes the working tree, index,
   stash or HEAD. Other workers and the leader have uncommitted work in this tree; a stash/clean destroys it. To compare against the
   committed version use `git show HEAD:<path>` or `git diff`. To test "clean", copy files into your own scratch folder instead.
+- PATHS (2026-10-09 cleanup: 120+ stray folders like `researchtournamentoc_x` appeared at the repo root): in bash always use forward slashes
+  (`research/tournament/oc_x/tmp`, `$TEMP/...` -> `/tmp/...`); a Windows path with backslashes in bash loses its separators and lands at the
+  repo root. Write only inside your own `research/tournament/<tag>/` folder; scratch goes in `<tag>/tmp/`; pip installs in `<tag>/pylib/`.

@@ -45,6 +45,7 @@ Live cần yêu cầu rõ ràng của chủ tài khoản, testnet sạch và đ�
 | `src/agentic_alpha_lab/` | Data, model adapter, training và backtest nền tảng |
 | `tests/` | Kiểm thử timing, chi phí, execution, bot và API |
 | `docs/` | Hướng dẫn hiện tại; tài liệu cũ ở `docs/legacy/` và `docs/research_reports/` |
+| `artifacts/`, `data/`, `models/` | Chỉ ở máy local (gitignore): DB web, log, state bot, dữ liệu tải về, checkpoint, cache nến (`data/raw/binance_klines_cache/`) |
 
 `../Kronos` là upstream tham chiếu, không sửa từ repo này.
 `archive/legacy_web_dashboard/` là demo snapshot cũ, không phải web hiện tại.
