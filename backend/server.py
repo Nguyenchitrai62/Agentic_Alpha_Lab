@@ -10,6 +10,7 @@ import gzip
 import hashlib
 import threading
 import time
+import warnings
 from collections import OrderedDict, defaultdict
 from datetime import datetime, timedelta, timezone
 
@@ -22,6 +23,9 @@ import orjson
 from . import auth, carry_view, catalog, db, pipeline
 from .config import ROOT, SETTINGS, log
 from .security import BodyLimitMiddleware
+
+# FastAPI >= 0.13x deprecates ORJSONResponse (kept here for the pre-serialized cache); the warning was logged on every request
+warnings.filterwarnings("ignore", message="ORJSONResponse is deprecated")
 
 APP_VERSION = "1.0.0"
 _started_at = time.time()
@@ -228,12 +232,11 @@ def overview(request: Request, pipeline: str | None = None, user: dict = Depends
     """pipeline=v205/v233/v236/v240: the walk-forward summary of that executable trade-mode pipeline (history_tm)."""
     pipeline = pipeline or catalog.default_pipeline(user)
     catalog.require_pipeline(user, pipeline)
-    if pipeline in ("v205", "v233", "v236", "v240", "v266", "v269", "v285", "v295", "v301", "v321", "v315", "v340", "v342", "v362", "v367", "v376", "g2c"):
-        if pipeline == "g2c":  # deployed BOT "G2 + carry": same plan file as v376, own walkforward summary
-            return cached(request, "overview:g2c", 60, lambda: {"walkforward": db.kv_get("summary_tm_g2c", {}),
-                                                               "plan": db.kv_get("trade_plan_v376", {})})
-        return cached(request, f"overview:{pipeline}", 60, lambda: {"walkforward": db.kv_get(f"summary_tm_{pipeline}", {}),
-                                                                   "plan": db.kv_get({"v205": "trade_plan"}.get(pipeline, f"trade_plan_{pipeline}"), {})})
+    if pipeline in catalog.PIPELINES or pipeline in catalog.LEGACY_TM:
+        # g2c (deployed BOT "G2 + carry"): own walk-forward summary, the v376 plan file
+        return cached(request, f"overview:{pipeline}", 60, lambda: {"walkforward": catalog.walkforward(pipeline),
+                                                                   "plan": db.kv_get(catalog.plan_key(pipeline), {}),
+                                                                   "plan_source": catalog.plan_source(pipeline)})
 
     def load():
         latest = db.one("SELECT id, decision_time, created_at, scale, governor, gross, pipeline FROM runs WHERE source = 'live' "
@@ -262,14 +265,14 @@ def pipelines_summary(request: Request, user: dict = Depends(auth.require_viewer
         for i, p in enumerate(order, 1):
             if p in catalog.BOT and not catalog.bot_access(user):
                 continue  # the Bot tab (its evaluation included) is visible only with the account's BOT grant
-            raw = db.kv_get(f"summary_tm_{p}", {}) or {}
             # Historical evaluation remains public to approved viewers; never serialize plans/signals here.
-            summary = {k: raw.get(k, catalog.PIPELINES[p].get(k)) for k in catalog.SUMMARY_FIELDS}
+            wf = catalog.walkforward(p)
+            summary = {k: wf.get(k) for k in catalog.SUMMARY_FIELDS}
             locked = p not in permitted
             # g2c shares the v376 plan file (same live signals); paper result shown from v376's plan.
-            plan = (db.kv_get(f"trade_plan_{'v376' if p == 'g2c' else p}", {}) or {}) if not locked else {}
+            plan = (db.kv_get(catalog.plan_key(p), {}) or {}) if not locked else {}
             out[p] = {"rank": i, "locked": locked, "locked_for_viewers": settings["locked"][p],
-                      "automatic_order": settings["automatic"], "walkforward": summary,
+                      "automatic_order": settings["automatic"], "walkforward": summary, "plan_source": catalog.plan_source(p),
                       "paper_net_pct": plan.get("net_return_pct"), "freeze": plan.get("freeze"),
                       "prospective": None if locked else {k: score.get(p, {}).get(k) for k in ("days", "live_pct", "expected_p50", "percentile")},
                       "admin_contact_email": SETTINGS.admin_contact_email if locked else None}
@@ -286,10 +289,9 @@ def trade_plan(request: Request, pipeline: str | None = None, user: dict = Depen
     pipeline=v205 (deployed, default), v233 (T3: TradingView indicator features) or v236 (W2: T3 + whale flow); paper comparison."""
     pipeline = pipeline or catalog.default_pipeline(user)
     catalog.require_pipeline(user, pipeline)
-    if pipeline not in catalog.PIPELINES and pipeline not in ("v205", "v233", "v236", "v240"):
+    if pipeline not in catalog.PIPELINES and pipeline not in catalog.LEGACY_TM:
         raise HTTPException(400, "Unknown pipeline.")
-    # g2c (deployed "G2 + carry") uses the v376 plan file (same trade_plan_v376.json).
-    key = {"v233": "trade_plan_v233", "v236": "trade_plan_v236", "v240": "trade_plan_v240", "v266": "trade_plan_v266", "v269": "trade_plan_v269", "v285": "trade_plan_v285", "v295": "trade_plan_v295", "v301": "trade_plan_v301", "v321": "trade_plan_v321", "v315": "trade_plan_v315", "v340": "trade_plan_v340", "v342": "trade_plan_v342", "v362": "trade_plan_v362", "v367": "trade_plan_v367", "v376": "trade_plan_v376", "g2c": "trade_plan_v376"}.get(pipeline, "trade_plan")
+    key = catalog.plan_key(pipeline)  # g2c (deployed "G2 + carry") reads the v376 plan
     return cached(request, key, 20, lambda: db.kv_get(key, {}))
 
 
@@ -464,6 +466,8 @@ def admin_run(payload: dict = Body(...), user: dict = Depends(auth.require_admin
            "walkforward_tm": pipeline.job_walkforward_tm, "check": pipeline.job_check, "summaries": pipeline.job_summaries}
     if not isinstance(kind, str) or kind not in fns:
         raise HTTPException(400, f"kind must be one of {list(fns)}")
+    if pipeline._job_lock.locked():  # the scheduler's cycle / 15-min refresh holds the lock: the job would only log "busy"
+        raise HTTPException(409, "Another pipeline job is running. Try again in a few minutes.")
 
     def work():
         pipeline.run_job(kind, fns[kind], triggered_by=user["email"])
@@ -534,14 +538,31 @@ def _last_cycle_ms() -> int:
     return int(r["finished_at"]) if r and r.get("finished_at") else 0
 
 
+RETRY_FIRST_S, RETRY_MAX_S = 60.0, 900.0
+
+
 def _run_cycle_until_done(trigger: str):
+    """Repeat the cycle until it completes, waiting 1, 2, 4 .. 15 min between attempts (a fixed 60 s retry kept a rate-limited
+    exchange API rate-limited: 25 failed cycles in a row on 2026-10-09). The hourly multi-phase plans (the deployed BOT) keep
+    running during the waits instead of going stale behind a failing cycle."""
+    delay = RETRY_FIRST_S
+    nph = _next_phase_run(datetime.now(timezone.utc))
     while True:
         _heartbeat["t"] = datetime.now(timezone.utc).isoformat()
         result = pipeline.run_job("cycle", pipeline.job_cycle, trigger)
         clear_cache()
         if result["status"] == "done":
             return
-        time.sleep(60)
+        left = delay
+        while left > 0:
+            _heartbeat["t"] = datetime.now(timezone.utc).isoformat()
+            step = min(left, max(1.0, (nph - datetime.now(timezone.utc)).total_seconds()))
+            time.sleep(step)
+            left -= step
+            if datetime.now(timezone.utc) >= nph:
+                _run_phase_plans("retry-gap", patience_s=0.0)
+                nph = _next_phase_run(datetime.now(timezone.utc))
+        delay = min(2 * delay, RETRY_MAX_S)
         trigger = "retry"
 
 
@@ -551,9 +572,9 @@ def _due_slot(now_ms: int) -> int:
 
 def _cycle_incomplete(now_ms: int) -> bool:
     slot = _due_slot(now_ms)
-    # g2c shares the v376 plan file: check v376's plan/status for it (no separate trade_plan_g2c).
-    return any((db.kv_get(f"plan_status_{'v376' if p == 'g2c' else p}", {}) or {}).get("completed_slot", 0) < slot
-               or not db.kv_get(f"trade_plan_{'v376' if p == 'g2c' else p}") for p in catalog.PIPELINES)
+    # display aliases (g2c) share their source's plan: only the plans the scheduler builds are checked
+    return any((db.kv_get(f"plan_status_{p}", {}) or {}).get("completed_slot", 0) < slot or not db.kv_get(catalog.plan_key(p))
+               for p in catalog.PIPELINES if p not in catalog.PLAN_ALIASES)
 
 
 def _startup_check():

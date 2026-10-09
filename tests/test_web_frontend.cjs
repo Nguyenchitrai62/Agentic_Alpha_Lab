@@ -6,7 +6,7 @@ const vm = require('node:vm');
 
 const source = fs.readFileSync(path.join(__dirname, '../frontend/app.js'), 'utf8').replace(
   '  boot();',
-  '  window.testing = { state, api, refreshSession, logout, onCredential, syncAccountAccess, visiblePipes, planPipe, setPlanPipe, histSource, histBoth, loadPerf, loadPlans, loadEvidence, renderEvidence, loadPipelineSettings, loadUsers, route, location, $, product, renderGoals, renderProductPanels, loadTodo, renderCards, renderBoard, renderPlan, PIPES };');
+  '  window.testing = { state, api, refreshSession, logout, onCredential, syncAccountAccess, visiblePipes, planPipe, setPlanPipe, srcPipe, refreshPlan, histBoth, loadPerf, loadPlans, loadEvidence, renderEvidence, loadPipelineSettings, loadUsers, route, location, $, product, renderGoals, renderProductPanels, loadTodo, renderCards, renderBoard, renderPlan, PIPES };');
 const user = { email: 'viewer@example.com', role: 'viewer', allowed_pipelines: ['v342', 'v362', 'v315'] };
 const expired = { access_token: 'old', expires_at: 1, user };
 const fresh = { access_token: 'new', expires_at: Date.now() / 1000 + 900, user };
@@ -45,15 +45,14 @@ function app(fetch, localStorage = storage(), sharedLocks = locks()) {
   return window.testing;
 }
 
-test('viewer selection ignores a saved restricted pipeline and only fetches allowed plans', async () => {
+test('viewer selection ignores a saved restricted pipeline and fetches only the selected plan', async () => {
   const saved = storage(fresh); saved.setItem('planPipe6', 'v367');
   const paths = [];
   const ui = app(async p => { paths.push(p); return response(200, {}); }, saved);
   assert.deepEqual(Array.from(ui.visiblePipes(), p => p.v), Array.from(user.allowed_pipelines));
   assert.equal(ui.planPipe(), 'v342');
   await ui.loadPlans();
-  assert.equal(paths.length, 4);
-  assert.ok(paths.every(p => user.allowed_pipelines.some(v => p === `/api/trade_plan?pipeline=${v}`)));
+  assert.deepEqual(paths, ['/api/trade_plan?pipeline=v342']);  // the other pipelines' plans are not downloaded
 });
 
 test('parallel API requests share one proactive refresh', async () => {
@@ -177,10 +176,9 @@ test('pipeline selection is shared by signal, history and performance, including
   }, saved);
   ui.state.view = 'todo';
   ui.state.h.pipe = 'v342'; ui.state.perfPipe = 'v342';
-  ui.state.live.paper = [['v362', { pipeline: 'stale cached M4', coins: {} }]];
   await ui.setPlanPipe('v362');
   assert.equal(ui.planPipe(), 'v362');
-  assert.equal(ui.histSource(), 'tm_v362');
+  assert.equal(ui.srcPipe('v362'), 'v362');
   await ui.histBoth('orders', 'BTCUSDT');
   assert.ok(paths.includes('/api/orders?symbol=BTCUSDT&source=tm_v362&limit=30000'));
   assert.ok(paths.includes('/api/orders?symbol=BTCUSDT&source=paper_v362&limit=30000'));
@@ -548,4 +546,36 @@ test('a single-book plan renders as before (no phase labels)', () => {
   assert.ok(cards.includes('<span class="ord-kind">Bắt đáy 3σ</span><span class="badge long">MUA</span>'));
   assert.ok(board.includes('GIỮ LONG') && board.includes('150.00') && !board.includes('ph-line'));
   assert.ok(!cards.includes('phase-tag') && !board.includes('phase-tag') && !cards.includes('note-bar'));
+});
+
+test('a display alias reads its plan source for history and performance', async () => {
+  const paths = [];
+  const ui = app(async p => { paths.push(p); return response(200, p.includes('overview') ? { walkforward: {}, plan: {} } : []); }, storage(fresh));
+  ui.state.user.allowed_pipelines = ['g2c', 'v376'];
+  ui.state.evid = { g2c: { rank: 1, plan_source: 'v376', walkforward: {} }, v376: { rank: 2, plan_source: 'v376', walkforward: {} } };
+  ui.state.selectedPipeline = 'g2c';
+  assert.equal(ui.srcPipe('g2c'), 'v376');
+  await ui.histBoth('orders', 'BTCUSDT');
+  assert.ok(paths.includes('/api/orders?symbol=BTCUSDT&source=tm_v376&limit=30000'));
+  assert.ok(paths.includes('/api/orders?symbol=BTCUSDT&source=paper_v376&limit=30000'));
+  assert.ok(!paths.some(p => p.includes('g2c') && !p.includes('overview') && !p.includes('trade_plan')));
+});
+
+test('the plan is re-fetched in the order views and re-rendered only when it changed', async () => {
+  let generated = '2026-10-09T13:00:00+00:00';
+  const paths = [];
+  const ui = app(async p => { paths.push(p); return response(200, { generated_at: generated, coins: {}, next_decision: '2026-10-09T16:05:00+00:00' }); }, storage(fresh));
+  ui.state.view = 'todo';
+  ui.state.live.plan = { generated_at: generated, coins: {} };
+  ui.$('todoCards').innerHTML = 'kept';
+  await ui.refreshPlan();
+  assert.equal(paths.filter(p => p.startsWith('/api/trade_plan')).length, 1);
+  assert.equal(ui.$('todoCards').innerHTML, 'kept');  // unchanged plan: cards (and opened step lists) are not rebuilt
+  generated = '2026-10-09T13:15:00+00:00';
+  await ui.refreshPlan();
+  assert.equal(ui.state.live.plan.generated_at, generated);
+  assert.notEqual(ui.$('todoCards').innerHTML, 'kept');
+  ui.state.view = 'history';
+  await ui.refreshPlan();
+  assert.equal(paths.filter(p => p.startsWith('/api/trade_plan')).length, 2);  // history / performance do not poll the plan
 });

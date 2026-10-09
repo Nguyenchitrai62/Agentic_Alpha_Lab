@@ -129,11 +129,14 @@ def merge_opens(op_h: pd.DataFrame, op_m: pd.DataFrame) -> tuple[pd.DataFrame, d
 # ------------------------------------------------------------------ data
 def market_rest(start, now, s: int):
     """Public Binance USD-M klines: 1h (200 days, for the shifted opens) + 1m (from start - 2 days); coverage as forward_v205.market."""
-    from agentic_alpha_lab.data.binance_usdm import fetch_klines
+    from agentic_alpha_lab.data.binance_usdm import fetch_klines_cached
     from agentic_alpha_lab.data.coverage import require_closed_coverage
     import requests
     sess = requests.Session()
     k1h, k1 = {}, {}
+
+    def fetch_klines(sym, iv, a, b, session):  # closed klines stored locally (as forward_v205.market); only the new tail is downloaded
+        return fetch_klines_cached(sym, iv, a, b, session=session, cache_dir=ROOT / "data/raw/binance_klines_cache")
     h0, m0 = pd.Timestamp(start) - OPEN_HISTORY, pd.Timestamp(start) - K1_HISTORY
     for sym in SYMS:
         a = fetch_klines(sym, "1h", h0.to_pydatetime(), now.to_pydatetime(), session=sess)

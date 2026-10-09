@@ -23,6 +23,7 @@ import numpy as np
 import pandas as pd
 
 ROOT = Path(__file__).resolve().parents[1]
+KLINE_CACHE = ROOT / "data/raw/binance_klines_cache"  # shared by every plan subprocess (forward_trade*, forward_v205)
 RD = ROOT / "research/parallel/rounds/parallel-20260906-r2"
 FREEZE = pd.Timestamp("2026-09-27T00:00:00Z")  # first traded holding bar (v205 rules frozen on 2026-09-26)
 OUT = ROOT / "artifacts/research/advisor_shadow/forward_v205.json"
@@ -114,11 +115,14 @@ def live_books(candidate="v151_deploy_v4"):
 
 
 def market(start, now):
-    from agentic_alpha_lab.data.binance_usdm import fetch_klines
+    from agentic_alpha_lab.data.binance_usdm import fetch_klines_cached
     from agentic_alpha_lab.data.coverage import require_closed_coverage
     import requests
     sess = requests.Session()
     k4, k1 = {}, {}
+
+    def fetch_klines(sym, iv, a, b, session):  # closed klines stored locally; only the new tail is downloaded
+        return fetch_klines_cached(sym, iv, a, b, session=session, cache_dir=KLINE_CACHE)
     for s in SYMS:
         a = fetch_klines(s, "4h", (start - pd.Timedelta(days=100)).to_pydatetime(), now.to_pydatetime(), session=sess)
         require_closed_coverage(a, start - pd.Timedelta(days=100), now, "4h")

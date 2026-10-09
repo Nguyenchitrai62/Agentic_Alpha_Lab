@@ -33,20 +33,20 @@
   const dt = (ms) => ms == null ? "—" : new Date(ms).toLocaleString("vi-VN", { hour12: false, year: "2-digit", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" });
   const toChart = (ms) => Math.floor(ms / 1000) + TZ;
   const fromChart = (t) => (t - TZ) * 1000;
-  const CONF = { CAO: "Cao", "TRUNG BINH": "Trung bình", THAP: "Thấp" };
   const REASON = { TP: "Chạm TP", SL: "Chạm SL", "SL hoà vốn": "SL hoà vốn", "Đóng limit": "Đóng bằng limit", "Hết giờ": "Hết giờ (dip)", "Hết dữ liệu mô phỏng": "Hết dữ liệu mô phỏng (23/09)",
                   "Rebalance về 0": "Đóng (rebalance)", "Đảo chiều": "Đảo chiều", "Đang mở": "Đang mở", "Hết 4h (market)": "Hết 4h" };
-  const histSource = () => `tm_${planPipe()}`;
+  // replay / paper rows a pipeline displays: its own, or its plan source for a display alias (g2c = the v376 plan + carry overlay)
+  const srcPipe = (v) => state.evid?.[v]?.plan_source || v;
+  const aliasNote = (v) => srcPipe(v) === v ? "" : `${PIPE_LABEL[v] || v} dùng chung plan với ${PIPE_LABEL[srcPipe(v)] || srcPipe(v)}: lệnh và đường vốn bên dưới là của ${PIPE_LABEL[srcPipe(v)] || srcPipe(v)} (chưa gồm carry và cỡ lệnh dip ×${dipMultOf(v).toLocaleString("vi-VN")} của bot).`;
   // walk-forward replay (until the research data end) + the prospective paper window (since the freeze), oldest first per endpoint order
   async function histBoth(kind, symbol) {
-    const pipe = planPipe();
+    const pipe = srcPipe(planPipe());
     const [a, b] = await Promise.all([api(`/api/${kind}?symbol=${symbol}&source=tm_${pipe}&limit=30000`),
       api(`/api/${kind}?symbol=${symbol}&source=paper_${pipe}&limit=30000`).catch(() => [])]);
     return kind === "orders" ? b.concat(a) : a.concat(b);  // orders come newest first, positions / trades oldest first
   }
   const sideBadge = (s, w) => s === "LONG" ? `<span class="badge long">LONG${w != null ? " " + pct(Math.abs(w), 0) : ""}</span>`
     : s === "SHORT" ? `<span class="badge short">SHORT${w != null ? " " + pct(Math.abs(w), 0) : ""}</span>` : `<span class="badge flat">Đứng ngoài</span>`;
-  const hms = (ms) => { if (ms <= 0) return "0:00:00"; const s = Math.floor(ms / 1000); return `${Math.floor(s / 3600)}:${String(Math.floor(s / 60) % 60).padStart(2, "0")}:${String(s % 60).padStart(2, "0")}`; };
 
   function toast(msg, ms = 3500) {
     const el = $("toast"); el.textContent = msg; el.hidden = false;
@@ -221,7 +221,7 @@
     state.token = ""; state.session = null; state.user = null;
     state.selectedPipeline = null; planGeneration++; perfGeneration++;
     store.set("token", ""); store.set("session", null);
-    state.live.plan = null; state.live.paper = []; state.live.conf = null; state.evid = null;
+    state.live.plan = null; state.evid = null;
     pipelineDraft = null;
     state.h.pipe = null; state.perfPipe = null;
     H.gen++;
@@ -230,7 +230,7 @@
     H.candles = []; H.times = []; H.orders = []; H.pos = []; H.fills = []; H.posAt = [];
     H.series = null; H.wSeries = null; H.prim = null;
     for (const key of Object.keys(lineCharts)) { lineCharts[key].remove(); delete lineCharts[key]; }
-    for (const id of ["pipeEvid", "pipeBar", "board", "todoCards", "planPanel", "watchlist", "hPipe", "ordersTbl", "oStats", "perfKpis", "yearTbl", "coinTbl", "fwSummary", "pPipe", "pipelineSettingsTbl", "pipelineMode", "pipelineSaveStatus", "usersTbl", "jobsTbl", "pipeSelectedNote", "carryBody", "carryMeta"]) {
+    for (const id of ["pipeEvid", "board", "todoCards", "planPanel", "watchlist", "hPipe", "ordersTbl", "oStats", "perfKpis", "yearTbl", "coinTbl", "fwSummary", "pPipe", "pipelineSettingsTbl", "pipelineMode", "pipelineSaveStatus", "usersTbl", "jobsTbl", "pipeSelectedNote", "carryBody", "carryMeta"]) {
       const el = $(id); if (el) el.innerHTML = "";
     }
     if (tickerWs) { tickerWs.close(); tickerWs = null; }
@@ -327,17 +327,11 @@
   async function loadPlans() {
     const gen = ++planGeneration, pipe = planPipe();
     state.live.latest = null;  // the retired v205 live signal is no longer computed; everything comes from the selected pipeline's plan
-    if (!pipe) { state.live.plan = null; state.live.paper = []; state.live.planLoading = false; return; }
+    if (!pipe) { state.live.plan = null; state.live.planLoading = false; return; }
     state.live.planLoading = true; state.live.planFetchFailed = false;
-    const [plan, paper] = await Promise.all([
-      api(`/api/trade_plan?pipeline=${pipe}`).catch((e) => { state.live.planFetchFailed = true; return null; }),
-      Promise.all(visiblePipes().map((p) => p.v).map((v) =>
-        api(`/api/trade_plan?pipeline=${v}`).then((pl) => [v, pl]).catch(() => [v, null]))),
-    ]);
+    const plan = await api(`/api/trade_plan?pipeline=${pipe}`).catch(() => { state.live.planFetchFailed = true; return null; });
     if (gen !== planGeneration || pipe !== planPipe() || !state.user) return;
-    state.live.plan = plan; state.live.paper = paper; state.live.planLoading = false;
-    if (!plan && !state.live.planFetchFailed) state.live.planFetchFailed = false;
-    if (state.user.role === "admin" && !state.live.conf) state.live.conf = await api("/api/confidence").catch(() => null);
+    state.live.plan = plan; state.live.planLoading = false;
   }
   async function loadLive() {
     mountTv(state.live.symbol);
@@ -368,7 +362,7 @@
   }
   function clearPipelineData() {
     planGeneration++; perfGeneration++;
-    state.live.plan = null; state.live.paper = []; state.h.pipe = null; state.h.selected = null; state.perfPipe = null;
+    state.live.plan = null; state.h.pipe = null; state.h.selected = null; state.perfPipe = null;
     state.live.planLoading = false; state.live.planFetchFailed = false;
     ++H.gen;
     if (H.chart) { H.chart.remove(); H.chart = null; }
@@ -462,7 +456,7 @@
       await loadEvidence();
       if (pipeOf(planPipe())?.product !== product()) await ensureProductPipe();
       await loadPlans();
-      renderProduct(); renderGoals(); renderPipeBar(); renderBoard(); renderCards(); renderProductPanels(); renderCarry(); updateTitle(); renderFreshBanners();
+      renderProduct(); renderGoals(); renderBoard(); renderCards(); renderProductPanels(); renderCarry(); updateTitle(); renderFreshBanners();
     } catch (e) { state.live.planFetchFailed = true; renderFreshBanners(); toast(e.message); }
   }
 
@@ -510,6 +504,9 @@
       ] },
   };
   const pipeOf = (v) => PIPES.find((p) => p.v === v);
+  // dip-size multiplier the deployed bot applies to the plan's rungs (bot --dip-mult); the plan stores the base size
+  const DIP_MULT = { g2c: 1.7 };
+  const dipMultOf = (v) => DIP_MULT[v] ?? 1.0;
   const ICON_LOCK = '<svg class="ic" viewBox="0 0 24 24" width="13" height="13" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2" fill="none" stroke="currentColor" stroke-width="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3" fill="none" stroke="currentColor" stroke-width="2"/></svg>';
   const ICON_STAR = '<svg class="ic" viewBox="0 0 24 24" width="12" height="12" aria-hidden="true"><path d="M12 3l2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1-4.4-4.3 6.1-.9z" fill="currentColor"/></svg>';
   const product = () => state.view === "bot" ? "bot" : "manual";  // the Pipeline tab = MANUAL, the Bot tab = BOT
@@ -627,7 +624,7 @@
     clearPipelineData();
     const gen = ++planGeneration;
     state.live.planLoading = true;
-    renderPipeBar(); renderBoard(); renderCards(); renderWatchlist(); renderPlan(); renderEvidence();
+    renderBoard(); renderCards(); renderWatchlist(); renderPlan(); renderEvidence();
     if (state.view === "history") initHistory();
     else if (state.view === "perf") loadPerf();
     const plan = await api(`/api/trade_plan?pipeline=${v}`).catch((e) => {
@@ -637,24 +634,7 @@
     if (gen !== planGeneration || v !== planPipe() || !state.user) return;
     state.live.plan = plan; state.live.planLoading = false;
     if (!plan) state.live.planFetchFailed = true;
-    renderPipeBar(); renderBoard(); renderCards(); renderWatchlist(); renderPlan(); renderEvidence(); renderGoals(); renderProductPanels(); renderFreshBanners();
-  }
-  function renderPipeBar() {
-    if (!$("pipeBar")) return;  // the Pipeline tab now selects pipelines in the training-results table
-    const cur = planPipe(), paper = Object.fromEntries(state.live.paper || []);
-    $("pipeBar").innerHTML = visiblePipes().map((p) => {
-      const pl = paper[p.v];
-      const pn = pl && pl.freeze ? `paper từ ${String(pl.freeze).slice(5, 10).split("-").reverse().join("/")}: ${sgn(pl.net_return_pct)}` : "paper: chưa có";
-      return `<button class="pipebtn${cur === p.v ? " on" : ""}" data-pipe="${p.v}">
-        <span class="nm">${p.nm}${p.star ? `<span class="star">${p.star}</span>` : ""}</span><span class="ds">${p.ds}</span><span class="pn">${pn}</span></button>`;
-    }).join("");
-    $("pipeBar").onclick = (e) => { const b = e.target.closest("[data-pipe]"); if (b) setPlanPipe(b.dataset.pipe); };
-  }
-  function planBadge(c) {
-    if (!c) return "";
-    if (c.state === "position") return `<span class="badge ${c.position.side === "LONG" ? "long" : "short"}">GIỮ ${c.position.side}</span>`;
-    if (c.state === "pending") return `<span class="badge ${c.order.side === "BUY" ? "long" : "short"}">CHỜ ${c.order.side === "BUY" ? "MUA" : "BÁN"}</span>`;
-    return `<span class="badge flat">—</span>`;
+    renderBoard(); renderCards(); renderWatchlist(); renderPlan(); renderEvidence(); renderGoals(); renderProductPanels(); renderFreshBanners();
   }
   const EVVI = { order_issue: "Đặt lệnh limit", order_cancel: "Huỷ lệnh", order_expire: "Lệnh hết hạn", book_fill: "Khớp vào lệnh",
                  book_add: "Khớp nhồi thêm", book_reduce: "Khớp chốt bớt", book_close: "Đóng bằng limit", book_stop: "Chạm SL (market)",
@@ -715,8 +695,7 @@
   function dipBlock(sym) {  // the dip ladder resting in the bar in progress (from the plan): what to have on the exchange now
     const c = planOf(sym), px = state.live.prices[sym]?.c, d = sortedDips(c?.dips || []), multi = isMulti();
     if (!d.length) return "";
-    // g2c (deployed BOT): the bot scales every dip rung x1.7 (--dip-mult 1.7); the plan stores the base size.
-    const dipMult = planPipe() === "g2c" ? 1.7 : 1.0;
+    const dipMult = dipMultOf(planPipe());
     const now = Date.now(), stOf = (r) => {
       const from = Date.parse(r.active_from), until = Date.parse(r.active_until);
       return now < from ? `đặt lúc ${dt(from)}` : now > until ? "đã hết hạn" : `đang chờ tới ${dt(until)}`;
@@ -796,8 +775,7 @@
       .concat(dipOrders(sortedDips(c.dips || [])).map((o) => ({ ...o, ph: o.dip })));
   }
   function dipOrders(dips) {
-    // g2c (deployed BOT): the bot scales every dip rung x1.7 (--dip-mult 1.7); the plan stores the base size.
-    const m = planPipe() === "g2c" ? 1.7 : 1.0;
+    const m = dipMultOf(planPipe());
     return (dips || []).filter((d) => !d.filled).map((d) => ({ kind: `Bắt đáy ${d.rung}σ${m !== 1 ? " (plan ×1,7)" : ""}`, side: "BUY", price: d.buy_limit, sl: d.stop, tp: d.tp,
       w: d.size_frac * m, until: d.active_until, dip: d }));
   }
@@ -874,8 +852,6 @@
   }
 
 
-
-  function bookOf(sym) { return (state.live.latest?.books || []).find((b) => b.symbol === sym); }
 
   // account size (per viewer): turns the pipeline's fraction-of-equity weights into coin quantities
   function equity() { try { return Math.max(10, Number(localStorage.getItem("equityUsdt")) || 1000); } catch { return 1000; } }
@@ -1005,111 +981,9 @@
     if ($("b-pl-" + sym)) { const b = boardCells(sym); $("b-pl-" + sym).innerHTML = b.pl; $("b-en-" + sym).innerHTML = b.px; }
     if (sym === (state.view === "history" ? state.h.symbol : state.live.symbol)) updateTitle();
     if (sym === state.live.symbol) {
-      updateLiveDistances();
       const pb = document.querySelector("#planPanel .plan-box");
       if (pb && state.view === "live" && !(state.live.pbT > Date.now() - 2000)) { renderPlan(); state.live.pbT = Date.now(); }
     }
-  }
-
-  function renderSignal() {
-    const sym = state.live.symbol, run = state.live.latest?.run, b = bookOf(sym);
-    if (!run || !b) { $("sigPanel").innerHTML = `<div class="panel-h"><span>Gợi ý hiện tại · ${coin(sym)}</span></div><p class="muted">Chưa có tín hiệu. Admin cần chạy pipeline.</p>`; return; }
-    const flat = b.side === "FLAT" || !b.entry;
-    const k = b.side === "LONG" ? 1 : -1;
-    const slP = flat ? null : k * (b.sl / b.entry - 1), tpP = flat ? null : k * (b.tp / b.entry - 1);
-    const until = run.decision_time + IV_MS["4h"];
-    $("sigPanel").innerHTML = `
-      <div class="sig-head"><div><div class="title">Tín hiệu pipeline · ${coin(sym)}</div><div class="muted small">vị thế mục tiêu (bản chỉnh liên tục ${esc(run.pipeline)}), để tham khảo</div></div>
-        <div>${sideBadge(b.side, flat ? null : b.weight)}</div></div>
-      <div class="sig-grid">
-        <span class="k">Giá hiện tại</span><span class="v" id="sgPx">${fmtPx(state.live.prices[sym]?.c)}</span><span class="d"></span>
-        ${flat ? `<span class="k">Hành động</span><span class="v" style="font-family:inherit">Không mở vị thế mới</span><span class="d"></span>` : `
-        <span class="k">Vốn dùng</span><span class="v">${pct(Math.abs(b.weight))}</span><span class="d muted">≈ ${Math.round(Math.abs(b.weight) * 10000).toLocaleString("en-US")} / 10k USDT</span>
-        <span class="k">Entry (limit)</span><span class="v">${fmtPx(b.entry)}</span><span class="d" id="sgDist"></span>
-        <span class="k">Stop-loss (market)</span><span class="v down">${fmtPx(b.sl)}</span><span class="d down">${(slP * 100).toFixed(2)}%</span>
-        <span class="k">Take-profit (limit)</span><span class="v up">${fmtPx(b.tp)}</span><span class="d up">+${(tpP * 100).toFixed(2)}%</span>`}
-      </div>
-      ${flat ? "" : `<div class="bar-rr"><div class="sl" style="flex:${Math.abs(slP)}"></div><div class="tp" style="flex:${Math.abs(tpP)}"></div></div>
-        <div class="muted small">Rủi ro : lợi nhuận = 1 : ${(Math.abs(tpP) / Math.abs(slP)).toFixed(1)} · độ tin cậy ${esc(CONF[b.confidence] || b.confidence || "—")}${b.members_agree ? "" : " (2 mô hình lệch nhau)"}</div>`}
-      <div class="meta">
-        <span>Nến 4h đóng: <b>${dt(run.decision_time)}</b></span>
-        <span>Phát lúc: <b>${dt(run.created_at)}</b></span>
-        <span>Hiệu lực đến: <b>${dt(until)}</b> (còn <b id="sgLeft">${hms(until - Date.now())}</b>)</span>
-        <span>Tổng vốn dùng danh mục: <b>${pct(run.gross, 0)}</b> · hệ số ${(run.scale ?? 0).toFixed(2)}×</span>
-      </div>
-      ${flat ? "" : confBlock(b.confidence)}
-      <p class="fine">Lệnh entry là limit chờ trong nến 4h hiện tại; không khớp thì huỷ. Sau khi khớp đặt ngay SL (market) và TP (limit).</p>`;
-    updateLiveDistances();
-  }
-
-  function updateLiveDistances() {
-    const sym = state.live.symbol, p = state.live.prices[sym]?.c, b = bookOf(sym);
-    if ($("sgPx") && p) $("sgPx").textContent = fmtPx(p);
-    if ($("sgDist") && p && b?.entry) $("sgDist").innerHTML = `<span class="muted">cách giá ${((b.entry / p - 1) * 100).toFixed(2)}%</span>`;
-  }
-  setInterval(() => {
-    const run = state.live.latest?.run, el = $("sgLeft");
-    if (run && el && state.view === "live") el.textContent = hms(run.decision_time + IV_MS["4h"] - Date.now());
-  }, 1000);
-
-  function confLine(st, label) {
-    if (!st) return "";
-    return `<tr><td>${label}</td><td>${st.n}</td><td><b>${(100 * st.win_rate).toFixed(0)}%</b></td><td class="up">+${(st.avg_win_pct ?? 0).toFixed(1)}%</td>
-      <td class="down">${(st.avg_loss_pct ?? 0).toFixed(1)}%</td><td>${sgn(st.avg_pct)}</td></tr>`;
-  }
-  function confBlock(level) { // historical win rate of orders opened at the same confidence level (walk-forward replay)
-    const lv = state.live.conf?.levels?.[level];
-    if (!lv) return "";
-    return `<div class="conf"><div class="muted small">Lịch sử các lệnh cùng mức tin cậy "${esc(CONF[level] || level)}" (mô phỏng walk-forward, chưa trừ phí):</div>
-      <table class="tbl compact"><thead><tr><th>Giai đoạn</th><th>Số lệnh</th><th>Thắng</th><th>TB thắng</th><th>TB thua</th><th>TB/lệnh</th></tr></thead>
-      <tbody>${confLine(lv.dev, "Train / chọn model · 4 năm")}${confLine(lv.hidden, "Test · 1 năm")}</tbody></table>
-      <div class="muted small">Lưu ý: nhãn tin cậy hiện tại chưa phân biệt tốt (97% lệnh là "Thấp"); đang nghiên cứu điểm tin cậy mới.</div></div>`;
-  }
-
-  function renderDips() {
-    const sym = state.live.symbol;
-    const rows = (state.live.latest?.sleeve || []).filter((r) => r.symbol === sym);
-    // C4 / C5: the dip stop fires on a 5m CLOSE (bot) at 4 / 5 sigma, plus a native 8-sigma touch stop on the exchange
-    // g2c shares the v376 plan (same R2·4P ladder, closeK 4); the bot scales every rung x1.7 (--dip-mult 1.7).
-    const isG2c = planPipe() === "g2c";
-    const closeK = { v321: 4, v376: 4, g2c: 4, v301: 4, v295: 4, v285: 4, v269: 4, v266: 5 }[planPipe()];
-    const dsz = ["v295", "v301", "v321", "v376", "g2c", "v340", "v342", "v362", "v367"].includes(planPipe()) ? (planOf(sym)?.dip_size || {}) : null;  // CS / G2: the agents' decision per rung
-    const dipMult = isG2c ? 1.7 : 1.0;
-    const decOf = (r) => { if (!dsz) return null; const k = Object.keys(dsz).find((x) => Number(x) === Number(r.rung)); return k ? dsz[k] : null; };
-    const mulOf = (r) => { const d = decOf(r); return (d == null ? 1 : Number(typeof d === "object" ? d.size : d)) * dipMult; };
-    const tpOf = (r) => { const d = decOf(r); return d && typeof d === "object" ? Number(d.tp) : 1; };
-    if (closeK) {
-      const head = ["Bậc", "Mua limit", "TP", "SL nến 5m đóng", "SL sàn (đặt sẵn)", "Vốn"].concat(dsz ? ["Agent"] : []);
-      table($("dipTbl"), head, rows.map((r) => {
-        const s = r.buy_limit > 0 ? (r.buy_limit - r.sl) / (5 * r.buy_limit) : 0; // sigma from the advisor's 5-sigma stop
-        const m = mulOf(r), tk = tpOf(r);
-        const tpPx = tk !== 1 && s > 0 ? r.buy_limit * (1 + tk * s) : r.tp;  // G2: the take-profit agent's multiple of sigma
-        return `<tr><td>${r.rung}σ</td><td>${fmtPx(r.buy_limit)}</td><td class="up">${fmtPx(tpPx)}${tk !== 1 ? ` <span class="muted small">(${tk}σ)</span>` : ""}</td>
-        <td class="down">${fmtPx(r.buy_limit * (1 - closeK * s))}</td><td class="down">${fmtPx(r.buy_limit * (1 - 8 * s))}</td><td>${pct(r.size_frac * m)}${isG2c ? ' <span class="muted small">(×1,7)</span>' : ""}</td>${
-          dsz ? `<td class="${m > 1 ? "up" : m < 1 ? "down" : "muted"}">×${typeof m === "number" ? (Math.round(m * 100) / 100) : m}</td>` : ""}</tr>`;
-      }), "Không có lệnh chờ");
-    } else {
-      table($("dipTbl"), ["Bậc", "Mua limit", "TP", "SL", "Vốn"], rows.map((r) => `<tr><td>${r.rung}σ</td><td>${fmtPx(r.buy_limit)}</td>
-      <td class="up">${fmtPx(r.tp)}</td><td class="down">${fmtPx(r.sl)}</td><td>${pct(r.size_frac * dipMult)}</td></tr>`), "Không có lệnh chờ");
-    }
-    const d = state.live.conf?.levels?.DIP;
-    const note = $("dipNote") || Object.assign(document.createElement("div"), { id: "dipNote", className: "muted small" });
-    const g2cDipNote = isG2c
-      ? `<div>G2+carry: cỡ lệnh dip = plan × 1,7 (bot --dip-mult 1.7). Bot giảm cỡ khi nhiều coin cùng flush (--corr-size) và giới hạn tổng dip gross ≤ 2× vốn (--dip-gross-cap 2.0); thị trường gấu giảm một nửa lệnh book LONG mới (--bear-book).</div>`
-      : "";
-    note.innerHTML = (d ? `Lịch sử lệnh dip: Win rate Train <b>${(100 * d.dev.win_rate).toFixed(0)}%</b> (${d.dev.n} lệnh, 4 năm) · Test <b>${(100 * d.hidden.win_rate).toFixed(0)}%</b> (${d.hidden.n} lệnh, 1 năm) · TB thắng +${d.dev.avg_win_pct.toFixed(2)}% / thua ${d.dev.avg_loss_pct.toFixed(2)}%` : "") + g2cDipNote;
-    $("dipTbl").after(note);
-  }
-
-  async function loadRecent() {
-    const sym = state.live.symbol;
-    $("recentSym").textContent = coin(sym) + " · chạy thực";
-    try {
-      const rows = await api(`/api/signals?source=live&symbol=${sym}&limit=30`);
-      table($("recentTbl"), ["Nến 4h", "Gợi ý", "Entry", "SL", "TP"], rows.map((r) => `<tr><td>${dt(r.decision_time)}</td>
-        <td>${sideBadge(r.side, r.side === "FLAT" ? null : r.weight)}</td><td>${fmtPx(r.entry)}</td><td class="down">${fmtPx(r.sl)}</td>
-        <td class="up">${fmtPx(r.tp)}</td></tr>`), "Chưa có");
-    } catch (e) { /* ignore */ }
   }
 
   // ================================================================== HISTORY
@@ -1415,7 +1289,7 @@
     $("oStats").innerHTML = `<span>Lệnh <b>${list.length}</b></span><span>Thắng <b>${done.length ? (100 * wins.length / done.length).toFixed(1) : 0}%</b></span>
       <span>TB lãi <b class="up">+${avg(wins).toFixed(2)}%</b></span><span>TB lỗ <b class="down">${avg(done.filter((o) => o.pnl_pct <= 0)).toFixed(2)}%</b></span>
       <span>Chạm TP / SL <b>${list.filter((o) => o.exit_reason === "TP").length} / ${list.filter((o) => o.exit_reason === "SL" || o.exit_reason === "SL hoà vốn").length}</b></span>
-      <span>Từ <b>${first ? dt(first) : "—"}</b></span>`;
+      <span>Từ <b>${first ? dt(first) : "—"}</b></span>${aliasNote(planPipe()) ? `<span class="muted small">${esc(aliasNote(planPipe()))}</span>` : ""}`;
     const rows = list.slice().reverse().slice(0, 800).map((o) => `<tr class="click ${o.id === state.h.selected ? "sel" : ""}" data-id="${o.id}">
       <td>${dt(o.entry_t)}</td><td>${o.kind === "dip" ? '<span class="badge dip">MUA DIP</span>' : "Lệnh 4h"}</td><td>${sideBadge(o.side)}</td>
       <td>${fmtPx(o.avg_px ?? o.entry_px)}${(o.fills ?? 1) > 1 ? `<span class="muted small"> (khớp đầu ${fmtPx(o.entry_px)})</span>` : ""}</td>
@@ -1448,7 +1322,7 @@
       await loadEvidence();
       if (gen !== perfGeneration) return;
       if (!visiblePipes().length) { $("pPipe").innerHTML = accessMessage(); return; }
-      const pipe = planPipe(), src = `tm_${pipe}`, nm = PIPES.find((p) => p.v === pipe).nm;
+      const pipe = planPipe(), src = `tm_${srcPipe(pipe)}`, nm = PIPES.find((p) => p.v === pipe).nm;
       seg($("pPipe"), visiblePipes().map((p) => p.v), pipe, (v) => { setPlanPipe(v); },
         (v) => PIPES.find((p) => p.v === v).nm + " — " + PIPES.find((p) => p.v === v).ds);
       const [ov, wfEq, st] = await Promise.all([api(`/api/overview?pipeline=${pipe}`), api(`/api/equity?source=${src}&points=3000`),
@@ -1459,7 +1333,8 @@
         [`${nm}: mô phỏng toàn bộ 5 năm`, wf.monthly_5y, "%/tháng (bình quân theo lãi kép)"], ["Train / chọn model · 4 năm", wf.monthly_dev4, "%/tháng"],
         ["Test · 1 năm", wf.monthly_last_year, "%/tháng"], ["Max DD", wf.gate_dd, "% (mức lớn hơn: nến 4h / từng phút)"],
         ["Số năm thua lỗ", wf.losing_years, "năm"],
-      ].map(([k, v, s]) => `<div class="kpi"><div class="k">${k}</div><div class="v">${esc(v ?? "—")}</div><div class="s">${esc(s)}</div></div>`).join("");
+      ].map(([k, v, s]) => `<div class="kpi"><div class="k">${k}</div><div class="v">${esc(v ?? "—")}</div><div class="s">${esc(s)}</div></div>`).join("")
+        + (aliasNote(pipe) ? `<p class="fine kpi-note">${esc(aliasNote(pipe))}</p>` : "");
       table($("yearTbl"), ["Năm / giai đoạn", "Lợi nhuận năm", "%/tháng", "DD (từng phút)"],
         (wf.yearly || []).map(([a, net, dd], i, all) => `<tr><td>${esc(String(a).slice(0, 7))} → ${+String(a).slice(0, 4) + 1}${String(a).slice(4, 7)} <span class="pill">${i === all.length - 1 ? "Test" : "Train / chọn model"}</span></td>
           <td>${sgn(net, 1)}</td><td>${sgn((Math.pow(1 + net / 100, 1 / 12) - 1) * 100)}</td><td>${esc(dd)}%</td></tr>`));
@@ -1611,7 +1486,30 @@
   }
 
   // ------------------------------------------------------------------ boot
-  setInterval(() => { if (state.view === "live" && state.user && state.user.role !== "pending" && !document.hidden) loadLive(); }, 120000);
+  // The plan changes every 15 min (refresh), every hour (multi-phase BOT) and after each 4h close: every view that shows orders
+  // re-fetches the selected plan once a minute and on returning to the tab, and re-renders only when the plan changed.
+  const PLAN_POLL_MS = 60000;
+  let planPoll = null;
+  async function refreshPlan() {
+    if (planPoll || !state.user || state.user.role === "pending" || !["todo", "bot", "live"].includes(state.view)) return;
+    const pipe = planPipe(), gen = planGeneration; if (!pipe) return;
+    planPoll = api(`/api/trade_plan?pipeline=${pipe}`).then((plan) => ({ plan }), () => ({ failed: true }));
+    const out = await planPoll; planPoll = null;
+    if (gen !== planGeneration || pipe !== planPipe() || !state.user) return;
+    state.live.planFetchFailed = !!out.failed;
+    if (!out.failed) {
+      const changed = (out.plan?.generated_at || "") !== (state.live.plan?.generated_at || "");
+      state.live.plan = out.plan; state.live.planLoading = false;
+      if (changed) {
+        if (state.view === "live") { renderWatchlist(); renderPlan(); }
+        else { renderBoard(); renderCards(); renderPipeStatus(); }
+        updateTitle();
+      }
+    }
+    renderFreshBanners();
+  }
+  setInterval(() => { if (!document.hidden) refreshPlan(); }, PLAN_POLL_MS);
+  document.addEventListener("visibilitychange", () => { if (!document.hidden) refreshPlan(); });
   setInterval(() => { if (state.user && state.user.role !== "pending" && !document.hidden) renderFreshBanners(); }, 60000);
   setInterval(async () => {
     if (!state.user || document.hidden) return;

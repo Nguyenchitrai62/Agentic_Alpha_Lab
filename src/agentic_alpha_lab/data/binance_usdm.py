@@ -57,11 +57,42 @@ def _to_utc_ms(value: datetime) -> int:
     return int(value.astimezone(timezone.utc).timestamp() * 1000)
 
 
+# Rate limits (429), IP bans (418) and gateway errors are transient: one of them used to fail a whole web pipeline cycle,
+# whose immediate retry then hit the rate limit again (2026-10-09: 25 failed cycles in a row).
+TRANSIENT_STATUS = {418, 429, 500, 502, 503, 504}
+RETRY_ATTEMPTS = 5
+RETRY_MAX_WAIT_S = 120.0
+
+
+def _get(client, url: str, timeout: float, **kw) -> requests.Response:
+    """GET with exponential backoff on connection errors and transient statuses (Retry-After honoured, capped)."""
+    delay = 2.0
+    for attempt in range(RETRY_ATTEMPTS):
+        last = attempt == RETRY_ATTEMPTS - 1
+        try:
+            response = client.get(url, timeout=timeout, **kw)
+        except (requests.ConnectionError, requests.Timeout):
+            if last:
+                raise
+            time.sleep(delay)
+            delay = min(2 * delay, 60.0)
+            continue
+        if response.status_code in TRANSIENT_STATUS and not last:
+            try:
+                wait = float(response.headers.get("Retry-After", delay))
+            except (TypeError, ValueError):
+                wait = delay
+            time.sleep(min(max(wait, delay), RETRY_MAX_WAIT_S))
+            delay = min(2 * delay, 60.0)
+            continue
+        response.raise_for_status()
+        return response
+    raise RuntimeError("unreachable")
+
+
 def get_server_time(session: requests.Session | None = None) -> int:
     client = session or requests.Session()
-    response = client.get(f"{BASE_URL}/fapi/v1/time", timeout=30)
-    response.raise_for_status()
-    return int(response.json()["serverTime"])
+    return int(_get(client, f"{BASE_URL}/fapi/v1/time", timeout=30).json()["serverTime"])
 
 
 def fetch_klines(
@@ -85,7 +116,8 @@ def fetch_klines(
 
     cursor = start_ms
     while cursor < end_ms:
-        response = client.get(
+        response = _get(
+            client,
             f"{BASE_URL}/fapi/v1/klines",
             params={
                 "symbol": symbol.upper(),
@@ -96,7 +128,6 @@ def fetch_klines(
             },
             timeout=60,
         )
-        response.raise_for_status()
         batch = response.json()
         if not batch:
             break
@@ -134,6 +165,73 @@ def fetch_klines(
     frame = frame.drop_duplicates(subset=["open_time"], keep="last")
     frame = frame.sort_values("open_time").reset_index(drop=True)
     return frame
+
+
+def _ms_dt(ms: int) -> datetime:
+    return datetime.fromtimestamp(ms / 1000, tz=timezone.utc)
+
+
+def fetch_klines_cached(
+    symbol: str,
+    interval: str,
+    start: datetime,
+    end: datetime | None = None,
+    session: requests.Session | None = None,
+    cache_dir: Path | None = None,
+) -> pd.DataFrame:
+    """fetch_klines backed by an on-disk store of closed klines (<cache_dir>/<SYMBOL>_<interval>.parquet).
+
+    fetch_klines only ever returns closed candles, which Binance never changes, so only the ranges before and after the
+    stored span are requested and the result equals fetch_klines(symbol, interval, start, end). The web plans used to
+    re-download every 1m candle since each paper start on every 15-minute refresh (hundreds of requests per cycle).
+    """
+    if cache_dir is None:
+        return fetch_klines(symbol, interval, start, end, session=session)
+    client = session or requests.Session()
+    step = INTERVAL_MS[interval]
+    path = Path(cache_dir) / f"{symbol.upper()}_{interval}.parquet"
+    try:
+        stored = pd.read_parquet(path) if path.exists() else None
+    except Exception:  # noqa: BLE001 - a damaged cache file is rebuilt from the exchange
+        stored = None
+    if stored is None or stored.empty:
+        merged = fetch_klines(symbol, interval, start, end, session=client)
+        changed = True
+    else:
+        def part(a_ms: int, b: datetime | None) -> pd.DataFrame | None:
+            try:
+                return fetch_klines(symbol, interval, _ms_dt(a_ms), b, session=client)
+            except RuntimeError as exc:
+                if "returned no klines" in str(exc):
+                    return None
+                raise
+
+        first = int(stored["open_time"].min().value // 1_000_000)
+        last = int(stored["open_time"].max().value // 1_000_000)
+        start_ms = _to_utc_ms(start)
+        end_ms = _to_utc_ms(end) if end else None
+        head = part(start_ms, _ms_dt(first - 1)) if start_ms < first else None
+        tail = part(last + step, end) if end_ms is None or end_ms >= last + step else None
+        pieces = [p for p in (head, stored, tail) if p is not None and not p.empty]
+        changed = len(pieces) > 1
+        merged = pd.concat(pieces, ignore_index=True) if changed else stored
+        merged = merged.drop_duplicates(subset=["open_time"], keep="last").sort_values("open_time").reset_index(drop=True)
+    if changed:
+        try:
+            path.parent.mkdir(parents=True, exist_ok=True)
+            tmp = path.with_suffix(f".{time.time_ns()}.tmp")
+            merged.to_parquet(tmp, index=False)
+            tmp.replace(path)
+        except OSError:  # cache is best effort (e.g. the file is open in another process on Windows)
+            tmp.unlink(missing_ok=True)
+    lo = pd.Timestamp(_to_utc_ms(start), unit="ms", tz="UTC")
+    keep = merged["open_time"] >= lo
+    if end is not None:
+        keep &= merged["open_time"] <= pd.Timestamp(_to_utc_ms(end), unit="ms", tz="UTC")
+    out = merged.loc[keep].reset_index(drop=True)
+    if out.empty:
+        raise RuntimeError("Binance returned no klines for the requested range")
+    return out
 
 
 def validate_klines(frame: pd.DataFrame, interval: str) -> DataQuality:

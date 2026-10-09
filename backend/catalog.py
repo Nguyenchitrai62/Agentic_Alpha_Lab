@@ -116,6 +116,27 @@ def ranked() -> list[str]:
 
 # Display-only pipelines that reuse another pipeline's plan (no plan job, no replay of their own).
 PLAN_ALIASES = {"g2c": "v376"}
+# retired pipelines whose stored plans / replays admins can still open (not ranked, not grantable)
+LEGACY_TM = ("v205", "v233", "v236", "v240", "v266", "v269", "v285")
+
+
+def plan_source(pipe: str) -> str:
+    """The pipeline whose plan / replay / paper rows a pipeline displays (itself, or the source of a display alias)."""
+    return PLAN_ALIASES.get(pipe, pipe)
+
+
+def walkforward(pipe: str) -> dict:
+    """Stored walk-forward summary; fields it lacks fall back to the recorded catalogue metrics (a display alias such as
+    g2c has no replay of its own, only its research headline numbers)."""
+    raw = db.kv_get(f"summary_tm_{pipe}", {}) or {}
+    rec = PIPELINES.get(pipe, {})
+    return {**raw, **{k: raw.get(k, rec.get(k)) for k in SUMMARY_FIELDS}}
+
+
+def plan_key(pipe: str) -> str:
+    """kv key of the trade plan a pipeline displays (display aliases read their source's plan)."""
+    pipe = plan_source(pipe)
+    return "trade_plan" if pipe == "v205" else f"trade_plan_{pipe}"
 
 
 def plan_pipes() -> list[str]:

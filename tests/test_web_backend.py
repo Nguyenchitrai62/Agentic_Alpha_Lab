@@ -598,8 +598,20 @@ def test_scheduler_retries_failed_and_busy_cycles(backend, monkeypatch):
         return {"status": next(statuses)}
     monkeypatch.setattr(server.pipeline, "run_job", run)
     monkeypatch.setattr(server.time, "sleep", pauses.append)
+    monkeypatch.setattr(server, "_next_phase_run", lambda now: now + server.timedelta(days=1))
     server._run_cycle_until_done("catch-up")
-    assert triggers == ["catch-up", "retry", "retry"] and pauses == [60, 60]
+    assert triggers == ["catch-up", "retry", "retry"] and pauses == [60, 120]  # backoff doubles
+
+
+def test_failing_cycle_keeps_hourly_phase_plans_running(backend, monkeypatch):
+    server = importlib.import_module("backend.server")
+    statuses, phases, pauses = iter(["failed", "failed", "done"]), [], []
+    monkeypatch.setattr(server.pipeline, "run_job", lambda kind, fn, trigger: {"status": next(statuses)})
+    monkeypatch.setattr(server.time, "sleep", pauses.append)
+    monkeypatch.setattr(server, "_next_phase_run", lambda now: now)  # a phase run is always due
+    monkeypatch.setattr(server, "_run_phase_plans", lambda trigger, patience_s=900.0: phases.append(trigger))
+    server._run_cycle_until_done("scheduler")
+    assert phases and set(phases) == {"retry-gap"} and sum(pauses) == 60 + 120
 
 
 def test_access_permission_updates_when_ranking_changes(web_client):
@@ -642,3 +654,22 @@ def test_bot_tab_is_an_account_grant_without_pipeline_locks(web_client):
     assert client.get("/api/auth/me", headers=admin).json()["bot_access"] is True
     assert client.post("/api/admin/users", headers=admin, json={"email": "viewer@example.com", "pipelines": []}).status_code == 200
     assert client.get("/api/trade_plan?pipeline=v321", headers=viewer).status_code == 403
+
+
+def test_admin_run_is_rejected_while_a_pipeline_job_holds_the_lock(web_client):
+    client, server, (_, _, auth) = web_client
+    admin = _bearer(auth, "admin@example.com")
+    with server.pipeline._job_lock:
+        r = client.post("/api/admin/run", headers=admin, json={"kind": "check"})
+    assert r.status_code == 409 and "running" in r.json()["detail"]
+
+
+def test_display_alias_reads_its_plan_source_and_catalog_metrics(web_client):
+    client, server, (_, db, auth) = web_client
+    admin = _bearer(auth, "admin@example.com")
+    db.kv_set("trade_plan_v376", {"pipeline": "v376", "coins": {}})
+    ov = client.get("/api/overview?pipeline=g2c", headers=admin).json()
+    assert ov["plan"]["pipeline"] == "v376" and ov["plan_source"] == "v376"
+    assert ov["walkforward"]["monthly_5y"] == server.catalog.PIPELINES["g2c"]["monthly_5y"]  # no replay of its own
+    summary = client.get("/api/pipelines_summary", headers=admin).json()
+    assert summary["g2c"]["plan_source"] == "v376" and summary["v367"]["plan_source"] == "v367"

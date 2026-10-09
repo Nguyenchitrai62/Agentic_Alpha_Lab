@@ -864,6 +864,14 @@ def test_refresh_runs_due_phases_merges_and_marks_complete(backend, tmp_path, mo
     assert mp.stale_reason(db, clock["now"]) == "khung +3h: not completed for its due shifted bar"
     mp.refresh(db)
     assert calls == [3] and mp.due_phases(db) == []
+    # the plan code changed after the sub-plans were made: every phase is rebuilt at once, not at its next shifted bar
+    calls.clear()
+    code_changed = clock["now"] + 1
+    monkeypatch.setattr(mp, "code_mtime_ms", lambda: code_changed)
+    assert mp.due_phases(db) == [0, 1, 2, 3] and "plan code changed" in mp.stale_reason(db, clock["now"])
+    clock["now"] += 2 * 60_000
+    mp.refresh(db)
+    assert calls == [0, 1, 2, 3] and mp.due_phases(db) == [] and mp.stale_reason(db, clock["now"]) is None
     # a failing phase raises; the merged plan of the stored sub-plans stays, the phase stays due
     calls.clear()
     clock["now"] = pipe_ms("2026-10-05T08:02Z")

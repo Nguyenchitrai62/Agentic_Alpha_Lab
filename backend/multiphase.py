@@ -61,12 +61,21 @@ def phase_due_slot(now_ms: int, s: int, offset_min: int | None = None) -> int:
 
 def due_phases(db, now_ms: int | None = None) -> list[int]:
     now_ms = db.now_ms() if now_ms is None else now_ms
+    code_ms = code_mtime_ms()
     out = []
     for s in PHASES:
         done = (db.kv_get(f"plan_status_{PIPE}_s{s}", {}) or {}).get("completed_slot")
-        if not isinstance(done, int) or done < phase_due_slot(now_ms, s) or not db.kv_get(sub_key(s)):
-            out.append(s)
+        plan = db.kv_get(sub_key(s))
+        if not isinstance(done, int) or done < phase_due_slot(now_ms, s) or not plan or _older_than(plan, code_ms):
+            out.append(s)  # a sub-plan made before the plan code changed is rebuilt now (stale_reason reports it as stale)
     return out
+
+
+def _older_than(plan: dict, ms: int) -> bool:
+    try:
+        return bool(plan.get("generated_at")) and _ms(plan["generated_at"]) < ms
+    except Exception:  # noqa: BLE001 - an unparseable time is judged by the completion marker alone
+        return False
 
 
 def code_mtime_ms() -> int:
@@ -244,11 +253,8 @@ def stale_reason(db, now_ms: int) -> str | None:
             return f"{label(s)}: not completed for its due shifted bar"
         if not (_root() / PLAN_DIR / f"{sub_key(s)}.json").exists():
             return f"{label(s)}: sub-plan file missing"
-        try:
-            if plan.get("generated_at") and _ms(plan["generated_at"]) < code_ms:
-                return f"{label(s)}: plan code changed after the sub-plan was generated"
-        except Exception:  # noqa: BLE001
-            pass
+        if _older_than(plan, code_ms):
+            return f"{label(s)}: plan code changed after the sub-plan was generated"
     return None
 
 
