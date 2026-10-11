@@ -3,6 +3,7 @@
 import importlib
 import importlib.util
 import json
+import time
 import os
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -958,3 +959,33 @@ def test_cycle_publishes_the_running_step(backend, monkeypatch):
         ("running", "candles", 2, 6), ("running", "aggflow", 3, 6), ("running", "backfill", 4, 6),
         ("running", "shadow", 5, 6), ("running", "trade_plan", 6, 6)]
     assert db.kv_get("pipeline_input_check")["status"] == "complete"
+
+
+def test_runners_down_reports_stale_paper_state(backend, tmp_path, monkeypatch):
+    _, db, _ = backend
+    pipe = importlib.import_module("backend.pipeline")
+    monkeypatch.setattr(pipe, "ROOT", tmp_path)
+    now = time.time()
+    for name, age_min in [("paper", 1), ("paper_d17bfg2c", 90), ("paper_carry", 100), ("paper_straddle", 45), ("dry", 999)]:
+        d = tmp_path / "artifacts/bot" / name
+        d.mkdir(parents=True)
+        (d / "state.json").write_text("{}")
+        os.utime(d / "state.json", (now - age_min * 60, now - age_min * 60))
+    down = pipe.runners_down(int(now * 1000))
+    assert set(down) == {"paper_d17bfg2c", "paper_straddle"}  # carry is hourly (limit 130 min); "dry" is not a paper runner
+    assert 89 < down["paper_d17bfg2c"] < 91
+
+
+def test_startup_report_lists_missing_repaired_and_catch_up(backend):
+    server = importlib.import_module("backend.server")
+    pipe = importlib.import_module("backend.pipeline")
+    now = pipe_ms("2026-10-11T09:34Z")
+    report = {"candles": ["BTCUSDT 4h: 10 closed candle(s) missing at the end"], "candles_repaired": True,
+              "plans_stale": {"v376": "not completed for the due 4h bar"}, "runners_down": {"paper_d17bfg2c": 2500.0}}
+    lines = server.startup_report(report, pipe_ms("2026-10-09T15:50Z"), now, True)
+    text = " | ".join(lines)
+    assert lines[0] == server.STARTUP_BEGIN and lines[-1] == server.STARTUP_END
+    assert "41.7 h" in text and "11 nen 4h" in text and "da tai bu ngay" in text and "plan: 1 plan cu (v376)" in text
+    assert "restart_all.ps1 -Only bots" in text and r".\scripts\restart_all.ps1" in text and "CHAY BU NGAY" in text
+    calm = server.startup_report({"candles": [], "plans_stale": {}, "runners_down": {}}, now - 600_000, now, False)
+    assert "tat ca plan moi" in " | ".join(calm) and "khong can chay bu" in " | ".join(calm)

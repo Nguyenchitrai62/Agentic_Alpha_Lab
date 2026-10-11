@@ -480,6 +480,27 @@ def flow_volume_issues(days: int = 45, lo: float = 0.7, hi: float = 1.3) -> list
     return out
 
 
+# paper runners (artifacts/bot/paper*/state.json): a runner whose state is older than this is reported as down (check only;
+# the backend never starts or stops runners - scripts/restart_all.ps1 does)
+RUNNER_DIR = "artifacts/bot"
+RUNNER_STALE_MIN = {"paper_carry": 130, "paper_straddle": 30}  # hourly ledger / 10-min loop; bots cycle every ~25 s
+RUNNER_STALE_DEFAULT_MIN = 10
+
+
+def runners_down(now_ms: int | None = None) -> dict[str, float]:
+    """Paper runners whose state.json has not been written recently: {dir name: minutes since the last write}."""
+    now_ms = db.now_ms() if now_ms is None else now_ms
+    out = {}
+    for d in sorted((ROOT / RUNNER_DIR).glob("paper*")):
+        f = d / "state.json"
+        if not f.is_file():
+            continue
+        age = (now_ms - f.stat().st_mtime * 1000) / 60_000
+        if age > RUNNER_STALE_MIN.get(d.name, RUNNER_STALE_DEFAULT_MIN):
+            out[d.name] = round(age, 1)
+    return out
+
+
 def ensure_data(build_summaries: bool = False, now_ms: int | None = None) -> dict:
     """One data-completeness pass: inspect everything the pipelines need and repair what can be repaired.
 
@@ -518,6 +539,7 @@ def ensure_data(build_summaries: bool = False, now_ms: int | None = None) -> dic
     report["flow"] = guard("flow", flow_volume_issues) or []
     if report["flow"]:
         report["warnings"].append("flow store size check: " + "; ".join(report["flow"]))
+    report["runners_down"] = guard("runners", lambda: runners_down(now_ms)) or {}
     report["static_missing"] = guard("static", static_inputs_missing) or []
     if report["static_missing"]:
         report["warnings"].append("static inputs missing (not repairable here): " + ", ".join(report["static_missing"]))

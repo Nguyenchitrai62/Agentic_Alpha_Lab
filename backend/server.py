@@ -583,19 +583,53 @@ def _startup_check():
     walk-forward replays are rebuilt. Both go through pipeline.run_job, so they never overlap another job."""
     _heartbeat["t"] = datetime.now(timezone.utc).isoformat()
     last = _last_cycle_ms()
-    if last:
-        missed = max(0, (_due_slot(db.now_ms()) - last // pipeline.H4_MS * pipeline.H4_MS) // pipeline.H4_MS)
-        log.info("startup catch-up: last completed cycle %.1f h ago, %d 4h close(s) since -> data check, then the cycle "
-                 "(candles, whale flow, as-of backfill of the missed bars, plans); progress: 'cycle step' lines",
-                 (db.now_ms() - last) / 3_600_000, missed)
     result = pipeline.run_job("check", pipeline.job_check, "startup")
     clear_cache()
     report = db.kv_get(pipeline.DATA_CHECK_KEY) or {}
-    if result["status"] != "done" or report.get("plans_stale") or _cycle_incomplete(db.now_ms()):
+    catch_up = result["status"] != "done" or bool(report.get("plans_stale")) or _cycle_incomplete(db.now_ms())
+    for line in startup_report(report, last, db.now_ms(), catch_up):
+        log.info("%s", line)
+    if catch_up:
         _run_cycle_until_done("startup")  # the cycle also builds missing replays, after the plans
     elif report.get("summaries_missing"):
         pipeline.run_job("summaries", pipeline.job_summaries, "startup")
         clear_cache()
+
+
+STARTUP_BEGIN, STARTUP_END = "=== STARTUP CHECK ===", "=== END STARTUP CHECK ==="
+
+
+def startup_report(report: dict, last_cycle_ms: int, now_ms: int, catch_up: bool) -> list[str]:
+    """Readable block printed right after the backend starts: what was missing, what the check repaired at once and what the
+    catch-up cycle still has to rebuild (run_backend.ps1 -Background prints the same block from backend.log)."""
+    lines = [STARTUP_BEGIN]
+    if last_cycle_ms:
+        missed = max(0, (pipeline.due_slot(now_ms) - last_cycle_ms // pipeline.H4_MS * pipeline.H4_MS) // pipeline.H4_MS)
+        lines.append(f"tat may / BE nghi: chu ky cuoi xong {(now_ms - last_cycle_ms) / 3_600_000:.1f} h truoc, {missed} nen 4h da dong tu do")
+    else:
+        lines.append("chua co chu ky nao hoan tat (DB moi)")
+    candles = report.get("candles") or []
+    if not candles:
+        lines.append("nen 5 coin x 4h/1h/1d: du")
+    else:
+        fixed = "da tai bu ngay" if report.get("candles_repaired") else "CHUA VA DUOC: " + "; ".join(report.get("errors") or [])[:300]
+        lines.append(f"nen: {len(candles)} chuoi thieu ({'; '.join(candles[:3])}{' ...' if len(candles) > 3 else ''}) -> {fixed}")
+    stale = report.get("plans_stale") or {}
+    lines.append(f"plan: {len(stale)} plan cu ({', '.join(stale)})" if stale else "plan: tat ca plan moi")
+    if report.get("summaries_missing"):
+        lines.append("replay walk-forward thieu: " + ", ".join(report["summaries_missing"]) + " (dung lai sau khi co plan)")
+    down = report.get("runners_down") or {}
+    if down:
+        lines.append(f"bot paper KHONG chay ({len(down)}): " + ", ".join(f"{k} ({v / 60:.1f} h)" for k, v in down.items())
+                     + r" -> chay .\scripts\restart_all.ps1 -Only bots (va -Only carry)")
+    else:
+        lines.append("bot paper: tat ca dang chay")
+    for w in (report.get("warnings") or [])[:3]:
+        lines.append("canh bao: " + w[:300])
+    lines.append("-> CHAY BU NGAY: chu ky day du (nen, dong lenh lon, tinh bu cac nen bi lo, tao plan); tien do = cac dong 'cycle step'"
+                 if catch_up else "-> khong can chay bu")
+    lines.append(STARTUP_END)
+    return lines
 
 
 def _next_phase_run(now: datetime) -> datetime:

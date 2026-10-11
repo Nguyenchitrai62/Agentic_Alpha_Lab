@@ -85,11 +85,32 @@ if ($Ensure) {
 
 if ($Background) {
     Stop-All
+    $beLog = Join-Path $logDir "backend.log"
+    $logStart = if (Test-Path $beLog) { (Get-Item $beLog).Length } else { 0 }
     Start-Process powershell.exe -WindowStyle Hidden -WorkingDirectory $root `
         -ArgumentList "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", (Join-Path $root "deploy\start_backend.ps1")
     Start-Tunnel | Out-Null
     $ok = $false; for ($i = 0; $i -lt 20 -and -not $ok; $i++) { Start-Sleep -Seconds 2; $ok = Test-Url "http://127.0.0.1:$port/health" }
     Write-Host ("Backend (background): {0}. Logs: artifacts\web\backend.log. Stop with .\run_backend.ps1 -Stop" -f $(if ($ok) { "OK" } else { "NOT RESPONDING" }))
+    # The startup check runs at once inside the backend: show its report (missing / repaired / still to catch up) here.
+    $shown = $false
+    for ($i = 0; $i -lt 45 -and $ok -and -not $shown; $i++) {
+        Start-Sleep -Seconds 2
+        $fs = [System.IO.File]::Open($beLog, "Open", "Read", "ReadWrite")
+        try { [void]$fs.Seek($logStart, "Begin"); $new = (New-Object System.IO.StreamReader($fs)).ReadToEnd() } finally { $fs.Close() }
+        $lines = @($new -split "`r?`n")
+        $b = -1; $e = -1
+        for ($j = 0; $j -lt $lines.Count; $j++) {
+            if ($b -lt 0 -and $lines[$j] -match "=== STARTUP CHECK ===") { $b = $j }
+            elseif ($b -ge 0 -and $lines[$j] -match "=== END STARTUP CHECK ===") { $e = $j; break }
+        }
+        if ($e -gt $b -and $b -ge 0) {
+            $lines[$b..$e] | ForEach-Object { Write-Host ($_ -replace '^\S+ \S+\s+INFO\s+', '') }
+            $shown = $true
+        }
+    }
+    if ($ok -and -not $shown) { Write-Host "Startup check still running - see artifacts\web\backend.log" -ForegroundColor Yellow }
+    Write-Host "Theo doi chay bu: Get-Content artifacts\web\backend.log -Wait -Tail 20  (cac dong 'cycle step')"
     return
 }
 
