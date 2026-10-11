@@ -943,3 +943,18 @@ def test_v376_summary_from_research_series(backend, tmp_path, monkeypatch):
     rows = db.rows("SELECT size, entry_type FROM orders WHERE source = 'tm_v376' ORDER BY entry_type")
     assert [r["entry_type"] for r in rows] == ["limit khung +0h", "limit khung +2h"] and abs(rows[0]["size"] - 0.02) < 1e-12
     assert db.one("SELECT COUNT(*) AS n FROM equity WHERE source = 'tm_v376'")["n"] == 2
+
+
+def test_cycle_publishes_the_running_step(backend, monkeypatch):
+    _, db, _ = backend
+    pipe = importlib.import_module("backend.pipeline")
+    seen = []
+    monkeypatch.setattr(pipe, "ensure_data", lambda **kw: {"message": "ok"})
+    for name, attr in [("candles", "job_candles"), ("aggflow", "job_aggflow"), ("backfill", "job_backfill"),
+                       ("shadow", "job_shadow_fast"), ("trade_plan", "job_trade_plan")]:
+        monkeypatch.setattr(pipe, attr, lambda: seen.append(dict(db.kv_get("pipeline_input_check"))) or "ok")
+    pipe.job_cycle()
+    assert [(r["status"], r["step"], r["step_no"], r["steps"]) for r in seen] == [
+        ("running", "candles", 2, 6), ("running", "aggflow", 3, 6), ("running", "backfill", 4, 6),
+        ("running", "shadow", 5, 6), ("running", "trade_plan", 6, 6)]
+    assert db.kv_get("pipeline_input_check")["status"] == "complete"

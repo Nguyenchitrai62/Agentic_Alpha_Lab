@@ -582,6 +582,12 @@ def _startup_check():
     pipeline cycle (best pipeline first) if any plan is stale or the check could not finish; otherwise only the missing
     walk-forward replays are rebuilt. Both go through pipeline.run_job, so they never overlap another job."""
     _heartbeat["t"] = datetime.now(timezone.utc).isoformat()
+    last = _last_cycle_ms()
+    if last:
+        missed = max(0, (_due_slot(db.now_ms()) - last // pipeline.H4_MS * pipeline.H4_MS) // pipeline.H4_MS)
+        log.info("startup catch-up: last completed cycle %.1f h ago, %d 4h close(s) since -> data check, then the cycle "
+                 "(candles, whale flow, as-of backfill of the missed bars, plans); progress: 'cycle step' lines",
+                 (db.now_ms() - last) / 3_600_000, missed)
     result = pipeline.run_job("check", pipeline.job_check, "startup")
     clear_cache()
     report = db.kv_get(pipeline.DATA_CHECK_KEY) or {}

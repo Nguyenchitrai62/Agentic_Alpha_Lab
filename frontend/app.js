@@ -341,13 +341,18 @@
       renderWatchlist(); renderPlan(); updateTitle(); renderFreshBanners();
     } catch (e) { state.live.planFetchFailed = true; renderFreshBanners(); toast(e.message); }
   }
+  const STEP_VI = { check: "kiểm tra dữ liệu", candles: "tải nến", aggflow: "dòng lệnh lớn", backfill: "tính bù các nến bị lỡ",
+                    shadow: "mô hình thành viên", trade_plan: "tạo kế hoạch lệnh" };
   async function renderPipeStatus() {
     const el = $("pipeStatus"); if (!el) return;
     try {
-      const h = await api("/api/status"), c = h.last_cycle, ok = c && c.status === "done";
+      const h = await api("/api/status"), c = h.last_cycle, ok = c && c.status === "done", ic = h.input_check || {};
+      // a running cycle (e.g. the catch-up after the backend was off) shows its current step instead of looking frozen
+      const running = ic.status === "running" && ic.step
+        ? `<span class="warn">Đang cập nhật / chạy bù: bước ${ic.step_no}/${ic.steps} · ${esc(STEP_VI[ic.step] || ic.step)} (từ ${dt(ic.step_started_at)})</span>` : "";
       el.innerHTML = `<span><i class="dot ${ok ? "" : "bad"}"></i>Tín hiệu mới mỗi nến 4h</span>
         <span>Cập nhật: <b>${c ? dt(c.started_at) : "—"}</b>${c && !ok ? ` (${esc(c.status)})` : ""}</span>
-        <span>Lần tới: <b>${h.next_cycle_utc ? dt(Date.parse(h.next_cycle_utc)) : "—"}</b></span>`;
+        <span>Lần tới: <b>${h.next_cycle_utc ? dt(Date.parse(h.next_cycle_utc)) : "—"}</b></span>${running}`;
     } catch (e) { el.textContent = ""; }
   }
   // ---- evidence table: the walk-forward record of every paper pipeline
@@ -1502,10 +1507,11 @@
       state.live.plan = out.plan; state.live.planLoading = false;
       if (changed) {
         if (state.view === "live") { renderWatchlist(); renderPlan(); }
-        else { renderBoard(); renderCards(); renderPipeStatus(); }
+        else { renderBoard(); renderCards(); }
         updateTitle();
       }
     }
+    if (state.view !== "live") renderPipeStatus();
     renderFreshBanners();
   }
   setInterval(() => { if (!document.hidden) refreshPlan(); }, PLAN_POLL_MS);

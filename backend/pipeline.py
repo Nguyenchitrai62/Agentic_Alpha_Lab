@@ -776,7 +776,6 @@ def job_cycle() -> str:
     after the plans) -> scorecard. The retired research logs (full shadow log, v205 live signal, v205 forward, dip log) no
     longer run."""
     out, failures, t0 = [], [], datetime.now(timezone.utc)
-    db.kv_set("pipeline_input_check", {"status": "checking", "started_at": db.now_ms()})
     check: dict = {}
 
     def data_check():
@@ -786,10 +785,18 @@ def job_cycle() -> str:
     def candles():  # the check already ran the full candle repair successfully: do not fetch twice in one cycle
         return "candles: repaired by the data check" if check.get("candles_repaired") else job_candles()
 
-    for name, fn in (("check", data_check), ("candles", candles), ("aggflow", job_aggflow), ("backfill", job_backfill),
-                     ("shadow", job_shadow_fast), ("trade_plan", job_trade_plan)):
+    steps = (("check", data_check), ("candles", candles), ("aggflow", job_aggflow), ("backfill", job_backfill),
+             ("shadow", job_shadow_fast), ("trade_plan", job_trade_plan))
+    for i, (name, fn) in enumerate(steps, 1):
+        # progress is visible while the cycle runs (log + /api/status): a catch-up after downtime spends minutes in
+        # aggflow / backfill before the plans and looked frozen
+        step_t0 = datetime.now(timezone.utc)
+        log.info("cycle step %d/%d %s started", i, len(steps), name)
+        db.kv_set("pipeline_input_check", {"status": "running", "step": name, "step_no": i, "steps": len(steps),
+                                           "started_at": _ms(t0), "step_started_at": _ms(step_t0)})
         try:
             out.append(fn())
+            log.info("cycle step %d/%d %s done in %.0fs", i, len(steps), name, (datetime.now(timezone.utc) - step_t0).total_seconds())
         except Exception as exc:
             out.append(f"{name} FAILED: {type(exc).__name__}: {exc}")
             failures.append(name)
