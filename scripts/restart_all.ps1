@@ -95,7 +95,9 @@ function Start-Detached([string]$exe, [string[]]$argv, [string]$logRel) {
   $cmd = '"{0}" {1} >> "{2}" 2>&1' -f $exe, ($argv -join ' '), $logAbs
   # Start-Process from the OWNER's console: independent hidden process. (2026-10-06: WMI-created bots died ~30 min
   # later with the WMI host; agent tool shells take their children down with them - agents start runners with nohup instead.)
-  Start-Process cmd.exe -WindowStyle Hidden -ArgumentList '/c', $cmd | Out-Null
+  # /s + one outer pair of quotes: plain `cmd /c "<exe>" ... >> "<log>"` strips the first and last quote of the line, which
+  # broke every detached start silently (2026-10-11: no bot started, nothing logged)
+  Start-Process cmd.exe -WindowStyle Hidden -ArgumentList '/s', '/c', ('"' + $cmd + '"') | Out-Null
 }
 
 $doBackend = ($Only -eq "all" -or $Only -eq "backend")
